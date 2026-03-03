@@ -2,6 +2,8 @@
 import { useState, useMemo } from 'react';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import { Search, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
 
 const mockOrders = [
     { id: 'DH001', status: 'pending', product: 'Áo sơ mi nam', quantity: 50, expectedDate: '15/03/2024' },
@@ -186,8 +188,14 @@ export default function Orders() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right">
-                                            <button className="text-emerald-600 hover:underline mr-3">Xem chi tiết</button>
+                                            <Link
+                                                to={`/orderdetail/${o.id}`}
+                                                className="text-emerald-600 hover:underline mr-3"
+                                            >
+                                                Xem chi tiết
+                                            </Link>
                                         </td>
+
                                     </tr>
                                 ))
                             )}

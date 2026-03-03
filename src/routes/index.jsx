@@ -1,5 +1,6 @@
 // src/routes/index.js
 import { lazy } from 'react';
+import OrderDetail from '../pages/orders/OrderDetail';
 
 // Lazy load các page
 const Orders = lazy(() => import('@/pages/orders/OrdersList')); // trang danh sách đơn hàng bạn đã code trước đó
@@ -12,6 +13,10 @@ export const routes = [
     {
         path: '/orders', // route để hiển thị danh sách đơn hàng
         element: <Orders />,
+    },
+    {
+        path: 'orderdetail/:id', // route để hiển thị chi tiết đơn hàng, :id là tham số động
+        element: <OrderDetail />,
     },
     // Thêm route khác nếu cần
     {
