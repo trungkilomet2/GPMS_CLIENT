@@ -3,7 +3,9 @@ import { lazy } from 'react';
 
 // Lazy load các page
 const Orders = lazy(() => import('@/pages/orders/OrdersList')); // trang danh sách đơn hàng bạn đã code trước đó
-
+// Auth pages (đúng theo bạn đã tạo)
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 export const routes = [
     {
         path: '/',
@@ -13,6 +15,15 @@ export const routes = [
         path: '/orders', // route để hiển thị danh sách đơn hàng
         element: <Orders />,
     },
+     // Auth
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: < RegisterPage />,
+  },
     // Thêm route khác nếu cần
     {
         path: '*', // 404
