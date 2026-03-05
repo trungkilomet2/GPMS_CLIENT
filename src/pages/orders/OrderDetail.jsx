@@ -134,7 +134,9 @@ export default function OrderDetail() {
                     >
                         <History size={18} /> Lịch sử chỉnh sửa
                     </button>
-                    <button className="px-4 py-2 border bg-yellow-300 rounded hover:bg-yellow-500">Chỉnh sửa</button>
+                    <button
+                        onClick={() => navigate(`/orders/edit/${order.id}`)}
+                        className="px-4 py-2 border bg-yellow-300 rounded hover:bg-yellow-500">Chỉnh sửa</button>
                     {/* <button className="px-4 py-2 border rounded hover:bg-gray-100 text-red-600">Từ chối</button>
                     <button className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Nhận đơn</button>
                     <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Hoàn thành, giao đơn</button> */}
