@@ -1,6 +1,8 @@
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare } from 'lucide-react';
+import OrderCommentModal from '@/components/OrderCommentModal';
 
 // Mock dữ liệu chi tiết đơn hàng
 const mockDetail = {
@@ -31,6 +33,7 @@ const mockDetail = {
 export default function OrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
 
     const order = mockDetail; // sau này thay bằng API getOrderById(id)
 
@@ -117,7 +120,12 @@ export default function OrderDetail() {
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3">
-                    <button className="px-4 py-2 border rounded hover:bg-gray-100">Bình luận</button>
+                    <button
+                        onClick={() => setIsCommentModalOpen(true)} // Mở modal khi click
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 flex items-center gap-2 transition-colors"
+                    >
+                        <MessageSquare size={18} /> Bình luận
+                    </button>
                     <button className="px-4 py-2 border rounded hover:bg-gray-100">Lịch sử chỉnh sửa</button>
                     <button className="px-4 py-2 border bg-yellow-300 rounded hover:bg-yellow-500">Chỉnh sửa</button>
                     {/* <button className="px-4 py-2 border rounded hover:bg-gray-100 text-red-600">Từ chối</button>
@@ -125,6 +133,12 @@ export default function OrderDetail() {
                     <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Hoàn thành, giao đơn</button> */}
                 </div>
             </div>
+            {/* Gọi Modal ở đây */}
+            <OrderCommentModal
+                isOpen={isCommentModalOpen}
+                onClose={() => setIsCommentModalOpen(false)}
+                orderId={order.id}
+            />
         </DashboardLayout>
     );
 }
