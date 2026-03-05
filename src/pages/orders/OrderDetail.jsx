@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
-import { ArrowLeft, FileText, MessageSquare } from 'lucide-react';
+import { ArrowLeft, FileText, MessageSquare, History } from 'lucide-react';
 import OrderCommentModal from '@/components/OrderCommentModal';
+import OrderHistoryUpdateModal from '@/components/OrderHistoryUpdateModal';
 
 // Mock dữ liệu chi tiết đơn hàng
 const mockDetail = {
@@ -34,6 +35,7 @@ export default function OrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
     const order = mockDetail; // sau này thay bằng API getOrderById(id)
 
@@ -126,7 +128,12 @@ export default function OrderDetail() {
                     >
                         <MessageSquare size={18} /> Bình luận
                     </button>
-                    <button className="px-4 py-2 border rounded hover:bg-gray-100">Lịch sử chỉnh sửa</button>
+                    <button
+                        onClick={() => setIsHistoryModalOpen(true)} // Mở modal lịch sử
+                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 flex items-center gap-2"
+                    >
+                        <History size={18} /> Lịch sử chỉnh sửa
+                    </button>
                     <button className="px-4 py-2 border bg-yellow-300 rounded hover:bg-yellow-500">Chỉnh sửa</button>
                     {/* <button className="px-4 py-2 border rounded hover:bg-gray-100 text-red-600">Từ chối</button>
                     <button className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Nhận đơn</button>
@@ -137,6 +144,11 @@ export default function OrderDetail() {
             <OrderCommentModal
                 isOpen={isCommentModalOpen}
                 onClose={() => setIsCommentModalOpen(false)}
+                orderId={order.id}
+            />
+            <OrderHistoryUpdateModal
+                isOpen={isHistoryModalOpen}
+                onClose={() => setIsHistoryModalOpen(false)}
                 orderId={order.id}
             />
         </DashboardLayout>
