@@ -129,9 +129,13 @@ export default function Orders() {
                             <option value="completed">Hoàn thành</option>
                         </select>
 
-                        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700">
-                            <Plus size={16} /> Tạo đơn hàng mới
-                        </button>
+                        <Link
+                            to="/orders/create"
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
+                        >
+                            <Plus size={18} /> Tạo đơn hàng mới
+                        </Link>
+
                     </div>
                 </div>
 
