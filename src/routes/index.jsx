@@ -1,43 +1,107 @@
 import { lazy } from "react";
 import CustomerLayout from "@/components/layout/CustomerLayout";
 
-const Orders = lazy(()=>import("../pages/orders/OrdersList"));
-const ViewProfile = lazy(()=>import("../pages/profile/ViewProfile"));
-const ProfileEdit = lazy(()=>import("../pages/profile/ProfileEdit"));
+/* ========================
+   AUTH
+======================== */
+
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
+
+/* ========================
+   ORDERS
+======================== */
+
+const Orders = lazy(() => import("@/pages/orders/OrdersList"));
+const OrderDetail = lazy(() => import("@/pages/orders/OrderDetail"));
+const CreateOrder = lazy(() => import("@/pages/orders/CreateOrder"));
+const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
+
+/* ========================
+   PROFILE
+======================== */
+
+const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
+const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 
 export const routes = [
 
+/* ========================
+   AUTH
+======================== */
+
 {
- path:"/",
- element:<Orders/>
+  path: "/login",
+  element: <LoginPage />
 },
 
 {
- path:"/orders",
- element:<Orders/>
+  path: "/register",
+  element: <RegisterPage />
+},
+
+/* ========================
+   ORDERS
+======================== */
+
+{
+  path: "/",
+  element: <Orders />
 },
 
 {
- path:"/profile",
- element:(
-   <CustomerLayout title="Hồ sơ cá nhân">
-     <ViewProfile/>
-   </CustomerLayout>
- )
+  path: "/orders",
+  element: <Orders />
 },
 
 {
- path:"/profile/edit",
- element:(
-   <CustomerLayout title="Chỉnh sửa hồ sơ">
-     <ProfileEdit/>
-   </CustomerLayout>
- )
+  path: "/orders/create",
+  element: <CreateOrder />
 },
 
 {
- path:"*",
- element:<div>404</div>
-}
+  path: "/orders/edit/:id",
+  element: <EditOrder />
+},
+
+{
+  path: "/orders/detail/:id",
+  element: <OrderDetail />
+},
+
+/* ========================
+   PROFILE
+======================== */
+
+{
+  path: "/profile",
+  element: (
+    <CustomerLayout title="Hồ sơ cá nhân">
+      <ViewProfile />
+    </CustomerLayout>
+  ),
+},
+
+{
+  path: "/profile/edit",
+  element: (
+    <CustomerLayout title="Chỉnh sửa hồ sơ">
+      <ProfileEdit />
+    </CustomerLayout>
+  ),
+},
+
+/* ========================
+   404
+======================== */
+
+{
+  path: "*",
+  element: (
+    <div className="flex items-center justify-center h-screen text-2xl font-bold text-gray-600">
+      Trang không tồn tại (404)
+    </div>
+  ),
+},
 
 ];
