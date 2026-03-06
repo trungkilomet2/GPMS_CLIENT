@@ -1,0 +1,171 @@
+.customer-layout{
+  display:flex;
+  min-height:100vh;
+}
+
+.customer-main{
+  flex:1;
+  background:#f7fafc;
+}
+
+.customer-page{
+  padding:30px;
+}
+
+/* sidebar */
+
+.customer-sidebar{
+  width:240px;
+  background:white;
+  border-right:1px solid #e2e8f0;
+  padding:20px;
+}
+
+.sidebar-logo{
+  font-weight:bold;
+  font-size:18px;
+  color:#2f855a;
+}
+
+.sidebar-nav{
+  margin-top:20px;
+}
+
+.sidebar-item{
+  display:block;
+  padding:10px;
+  border-radius:8px;
+  text-decoration:none;
+  color:#2d3748;
+}
+
+.sidebar-item.active{
+  background:#e6fffa;
+  color:#2f855a;
+}
+
+.sidebar-item:hover{
+  background:#edf2f7;
+}
+
+.sidebar-avatar{
+  width:60px;
+  height:60px;
+  border-radius:50%;
+}
+
+/* header */
+
+.customer-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:15px 30px;
+  background:white;
+  border-bottom:1px solid #e2e8f0;
+}
+
+.header-avatar{
+  width:36px;
+  border-radius:50%;
+}
+
+/* profile */
+
+.profile-hero{
+  display:flex;
+  align-items:center;
+  gap:15px;
+  background:linear-gradient(135deg,#2f855a,#38b2ac);
+  color:white;
+  padding:20px;
+  border-radius:10px;
+  margin-bottom:20px;
+}
+
+.profile-avatar{
+  width:70px;
+  border-radius:50%;
+}
+
+.profile-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+
+.profile-card{
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  border:1px solid #e2e8f0;
+}
+
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  padding:10px 0;
+  border-bottom:1px solid #edf2f7;
+}
+
+.edit-btn{
+  margin-top:20px;
+  background:#2f855a;
+  color:white;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.save-btn{
+  margin-top:20px;
+  background:#2f855a;
+  color:white;
+  padding:10px 20px;
+  border:none;
+  border-radius:6px;
+}
+/* edit profile */
+
+.edit-title{
+  margin-bottom:20px;
+}
+
+.form-row{
+  display:flex;
+  flex-direction:column;
+  margin-bottom:15px;
+}
+
+.form-row label{
+  font-size:14px;
+  margin-bottom:6px;
+  color:#4a5568;
+}
+
+.form-row input{
+  padding:10px;
+  border:1px solid #e2e8f0;
+  border-radius:6px;
+  font-size:14px;
+}
+
+.form-row input:focus{
+  outline:none;
+  border-color:#2f855a;
+}
+
+.save-btn{
+  margin-top:10px;
+  background:#2f855a;
+  color:white;
+  border:none;
+  padding:10px 20px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.save-btn:hover{
+  background:#276749;
+}
