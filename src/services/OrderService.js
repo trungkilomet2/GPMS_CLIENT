@@ -1,4 +1,4 @@
-import { axiosClient } from '../lib/axios';
+import axiosClient from '../lib/axios';
 import { API_ENDPOINTS } from '../lib/apiconfig';
 
 const OrderService = {

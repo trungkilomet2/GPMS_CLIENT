@@ -10,3 +10,5 @@ export const API_ENDPOINTS = {
         CREATE: `${BASE_URL}/api/orders`,
     }
 }
+
+export default BASE_URL;

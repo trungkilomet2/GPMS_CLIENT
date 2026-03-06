@@ -1,5 +1,5 @@
 import axios from 'axios';
-import BASE_URL from './apiconfig'; // Import từ file bạn vừa tạo
+import BASE_URL from './apiconfig';
 
 const axiosClient = axios.create({
     baseURL: BASE_URL,
