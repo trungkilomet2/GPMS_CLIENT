@@ -8,6 +8,12 @@ export const API_ENDPOINTS = {
         GET_ALL: `${BASE_URL}/api/Order`,
         GET_DETAIL: (id) => `${BASE_URL}/api/Order/${id}`,
         CREATE: `${BASE_URL}/api/orders`,
+    },
+    COMMENT: {
+        GET_BY_ORDER: (orderId) => `${BASE_URL}/api/Comment/${orderId}`,
+    },
+    USER: {
+        GET_USER_PROFILE: (userId) => `${BASE_URL}/api/User/view-profile/${userId}`,
     }
 }
 
