@@ -29,8 +29,8 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                         <label className="block text-sm font-medium text-gray-700 mb-1">Tên vật liệu</label>
                         <input
                             type="text"
-                            name="name"
-                            value={formData.name}
+                            name="materialName"
+                            value={formData.materialName || ''}
                             onChange={onChange}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                             placeholder="Ví dụ: Vải cotton, Chỉ tơ..."
@@ -42,8 +42,8 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                         <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
                         <input
                             type="number"
-                            name="qty"
-                            value={formData.qty}
+                            name="quantity"
+                            value={formData.quantity || ''}
                             onChange={onChange}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                             placeholder="Nhập số lượng..."
@@ -56,7 +56,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                         <label className="block text-sm font-medium text-gray-700 mb-1">Đơn vị tính</label>
                         <select
                             name="uom"
-                            value={formData.uom}
+                            value={formData.uom || ''}
                             onChange={onChange}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white cursor-pointer"
                         >
