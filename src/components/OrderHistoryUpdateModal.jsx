@@ -87,7 +87,7 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
                                 <div className="grid grid-cols-12 items-center gap-2">
                                     <div className="col-span-3">
                                         <p className="text-xs text-gray-400 mb-1">Trường sửa</p>
-                                        <p className="font-bold text-gray-700 text-sm">{item.field || "Cập nhật"}</p>
+                                        <p className="font-bold text-gray-700 text-sm">{item.fieldName || "Cập nhật"}</p>
                                     </div>
 
                                     <div className="col-span-4 bg-red-50 p-2 rounded-lg text-center">

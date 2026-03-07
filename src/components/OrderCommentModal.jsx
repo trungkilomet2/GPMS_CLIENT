@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { X, MessageSquare, Send, Loader2 } from 'lucide-react';
-import CommentService from '@/services/CommentService'; // Đường dẫn service của bạn
+import React, { useState, useEffect, useRef } from 'react';
+import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
+import CommentService from '@/services/CommentService';
 
 export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const [comments, setComments] = useState([]);
@@ -8,18 +8,27 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const [newComment, setNewComment] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 1. Lấy danh sách bình luận từ API
+    const scrollRef = useRef(null);
+
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const CURRENT_USER_ID = user.id || 1;
+
     useEffect(() => {
         if (isOpen && orderId) {
             fetchComments();
         }
     }, [isOpen, orderId]);
 
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [comments, loading]);
+
     const fetchComments = async () => {
         try {
             setLoading(true);
             const response = await CommentService.getCommentsByOrderId(orderId);
-            // Giả sử API trả về data trực tiếp hoặc trong response.data
             setComments(response.data || []);
         } catch (error) {
             console.error("Lỗi lấy bình luận:", error);
@@ -28,21 +37,46 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         }
     };
 
-    // 2. Xử lý gửi bình luận mới
+    // --- HÀM TẠO CHUỖI THỜI GIAN LOCAL CHÍNH XÁC ---
+    const getLocalISOString = () => {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        const localTime = new Date(now.getTime() - offset);
+        // Thay thế toISOString bằng cách thủ công hoặc xử lý chuỗi để giữ nguyên giờ địa phương
+        return new Date(now.getTime() - offset).toISOString().replace('Z', '');
+    };
+
     const handleSendComment = async () => {
-        if (!newComment.trim()) return;
+        if (!newComment.trim() || isSubmitting) return;
 
         try {
             setIsSubmitting(true);
-            // Giả sử bạn có hàm createComment trong CommentService
-            // await CommentService.createComment({ orderId, content: newComment });
 
-            // Sau khi gửi thành công:
+            // Cách này đảm bảo chuỗi gửi đi là giờ hiện tại của bạn (ví dụ 23:57)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+
+            const commentPayload = {
+                fromUserId: CURRENT_USER_ID,
+                toOrderId: orderId,
+                content: newComment.trim(),
+                sendDateTime: localDateTime
+            };
+
+            await CommentService.createComment(commentPayload);
+
             setNewComment("");
-            fetchComments(); // Load lại danh sách
+            await fetchComments();
         } catch (error) {
             console.error("Lỗi gửi bình luận:", error);
-            alert("Không thể gửi bình luận lúc này.");
+            alert("Không thể gửi tin nhắn. Vui lòng thử lại!");
         } finally {
             setIsSubmitting(false);
         }
@@ -51,80 +85,103 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col h-[85vh] animate-in fade-in zoom-in duration-200">
 
                 {/* Header */}
-                <div className="p-6 border-b flex justify-between items-start">
-                    <div className="flex gap-4">
-                        <div className="p-3 bg-blue-50 rounded-xl text-blue-600">
-                            <MessageSquare size={24} />
+                <div className="p-4 border-b flex justify-between items-center bg-white rounded-t-2xl shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                            <MessageSquare size={20} />
                         </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-900">Bình luận đơn hàng</h3>
-                            <p className="text-sm text-gray-500">
-                                Đơn hàng #{orderId} - {loading ? "..." : comments.length} bình luận
+                        <div className="text-left">
+                            <h3 className="font-bold text-gray-900 text-base leading-none">Thảo luận đơn hàng</h3>
+                            <p className="text-[11px] text-gray-500 mt-1 uppercase tracking-wider font-medium font-sans">
+                                Đơn hàng #{orderId} • {comments.length} tin nhắn
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
                         <X size={20} />
                     </button>
                 </div>
 
-                {/* Danh sách bình luận (Scrollable) */}
-                <div className="p-6 overflow-y-auto space-y-4 bg-gray-50/50 flex-1 min-h-75px">
+                {/* Nội dung Chat */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-[#f0f2f5] scroll-smooth font-sans">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center h-full py-20">
-                            <Loader2 className="animate-spin text-blue-600 mb-2" />
-                            <p className="text-sm text-gray-400">Đang tải bình luận...</p>
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <Loader2 className="animate-spin text-emerald-600 mb-2" />
+                            <p className="text-xs text-gray-400 font-medium">Đang tải tin nhắn...</p>
                         </div>
                     ) : comments.length > 0 ? (
-                        comments.map((comment) => (
-                            <div key={comment.id} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                                <div className="flex justify-between mb-2">
-                                    <span className="font-bold text-gray-800 text-sm">{comment.author || "Người dùng"}</span>
-                                    <span className="text-xs text-gray-400">
-                                        {comment.time || new Date(comment.sendDateTime).toLocaleString('vi-VN')}
-                                    </span>
+                        comments.map((comment, index) => {
+                            const isMine = comment.fromUserId === CURRENT_USER_ID;
+                            const showName = index === 0 || comments[index - 1].fromUserId !== comment.fromUserId;
+
+                            return (
+                                <div key={comment.id || index} className={`flex ${isMine ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
+                                    <div className={`max-w-[80%] flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                                        {showName && (
+                                            <span className={`text-[10px] font-bold mb-1 px-1 flex items-center gap-1 uppercase tracking-widest ${isMine ? 'text-emerald-700' : 'text-gray-500'}`}>
+                                                {!isMine && <User size={10} />}
+                                                {isMine ? "Bạn" : (comment.fromUserName || "Đối tác")}
+                                            </span>
+                                        )}
+                                        <div className={`px-4 py-2.5 rounded-2xl text-sm shadow-sm leading-relaxed text-left ${isMine
+                                            ? 'bg-emerald-600 text-white rounded-tr-none'
+                                            : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
+                                            }`}>
+                                            {comment.content}
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 mt-1.5 px-1 font-medium italic">
+                                            {new Date(comment.sendDateTime).toLocaleTimeString('vi-VN', {
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                hour12: false
+                                            })}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-sm text-gray-600 leading-relaxed">{comment.content}</p>
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
-                        <div className="text-center py-20 text-gray-400 italic text-sm">
-                            Chưa có bình luận nào cho đơn hàng này.
+                        <div className="flex flex-col items-center justify-center h-full text-gray-400 opacity-60">
+                            <MessageSquare size={48} strokeWidth={1} className="mb-3" />
+                            <p className="text-sm italic font-medium">Bắt đầu cuộc hội thoại cho đơn hàng này</p>
                         </div>
                     )}
                 </div>
 
-                {/* Footer: Thêm bình luận mới */}
-                <div className="p-6 border-t bg-white rounded-b-2xl">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Thêm bình luận mới</label>
-                    <textarea
-                        className="w-full border border-gray-200 rounded-xl p-4 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition-all disabled:bg-gray-50"
-                        rows="3"
-                        placeholder="Nhập nội dung bình luận của bạn..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        disabled={isSubmitting}
-                    ></textarea>
+                {/* Input nhập tin nhắn */}
+                <div className="p-4 border-t bg-white rounded-b-2xl">
+                    <div className="flex flex-col gap-2 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-200 transition-all shadow-inner">
+                        <textarea
+                            className="w-full bg-transparent border-none p-4 text-sm focus:ring-0 outline-none resize-none min-h-140px max-h-250px disabled:opacity-50 font-sans"
+                            placeholder="Nhập nội dung phản hồi hoặc ghi chú đơn hàng..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendComment();
+                                }
+                            }}
+                            disabled={isSubmitting}
+                        ></textarea>
 
-                    <div className="mt-4 flex justify-end gap-3">
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
-                        >
-                            Đóng
-                        </button>
-                        <button
-                            onClick={handleSendComment}
-                            disabled={!newComment.trim() || isSubmitting}
-                            className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-200 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
-                        >
-                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                            Gửi bình luận
-                        </button>
+                        <div className="flex justify-between items-center p-3 border-t border-gray-200/50">
+                            <div className="text-[10px] text-gray-400 ml-2 font-medium font-sans">
+                                <span className="hidden sm:inline">Nhấn <b>Enter</b> gửi • <b>Shift+Enter</b> xuống dòng</span>
+                            </div>
+                            <button
+                                onClick={handleSendComment}
+                                disabled={!newComment.trim() || isSubmitting}
+                                className="px-8 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-100 active:scale-95 transition-all disabled:bg-gray-300 disabled:shadow-none flex items-center justify-center gap-2 text-sm font-bold uppercase tracking-wide font-sans"
+                            >
+                                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                Gửi trao đổi
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
