@@ -170,7 +170,7 @@ export default function OrderDetail() {
                                     order.materials.map((m, i) => (
                                         <tr key={i} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-4 py-2 text-gray-900">{m.name}</td>
-                                            <td className="px-4 py-2 text-gray-600 font-medium">{m.qty}</td>
+                                            <td className="px-4 py-2 text-gray-600 font-medium">{m.value}</td>
                                             <td className="px-4 py-2 text-gray-500">{m.uom}</td>
                                         </tr>
                                     ))
