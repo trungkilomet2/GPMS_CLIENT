@@ -188,14 +188,14 @@ export default function Orders() {
                                 pageData.map((o) => (
                                     <tr key={o.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3 text-sm text-gray-700 font-medium">{o.id}</td>
-                                        <td className="px-4 py-3 text-sm text-gray-700">{o.product}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{o.orderName}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">{o.quantity}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">
-                                            {new Date(o.expectedDate).toLocaleDateString('vi-VN')}
+                                            {new Date(o.endDate).toLocaleDateString('vi-VN')}
                                         </td>
                                         <td className="px-4 py-3 text-sm">
                                             <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium
-                                                ${o.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
+                                                ${o.status === 'Process' ? 'bg-yellow-100 text-yellow-800' : ''}
                                                 ${o.status === 'producing' ? 'bg-blue-100 text-blue-800' : ''}
                                                 ${o.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
                                                 ${o.status === 'delivered' ? 'bg-gray-100 text-gray-800' : ''}`}
@@ -204,7 +204,7 @@ export default function Orders() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right">
-                                            <Link to={`/orderdetail/${o.id}`} className="text-emerald-600 hover:text-emerald-800 hover:underline font-medium">
+                                            <Link to={`/orders/detail/${o.id}`} className="text-emerald-600 hover:text-emerald-800 hover:underline font-medium">
                                                 Xem chi tiết
                                             </Link>
                                         </td>
