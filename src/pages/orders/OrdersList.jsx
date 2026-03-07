@@ -56,8 +56,7 @@ export default function Orders() {
             const matchesSearch =
                 !q ||
                 o.id.toString().toLowerCase().includes(q) ||
-                (o.product && o.product.toLowerCase().includes(q)) ||
-                (o.status && STATUS_LABEL[o.status]?.toLowerCase().includes(q));
+                (o.orderName && o.orderName.toLowerCase().includes(q));
             const matchesStatus = !statusFilter || statusFilter === o.status;
             return matchesSearch && matchesStatus;
         });
