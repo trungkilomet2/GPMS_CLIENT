@@ -5,8 +5,8 @@ const BASE_URL = 'http://localhost:5229'; // Development http URL
 
 export const API_ENDPOINTS = {
     ORDER: {
-        GET_ALL: `${BASE_URL}/api/orders`,
-        GET_DETAIL: (id) => `${BASE_URL}/api/orders/${id}`,
+        GET_ALL: `${BASE_URL}/api/Order`,
+        GET_DETAIL: (id) => `${BASE_URL}/api/Order/${id}`,
         CREATE: `${BASE_URL}/api/orders`,
     }
 }
