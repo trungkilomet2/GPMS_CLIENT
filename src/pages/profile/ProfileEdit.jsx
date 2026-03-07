@@ -1,12 +1,19 @@
+import { useNavigate } from "react-router-dom";
+
 export default function ProfileEdit() {
+  const navigate = useNavigate();
 
   return (
-
     <div className="profile-card">
 
-      <h2 className="edit-title">
-        Chỉnh sửa hồ sơ
-      </h2>
+      <button
+        className="back-btn"
+        onClick={() => navigate("/profile")}
+      >
+        ← Quay lại
+      </button>
+
+      <h2 className="edit-title">Chỉnh sửa hồ sơ</h2>
 
       <div className="form-row">
         <label>Tên</label>
@@ -32,11 +39,19 @@ export default function ProfileEdit() {
         />
       </div>
 
-      <button className="save-btn">
-        Lưu thay đổi
-      </button>
+      <div className="form-actions">
+        <button
+          className="cancel-btn"
+          onClick={() => navigate("/profile")}
+        >
+          Huỷ
+        </button>
+
+        <button className="save-btn">
+          Lưu thay đổi
+        </button>
+      </div>
 
     </div>
-
   );
 }

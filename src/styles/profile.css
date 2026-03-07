@@ -1,76 +1,121 @@
+/* =========================
+   Layout
+========================= */
+
 .customer-layout{
   display:flex;
   min-height:100vh;
+  background:#f7fafc;
 }
 
 .customer-main{
   flex:1;
-  background:#f7fafc;
+  display:flex;
+  flex-direction:column;
 }
 
 .customer-page{
   padding:30px;
 }
 
-/* sidebar */
+
+/* =========================
+   Sidebar
+========================= */
 
 .customer-sidebar{
   width:240px;
   background:white;
   border-right:1px solid #e2e8f0;
   padding:20px;
+  display:flex;
+  flex-direction:column;
+}
+
+.sidebar-brand{
+  margin-bottom:25px;
 }
 
 .sidebar-logo{
-  font-weight:bold;
-  font-size:18px;
+  font-size:20px;
+  font-weight:700;
   color:#2f855a;
 }
 
+.sidebar-sub{
+  font-size:13px;
+  color:#718096;
+}
+
 .sidebar-nav{
-  margin-top:20px;
+  display:flex;
+  flex-direction:column;
 }
 
 .sidebar-item{
-  display:block;
+  display:flex;
+  align-items:center;
+  gap:8px;
   padding:10px;
   border-radius:8px;
   text-decoration:none;
   color:#2d3748;
-}
-
-.sidebar-item.active{
-  background:#e6fffa;
-  color:#2f855a;
+  margin-bottom:6px;
+  font-size:14px;
 }
 
 .sidebar-item:hover{
   background:#edf2f7;
 }
 
-.sidebar-avatar{
-  width:60px;
-  height:60px;
-  border-radius:50%;
+.sidebar-item.active{
+  background:#e6fffa;
+  color:#2f855a;
+  font-weight:600;
 }
 
-/* header */
+/* sidebar bottom */
+
+.sidebar-bottom{
+  margin-top:auto;
+}
+
+.logout-btn{
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:8px;
+  background:#e53e3e;
+  color:white;
+  font-size:14px;
+  cursor:pointer;
+}
+
+.logout-btn:hover{
+  background:#c53030;
+}
+
+
+/* =========================
+   Header
+========================= */
 
 .customer-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:15px 30px;
+  padding:20px 30px;
   background:white;
   border-bottom:1px solid #e2e8f0;
 }
 
-.header-avatar{
-  width:36px;
-  border-radius:50%;
+.customer-header-title{
+  font-size:20px;
+  font-weight:600;
+  color:#2d3748;
 }
 
-/* profile */
+
+/* =========================
+   Profile Hero
+========================= */
 
 .profile-hero{
   display:flex;
@@ -79,14 +124,21 @@
   background:linear-gradient(135deg,#2f855a,#38b2ac);
   color:white;
   padding:20px;
-  border-radius:10px;
-  margin-bottom:20px;
+  border-radius:12px;
+  margin-bottom:25px;
 }
 
 .profile-avatar{
   width:70px;
+  height:70px;
   border-radius:50%;
+  object-fit:cover;
 }
+
+
+/* =========================
+   Profile Cards
+========================= */
 
 .profile-grid{
   display:grid;
@@ -96,17 +148,38 @@
 
 .profile-card{
   background:white;
-  padding:20px;
-  border-radius:10px;
+  padding:22px;
+  border-radius:12px;
   border:1px solid #e2e8f0;
 }
+
+.profile-card h3{
+  margin-bottom:15px;
+  font-size:16px;
+  font-weight:600;
+}
+
+
+/* =========================
+   Info Rows
+========================= */
 
 .info-row{
   display:flex;
   justify-content:space-between;
   padding:10px 0;
   border-bottom:1px solid #edf2f7;
+  font-size:14px;
 }
+
+.info-row:last-child{
+  border-bottom:none;
+}
+
+
+/* =========================
+   Buttons
+========================= */
 
 .edit-btn{
   margin-top:20px;
@@ -116,17 +189,17 @@
   border:none;
   border-radius:6px;
   cursor:pointer;
+  font-size:14px;
 }
 
-.save-btn{
-  margin-top:20px;
-  background:#2f855a;
-  color:white;
-  padding:10px 20px;
-  border:none;
-  border-radius:6px;
+.edit-btn:hover{
+  background:#276749;
 }
-/* edit profile */
+
+
+/* =========================
+   Edit Profile Form
+========================= */
 
 .edit-title{
   margin-bottom:20px;
@@ -135,13 +208,13 @@
 .form-row{
   display:flex;
   flex-direction:column;
-  margin-bottom:15px;
+  margin-bottom:16px;
 }
 
 .form-row label{
   font-size:14px;
-  margin-bottom:6px;
   color:#4a5568;
+  margin-bottom:6px;
 }
 
 .form-row input{
@@ -156,8 +229,30 @@
   border-color:#2f855a;
 }
 
+
+/* =========================
+   Form Buttons
+========================= */
+
+.form-actions{
+  display:flex;
+  gap:10px;
+  margin-top:20px;
+}
+
+.cancel-btn{
+  background:#e2e8f0;
+  border:none;
+  padding:10px 20px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.cancel-btn:hover{
+  background:#cbd5e0;
+}
+
 .save-btn{
-  margin-top:10px;
   background:#2f855a;
   color:white;
   border:none;
@@ -168,4 +263,40 @@
 
 .save-btn:hover{
   background:#276749;
+}
+
+
+/* =========================
+   Back Button
+========================= */
+
+.back-btn{
+  margin-bottom:15px;
+  background:none;
+  border:none;
+  color:#2f855a;
+  font-weight:500;
+  cursor:pointer;
+  font-size:14px;
+}
+
+.back-btn:hover{
+  text-decoration:underline;
+}
+
+
+/* =========================
+   Responsive
+========================= */
+
+@media (max-width:900px){
+
+  .profile-grid{
+    grid-template-columns:1fr;
+  }
+
+  .customer-sidebar{
+    width:200px;
+  }
+
 }
