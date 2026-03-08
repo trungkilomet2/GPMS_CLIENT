@@ -1,2 +1,63 @@
 /* src/styles/global.css */
 @import "tailwindcss";
+.homepage section{
+padding:80px 40px;
+}
+
+.hero{
+background:#1e6e43;
+color:white;
+height:500px;
+display:flex;
+align-items:center;
+justify-content:center;
+text-align:center;
+}
+
+.hero-buttons{
+margin-top:20px;
+display:flex;
+gap:10px;
+justify-content:center;
+}
+
+.btn-primary{
+background:#2d9058;
+color:white;
+padding:10px 20px;
+border-radius:6px;
+text-decoration:none;
+}
+
+.btn-outline{
+border:2px solid white;
+padding:10px 20px;
+border-radius:6px;
+color:white;
+text-decoration:none;
+}
+
+.product-grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:20px;
+}
+
+.card{
+padding:30px;
+background:#f5f3ee;
+border-radius:10px;
+}
+
+.feature-grid{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:20px;
+}
+
+.process-grid{
+display:grid;
+grid-template-columns:repeat(6,1fr);
+gap:10px;
+text-align:center;
+}

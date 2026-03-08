@@ -4,27 +4,15 @@ import ProfileHeader from "@/components/layout/ProfileHeader";
 import "@/styles/profile.css";
 
 export default function CustomerLayout({ title, children }) {
-
-  const user = {
-    name: "Nguyễn Văn A",
-    avatar: "https://i.pravatar.cc/150?img=3",
-  };
-
   return (
     <div className="customer-layout">
-
-      <CustomerSidebar user={user} />
-
+      <CustomerSidebar />
       <div className="customer-main">
-
-        <ProfileHeader title={title} user={user} />
-
+        <ProfileHeader title={title} />
         <div className="customer-page">
           {children}
         </div>
-
       </div>
-
     </div>
   );
 }

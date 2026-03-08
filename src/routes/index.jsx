@@ -1,107 +1,64 @@
 import { lazy } from "react";
 import CustomerLayout from "@/components/layout/CustomerLayout";
 
-/* ========================
-   AUTH
-======================== */
+/* ── HOMEPAGE ── */
+const HomePage = lazy(() => import("@/pages/HomePage"));
 
-const LoginPage = lazy(() => import("@/pages/LoginPage"));
+/* ── AUTH ── */
+const LoginPage    = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
-/* ========================
-   ORDERS
-======================== */
-
-const Orders = lazy(() => import("@/pages/orders/OrdersList"));
+/* ── ORDERS ── */
+const Orders      = lazy(() => import("@/pages/orders/OrdersList"));
 const OrderDetail = lazy(() => import("@/pages/orders/OrderDetail"));
 const CreateOrder = lazy(() => import("@/pages/orders/CreateOrder"));
-const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
+const EditOrder   = lazy(() => import("@/pages/orders/EditOrder"));
 
-/* ========================
-   PROFILE
-======================== */
-
+/* ── PROFILE ── */
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
 const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 
 export const routes = [
 
-/* ========================
-   AUTH
-======================== */
+  /* HOMEPAGE */
+  { path: "/home", element: <HomePage /> },
 
-{
-  path: "/login",
-  element: <LoginPage />
-},
+  /* AUTH */
+  { path: "/login",    element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
 
-{
-  path: "/register",
-  element: <RegisterPage />
-},
+  /* ORDERS */
+  { path: "/",                  element: <Orders /> },
+  { path: "/orders",            element: <Orders /> },
+  { path: "/orders/create",     element: <CreateOrder /> },
+  { path: "/orders/edit/:id",   element: <EditOrder /> },
+  { path: "/orders/detail/:id", element: <OrderDetail /> },
 
-/* ========================
-   ORDERS
-======================== */
+  /* PROFILE */
+  {
+    path: "/profile",
+    element: (
+      <CustomerLayout title="Hồ sơ cá nhân">
+        <ViewProfile />
+      </CustomerLayout>
+    ),
+  },
+  {
+    path: "/profile/edit",
+    element: (
+      <CustomerLayout title="Chỉnh sửa hồ sơ">
+        <ProfileEdit />
+      </CustomerLayout>
+    ),
+  },
 
-{
-  path: "/",
-  element: <Orders />
-},
-
-{
-  path: "/orders",
-  element: <Orders />
-},
-
-{
-  path: "/orders/create",
-  element: <CreateOrder />
-},
-
-{
-  path: "/orders/edit/:id",
-  element: <EditOrder />
-},
-
-{
-  path: "/orders/detail/:id",
-  element: <OrderDetail />
-},
-
-/* ========================
-   PROFILE
-======================== */
-
-{
-  path: "/profile",
-  element: (
-    <CustomerLayout title="Hồ sơ cá nhân">
-      <ViewProfile />
-    </CustomerLayout>
-  ),
-},
-
-{
-  path: "/profile/edit",
-  element: (
-    <CustomerLayout title="Chỉnh sửa hồ sơ">
-      <ProfileEdit />
-    </CustomerLayout>
-  ),
-},
-
-/* ========================
-   404
-======================== */
-
-{
-  path: "*",
-  element: (
-    <div className="flex items-center justify-center h-screen text-2xl font-bold text-gray-600">
-      Trang không tồn tại (404)
-    </div>
-  ),
-},
-
+  /* 404 */
+  {
+    path: "*",
+    element: (
+      <div className="flex items-center justify-center h-screen text-2xl font-bold text-gray-600">
+        Trang không tồn tại (404)
+      </div>
+    ),
+  },
 ];
