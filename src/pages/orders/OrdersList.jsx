@@ -154,6 +154,12 @@ export default function Orders() {
                                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer" onClick={() => toggleSort('product')}>
                                     Sản phẩm <SortIcon direction={sortBy.key === 'product' ? sortBy.dir : null} />
                                 </th>
+                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer" onClick={() => toggleSort('size')}>
+                                    Kích thước <SortIcon direction={sortBy.key === 'size' ? sortBy.dir : null} />
+                                </th>
+                                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer" onClick={() => toggleSort('color')}>
+                                    Màu sắc <SortIcon direction={sortBy.key === 'color' ? sortBy.dir : null} />
+                                </th>
                                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 cursor-pointer" onClick={() => toggleSort('quantity')}>
                                     Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                                 </th>
@@ -188,6 +194,8 @@ export default function Orders() {
                                     <tr key={o.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3 text-sm text-gray-700 font-medium">{o.id}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">{o.orderName}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{o.size}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{o.color}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">{o.quantity}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">
                                             {new Date(o.endDate).toLocaleDateString('vi-VN')}
