@@ -1,72 +1,104 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
-// Danh sách đơn vị đo lường phổ biến trong ngành may
-const UNIT_OPTIONS = [
-    'Mét',
-    'Cái',
-    'Cuộn',
-    'Bộ',
-    'Kg',
-    'Tấm',
-    'Yards',
-    'Hộp',
-    'Cặp'
-];
+const UNIT_OPTIONS = ['Mét', 'Cái', 'Cuộn', 'Bộ', 'Kg', 'Tấm', 'Yards', 'Hộp', 'Cặp'];
 
 export default function AddMaterialModal({ isOpen, onClose, onSave, formData, onChange, editingIndex }) {
+    // State quản lý lỗi cục bộ trong Modal
+    const [errors, setErrors] = useState({});
+
+    // Reset lỗi mỗi khi đóng/mở Modal hoặc đổi vật liệu đang sửa
+    useEffect(() => {
+        setErrors({});
+    }, [isOpen, editingIndex]);
+
     if (!isOpen) return null;
 
+    // Hàm kiểm tra dữ liệu trước khi lưu
+    const handleValidateAndSave = () => {
+        let newErrors = {};
+
+        if (!formData.materialName?.trim()) {
+            newErrors.materialName = "Tên vật liệu không được để trống";
+        }
+        if (!formData.quantity || Number(formData.quantity) <= 0) {
+            newErrors.quantity = "Số lượng phải lớn hơn 0";
+        }
+        if (!formData.uom) {
+            newErrors.uom = "Vui lòng chọn đơn vị tính";
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
+        // Nếu không có lỗi, gọi hàm onSave từ props
+        onSave();
+    };
+
+    // Xóa lỗi của field khi người dùng bắt đầu nhập liệu lại
+    const handleInputChange = (e) => {
+        const { name } = e.target;
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: null }));
+        }
+        onChange(e);
+    };
+
     return (
-        <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50 transition-all">
-            <div className="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6 border border-gray-100 animate-in fade-in zoom-in duration-200">
-                <h3 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-                    {editingIndex === null ? 'Thêm vật liệu mới' : 'Chỉnh sửa vật liệu'}
+        <div className="fixed inset-0 backdrop-blur-md bg-white/10 flex items-center justify-center z-50 transition-all p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 animate-in fade-in zoom-in duration-200">
+                <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
+                    {editingIndex === null ? '📦 Thêm vật liệu mới' : '✏️ Chỉnh sửa vật liệu'}
                 </h3>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
                     {/* Tên vật liệu */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tên vật liệu</label>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-bold text-gray-700">Tên vật liệu <span className="text-red-500">*</span></label>
                         <input
                             type="text"
                             name="materialName"
                             value={formData.materialName || ''}
-                            onChange={onChange}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            onChange={handleInputChange}
+                            className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none ${errors.materialName ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                                }`}
                             placeholder="Ví dụ: Vải cotton, Chỉ tơ..."
                         />
+                        {errors.materialName && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.materialName}</p>}
                     </div>
 
                     {/* Số lượng */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng</label>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-bold text-gray-700">Số lượng <span className="text-red-500">*</span></label>
                         <input
                             type="number"
                             name="quantity"
                             value={formData.quantity || ''}
-                            onChange={onChange}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                            onChange={handleInputChange}
+                            className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none ${errors.quantity ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                                }`}
                             placeholder="Nhập số lượng..."
-                            min="1"
                         />
+                        {errors.quantity && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.quantity}</p>}
                     </div>
 
-                    {/* Đơn vị (Dropdown) */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Đơn vị tính</label>
+                    {/* Đơn vị */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-bold text-gray-700">Đơn vị tính <span className="text-red-500">*</span></label>
                         <select
                             name="uom"
                             value={formData.uom || ''}
-                            onChange={onChange}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white cursor-pointer"
+                            onChange={handleInputChange}
+                            className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none bg-white cursor-pointer ${errors.uom ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                                }`}
                         >
                             <option value="">-- Chọn đơn vị --</option>
                             {UNIT_OPTIONS.map((unit) => (
-                                <option key={unit} value={unit}>
-                                    {unit}
-                                </option>
+                                <option key={unit} value={unit}>{unit}</option>
                             ))}
                         </select>
+                        {errors.uom && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.uom}</p>}
                     </div>
                 </div>
 
@@ -75,16 +107,16 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-5 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                        className="px-6 py-2.5 text-gray-500 font-bold hover:text-gray-700 transition-colors"
                     >
                         Hủy
                     </button>
                     <button
                         type="button"
-                        onClick={onSave}
-                        className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-bold shadow-md shadow-emerald-100 transition-all active:scale-95"
+                        onClick={handleValidateAndSave}
+                        className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95"
                     >
-                        {editingIndex === null ? 'Thêm vật liệu' : 'Lưu thay đổi'}
+                        {editingIndex === null ? 'Thêm ngay' : 'Cập nhật'}
                     </button>
                 </div>
             </div>
