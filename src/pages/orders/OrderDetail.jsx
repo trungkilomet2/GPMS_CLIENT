@@ -1,252 +1,211 @@
-import React, { useState, useEffect } from 'react'; // Thêm useEffect
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
-import { ArrowLeft, FileText, MessageSquare, History, Loader2 } from 'lucide-react'; // Thêm Loader2
+import {
+    ArrowLeft, FileText, MessageSquare, History,
+    Loader2, Edit3, Download, Package, Info
+} from 'lucide-react';
 import OrderCommentModal from '@/components/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/OrderHistoryUpdateModal';
-import OrderService from '@/services/OrderService'; // Import Service của bạn
+import OrderService from '@/services/OrderService';
 
 export default function OrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    // 1. Quản lý trạng thái dữ liệu
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-    // 2. Gọi API khi Component mount
     useEffect(() => {
         const fetchOrderDetail = async () => {
             try {
                 setLoading(true);
                 const response = await OrderService.getOrderDetail(id);
-                // Giả sử API trả về data nằm trong response.data hoặc response.data.data tùy cấu hình BE của bạn
                 setOrder(response.data.data || response.data);
             } catch (err) {
-                console.error("Lỗi khi lấy chi tiết đơn hàng:", err);
-                setError("Không thể tải thông tin đơn hàng. Vui lòng thử lại sau.");
+                setError("Không thể tải thông tin đơn hàng.");
             } finally {
                 setLoading(false);
             }
         };
-
         if (id) fetchOrderDetail();
     }, [id]);
 
-    // 3. Xử lý trạng thái Loading và Error
-    if (loading) {
-        return (
-            <DashboardLayout>
-                <div className="flex flex-col items-center justify-center h-64">
-                    <Loader2 className="animate-spin text-emerald-600 mb-2" size={40} />
-                    <p className="text-gray-500">Đang tải chi tiết đơn hàng...</p>
-                </div>
-            </DashboardLayout>
-        );
-    }
+    if (loading) return (
+        <DashboardLayout>
+            <div className="flex flex-col items-center justify-center min-h-400px">
+                <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
+                <p className="text-gray-500 text-sm font-medium">Đang truy xuất dữ liệu...</p>
+            </div>
+        </DashboardLayout>
+    );
 
-    if (error || !order) {
-        return (
-            <DashboardLayout>
-                <div className="text-center py-20">
-                    <p className="text-red-500 mb-4">{error || "Không tìm thấy đơn hàng"}</p>
-                    <button onClick={() => navigate(-1)} className="text-emerald-600 underline">Quay lại</button>
-                </div>
-            </DashboardLayout>
-        );
-    }
-
-    // 4. Render dữ liệu thật
     return (
         <DashboardLayout>
-            <div className="max-w-6xl mx-auto py-8">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <button
-                            onClick={() => navigate(-1)}
-                            className="p-2 rounded hover:bg-gray-100"
-                            aria-label="Quay lại"
-                        >
-                            <ArrowLeft size={18} />
+            <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900">
+                {/* Header thanh mảnh, tập trung vào ID và Nút sửa */}
+                <div className="flex items-center justify-between mb-6 border-b pb-4 border-gray-200">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded text-gray-400">
+                            <ArrowLeft size={20} />
                         </button>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">
-                                Chi tiết đơn hàng <span className="text-emerald-600">#{order.id}</span>
-                            </h1>
-                            <p className="text-sm text-gray-500">Xem chi tiết 1 đơn hàng</p>
+                            <h1 className="text-xl font-bold">Chi tiết đơn hàng #{order.id}</h1>
+                            <p className="text-xs text-gray-500 font-medium uppercase tracking-tighter">Hệ thống quản lý sản xuất GPMS</p>
                         </div>
                     </div>
-                    {/* Trạng thái nên lấy từ field status của API */}
-                    <span className={`px-3 py-1 rounded text-sm font-medium ${getStatusStyle(order.status)}`}>
-                        {order.statusName || order.status}
-                    </span>
-                </div>
-
-                {/* Thông tin đơn hàng */}
-                <div className="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 className="text-lg font-semibold mb-4">Thông tin đơn hàng</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Info label="Mã đơn hàng" value={`#ID-${order.id}`} />
-                        <Info label="Loại sản phẩm" value={order.orderName} />
-                        <Info label="Kích thước" value={order.size} />
-                        <Info label="Màu sắc" value={order.color} />
-                        <Info label="Số lượng" value={order.quantity?.toLocaleString()} />
-                        <Info label="Ngày bắt đầu" value={formatDate(order.startDate)} />
-                        <Info label="Ngày kết thúc" value={formatDate(order.endDate)} />
-                        <Info label="Đơn giá" value={order.cpu} />
-                    </div>
-                    <div className="mt-4">
-                        <h3 className="text-sm text-gray-500">Ghi chú</h3>
-                        <p className="text-gray-700">{order.note || "Không có ghi chú"}</p>
+                    <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getStatusStyle(order.status)}`}>
+                            {order.statusName || order.status}
+                        </span>
+                        <button
+                            onClick={() => navigate(`/orders/edit/${order.id}`)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-all text-sm font-bold shadow-sm"
+                        >
+                            <Edit3 size={16} /> Chỉnh sửa
+                        </button>
                     </div>
                 </div>
 
-                {/* Mẫu thiết kế & Vật liệu (Tương tự, map từ mảng trong API) */}
-                {/* 2. Cung cấp mẫu (Files & Hardcopies) */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4 border-b pb-2">Mẫu thiết kế & Tài liệu</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">File bản mềm (PDF, Image)</label>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* KHỐI THÔNG TIN CHI TIẾT (2/3) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 text-gray-600">
+                                <Info size={16} />
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin tổng quát đơn hàng</h2>
+                            </div>
+
+                            {/* Layout Grid 2 cột cho thông tin chi tiết */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100 font-sans">
+                                <div className="p-0">
+                                    <DetailItem label="Mã đơn hàng" value={`#ĐH-${order.id}`} />
+                                    <DetailItem label="Tên sản phẩm" value={order.orderName} isBold />
+                                    <DetailItem label="Loại sản phẩm" value={order.type} />
+                                    <DetailItem label="Kích thước (Size)" value={order.size} />
+                                    <DetailItem label="Màu sắc" value={order.color} />
+                                </div>
+                                <div className="p-0">
+                                    <DetailItem label="Số lượng đặt hàng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="Ngày bắt đầu" value={formatDate(order.startDate)} />
+                                    <DetailItem label="Ngày kết thúc dự kiến" value={formatDate(order.endDate)} />
+                                    <DetailItem label="Mẫu thiết kế bản cứng" value={`${order.hardCopy || 0} bản`} />
+                                    <DetailItem label="Đơn giá (CPU)" value={order.cpu ? `${order.cpu} VND/SP` : '---'} />
+                                </div>
+                            </div>
+
+                            {/* Ghi chú chiếm toàn bộ chiều ngang phía dưới */}
+                            <div className="p-5 border-t border-gray-100 bg-amber-50/30">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ghi chú đặc biệt cho xưởng</p>
+                                <p className="text-sm text-gray-700 leading-relaxed italic">
+                                    {order.note ? `"${order.note}"` : "Không có ghi chú bổ sung cho đơn hàng này."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Bảng vật liệu - Thực dụng và rõ ràng */}
+                        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 text-gray-600">
+                                <Package size={16} />
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
+                            </div>
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                                    <tr>
+                                        <th className="px-6 py-3">Tên vật liệu</th>
+                                        <th className="px-6 py-3 text-center">Định mức/Số lượng</th>
+                                        <th className="px-6 py-3 text-right">Đơn vị (UoM)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 text-sm">
+                                    {order.materials?.length > 0 ? (
+                                        order.materials.map((m, i) => (
+                                            <tr key={i} className="hover:bg-gray-50/80 transition-colors">
+                                                <td className="px-6 py-4 font-semibold text-gray-700">{m.name}</td>
+                                                <td className="px-6 py-4 text-center text-emerald-700 font-bold">{m.value}</td>
+                                                <td className="px-6 py-4 text-right text-gray-500 font-medium uppercase">{m.uom}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr><td colSpan="3" className="px-6 py-10 text-center text-gray-400 text-xs italic">Dữ liệu vật liệu chưa được cập nhật</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
+                    <div className="space-y-6">
+                        <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
+                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Mẫu thiết kế bản mềm</h2>
                             <div className="space-y-2">
-                                {/* Hiển thị danh sách file từ API nếu có */}
-                                {order.files && order.files.length > 0 ? (
-                                    <ul className="divide-y divide-gray-100 border rounded-lg">
-                                        {order.files.map((file, idx) => (
-                                            <li key={idx} className="flex items-center justify-between p-3 hover:bg-gray-50">
-                                                <div className="flex items-center gap-3">
-                                                    <FileText size={20} className="text-emerald-500" />
-                                                    <div>
-                                                        <p className="text-sm font-medium text-gray-700">{file.name}</p>
-                                                        <p className="text-xs text-gray-400">{file.size}</p>
-                                                    </div>
+                                {order.files?.length > 0 ? (
+                                    order.files.map((file, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 rounded border border-gray-100 hover:border-emerald-200 transition-all">
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <FileText size={18} className="text-emerald-600 shrink-0" />
+                                                <div className="overflow-hidden">
+                                                    <p className="text-sm font-bold text-gray-700 truncate">{file.name}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>
                                                 </div>
-                                                <button className="text-xs text-emerald-600 hover:underline">Tải về</button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="border-2 border-dashed border-gray-100 rounded-lg p-6 text-center">
-                                        <span className="text-sm text-gray-400">Không có file đính kèm</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng bản cứng</label>
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                                <span className="text-lg font-bold text-emerald-700">
-                                    {order.hardCopy || 0}
-                                </span>
-                                <span className="ml-2 text-sm text-gray-500">bản</span>
-                            </div>
-                            <p className="mt-2 text-xs text-gray-400 font-italic italic">* Bản cứng dùng để đối chiếu trực tiếp tại xưởng.</p>
-                        </div>
-                    </div>
-                </div>
-                <br />
-                {/* ... giữ nguyên logic render mảng nhưng check null/undefined ... */}
-                <div className="bg-white rounded-lg shadow p-6 mb-6">
-                    <h2 className="text-lg font-semibold mb-4">Danh sách vật liệu</h2>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Tên vật liệu</th>
-                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Số lượng</th>
-                                    <th className="px-4 py-2 text-left font-medium text-gray-700">Đơn vị (UoM)</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
-                                {/* Kiểm tra: Nếu order.materials tồn tại VÀ có độ dài > 0 
-                */}
-                                {order.materials && order.materials.length > 0 ? (
-                                    order.materials.map((m, i) => (
-                                        <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-4 py-2 text-gray-900">{m.name}</td>
-                                            <td className="px-4 py-2 text-gray-600 font-medium">{m.value}</td>
-                                            <td className="px-4 py-2 text-gray-500">{m.uom}</td>
-                                        </tr>
+                                            </div>
+                                            <button className="text-gray-400 hover:text-emerald-600"><Download size={16} /></button>
+                                        </div>
                                     ))
                                 ) : (
-                                    /* Trường hợp mảng rỗng hoặc null/undefined 
-                                    */
-                                    <tr>
-                                        <td colSpan="3" className="px-4 py-10 text-center text-gray-400 italic">
-                                            <div className="flex flex-col items-center justify-center gap-2">
-                                                {/* Bạn có thể thêm icon Package từ lucide-react ở đây */}
-                                                <span>Không có dữ liệu vật liệu cho đơn hàng này</span>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <p className="text-center py-4 text-gray-400 text-[11px] italic">Không có file thiết kế</p>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            </div>
+                        </div>
 
-                {/* Action buttons */}
-                <div className="flex flex-wrap gap-3">
-                    <button
-                        onClick={() => setIsCommentModalOpen(true)}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 flex items-center gap-2 transition-colors"
-                    >
-                        <MessageSquare size={18} /> Bình luận
-                    </button>
-                    <button
-                        onClick={() => setIsHistoryModalOpen(true)}
-                        className="px-4 py-2 border rounded-lg hover:bg-gray-100 flex items-center gap-2"
-                    >
-                        <History size={18} /> Lịch sử chỉnh sửa
-                    </button>
-                    <button
-                        onClick={() => navigate(`/orders/edit/${order.id}`)}
-                        className="px-4 py-2 border bg-yellow-300 rounded hover:bg-yellow-500 font-medium"
-                    >
-                        Chỉnh sửa
-                    </button>
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => setIsCommentModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 text-sm font-bold"
+                            >
+                                <MessageSquare size={16} /> Thảo luận đơn hàng
+                            </button>
+                            <button
+                                onClick={() => setIsHistoryModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                            >
+                                <History size={16} /> Lịch sử chỉnh sửa
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <OrderCommentModal
-                isOpen={isCommentModalOpen}
-                onClose={() => setIsCommentModalOpen(false)}
-                orderId={order.id}
-            />
-            <OrderHistoryUpdateModal
-                isOpen={isHistoryModalOpen}
-                onClose={() => setIsHistoryModalOpen(false)}
-                orderId={order.id}
-            />
+            <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
+            <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
         </DashboardLayout>
     );
 }
 
-// Helper functions để code sạch hơn
-function Info({ label, value }) {
+// Sub-component hiển thị từng dòng thông tin
+function DetailItem({ label, value, isBold = false, isEmerald = false }) {
     return (
-        <div>
-            <h3 className="text-sm text-gray-500">{label}</h3>
-            <p className="font-medium text-gray-900">{value || "---"}</p>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{label}</span>
+            <span className={`text-sm ${isBold ? 'font-bold text-gray-900' : 'font-medium text-gray-700'} ${isEmerald ? 'text-emerald-700 font-bold' : ''}`}>
+                {value || "---"}
+            </span>
         </div>
     );
 }
 
 function formatDate(dateString) {
     if (!dateString) return "---";
-    return new Date(dateString).toLocaleDateString('vi-VN');
+    return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateString));
 }
 
 function getStatusStyle(status) {
-    switch (status?.toLowerCase()) {
-        case 'pending': return 'bg-yellow-100 text-yellow-800';
-        case 'completed': return 'bg-emerald-100 text-emerald-800';
-        default: return 'bg-gray-100 text-gray-800';
-    }
+    const s = status?.toLowerCase();
+    if (s === 'completed') return 'bg-emerald-600 text-white';
+    if (s === 'pending') return 'bg-amber-100 text-amber-800 border border-amber-200';
+    if (s === 'processing') return 'bg-blue-600 text-white';
+    return 'bg-gray-100 text-gray-700';
 }
