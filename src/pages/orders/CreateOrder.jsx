@@ -47,7 +47,7 @@ export default function CreateOrder() {
         if (orderData.quantity <= 0) newErrors.quantity = "Số lượng sản xuất phải lớn hơn 0";
         if (orderData.cpu < 0) newErrors.cpu = "Chi phí đơn vị không được âm";
 
-        if (orderData.size.length > 5) newErrors.size = "Kích thước không quá 5 ký tự";
+        if (orderData.size.length > 5) newErrors.size = "Kích thước quá dài, tối đa 5 ký tự";
         if (!orderData.startDate) {
             newErrors.startDate = "Vui lòng chọn ngày bắt đầu";
         }
@@ -156,14 +156,14 @@ export default function CreateOrder() {
                         </div>
                     </div>
                     {/* 2. Vật liệu cung cấp */}
-                    <div className={`bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100`}>
+                    <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
                         <div className="flex items-center justify-between mb-4 border-b pb-2">
                             <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
                             <button
                                 type="button"
                                 onClick={() => {
                                     setEditingIndex(null);
-                                    setMaterialFormData({ materialName: '', quantity: '', uom: '' });
+                                    setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '' });
                                     setIsModalOpen(true);
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
@@ -182,27 +182,67 @@ export default function CreateOrder() {
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
                                     <tr>
+                                        {/* Cố định độ rộng cột ảnh để không bị xê dịch */}
+                                        <th className="px-4 py-3 text-center w-24">Ảnh</th>
                                         <th className="px-4 py-3 text-left">Tên vật liệu</th>
-                                        <th className="px-4 py-3 text-left">Số lượng</th>
-                                        <th className="px-4 py-3 text-left">Đơn vị</th>
+                                        <th className="px-4 py-3 text-left w-32">Số lượng</th>
+                                        <th className="px-4 py-3 text-left w-32">Đơn vị</th>
                                         <th className="px-4 py-3 w-24"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm bg-white">
                                     {materials.map((m, i) => (
                                         <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-4 py-3 font-semibold text-gray-700">{m.materialName}</td>
-                                            <td className="px-4 py-3 text-gray-600">{m.quantity}</td>
-                                            <td className="px-4 py-3 text-gray-500">{m.uom}</td>
-                                            <td className="px-4 py-3 text-right flex gap-3 justify-end">
-                                                <button type="button" onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }} className="text-blue-600 hover:text-blue-800"><Pencil size={18} /></button>
-                                                <button type="button" onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700"><Trash size={18} /></button>
+                                            {/* Căn giữa ảnh trong ô */}
+                                            <td className="px-4 py-3 text-center align-middle">
+                                                <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
+                                                    {m.image ? (
+                                                        <img src={m.image} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            {/* Thêm align-middle để chữ nằm giữa chiều cao hàng */}
+                                            <td className="px-4 py-3 font-semibold text-gray-700 align-middle">
+                                                {m.materialName}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 align-middle">
+                                                {m.quantity}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-500 align-middle">
+                                                {m.uom}
+                                            </td>
+
+                                            <td className="px-4 py-3 text-right align-middle">
+                                                <div className="flex gap-3 justify-end items-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }}
+                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                    >
+                                                        <Pencil size={18} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                                    >
+                                                        <Trash size={18} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
+
                                     {materials.length === 0 && (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-10 text-center text-gray-400 italic">Danh sách vật liệu đang trống...</td>
+                                            <td colSpan={5} className="px-4 py-10 text-center text-gray-400 italic">
+                                                Danh sách vật liệu đang trống...
+                                            </td>
                                         </tr>
                                     )}
                                 </tbody>

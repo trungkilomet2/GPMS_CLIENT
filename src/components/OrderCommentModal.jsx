@@ -52,22 +52,31 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         try {
             setIsSubmitting(true);
 
-            // Cách này đảm bảo chuỗi gửi đi là giờ hiện tại của bạn (ví dụ 23:57)
+            // --- LẤY THỜI GIAN HIỆN TẠI THEO MÚI GIỜ VIỆT NAM ---
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
 
-            const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+            // Format sang chuỗi ISO cục bộ cho Việt Nam (YYYY-MM-DDTHH:mm:ss)
+            const formatter = new Intl.DateTimeFormat('sv-SE', { // 'sv-SE' trả về định dạng gần giống ISO: YYYY-MM-DD HH:mm:ss
+                timeZone: 'Asia/Ho_Chi_Minh',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+
+            const parts = formatter.formatToParts(now);
+            const getPart = (type) => parts.find(p => p.type === type).value;
+
+            // Tạo chuỗi đúng định dạng LocalDateTime cho Backend (ISO 8601 không có Z)
+            const localDateTime = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
 
             const commentPayload = {
                 fromUserId: CURRENT_USER_ID,
                 toOrderId: orderId,
                 content: newComment.trim(),
-                sendDateTime: localDateTime
+                sendDateTime: localDateTime // Kết quả sẽ luôn là giờ VN: ví dụ 2024-05-20T23:57:00
             };
 
             await CommentService.createComment(commentPayload);
@@ -81,7 +90,6 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
             setIsSubmitting(false);
         }
     };
-
     if (!isOpen) return null;
 
     return (
