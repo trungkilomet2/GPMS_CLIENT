@@ -1,6 +1,6 @@
 //API Configuration
-const BASE_URL = 'http://localhost:5229'; // Development http URL
-//const BASE_URL = 'http://26.250.4.244'; // Server Development http URL
+//const BASE_URL = 'http://localhost:5229'; // Development http URL
+const BASE_URL = 'http://26.250.4.244:5229'; // Server Development http URL
 
 // const BASE_URL = 'https://localhost:7096'; // Development https URL
 // const BASE_URL = ''; // Production URL

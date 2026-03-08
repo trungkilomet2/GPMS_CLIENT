@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
-import { Plus, Trash, ArrowLeft, Upload, Pencil, FileText, Loader2 } from 'lucide-react';
+import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
-import OrderService from '@/services/OrderService'; // Đảm bảo đường dẫn đúng
+import OrderService from '@/services/OrderService';
 
 export default function CreateOrder() {
     const navigate = useNavigate();
 
-    // 1. State quản lý danh sách vật liệu (Khớp schema BE)
+    // 1. State quản lý danh sách vật liệu
     const [materials, setMaterials] = useState([]);
 
-    // 2. State quản lý thông tin đơn hàng (Khớp 100% Schema JSON BE)
+    // 2. State quản lý thông tin đơn hàng
     const [orderData, setOrderData] = useState({
-        userId: 2, // Thay bằng ID thực tế của User
+        userId: 2, // Có thể lấy từ LocalStorage nếu cần
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQsTBf5IHNCDXiFB_PjTIuyi9FdnM6-wGyTg&s",
         orderName: '',
         type: '',
@@ -27,24 +27,58 @@ export default function CreateOrder() {
         status: "Pending"
     });
 
+    // 3. State quản lý lỗi (Validation)
+    const [errors, setErrors] = useState({});
+
     // States cho Modal và Loading
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
     const [materialFormData, setMaterialFormData] = useState({ materialName: '', quantity: '', uom: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Xử lý thay đổi input đơn hàng
+    // Hàm Validate toàn bộ Form
+    const validateForm = () => {
+        let newErrors = {};
+
+        if (!orderData.orderName?.trim()) newErrors.orderName = "Tên đơn hàng không được để trống";
+        if (!orderData.type?.trim()) newErrors.type = "Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)";
+        if (!orderData.size?.trim()) newErrors.size = "Kích thước không được để trống";
+        if (!orderData.color?.trim()) newErrors.color = "Màu sắc không được để trống";
+        if (orderData.quantity <= 0) newErrors.quantity = "Số lượng sản xuất phải lớn hơn 0";
+        if (orderData.cpu < 0) newErrors.cpu = "Chi phí đơn vị không được âm";
+
+        if (!orderData.startDate) {
+            newErrors.startDate = "Vui lòng chọn ngày bắt đầu";
+        }
+        if (!orderData.endDate) {
+            newErrors.endDate = "Vui lòng chọn ngày kết thúc";
+        } else if (orderData.startDate && new Date(orderData.startDate) > new Date(orderData.endDate)) {
+            newErrors.endDate = "Ngày kết thúc không được trước ngày bắt đầu";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    // Xử lý thay đổi input đơn hàng & xóa lỗi khi user nhập
     const handleOrderChange = (e) => {
         const { name, value } = e.target;
-        // Tự động ép kiểu số cho các trường quantity, cpu, userId
         const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
-            ? (value === '' ? 0 : Number(value))
+            ? (value === '' ? '' : Number(value))
             : value;
 
         setOrderData(prev => ({ ...prev, [name]: finalValue }));
+
+        // Xóa lỗi ngay khi người dùng bắt đầu nhập lại trường đó
+        if (errors[name]) {
+            setErrors(prev => {
+                const newErrs = { ...prev };
+                delete newErrs[name];
+                return newErrs;
+            });
+        }
     };
 
-    // Xử lý lưu vật liệu từ Modal
     const handleSaveMaterial = () => {
         const newMaterial = {
             materialName: materialFormData.materialName,
@@ -59,33 +93,36 @@ export default function CreateOrder() {
             updated[editingIndex] = newMaterial;
             setMaterials(updated);
         }
+
+        // Xóa lỗi phần vật liệu nếu có
+        if (errors.materials) {
+            setErrors(prev => ({ ...prev, materials: null }));
+        }
         setIsModalOpen(false);
     };
 
-    // CALL API GỬI DỮ LIỆU
     const handleSubmit = async (e) => {
         e.preventDefault();
 
+        if (!validateForm()) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
         try {
             setIsSubmitting(true);
-
-            // Chuẩn bị payload khớp hoàn toàn với Backend
             const payload = {
                 ...orderData,
-                materials: materials, // Đã khớp materialName, quantity, uom
-                templates: [
-                    { templateName: "Bản thiết kế gốc" } // BE yêu cầu mảng templates
-                ]
+                materials: materials,
+                templates: [{ templateName: "Bản thiết kế gốc" }]
             };
 
-            const response = await OrderService.createOrder(payload);
-            console.log("Response:", response);
-
+            await OrderService.createOrder(payload);
             alert('Tạo đơn hàng thành công!');
             navigate('/orders');
         } catch (error) {
-            console.error('Lỗi khi call API:', error.response?.data || error.message);
-            alert('Có lỗi xảy ra: ' + (error.response?.data?.title || 'Vui lòng kiểm tra lại dữ liệu'));
+            console.error('Lỗi API:', error.response?.data || error.message);
+            alert('Lỗi: ' + (error.response?.data?.title || 'Không thể kết nối đến máy chủ'));
         } finally {
             setIsSubmitting(false);
         }
@@ -93,7 +130,7 @@ export default function CreateOrder() {
 
     return (
         <DashboardLayout>
-            <div className="max-w-5xl mx-auto py-8 px-4">
+            <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
@@ -105,23 +142,22 @@ export default function CreateOrder() {
                 <form onSubmit={handleSubmit} className="space-y-8">
                     {/* 1. Thông tin đơn hàng */}
                     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2">Thông tin chung</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} placeholder="Đơn hàng sơ mi tháng 3" />
-                            <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} placeholder="Sơ mi nam" />
-                            <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} placeholder="M, L, XL" />
-                            <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} placeholder="Xanh biển" />
-                            <Input label="Số lượng sản xuất" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} />
-                            <Input label="CPU (Chi phí/đơn vị)" name="cpu" type="number" value={orderData.cpu} onChange={handleOrderChange} />
-                            <Input label="Ngày bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} />
-                            <Input label="Ngày kết thúc" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} />
+                        <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Thông tin chung</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
+                            <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
+                            <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} error={errors.size} placeholder="M, L, XL, XXL" />
+                            <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} error={errors.color} placeholder="Trắng, Xanh Navy..." />
+                            <Input label="Số lượng sản xuất" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} error={errors.quantity} />
+                            <Input label="Chi phí dự kiến (CPU)" name="cpu" type="number" value={orderData.cpu} onChange={handleOrderChange} error={errors.cpu} />
+                            <Input label="Ngày bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} error={errors.startDate} />
+                            <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
                         </div>
                     </div>
-
                     {/* 2. Vật liệu cung cấp */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+                    <div className={`bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100`}>
                         <div className="flex items-center justify-between mb-4 border-b pb-2">
-                            <h2 className="text-lg font-semibold">Vật liệu cung cấp</h2>
+                            <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -129,14 +165,21 @@ export default function CreateOrder() {
                                     setMaterialFormData({ materialName: '', quantity: '', uom: '' });
                                     setIsModalOpen(true);
                                 }}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-all text-sm font-medium"
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
                             >
-                                <Plus size={16} /> Thêm vật liệu
+                                <Plus size={18} /> Thêm vật liệu
                             </button>
                         </div>
+
+                        {errors.materials && (
+                            <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
+                                <AlertCircle size={16} /> {errors.materials}
+                            </div>
+                        )}
+
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50 text-[10px] uppercase font-bold text-gray-500">
+                                <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
                                     <tr>
                                         <th className="px-4 py-3 text-left">Tên vật liệu</th>
                                         <th className="px-4 py-3 text-left">Số lượng</th>
@@ -144,21 +187,21 @@ export default function CreateOrder() {
                                         <th className="px-4 py-3 w-24"></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 text-sm">
+                                <tbody className="divide-y divide-gray-100 text-sm bg-white">
                                     {materials.map((m, i) => (
                                         <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-4 py-3 font-medium text-gray-700">{m.materialName}</td>
-                                            <td className="px-4 py-3">{m.quantity}</td>
+                                            <td className="px-4 py-3 font-semibold text-gray-700">{m.materialName}</td>
+                                            <td className="px-4 py-3 text-gray-600">{m.quantity}</td>
                                             <td className="px-4 py-3 text-gray-500">{m.uom}</td>
-                                            <td className="px-4 py-3 text-right flex gap-2 justify-end">
-                                                <button type="button" onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }} className="p-1 text-blue-600 hover:bg-blue-50 rounded"><Pencil size={16} /></button>
-                                                <button type="button" onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))} className="p-1 text-red-600 hover:bg-red-50 rounded"><Trash size={16} /></button>
+                                            <td className="px-4 py-3 text-right flex gap-3 justify-end">
+                                                <button type="button" onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }} className="text-blue-600 hover:text-blue-800"><Pencil size={18} /></button>
+                                                <button type="button" onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700"><Trash size={18} /></button>
                                             </td>
                                         </tr>
                                     ))}
                                     {materials.length === 0 && (
                                         <tr>
-                                            <td colSpan={4} className="px-4 py-8 text-center text-gray-400 italic text-sm">Chưa có vật liệu nào</td>
+                                            <td colSpan={4} className="px-4 py-10 text-center text-gray-400 italic">Danh sách vật liệu đang trống...</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -167,43 +210,42 @@ export default function CreateOrder() {
                     </div>
 
                     {/* 3. Ghi chú */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 border-l-4 border-l-amber-400">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-amber-800">
-                            <FileText size={20} /> Ghi chú kỹ thuật
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 border-l-4 border-l-emerald-500">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                            <FileText size={20} className="text-emerald-600" /> Ghi chú sản xuất
                         </h2>
                         <textarea
                             name="note"
                             rows={3}
                             value={orderData.note}
                             onChange={handleOrderChange}
-                            placeholder="Nhập yêu cầu đặc biệt về may mặc, đóng gói..."
-                            className="block w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50/30 transition-all"
+                            placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
+                            className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
                         />
                     </div>
 
-                    {/* Footer Actions */}
-                    <div className="flex gap-4 justify-end pt-6 border-t border-gray-100">
+                    {/* Actions */}
+                    <div className="flex gap-4 justify-end pt-6 border-t">
                         <button
                             type="button"
                             onClick={() => navigate(-1)}
                             disabled={isSubmitting}
-                            className="px-8 py-2.5 border border-gray-300 text-gray-600 font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                            className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
                         >
                             Hủy bỏ
                         </button>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="px-10 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-100 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
+                            className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
                         >
                             {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-                            {isSubmitting ? 'Đang gửi...' : 'Tạo đơn hàng'}
+                            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
                         </button>
                     </div>
                 </form>
             </div>
 
-            {/* Modal - Đảm bảo AddMaterialModal sử dụng đúng key: materialName, quantity, uom */}
             <AddMaterialModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
@@ -216,19 +258,32 @@ export default function CreateOrder() {
     );
 }
 
-// Reusable Input Component
-function Input({ label, name, value, onChange, type = 'text', placeholder }) {
+// Component Input Tái sử dụng (Kèm Logic Hiển thị Lỗi)
+function Input({ label, name, value, onChange, type = 'text', placeholder, error }) {
+    const isRequired = ['orderName', 'type', 'size', 'color', 'quantity', 'cpu', 'startDate', 'endDate'].includes(name);
+
     return (
         <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-gray-700">{label}</label>
+            <label className="text-sm font-bold text-gray-700 flex items-center gap-1">
+                {label} {isRequired && <span className="text-red-500">*</span>}
+            </label>
             <input
                 type={type}
                 name={name}
                 value={value}
                 onChange={onChange}
                 placeholder={placeholder}
-                className="block w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all text-sm"
+                className={`block w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none
+                    ${error
+                        ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                        : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'
+                    }`}
             />
+            {error && (
+                <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold mt-1 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={12} /> {error}
+                </div>
+            )}
         </div>
     );
 }
