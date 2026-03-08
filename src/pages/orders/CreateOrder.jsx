@@ -47,6 +47,7 @@ export default function CreateOrder() {
         if (orderData.quantity <= 0) newErrors.quantity = "Số lượng sản xuất phải lớn hơn 0";
         if (orderData.cpu < 0) newErrors.cpu = "Chi phí đơn vị không được âm";
 
+        if (orderData.size.length > 5) newErrors.size = "Kích thước không quá 5 ký tự";
         if (!orderData.startDate) {
             newErrors.startDate = "Vui lòng chọn ngày bắt đầu";
         }
