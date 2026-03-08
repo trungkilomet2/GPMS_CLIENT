@@ -91,7 +91,7 @@ export default function OrderDetail() {
                 <div className="bg-white rounded-lg shadow p-6 mb-6">
                     <h2 className="text-lg font-semibold mb-4">Thông tin đơn hàng</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Info label="Mã đơn hàng" value={order.id} />
+                        <Info label="Mã đơn hàng" value={`#ID-${order.id}`} />
                         <Info label="Loại sản phẩm" value={order.orderName} />
                         <Info label="Kích thước" value={order.size} />
                         <Info label="Màu sắc" value={order.color} />
