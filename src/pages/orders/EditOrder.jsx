@@ -1,190 +1,327 @@
-import React, { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import DashboardLayout from '@/layouts/DashboardLayout';
-import { Plus, Trash, ArrowLeft, Upload, Pencil, Save, FileText } from 'lucide-react';
+import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle, Save } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
-
-const mockDetail = {
-    id: 'DH003',
-    product: 'Áo phông',
-    size: 'M',
-    color: 'Đỏ',
-    quantity: 200,
-    startDate: '2024-03-01',
-    endDate: '2024-03-10',
-    price: '20000',
-    note: 'Yêu cầu kiểm tra kỹ đường may cổ áo.',
-    hardCopy: 2, // Số lượng bản cứng
-    files: [ // Danh sách file cũ
-        { name: 'thiet-ke-ao-phong.pdf', size: '2.4 MB' },
-    ],
-    materials: [
-        { name: 'Vải', qty: 200, uom: 'Mét' },
-        { name: 'Cúc áo', qty: 200, uom: 'Cái' },
-    ],
-};
+import OrderService from '@/services/OrderService';
+import MainLayout from '../../layouts/MainLayout';
 
 export default function EditOrder() {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    const [orderData, setOrderData] = useState(mockDetail);
-    const [materials, setMaterials] = useState(mockDetail.materials);
+    const [materials, setMaterials] = useState([]);
+    const [orderData, setOrderData] = useState({
+        userId: 2,
+        image: '',
+        orderName: '',
+        type: '',
+        size: '',
+        color: '',
+        startDate: '',
+        endDate: '',
+        quantity: 0,
+        cpu: 0,
+        note: '',
+        status: '',
+    });
+
+    const [errors, setErrors] = useState({});
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [materialFormData, setMaterialFormData] = useState({ name: '', qty: '', uom: '' });
+    const [materialFormData, setMaterialFormData] = useState({ materialName: '', quantity: '', uom: '' });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
+
+    const normalizeMaterial = (material = {}) => ({
+        ...material,
+        materialName: material.materialName ?? material.name ?? '',
+        quantity: Number(material.quantity ?? material.value ?? 0),
+        uom: material.uom ?? '',
+        image: material.image ?? '',
+    });
+
+    useEffect(() => {
+        const fetchOrderDetails = async () => {
+            try {
+                setIsFetching(true);
+                const response = await OrderService.getOrderDetail(id);
+                const data = response?.data?.data || response?.data || {};
+
+                const formattedData = {
+                    ...data,
+                    startDate: data.startDate ? data.startDate.split('T')[0] : '',
+                    endDate: data.endDate ? data.endDate.split('T')[0] : '',
+                };
+
+                setOrderData((prev) => ({ ...prev, ...formattedData }));
+                setMaterials((data.materials || []).map(normalizeMaterial));
+            } catch (error) {
+                console.error('Lỗi khi tải chi tiết đơn hàng:', error);
+                alert('Không thể tải thông tin đơn hàng.');
+                navigate('/orders');
+            } finally {
+                setIsFetching(false);
+            }
+        };
+
+        fetchOrderDetails();
+    }, [id, navigate]);
+
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!orderData.orderName?.trim()) newErrors.orderName = 'Tên đơn hàng không được để trống';
+        if (!orderData.type?.trim()) newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
+        if (!orderData.size?.trim()) newErrors.size = 'Kích thước không được để trống';
+        if (!orderData.color?.trim()) newErrors.color = 'Màu sắc không được để trống';
+        if (orderData.quantity <= 0) newErrors.quantity = 'Số lượng sản xuất phải lớn hơn 0';
+        if (orderData.cpu < 0) newErrors.cpu = 'Chi phí đơn vị không được âm';
+
+        if (orderData.size?.length > 5) newErrors.size = 'Kích thước quá dài, tối đa 5 ký tự';
+        if (!orderData.startDate) {
+            newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
+        }
+        if (!orderData.endDate) {
+            newErrors.endDate = 'Vui lòng chọn ngày kết thúc';
+        } else if (orderData.startDate && new Date(orderData.startDate) > new Date(orderData.endDate)) {
+            newErrors.endDate = 'Ngày kết thúc không được trước ngày bắt đầu';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
 
     const handleOrderChange = (e) => {
         const { name, value } = e.target;
-        setOrderData(prev => ({ ...prev, [name]: value }));
+        const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
+            ? (value === '' ? '' : Number(value))
+            : value;
+
+        setOrderData((prev) => ({ ...prev, [name]: finalValue }));
+
+        if (errors[name]) {
+            setErrors((prev) => {
+                const newErrs = { ...prev };
+                delete newErrs[name];
+                return newErrs;
+            });
+        }
     };
 
-    // Xử lý xóa file cũ (chế độ Edit thường cần chức năng này)
-    const removeFile = (index) => {
-        const updatedFiles = orderData.files.filter((_, i) => i !== index);
-        setOrderData(prev => ({ ...prev, files: updatedFiles }));
+    const handleSaveMaterial = () => {
+        const newMaterial = normalizeMaterial({
+            materialName: materialFormData.materialName,
+            quantity: Number(materialFormData.quantity),
+            uom: materialFormData.uom,
+            image: materialFormData.image,
+        });
+
+        if (editingIndex === null) {
+            setMaterials([...materials, newMaterial]);
+        } else {
+            const updated = [...materials];
+            updated[editingIndex] = newMaterial;
+            setMaterials(updated);
+        }
+
+        if (errors.materials) {
+            setErrors((prev) => ({ ...prev, materials: null }));
+        }
+        setIsModalOpen(false);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log('Cập nhật thành công!', { ...orderData, materials });
-        alert('Đã lưu thay đổi!');
-        navigate(`/orders/${id}`);
+
+        if (!validateForm()) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            const payload = {
+                ...orderData,
+                materials: materials.map((m) => ({
+                    ...m,
+                    materialName: m.materialName,
+                    quantity: Number(m.quantity) || 0,
+                    name: m.materialName,
+                    value: Number(m.quantity) || 0,
+                })),
+            };
+
+            await OrderService.updateOrder(id, payload);
+            alert('Cập nhật đơn hàng thành công!');
+            navigate(`/orders/detail/${id}`);
+        } catch (error) {
+            console.error('Lỗi cập nhật:', error.response?.data || error.message);
+            alert('Lỗi: ' + (error.response?.data?.title || 'Không thể cập nhật'));
+        } finally {
+            setIsSubmitting(false);
+        }
     };
+
+    if (isFetching) {
+        return (
+            <MainLayout>
+                <div className="flex flex-col items-center justify-center min-h-[60vh]">
+                    <Loader2 className="animate-spin text-emerald-600 mb-2" size={40} />
+                    <p className="text-gray-500">Đang tải dữ liệu đơn hàng...</p>
+                </div>
+            </MainLayout>
+        );
+    }
 
     return (
-        <DashboardLayout>
-            <div className="max-w-5xl mx-auto py-8">
+        <MainLayout>
+            <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100">
+                    <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                     <h1 className="text-2xl font-bold text-gray-900">Chỉnh sửa đơn hàng #{id}</h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* 1. Thông tin đơn hàng */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2">Thông tin đơn hàng</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Input label="Loại sản phẩm" name="product" value={orderData.product} onChange={handleOrderChange} />
-                            <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} />
-                            <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} />
-                            <Input label="Số lượng" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} />
-                            <Input label="Thời gian bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} />
-                            <Input label="Thời gian kết thúc" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} />
-                            <Input label="Giá mong muốn" name="price" value={orderData.price} onChange={handleOrderChange} />
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+                        <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Thông tin chung</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
+                            <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
+                            <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} error={errors.size} placeholder="M, L, XL, XXL" />
+                            <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} error={errors.color} placeholder="Trắng, Xanh Navy..." />
+                            <Input label="Số lượng sản xuất" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} error={errors.quantity} />
+                            <Input label="Chi phí dự kiến (CPU)" name="cpu" type="number" value={orderData.cpu} onChange={handleOrderChange} error={errors.cpu} />
+                            <Input label="Ngày bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} error={errors.startDate} />
+                            <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
                         </div>
                     </div>
 
-                    {/* 2. Cung cấp mẫu (Files & Hardcopies) */}
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2">Mẫu thiết kế & Tài liệu</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {/* File mềm */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">File bản mềm (PDF, Image)</label>
-                                <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 hover:border-emerald-400 transition-colors">
-                                    <input type="file" multiple className="hidden" id="file-upload" />
-                                    <label htmlFor="file-upload" className="flex flex-col items-center cursor-pointer">
-                                        <Upload className="text-gray-400 mb-2" size={24} />
-                                        <span className="text-sm text-gray-500">Click để tải lên file mới</span>
-                                    </label>
-                                </div>
-                                {/* Hiển thị danh sách file hiện có */}
-                                <ul className="mt-4 space-y-2">
-                                    {orderData.files.map((file, index) => (
-                                        <li key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                                <FileText size={16} className="text-blue-500 shrink-0" />
-                                                <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                                            </div>
-                                            <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-700 ml-2">
-                                                <Trash size={14} />
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-
-                            {/* Bản cứng */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Số lượng bản cứng</label>
-                                <input
-                                    type="number"
-                                    name="hardCopy"
-                                    value={orderData.hardCopy}
-                                    onChange={handleOrderChange}
-                                    className="block w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    placeholder="Ví dụ: 2"
-                                />
-                                <p className="mt-2 text-xs text-gray-400 font-italic">
-                                    * Bản cứng dùng để công nhân đối chiếu trực tiếp tại xưởng.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. Vật liệu & Ghi chú (Giữ nguyên logic cũ) */}
-                    <div className="bg-white rounded-lg shadow p-6">
+                    <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
                         <div className="flex items-center justify-between mb-4 border-b pb-2">
-                            <h2 className="text-lg font-semibold">Vật liệu cung cấp</h2>
-                            <button type="button" onClick={() => { setEditingIndex(null); setMaterialFormData({ name: '', qty: '', uom: '' }); setIsModalOpen(true); }}
-                                className="flex items-center gap-2 px-3 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 shadow-sm transition-all">
-                                <Plus size={16} /> Thêm vật liệu
+                            <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditingIndex(null);
+                                    setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '' });
+                                    setIsModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                            >
+                                <Plus size={18} /> Thêm vật liệu
                             </button>
                         </div>
-                        {/* Table vật liệu ở đây... (giống code trước) */}
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wider">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-bold">Tên vật liệu</th>
-                                    <th className="px-4 py-3 text-left font-bold">Số lượng</th>
-                                    <th className="px-4 py-3 text-left font-bold">Đơn vị</th>
-                                    <th className="px-4 py-3 w-24"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {materials.map((m, i) => (
-                                    <tr key={i} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-700">{m.materialName}</td>
-                                        <td className="px-4 py-3">{m.quantity}</td>
-                                        <td className="px-4 py-3 text-gray-500">{m.uom}</td>
-                                        <td className="px-4 py-3 text-right flex gap-2 justify-end">
-                                            <button type="button" onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil size={16} /></button>
-                                            <button type="button" onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash size={16} /></button>
-                                        </td>
+
+                        {errors.materials && (
+                            <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
+                                <AlertCircle size={16} /> {errors.materials}
+                            </div>
+                        )}
+
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
+                                    <tr>
+                                        <th className="px-4 py-3 text-center w-24">Ảnh</th>
+                                        <th className="px-4 py-3 text-left">Tên vật liệu</th>
+                                        <th className="px-4 py-3 text-left w-32">Số lượng</th>
+                                        <th className="px-4 py-3 text-left w-32">Đơn vị</th>
+                                        <th className="px-4 py-3 w-24"></th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-sm bg-white">
+                                    {materials.map((m, i) => (
+                                        <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 text-center align-middle">
+                                                <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
+                                                    {m.image ? (
+                                                        <img src={m.image} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                            </td>
+
+                                            <td className="px-4 py-3 font-semibold text-gray-700 align-middle">{m.materialName}</td>
+                                            <td className="px-4 py-3 text-gray-600 align-middle">{m.quantity}</td>
+                                            <td className="px-4 py-3 text-gray-500 align-middle">{m.uom}</td>
+
+                                            <td className="px-4 py-3 text-right align-middle">
+                                                <div className="flex gap-3 justify-end items-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setEditingIndex(i);
+                                                            setMaterialFormData({
+                                                                materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                                                quantity: materials[i].quantity ?? materials[i].value ?? '',
+                                                                uom: materials[i].uom ?? '',
+                                                                image: materials[i].image ?? '',
+                                                            });
+                                                            setIsModalOpen(true);
+                                                        }}
+                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                                                    >
+                                                        <Pencil size={18} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                                        className="text-red-500 hover:text-red-700 transition-colors"
+                                                    >
+                                                        <Trash size={18} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {materials.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="px-4 py-10 text-center text-gray-400 italic">
+                                                Danh sách vật liệu đang trống...
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    {/* 4. Ghi chú quan trọng (Tách biệt hoàn toàn xuống dưới) */}
-                    <div className="bg-white rounded-lg shadow p-6 mb-6 border-l-4 border-l-amber-400">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-amber-700">
-                            <FileText size={20} /> Ghi chú từ khách hàng
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 border-l-4 border-l-emerald-500">
+                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                            <FileText size={20} className="text-emerald-600" /> Ghi chú sản xuất
                         </h2>
                         <textarea
                             name="note"
-                            rows={4}
+                            rows={3}
                             value={orderData.note}
                             onChange={handleOrderChange}
-                            placeholder="Nhập các yêu cầu kỹ thuật đặc biệt hoặc lưu ý về đường may..."
-                            className="block w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-50/50"
+                            placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
+                            className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
                         />
-                        <p className="mt-2 text-sm text-gray-500">
-                            * Ghi chú này sẽ được hiển thị trực tiếp trên lệnh sản xuất của công nhân.
-                        </p>
                     </div>
 
-
-                    {/* Footer Buttons */}
-                    <div className="flex gap-3 justify-end pt-4 border-t">
-                        <button type="button" onClick={() => navigate(-1)} className="px-6 py-2 border border-gray-300 text-gray-600 font-semibold rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex gap-4 justify-end pt-6 border-t">
+                        <button
+                            type="button"
+                            onClick={() => navigate(-1)}
+                            disabled={isSubmitting}
+                            className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
+                        >
                             Hủy bỏ
                         </button>
-                        <button type="submit" className="px-10 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95">
-                            <Save size={18} /> Lưu thay đổi
+                        <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
+                        >
+                            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                            {isSubmitting ? 'Đang xử lý...' : 'Lưu thay đổi'}
                         </button>
                     </div>
                 </form>
@@ -193,35 +330,40 @@ export default function EditOrder() {
             <AddMaterialModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSave={() => {
-                    const newMaterial = { ...materialFormData, qty: Number(materialFormData.qty) };
-                    if (editingIndex === null) setMaterials([...materials, newMaterial]);
-                    else {
-                        const updated = [...materials];
-                        updated[editingIndex] = newMaterial;
-                        setMaterials(updated);
-                    }
-                    setIsModalOpen(false);
-                }}
+                onSave={handleSaveMaterial}
                 formData={materialFormData}
                 onChange={(e) => setMaterialFormData({ ...materialFormData, [e.target.name]: e.target.value })}
                 editingIndex={editingIndex}
             />
-        </DashboardLayout>
+        </MainLayout>
     );
 }
 
-function Input({ label, name, value, onChange, type = 'text' }) {
+function Input({ label, name, value, onChange, type = 'text', placeholder, error }) {
+    const isRequired = ['orderName', 'type', 'size', 'color', 'quantity', 'cpu', 'startDate', 'endDate'].includes(name);
+
     return (
-        <div>
-            <label className="block text-sm font-medium text-gray-700">{label}</label>
+        <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-bold text-gray-700 flex items-center gap-1">
+                {label} {isRequired && <span className="text-red-500">*</span>}
+            </label>
             <input
                 type={type}
                 name={name}
                 value={value}
                 onChange={onChange}
-                className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                placeholder={placeholder}
+                className={`block w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none
+                    ${error
+                        ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                        : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'
+                    }`}
             />
+            {error && (
+                <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold mt-1 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={12} /> {error}
+                </div>
+            )}
         </div>
     );
 }

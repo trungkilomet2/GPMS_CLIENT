@@ -4,6 +4,8 @@ import DashboardLayout from '@/layouts/DashboardLayout';
 import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
 import OrderService from '@/services/OrderService';
+import MainLayout from '../../layouts/MainLayout';
+import '@/styles/homepage.css';
 
 export default function CreateOrder() {
     const navigate = useNavigate();
@@ -33,7 +35,7 @@ export default function CreateOrder() {
     // States cho Modal và Loading
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [materialFormData, setMaterialFormData] = useState({ materialName: '', quantity: '', uom: '' });
+    const [materialFormData, setMaterialFormData] = useState({ materialName: '', value: '', uom: '', image: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Hàm Validate toàn bộ Form
@@ -61,6 +63,14 @@ export default function CreateOrder() {
         return Object.keys(newErrors).length === 0;
     };
 
+    const normalizeMaterial = (material = {}) => ({
+        ...material,
+        materialName: material.materialName ?? material.name ?? '',
+        value: Number(material.quantity ?? material.value ?? 0),
+        uom: material.uom ?? '',
+        image: material.image ?? '',
+    });
+
     // Xử lý thay đổi input đơn hàng & xóa lỗi khi user nhập
     const handleOrderChange = (e) => {
         const { name, value } = e.target;
@@ -83,8 +93,9 @@ export default function CreateOrder() {
     const handleSaveMaterial = () => {
         const newMaterial = {
             materialName: materialFormData.materialName,
-            quantity: Number(materialFormData.quantity),
-            uom: materialFormData.uom
+            value: Number(materialFormData.quantity),
+            uom: materialFormData.uom,
+            image: materialFormData.image,
         };
 
         if (editingIndex === null) {
@@ -130,14 +141,14 @@ export default function CreateOrder() {
     };
 
     return (
-        <DashboardLayout>
+        <MainLayout>
             <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-900">Tạo đơn hàng mới</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Gửi yêu cầu đặt hàng</h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">
@@ -211,7 +222,7 @@ export default function CreateOrder() {
                                                 {m.materialName}
                                             </td>
                                             <td className="px-4 py-3 text-gray-600 align-middle">
-                                                {m.quantity}
+                                                {m.value}
                                             </td>
                                             <td className="px-4 py-3 text-gray-500 align-middle">
                                                 {m.uom}
@@ -221,7 +232,14 @@ export default function CreateOrder() {
                                                 <div className="flex gap-3 justify-end items-center">
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }}
+                                                        onClick={() => {
+                                                            setEditingIndex(i); setMaterialFormData({
+                                                                materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                                                quantity: materials[i].quantity ?? materials[i].value ?? '',
+                                                                uom: materials[i].uom ?? '',
+                                                                image: materials[i].image ?? '',
+                                                            }); setIsModalOpen(true);
+                                                        }}
                                                         className="text-blue-600 hover:text-blue-800 transition-colors"
                                                     >
                                                         <Pencil size={18} />
@@ -295,7 +313,7 @@ export default function CreateOrder() {
                 onChange={(e) => setMaterialFormData({ ...materialFormData, [e.target.name]: e.target.value })}
                 editingIndex={editingIndex}
             />
-        </DashboardLayout>
+        </MainLayout>
     );
 }
 
