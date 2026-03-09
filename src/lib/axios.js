@@ -1,25 +1,20 @@
-import axios from "axios";
-import BASE_URL from "./apiconfig";
+import axios from 'axios';
+import BASE_URL from './apiconfig';
 
-const api = axios.create({
-  baseURL: `${BASE_URL}/api`,
+const axiosClient = axios.create({
+  baseURL: BASE_URL,
   headers: {
-    "Content-Type": "application/json",
+    'Content-Type': 'application/json',
   },
 });
 
-export const authService = {
+// Interceptor xử lý dữ liệu trả về cho gọn
+axiosClient.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    // Xử lý lỗi tập trung (ví dụ: Token hết hạn)
+    return Promise.reject(error);
+  }
+);
 
-  login: async (payload) => {
-    const response = await api.post("/Account/login", payload);
-    return response.data;
-  },
-
-  register: async (payload) => {
-    const response = await api.post("/Account/register", payload);
-    return response.data;
-  },
-
-};
-
-export default api;
+export default axiosClient;
