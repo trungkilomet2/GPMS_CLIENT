@@ -5,8 +5,8 @@ import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
 // ── Auth nav items (logged-in Tier 2) ──
 const AUTH_NAV = [
   { label: "Trang chủ", path: "/home" },
-  { label: "Sản phẩm",  path: "/products" },
-  { label: "Đơn hàng",  path: "/orders" },
+  { label: "Đặt đơn hàng", path: "/orders/create" },
+  { label: "Lịch sử đơn hàng", path: "/orders" },
 ];
 
 const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.1 4H2V2H0v2h2l3.6 7.59L4.25 14C4.09 14.31 4 14.65 4 15c0 1.1.9 2 2 2h14v-2H6.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.1z";
@@ -14,10 +14,10 @@ const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0
 export default function Header() {
   const navigate = useNavigate();
 
-  const [user,        setUser]        = useState(null);
+  const [user, setUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [catOpen,     setCatOpen]     = useState(false);
-  const [openMenu,    setOpenMenu]    = useState(null);
+  const [catOpen, setCatOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState(null);
 
   // Load user từ localStorage khi mount
   // và lắng nghe event "auth-change" để re-render ngay sau login/logout
@@ -151,7 +151,7 @@ export default function Header() {
             ) : (
               <>
                 <button className="btn-outline-green" onClick={() => navigate("/login")}>Đăng nhập</button>
-                <button className="btn-green"         onClick={() => navigate("/register")}>Đăng ký</button>
+                <button className="btn-green" onClick={() => navigate("/register")}>Đăng ký</button>
               </>
             )}
 

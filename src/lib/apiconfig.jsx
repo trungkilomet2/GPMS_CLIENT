@@ -22,8 +22,8 @@ export const API_ENDPOINTS = {
         CREATE_COMMENT: `${BASE_URL}/api/Comment/create-comment`,
     },
     USER: {
-        GET_USER_PROFILE: (userId) => `${BASE_URL}/api/User/view-profile/${userId}`,
-        UPDATE_USER_PROFILE: (userId) => `${BASE_URL}/api/User/update-profile/${userId}`,
+        GET_USER_PROFILE: (id) => `${BASE_URL}/api/User/view-profile/${id}`,
+        UPDATE_PROFILE: (id) => `${BASE_URL}/api/User/update-profile/${id}`,
     }
 }
 
