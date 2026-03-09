@@ -174,7 +174,7 @@ export default function Orders() {
                         <tbody className="bg-white divide-y divide-gray-200 relative">
                             {loading ? (
                                 <tr>
-                                    <td colSpan="6" className="px-4 py-20 text-center">
+                                    <td colSpan="8" className="px-4 py-20 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <Loader2 className="animate-spin text-emerald-600" size={32} />
                                             <span className="text-gray-500">Đang tải dữ liệu...</span>
@@ -183,7 +183,7 @@ export default function Orders() {
                                 </tr>
                             ) : error ? (
                                 <tr>
-                                    <td colSpan="6" className="px-4 py-8 text-center text-red-500">{error}</td>
+                                    <td colSpan="8" className="px-4 py-8 text-center text-red-500">{error}</td>
                                 </tr>
                             ) : pageData.length === 0 ? (
                                 <tr>
