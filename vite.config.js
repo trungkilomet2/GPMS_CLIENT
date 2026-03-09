@@ -11,6 +11,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    css: true,
+    include: ['src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+    exclude: [
+      '**/src/services/__tests__/OrderService.test.js',
+      '**/src/services/__tests__/CommentService.test.js',
+      '**/src/services/__tests__/UserService.test.js',
+      '**/src/hooks/__tests__/useFadeIn.test.js',
+    ],
+  },
   server: {
     host: '0.0.0.0', // Cho phép truy cập từ bên ngoài
     port: 3000, // Đặt cổng cho server phát triển
