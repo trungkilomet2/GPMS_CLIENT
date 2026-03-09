@@ -8,6 +8,8 @@ import {
 import OrderCommentModal from '@/components/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/OrderHistoryUpdateModal';
 import OrderService from '@/services/OrderService';
+import MainLayout from '../../layouts/MainLayout';
+import '@/styles/homepage.css';
 
 export default function OrderDetail() {
     const { id } = useParams();
@@ -35,16 +37,16 @@ export default function OrderDetail() {
     }, [id]);
 
     if (loading) return (
-        <DashboardLayout>
+        <MainLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
                 <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
                 <p className="text-gray-500 text-sm font-medium">Đang truy xuất dữ liệu...</p>
             </div>
-        </DashboardLayout>
+        </MainLayout>
     );
 
     return (
-        <DashboardLayout>
+        <MainLayout>
             <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900">
                 {/* Header thanh mảnh, tập trung vào ID và Nút sửa */}
                 <div className="flex items-center justify-between mb-6 border-b pb-4 border-gray-200">
@@ -181,7 +183,7 @@ export default function OrderDetail() {
 
             <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
             <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
-        </DashboardLayout>
+        </MainLayout>
     );
 }
 

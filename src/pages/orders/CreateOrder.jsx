@@ -4,6 +4,8 @@ import DashboardLayout from '@/layouts/DashboardLayout';
 import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
 import OrderService from '@/services/OrderService';
+import MainLayout from '../../layouts/MainLayout';
+import '@/styles/homepage.css';
 
 export default function CreateOrder() {
     const navigate = useNavigate();
@@ -130,7 +132,7 @@ export default function CreateOrder() {
     };
 
     return (
-        <DashboardLayout>
+        <MainLayout>
             <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-6">
@@ -295,7 +297,7 @@ export default function CreateOrder() {
                 onChange={(e) => setMaterialFormData({ ...materialFormData, [e.target.name]: e.target.value })}
                 editingIndex={editingIndex}
             />
-        </DashboardLayout>
+        </MainLayout>
     );
 }
 
