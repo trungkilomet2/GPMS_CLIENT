@@ -1,174 +1,174 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import UserService from "@/services/userService";
 import "@/styles/profile.css";
+
+function getInitials(name = "") {
+  return name.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase();
+}
+
+function FormField({ label, name, value, onChange, type = "text", placeholder = "" }) {
+  return (
+    <div className="profile-form-group">
+      <label className="profile-form-label">{label}</label>
+      <input
+        type={type}
+        name={name}
+        className="profile-form-input"
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
 
 export default function ProfileEdit() {
   const navigate = useNavigate();
-  const userId = 1;
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
+
+  const stored   = localStorage.getItem("user");
+  const authUser = stored ? JSON.parse(stored) : {};
+
   const [form, setForm] = useState({
-    fullName:    "",
-    email:       "",
-    phoneNumber: "",
-    location:    "",
-    avatarUrl:   "",
+    name:       authUser.name       ?? "Nguyễn Văn Hùng",
+    email:      authUser.email      ?? "hung.nguyen@garmentpro.vn",
+    phone:      authUser.phone      ?? "(+84) 098 765 4321",
+    address:    authUser.address    ?? "123 Đường Láng, Đống Đa, Hà Nội",
+    department: authUser.department ?? "Xưởng may Hà Nội",
+    bio:        authUser.bio        ?? "Quản lý vận hành xưởng may với hơn 5 năm kinh nghiệm trong ngành dệt may xuất khẩu.",
   });
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await UserService.getUserProfile(userId);
-        // axiosClient interceptor đã unwrap response.data một lần
-        // → res = { data: { fullName, email, ... }, pageIndex, ... }
-        // → res.data = object profile thật
-        setForm({
-          fullName:    res.data.fullName    || "",
-          email:       res.data.email       || "",
-          phoneNumber: res.data.phoneNumber || "",
-          location:    res.data.location    || "",
-          avatarUrl:   res.data.avatarUrl   || "",
-        });
-        setTimeout(() => setLoaded(true), 50);
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchProfile();
-  }, []);
+  const [saved, setSaved] = useState(false);
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const handle = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    setSaving(true);
-    try {
-      await UserService.updateUserProfile(userId, form);
-      navigate("/profile");
-    } catch (error) {
-      console.error(error);
-      alert("Cập nhật thất bại");
-    } finally {
-      setSaving(false);
-    }
+    // Lưu lại localStorage (thay bằng API call thật)
+    const updated = { ...authUser, ...form };
+    localStorage.setItem("user", JSON.stringify(updated));
+    window.dispatchEvent(new Event("auth-change"));
+    setSaved(true);
+    setTimeout(() => { setSaved(false); navigate("/profile"); }, 1500);
   };
 
   return (
-    <div className={`profile-page ${loaded ? "profile-page--in" : ""}`}>
-      <div className="profile-bg-orb profile-bg-orb--1" />
-      <div className="profile-bg-orb profile-bg-orb--2" />
+    <div className="profile-page">
 
-      <div className="profile-wrapper">
-        {/* Back button */}
-        <button className="profile-back-btn" onClick={() => navigate("/profile")}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
-          Quay lại
-        </button>
+      {/* Cover */}
+      <div className="profile-cover">
+        <div className="profile-cover-ring profile-cover-ring-1" />
+        <div className="profile-cover-ring profile-cover-ring-2" />
+        <div className="profile-cover-ring profile-cover-ring-3" />
+      </div>
 
-        {/* Card */}
-        <div className="profile-card profile-card--edit">
-          <div className="profile-card__header">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            <span>Chỉnh sửa hồ sơ</span>
+      {/* Avatar row */}
+      <div className="profile-avatar-row">
+        <div className="profile-avatar-wrap">
+          <div className="profile-avatar">{getInitials(form.name)}</div>
+          {/* Upload avatar button */}
+          <button style={{
+            position: "absolute", bottom: 4, right: 4,
+            width: 28, height: 28, borderRadius: "50%",
+            background: "var(--green)", border: "2px solid #fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", fontSize: ".75rem",
+          }} title="Đổi ảnh đại diện">📷</button>
+        </div>
+
+        <div className="profile-name-block">
+          <div className="profile-name">{form.name || "Tên của bạn"}</div>
+          <div className="profile-role-badge">
+            <div className="profile-role-dot" />
+            Đang chỉnh sửa hồ sơ
           </div>
+        </div>
 
-          <form className="edit-form" onSubmit={handleSubmit}>
-            <EditField icon={<UserIcon />} label="Họ và tên" name="fullName" type="text"
-              value={form.fullName} placeholder="Nguyễn Văn A" onChange={handleChange} delay={0} />
-            <EditField icon={<MailIcon />} label="Email" name="email" type="email"
-              value={form.email} placeholder="example@email.com" onChange={handleChange} delay={1} />
-            <EditField icon={<PhoneIcon />} label="Số điện thoại" name="phoneNumber" type="tel"
-              value={form.phoneNumber} placeholder="0901 234 567" onChange={handleChange} delay={2} />
-            <EditField icon={<LocationIcon />} label="Địa chỉ" name="location" type="text"
-              value={form.location} placeholder="Hà Nội, Việt Nam" onChange={handleChange} delay={3} />
-
-            <div className="edit-form__actions">
-              <button type="button" className="edit-cancel-btn" onClick={() => navigate("/profile")}>
-                Hủy
-              </button>
-              <button
-                type="submit"
-                className={`edit-save-btn ${saving ? "edit-save-btn--loading" : ""}`}
-                disabled={saving}
-              >
-                {saving ? (
-                  <>
-                    <div className="btn-spinner" />
-                    Đang lưu…
-                  </>
-                ) : (
-                  <>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                      <polyline points="17 21 17 13 7 13 7 21"/>
-                      <polyline points="7 3 7 8 15 8"/>
-                    </svg>
-                    Lưu thay đổi
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+        <div style={{ display: "flex", gap: ".65rem", marginBottom: ".5rem" }}>
+          <button className="profile-edit-btn secondary" onClick={() => navigate("/profile")}>✕ Hủy</button>
         </div>
       </div>
-    </div>
-  );
-}
 
-function EditField({ icon, label, name, type, value, placeholder, onChange, delay }) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <div className={`edit-field ${focused ? "edit-field--focused" : ""}`} style={{ "--delay": delay }}>
-      <label className="edit-field__label" htmlFor={name}>{label}</label>
-      <div className="edit-field__input-wrap">
-        <div className="edit-field__icon">{icon}</div>
-        <input
-          id={name}
-          className="edit-field__input"
-          name={name}
-          type={type}
-          value={value}
-          placeholder={placeholder}
-          onChange={onChange}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-        />
+      {/* Form layout */}
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem 4rem" }}>
+
+        {saved && (
+          <div style={{
+            background: "var(--green-light)", color: "var(--green)",
+            border: "1px solid rgba(30,110,67,.25)",
+            borderRadius: 10, padding: ".85rem 1.2rem",
+            marginBottom: "1.25rem", fontWeight: 700, fontSize: ".88rem",
+            display: "flex", alignItems: "center", gap: ".6rem",
+            animation: "heroIn .4s ease both",
+          }}>
+            ✅ Lưu thành công! Đang chuyển hướng...
+          </div>
+        )}
+
+        <form onSubmit={handleSave}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }} className="profile-edit-grid">
+
+            {/* Thông tin cá nhân */}
+            <div className="profile-card">
+              <div className="profile-card-header">
+                <div className="profile-card-title"><div className="profile-card-title-dot" />Thông tin cá nhân</div>
+              </div>
+              <div className="profile-card-body">
+                <FormField label="Họ và tên"   name="name"    value={form.name}    onChange={handle} placeholder="Nguyễn Văn A" />
+                <FormField label="Email"        name="email"   value={form.email}   onChange={handle} type="email" placeholder="email@example.com" />
+                <FormField label="Điện thoại"   name="phone"   value={form.phone}   onChange={handle} placeholder="(+84) 0xx xxx xxx" />
+                <FormField label="Địa chỉ"      name="address" value={form.address} onChange={handle} placeholder="Số nhà, đường, quận, thành phố" />
+                <FormField label="Phòng ban"    name="department" value={form.department} onChange={handle} placeholder="Xưởng may ..." />
+              </div>
+            </div>
+
+            {/* Giới thiệu */}
+            <div className="profile-card">
+              <div className="profile-card-header">
+                <div className="profile-card-title"><div className="profile-card-title-dot" />Giới thiệu bản thân</div>
+              </div>
+              <div className="profile-card-body">
+                <div className="profile-form-group">
+                  <label className="profile-form-label">Bio</label>
+                  <textarea
+                    name="bio"
+                    className="profile-form-input"
+                    rows={6}
+                    value={form.bio}
+                    onChange={handle}
+                    placeholder="Mô tả ngắn về bản thân, kinh nghiệm..."
+                    style={{ resize: "vertical", lineHeight: 1.6 }}
+                  />
+                </div>
+
+                {/* Preview */}
+                <div style={{
+                  background: "var(--sand)", borderRadius: 10,
+                  padding: "1rem", marginTop: ".5rem",
+                  border: "1px solid var(--border)",
+                }}>
+                  <div style={{ fontSize: ".72rem", fontWeight: 700, color: "var(--text-light)", textTransform: "uppercase", letterSpacing: ".08em", marginBottom: ".6rem" }}>
+                    Xem trước
+                  </div>
+                  <div style={{ fontSize: ".84rem", color: "var(--text-mid)", lineHeight: 1.7 }}>
+                    {form.bio || <span style={{ fontStyle: "italic", color: "var(--text-light)" }}>Chưa có mô tả.</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: "1rem", marginTop: "1.5rem", justifyContent: "flex-end" }}>
+            <button type="button" className="profile-edit-btn secondary" onClick={() => navigate("/profile")}>
+              Hủy thay đổi
+            </button>
+            <button type="submit" className="profile-edit-btn">
+              💾&nbsp;Lưu hồ sơ
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
-
-const UserIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
-  </svg>
-);
-
-const MailIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="4" width="20" height="16" rx="2"/>
-    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
-  </svg>
-);
-
-const PhoneIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.1a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17.5z"/>
-  </svg>
-);
-
-const LocationIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-    <circle cx="12" cy="10" r="3"/>
-  </svg>
-);
