@@ -85,15 +85,15 @@ export default function OrderDetail() {
                             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100 font-sans">
                                 <div className="p-0">
                                     <DetailItem label="Mã đơn hàng" value={`#ĐH-${order.id}`} />
-                                    <DetailItem label="Tên sản phẩm" value={order.orderName} isBold />
-                                    <DetailItem label="Loại sản phẩm" value={order.type} />
+                                    <DetailItem label="Tên đơn hàng" value={order.orderName} isBold />
+                                    <DetailItem label="Loại đơn hàng" value={order.type} />
                                     <DetailItem label="Kích thước (Size)" value={order.size} />
                                     <DetailItem label="Màu sắc" value={order.color} />
                                 </div>
                                 <div className="p-0">
-                                    <DetailItem label="Số lượng đặt hàng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
                                     <DetailItem label="Ngày bắt đầu" value={formatDate(order.startDate)} />
-                                    <DetailItem label="Ngày kết thúc dự kiến" value={formatDate(order.endDate)} />
+                                    <DetailItem label="Ngày kết thúc" value={formatDate(order.endDate)} />
                                     <DetailItem label="Mẫu thiết kế bản cứng" value={`${order.hardCopy || 0} bản`} />
                                     <DetailItem label="Đơn giá (CPU)" value={order.cpu ? `${order.cpu} VND/SP` : '---'} />
                                 </div>
@@ -101,7 +101,7 @@ export default function OrderDetail() {
 
                             {/* Ghi chú chiếm toàn bộ chiều ngang phía dưới */}
                             <div className="p-5 border-t border-gray-100 bg-amber-50/30">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ghi chú đặc biệt cho xưởng</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ghi chú</p>
                                 <p className="text-sm text-gray-700 leading-relaxed italic">
                                     {order.note ? `"${order.note}"` : "Không có ghi chú bổ sung cho đơn hàng này."}
                                 </p>
