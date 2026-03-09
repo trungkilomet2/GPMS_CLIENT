@@ -139,7 +139,7 @@ export default function CreateOrder() {
                     <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
-                    <h1 className="text-2xl font-bold text-gray-900">Tạo đơn hàng mới</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Gửi yêu cầu đặt hàng</h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-8">

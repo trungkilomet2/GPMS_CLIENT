@@ -1,18 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
-
-// ── Auth nav items (logged-in Tier 2) ──
-const AUTH_NAV = [
-  { label: "Trang chủ", path: "/home" },
-  { label: "Đặt đơn hàng", path: "/orders/create" },
-  { label: "Lịch sử đơn hàng", path: "/orders" },
-];
+import { AUTH_NAV_TREE } from "@/lib/navigation";
 
 const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.1 4H2V2H0v2h2l3.6 7.59L4.25 14C4.09 14.31 4 14.65 4 15c0 1.1.9 2 2 2h14v-2H6.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.1z";
 
 export default function Header() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [user, setUser] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -54,6 +49,8 @@ export default function Header() {
   const initials = user?.name
     ? user.name.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase()
     : "U";
+
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
     <header className="header-root">
@@ -186,16 +183,16 @@ export default function Header() {
                 <div
                   key={item.label}
                   className="mnav-item"
-                  onMouseEnter={() => { if (item.hasDropdown) setOpenMenu(i); }}
+                  onMouseEnter={() => { if (item.hasDropdown) setOpenMenu(`guest-${i}`); }}
                   onMouseLeave={() => setOpenMenu(null)}
-                  onClick={e => { e.stopPropagation(); if (item.hasDropdown) setOpenMenu(openMenu === i ? null : i); }}
+                  onClick={e => { e.stopPropagation(); if (item.hasDropdown) setOpenMenu(openMenu === `guest-${i}` ? null : `guest-${i}`); }}
                 >
                   <button className={`mnav-a${i === 0 ? " active-m" : ""}`}>
                     <SvgIcon d={item.icon} size={14} />
                     {item.label.toUpperCase()}
                     {item.hasDropdown && <span className="plus">▾</span>}
                   </button>
-                  {item.hasDropdown && openMenu === i && (
+                  {item.hasDropdown && openMenu === `guest-${i}` && (
                     <div className="mnav-dropdown" onClick={e => e.stopPropagation()}>
                       {item.items.map(sub => (
                         <a key={sub} href="#" onClick={e => { e.preventDefault(); setOpenMenu(null); }}>{sub}</a>
@@ -210,16 +207,54 @@ export default function Header() {
           {/* Logged-in nav */}
           {user && (
             <nav style={{ display: "flex", alignItems: "stretch", flex: 1 }}>
-              {AUTH_NAV.map(item => (
-                <button
-                  key={item.label}
-                  className="mnav-a"
-                  style={{ border: "none" }}
-                  onClick={() => navigate(item.path)}
-                >
-                  {item.label.toUpperCase()}
-                </button>
-              ))}
+              {AUTH_NAV_TREE.map((item) => {
+                const hasDropdown = Array.isArray(item.children) && item.children.length > 0;
+                return (
+                  <div
+                    key={item.key}
+                    className="mnav-item"
+                    onMouseEnter={() => { if (hasDropdown) setOpenMenu(item.key); }}
+                    onMouseLeave={() => setOpenMenu(null)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (hasDropdown) setOpenMenu(openMenu === item.key ? null : item.key);
+                    }}
+                  >
+                    <button
+                      className={`mnav-a${isActive(item.path) ? " active-m" : ""}`}
+                      style={{ border: "none" }}
+                      onClick={(e) => {
+                        if (hasDropdown) {
+                          e.preventDefault();
+                          return;
+                        }
+                        navigate(item.path);
+                      }}
+                    >
+                      {item.label.toUpperCase()}
+                      {hasDropdown && <span className="plus">▾</span>}
+                    </button>
+
+                    {hasDropdown && openMenu === item.key && (
+                      <div className="mnav-dropdown" onClick={(e) => e.stopPropagation()}>
+                        {item.children.map((child) => (
+                          <a
+                            key={child.path}
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(child.path);
+                              setOpenMenu(null);
+                            }}
+                          >
+                            {child.label}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </nav>
           )}
 

@@ -11,7 +11,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const scrollRef = useRef(null);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const CURRENT_USER_ID = user.id || 1;
+    const CURRENT_USER_ID = user.id || 2;
 
     useEffect(() => {
         if (isOpen && orderId) {
@@ -93,7 +93,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col h-[85vh] animate-in fade-in zoom-in duration-200">
 
                 {/* Header */}

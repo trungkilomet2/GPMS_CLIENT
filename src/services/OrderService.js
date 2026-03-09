@@ -14,6 +14,9 @@ const OrderService = {
     createOrder: (orderData) => {
         return axiosClient.post(API_ENDPOINTS.ORDER.CREATE_ORDER, orderData);
     },
-}
+    updateOrder: (orderId, orderData) => {
+        return axiosClient.put(API_ENDPOINTS.ORDER.UPDATE_ORDER(orderId), orderData);
+    },
+};
 
 export default OrderService;

@@ -188,13 +188,6 @@ export default function Orders() {
                                     <option key={k} value={k}>{v}</option>
                                 ))}
                             </select>
-                            <button
-                                type="button"
-                                onClick={resetFilters}
-                                className="px-4 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition whitespace-nowrap"
-                            >
-                                Xóa lọc
-                            </button>
                         </div>
                     </div>
 
