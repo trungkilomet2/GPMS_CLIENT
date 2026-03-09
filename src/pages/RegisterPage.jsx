@@ -87,35 +87,39 @@ export default function RegisterPage() {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const payload = {
-        fullName: formData.fullName.trim(),
-        userName: formData.userName.trim(),
-        phoneNumber: formData.phoneNumber.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-      };
+    const payload = {
+  userName: formData.userName.trim(),
+  fullName: formData.fullName.trim(),
+  password: formData.password,
+  rePassword: formData.confirmPassword,
+};
 
-      const result = await authService.register(payload);
-      alert(result?.message || "Đăng ký thành công");
-      navigate("/home");
-    } catch (error) {
-      alert(
-        error?.response?.data?.message ||
-        error?.response?.data?.title ||
-        "Đăng ký thất bại. Vui lòng thử lại."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    await authService.register(payload);
+
+    alert("Đăng ký thành công");
+
+    navigate("/login");
+
+  } catch (error) {
+
+    alert(
+      error?.response?.data?.message ||
+      error?.response?.data?.title ||
+      "Đăng ký thất bại"
+    );
+
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="login-container">

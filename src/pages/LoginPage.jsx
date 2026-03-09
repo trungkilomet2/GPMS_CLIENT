@@ -1,100 +1,58 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { authService } from "../services/authService";
+import { authService } from "@/services/authService";
 import "../styles/login.css";
 
-const initialValues = {
-  userName: "",
-  password: "",
-};
+const initialValues = { userName: "", password: "" };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-
   const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialValues);
-  const [errors, setErrors] = useState({});
+  const [remember,     setRemember]     = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [formData,     setFormData]     = useState(initialValues);
+  const [errors,       setErrors]       = useState({});
 
   useEffect(() => {
-    const savedUserName = localStorage.getItem("rememberUserName");
-    if (savedUserName) {
-      setFormData((prev) => ({
-        ...prev,
-        userName: savedUserName,
-      }));
+    const saved = localStorage.getItem("rememberUserName");
+    if (saved) {
+      setFormData(p => ({ ...p, userName: saved }));
       setRemember(true);
     }
   }, []);
 
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.userName.trim()) {
-      newErrors.userName = "Vui lòng nhập tên đăng nhập";
-    } else if (formData.userName.trim().length < 3) {
-      newErrors.userName = "Tên đăng nhập phải có ít nhất 3 ký tự";
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = "Vui lòng nhập mật khẩu";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validate = () => {
+    const e = {};
+    if (!formData.userName.trim())              e.userName = "Vui lòng nhập tên đăng nhập";
+    else if (formData.userName.trim().length < 3) e.userName = "Tên đăng nhập phải có ít nhất 3 ký tự";
+    if (!formData.password.trim())              e.password = "Vui lòng nhập mật khẩu";
+    else if (formData.password.length < 6)      e.password = "Mật khẩu phải có ít nhất 6 ký tự";
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    setErrors((prev) => ({
-      ...prev,
-      [name]: "",
-    }));
+    setFormData(p => ({ ...p, [name]: value }));
+    setErrors(p => ({ ...p, [name]: "" }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
-
+    if (!validate()) return;
     try {
       setLoading(true);
-
-      const payload = {
+      await authService.login({
         userName: formData.userName.trim(),
         password: formData.password,
-      };
-
-      const result = await authService.login(payload);
-
-      if (remember) {
-        localStorage.setItem("rememberUserName", formData.userName.trim());
-      } else {
-        localStorage.removeItem("rememberUserName");
-      }
-
-      if (result?.token) {
-        localStorage.setItem("token", result.token);
-      }
-
-      if (result?.user) {
-        localStorage.setItem("user", JSON.stringify(result.user));
-      }
-
+      });
+      if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
+      else          localStorage.removeItem("rememberUserName");
       navigate("/home");
-    } catch (error) {
+    } catch (err) {
       alert(
-        error?.response?.data?.message ||
-        error?.response?.data?.title ||
+        err?.response?.data?.message ||
+        err?.response?.data?.title   ||
         "Đăng nhập thất bại. Vui lòng kiểm tra lại."
       );
     } finally {
@@ -113,49 +71,23 @@ export default function LoginPage() {
               <p>Hệ thống quản lý sản xuất may mặc</p>
             </div>
           </div>
-
           <h1 className="left-heading">Quản lý sản xuất thông minh</h1>
-
-          <p className="left-desc">
-            Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả
-          </p>
-
+          <p className="left-desc">Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả</p>
           <div className="features-box">
-            <div className="feature">
-              <div className="icon">⏱</div>
-              <div>
-                <h4>Theo dõi thời gian thực</h4>
-                <p>Giám sát tiến độ sản xuất mọi lúc mọi nơi</p>
+            {[
+              { icon:"⏱", title:"Theo dõi thời gian thực", desc:"Giám sát tiến độ sản xuất mọi lúc mọi nơi" },
+              { icon:"👔", title:"Quản lý nhân sự",         desc:"Phân công công việc và theo dõi hiệu suất" },
+              { icon:"📦", title:"Quản lý đơn hàng",        desc:"Theo dõi đơn hàng từ A đến Z" },
+              { icon:"📊", title:"Báo cáo chi tiết",        desc:"Phân tích dữ liệu và tạo báo cáo tự động" },
+            ].map(f => (
+              <div key={f.title} className="feature">
+                <div className="icon">{f.icon}</div>
+                <div><h4>{f.title}</h4><p>{f.desc}</p></div>
               </div>
-            </div>
-
-            <div className="feature">
-              <div className="icon">👔</div>
-              <div>
-                <h4>Quản lý nhân sự</h4>
-                <p>Phân công công việc và theo dõi hiệu suất</p>
-              </div>
-            </div>
-
-            <div className="feature">
-              <div className="icon">📦</div>
-              <div>
-                <h4>Quản lý đơn hàng</h4>
-                <p>Theo dõi đơn hàng từ A đến Z</p>
-              </div>
-            </div>
-
-            <div className="feature">
-              <div className="icon">📊</div>
-              <div>
-                <h4>Báo cáo chi tiết</h4>
-                <p>Phân tích dữ liệu và tạo báo cáo tự động</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-
-        <div className="tape"></div>
+        <div className="tape" />
       </div>
 
       <div className="login-right">
@@ -166,51 +98,31 @@ export default function LoginPage() {
           <label className="field-label">Tên đăng nhập</label>
           <div className="input-wrapper">
             <span className="input-icon">👤</span>
-            <input
-              type="text"
-              name="userName"
-              value={formData.userName}
-              onChange={handleChange}
-              placeholder="Nhập tên đăng nhập"
-              className={errors.userName ? "input-error" : ""}
-            />
+            <input type="text" name="userName" value={formData.userName}
+              onChange={handleChange} placeholder="Nhập tên đăng nhập"
+              className={errors.userName ? "input-error" : ""} />
           </div>
           {errors.userName && <p className="error-text">{errors.userName}</p>}
 
           <label className="field-label">Mật khẩu</label>
           <div className="input-wrapper">
             <span className="input-icon">🔒</span>
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
+            <input type={showPassword ? "text" : "password"} name="password"
+              value={formData.password} onChange={handleChange}
               placeholder="Nhập mật khẩu"
-              className={errors.password ? "input-error" : ""}
-            />
-            <button
-              type="button"
-              className="eye-btn"
-              onClick={() => setShowPassword((prev) => !prev)}
-            >
-              👁
-            </button>
+              className={errors.password ? "input-error" : ""} />
+            <button type="button" className="eye-btn"
+              onClick={() => setShowPassword(p => !p)}>👁</button>
           </div>
           {errors.password && <p className="error-text">{errors.password}</p>}
 
           <div className="options-row">
             <label className="remember-label">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
+              <input type="checkbox" checked={remember}
+                onChange={e => setRemember(e.target.checked)} />
               Ghi nhớ đăng nhập
             </label>
-
-            <a href="#" className="forgot-link">
-              Quên mật khẩu?
-            </a>
+            <a href="#" className="forgot-link">Quên mật khẩu?</a>
           </div>
 
           <button type="submit" className="login-btn" disabled={loading}>

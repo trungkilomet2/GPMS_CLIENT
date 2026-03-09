@@ -1,43 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { userService } from "@/services/userService";
 import "@/styles/profile.css";
-
-// ── Mock data — thay bằng API call / store thật ──
-const MOCK_USER = {
-  name:       "Nguyễn Văn Hùng",
-  email:      "hung.nguyen@garmentpro.vn",
-  phone:      "(+84) 098 765 4321",
-  role:       "Quản lý xưởng",
-  department: "Xưởng may Hà Nội",
-  joinDate:   "15/03/2022",
-  address:    "123 Đường Láng, Đống Đa, Hà Nội",
-  avatarUrl:  null,
-  bio:        "Quản lý vận hành xưởng may với hơn 5 năm kinh nghiệm trong ngành dệt may xuất khẩu.",
-};
-
-const STATS = [
-  { val: "128", label: "Đơn hoàn thành" },
-  { val: "5",   label: "Năm kinh nghiệm" },
-  { val: "98%", label: "Đánh giá tốt" },
-  { val: "12",  label: "Dự án hiện tại" },
-];
-
-const SKILLS = [
-  "Quản lý đơn hàng", "Kế hoạch sản xuất", "Kiểm soát chất lượng",
-  "Excel / ERP", "Quản lý nhân sự", "Logistics",
-];
-
-const ACTIVITIES = [
-  { title: "Cập nhật đơn hàng #DH2024-089",   desc: "Đã chuyển trạng thái sang Đang sản xuất.", time: "2 giờ trước"   },
-  { title: "Phê duyệt kế hoạch tuần 12",       desc: "Xác nhận phân công 3 tổ sản xuất.",        time: "Hôm qua"       },
-  { title: "Kiểm tra chất lượng lô hàng #045", desc: "Ghi nhận 2 lỗi nhỏ, đã xử lý xong.",      time: "2 ngày trước"  },
-  { title: "Thêm mới đơn hàng #DH2024-090",    desc: "Khách hàng: Công ty TNHH Thời Trang ABC.", time: "3 ngày trước"  },
-];
 
 const NAV_ITEMS = [
   { key: "info",     icon: "👤", label: "Thông tin cá nhân" },
   { key: "security", icon: "🔒", label: "Bảo mật" },
   { key: "activity", icon: "📋", label: "Lịch sử hoạt động" },
+];
+
+const STATS = [
+  { key: "completedOrders", label: "Đơn hoàn thành", fallback: "—" },
+  { key: "experience",      label: "Năm kinh nghiệm", fallback: "—" },
+  { key: "rating",          label: "Đánh giá tốt",   fallback: "—" },
+  { key: "activeProjects",  label: "Dự án hiện tại", fallback: "—" },
 ];
 
 function getInitials(name = "") {
@@ -50,9 +26,23 @@ function InfoRow({ icon, label, value }) {
       <div className="profile-info-icon-wrap">{icon}</div>
       <div>
         <div className="profile-info-label">{label}</div>
-        <div className="profile-info-value">{value || <span className="muted">Chưa cập nhật</span>}</div>
+        <div className="profile-info-value">
+          {value || <span className="muted">Chưa cập nhật</span>}
+        </div>
       </div>
     </div>
+  );
+}
+
+// ── Skeleton loader ──
+function Skeleton({ h = 16, w = "100%", radius = 6 }) {
+  return (
+    <div style={{
+      height: h, width: w, borderRadius: radius,
+      background: "linear-gradient(90deg,#e8f4ec 25%,#d4ead9 50%,#e8f4ec 75%)",
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.4s infinite",
+    }} />
   );
 }
 
@@ -65,11 +55,16 @@ function SectionInfo({ user, onEdit }) {
         </div>
         <div className="profile-card-body">
           <p style={{ fontSize: ".88rem", color: "var(--text-mid)", lineHeight: 1.7 }}>
-            {user.bio || <span style={{ fontStyle: "italic", color: "var(--text-light)" }}>Chưa có thông tin giới thiệu.</span>}
+            {user.bio
+              ? user.bio
+              : <span style={{ fontStyle: "italic", color: "var(--text-light)" }}>Chưa có thông tin giới thiệu.</span>
+            }
           </p>
-          <div className="profile-tags" style={{ marginTop: "1rem" }}>
-            {SKILLS.map(s => <span key={s} className="profile-tag">{s}</span>)}
-          </div>
+          {user.skills?.length > 0 && (
+            <div className="profile-tags" style={{ marginTop: "1rem" }}>
+              {user.skills.map(s => <span key={s} className="profile-tag">{s}</span>)}
+            </div>
+          )}
         </div>
       </div>
 
@@ -81,11 +76,12 @@ function SectionInfo({ user, onEdit }) {
           </button>
         </div>
         <div className="profile-card-body">
-          <InfoRow icon="✉️" label="Email"          value={user.email} />
-          <InfoRow icon="📞" label="Điện thoại"     value={user.phone} />
-          <InfoRow icon="📍" label="Địa chỉ"        value={user.address} />
-          <InfoRow icon="🏢" label="Phòng ban"      value={user.department} />
-          <InfoRow icon="📅" label="Ngày tham gia"  value={user.joinDate} />
+          <InfoRow icon="✉️" label="Email"         value={user.email} />
+          <InfoRow icon="📞" label="Điện thoại"    value={user.phone} />
+          <InfoRow icon="📍" label="Địa chỉ"       value={user.address} />
+          <InfoRow icon="🏢" label="Phòng ban"     value={user.department} />
+          <InfoRow icon="🎭" label="Vai trò"       value={user.role} />
+          <InfoRow icon="📅" label="Ngày tham gia" value={user.joinDate} />
         </div>
       </div>
     </>
@@ -96,10 +92,15 @@ function SectionSecurity() {
   const [form, setForm] = useState({ current: "", next: "", confirm: "" });
   const [msg,  setMsg]  = useState(null);
 
-  const handle = (e) => {
+  const handle = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (form.next !== form.confirm) return setMsg({ type: "error",   text: "Mật khẩu mới không khớp." });
-    if (form.next.length < 6)       return setMsg({ type: "error",   text: "Mật khẩu phải có ít nhất 6 ký tự." });
+    if (form.next !== form.confirm)
+      return setMsg({ type: "error", text: "Mật khẩu mới không khớp." });
+    if (form.next.length < 6)
+      return setMsg({ type: "error", text: "Mật khẩu phải có ít nhất 6 ký tự." });
+    // TODO: gọi API đổi mật khẩu
     setMsg({ type: "success", text: "Đổi mật khẩu thành công!" });
     setForm({ current: "", next: "", confirm: "" });
     setTimeout(() => setMsg(null), 3000);
@@ -121,69 +122,50 @@ function SectionSecurity() {
             {msg.type === "success" ? "✅" : "⚠️"}&nbsp;{msg.text}
           </div>
         )}
-        <form onSubmit={handle} style={{ maxWidth: 420 }}>
+        <form onSubmit={handleSubmit} style={{ maxWidth: 420 }}>
           {[
-            { key: "current", label: "Mật khẩu hiện tại" },
-            { key: "next",    label: "Mật khẩu mới" },
-            { key: "confirm", label: "Xác nhận mật khẩu mới" },
+            { name: "current", label: "Mật khẩu hiện tại" },
+            { name: "next",    label: "Mật khẩu mới" },
+            { name: "confirm", label: "Xác nhận mật khẩu mới" },
           ].map(f => (
-            <div key={f.key} className="profile-form-group">
+            <div key={f.name} className="profile-form-group">
               <label className="profile-form-label">{f.label}</label>
-              <input type="password" className="profile-form-input" placeholder="••••••••"
-                value={form[f.key]} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
+              <input type="password" name={f.name} className="profile-form-input"
+                placeholder="••••••••" value={form[f.name]} onChange={handle} />
             </div>
           ))}
           <button type="submit" className="profile-edit-btn" style={{ marginTop: ".5rem" }}>
             🔒&nbsp;Cập nhật mật khẩu
           </button>
         </form>
-
-        <div style={{ borderTop: "1px solid var(--border)", margin: "1.75rem 0" }} />
-        <div style={{ fontSize: ".88rem", fontWeight: 700, color: "var(--text)", marginBottom: "1rem" }}>Phiên đăng nhập</div>
-        {[
-          { device: "💻 Chrome / Windows", location: "Hà Nội, VN", time: "Đang hoạt động", current: true },
-          { device: "📱 Safari / iPhone",  location: "Hà Nội, VN", time: "2 ngày trước",   current: false },
-        ].map((s, i) => (
-          <div key={i} style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: ".75rem 1rem", borderRadius: 10, marginBottom: ".65rem", fontSize: ".82rem",
-            background: s.current ? "var(--green-light)" : "var(--sand)",
-            border: `1px solid ${s.current ? "rgba(30,110,67,.2)" : "var(--border)"}`,
-          }}>
-            <div>
-              <div style={{ fontWeight: 600, color: "var(--text)" }}>{s.device}</div>
-              <div style={{ color: "var(--text-light)", fontSize: ".75rem" }}>{s.location} · {s.time}</div>
-            </div>
-            {s.current
-              ? <span style={{ color: "var(--green)", fontWeight: 700, fontSize: ".72rem", background: "rgba(30,110,67,.1)", padding: ".2rem .6rem", borderRadius: 20 }}>● Hiện tại</span>
-              : <button style={{ background: "none", border: "none", color: "#dc2626", fontSize: ".78rem", cursor: "pointer", fontWeight: 600 }}>Đăng xuất</button>}
-          </div>
-        ))}
       </div>
     </div>
   );
 }
 
-function SectionActivity() {
+function SectionActivity({ activities = [] }) {
   return (
     <div className="profile-card">
       <div className="profile-card-header">
         <div className="profile-card-title"><div className="profile-card-title-dot" />Lịch sử hoạt động</div>
       </div>
       <div className="profile-card-body">
-        {ACTIVITIES.map((a, i) => (
-          <div key={i} className="profile-activity-item">
-            <div className="profile-activity-dot-wrap">
-              <div className="profile-activity-dot" />
-              <div className="profile-activity-line" />
+        {activities.length === 0
+          ? <p style={{ fontSize: ".85rem", color: "var(--text-light)", fontStyle: "italic" }}>Chưa có hoạt động nào.</p>
+          : activities.map((a, i) => (
+            <div key={i} className="profile-activity-item">
+              <div className="profile-activity-dot-wrap">
+                <div className="profile-activity-dot" />
+                <div className="profile-activity-line" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="profile-activity-title">{a.title}</div>
+                <div className="profile-activity-desc">{a.description}</div>
+                <div className="profile-activity-time">🕐 {a.time}</div>
+              </div>
             </div>
-            <div style={{ flex: 1 }}>
-              <div className="profile-activity-title">{a.title}</div>
-              <div className="profile-activity-desc">{a.desc}</div>
-              <div className="profile-activity-time">🕐 {a.time}</div>
-            </div>
-          </div>
-        ))}
+          ))
+        }
       </div>
     </div>
   );
@@ -192,18 +174,66 @@ function SectionActivity() {
 // ══ MAIN ══
 export default function ViewProfile() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("info");
+  const [tab,      setTab]      = useState("info");
+  const [profile,  setProfile]  = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
-  const stored  = localStorage.getItem("user");
-  const authUser = stored ? JSON.parse(stored) : null;
-  const user = {
-    ...MOCK_USER,
-    ...(authUser?.name  && { name:  authUser.name }),
-    ...(authUser?.email && { email: authUser.email }),
-  };
+  useEffect(() => {
+  const stored = localStorage.getItem("user");
+
+  if (!stored) {
+    navigate("/login");
+    return;
+  }
+
+  userService.getProfile()
+    .then(data => setProfile(data))
+    .catch(err => setError(err?.response?.data?.message || "Không thể tải hồ sơ."))
+    .finally(() => setLoading(false));
+}, []);
+
+  // ── Loading state ──
+  if (loading) return (
+    <div className="profile-page">
+      <div className="profile-cover" />
+      <div className="profile-avatar-row">
+        <Skeleton h={112} w={112} radius={56} />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+          <Skeleton h={24} w={200} />
+          <Skeleton h={16} w={140} />
+        </div>
+      </div>
+      <div className="profile-layout">
+        <aside style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <Skeleton h={120} radius={12} />
+          <Skeleton h={160} radius={12} />
+        </aside>
+        <main style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <Skeleton h={100} radius={14} />
+          <Skeleton h={260} radius={14} />
+        </main>
+      </div>
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+    </div>
+  );
+
+  // ── Error state ──
+  if (error) return (
+    <div className="profile-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>⚠️</div>
+        <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: ".5rem" }}>{error}</div>
+        <button className="profile-edit-btn" onClick={() => window.location.reload()}>Thử lại</button>
+      </div>
+    </div>
+  );
+
+  const name = profile?.fullName || profile?.name || "Người dùng";
 
   return (
     <div className="profile-page">
+      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
 
       {/* Cover */}
       <div className="profile-cover">
@@ -215,17 +245,19 @@ export default function ViewProfile() {
       {/* Avatar row */}
       <div className="profile-avatar-row">
         <div className="profile-avatar-wrap">
-          {user.avatarUrl
-            ? <img src={user.avatarUrl} alt="avatar" className="profile-avatar" />
-            : <div className="profile-avatar">{getInitials(user.name)}</div>}
+          {profile?.avatarUrl
+            ? <img src={profile.avatarUrl} alt="avatar" className="profile-avatar" />
+            : <div className="profile-avatar">{getInitials(name)}</div>
+          }
           <div className="profile-avatar-badge"><div className="profile-avatar-badge-dot" /></div>
         </div>
 
         <div className="profile-name-block">
-          <div className="profile-name">{user.name}</div>
+          <div className="profile-name">{name}</div>
           <div className="profile-role-badge">
             <div className="profile-role-dot" />
-            {user.role}&nbsp;·&nbsp;{user.department}
+            {profile?.role || "Người dùng"}
+            {profile?.department && <>&nbsp;·&nbsp;{profile.department}</>}
           </div>
         </div>
 
@@ -240,15 +272,18 @@ export default function ViewProfile() {
 
         {/* Sidebar */}
         <aside style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+          {/* Stats */}
           <div className="profile-stat-grid">
             {STATS.map(s => (
-              <div key={s.label} className="profile-stat-item">
-                <div className="profile-stat-val">{s.val}</div>
+              <div key={s.key} className="profile-stat-item">
+                <div className="profile-stat-val">{profile?.[s.key] ?? s.fallback}</div>
                 <div className="profile-stat-label">{s.label}</div>
               </div>
             ))}
           </div>
 
+          {/* Nav */}
           <div className="profile-card">
             <div className="profile-card-body" style={{ padding: ".75rem" }}>
               <div className="profile-sidenav">
@@ -268,25 +303,27 @@ export default function ViewProfile() {
             </div>
           </div>
 
+          {/* Quick contact */}
           <div className="profile-card">
             <div className="profile-card-header">
               <div className="profile-card-title"><div className="profile-card-title-dot" />Liên hệ nhanh</div>
             </div>
             <div className="profile-card-body" style={{ display: "flex", flexDirection: "column", gap: ".6rem" }}>
-              {[["✉️", user.email], ["📞", user.phone]].map(([ic, val]) => (
+              {[["✉️", profile?.email], ["📞", profile?.phone]].map(([ic, val]) => val && (
                 <div key={val} style={{ display: "flex", gap: ".6rem", alignItems: "center", fontSize: ".82rem", color: "var(--text-mid)" }}>
                   <span>{ic}</span><span style={{ wordBreak: "break-all" }}>{val}</span>
                 </div>
               ))}
             </div>
           </div>
+
         </aside>
 
         {/* Content */}
         <main>
-          {tab === "info"     && <SectionInfo user={user} onEdit={() => navigate("/profile/edit")} />}
+          {tab === "info"     && <SectionInfo user={profile} onEdit={() => navigate("/profile/edit")} />}
           {tab === "security" && <SectionSecurity />}
-          {tab === "activity" && <SectionActivity />}
+          {tab === "activity" && <SectionActivity activities={profile?.activities || []} />}
         </main>
 
       </div>

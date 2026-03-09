@@ -1,0 +1,24 @@
+ import { API_ENDPOINTS } from "@/lib/apiconfig";
+
+export const productService = {
+
+  async getAll() {
+
+    const token = localStorage.getItem("token");
+
+    const res = await fetch(API_ENDPOINTS.PRODUCT.GET_ALL, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : ""
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error("Không thể tải danh sách sản phẩm");
+    }
+
+    return res.json();
+  }
+
+};

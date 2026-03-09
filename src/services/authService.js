@@ -1,49 +1,74 @@
-// src/services/authService.js
+import { API_ENDPOINTS } from "@/lib/apiconfig";
 
 export const authService = {
+
   async login(payload) {
-    console.log("Login payload:", payload);
+    const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userName: payload.userName,
+        password: payload.password,
+      }),
+    });
 
-    // TODO: thay bằng API call thật
-    // const res = await axios.post("/api/auth/login", payload);
-    // const { user, token } = res.data;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw { response: { data: err } };
+    }
 
-    const user = {
-      id:        "u001",
-      name:      payload.loginId,   // hoặc res.data.fullName
-      email:     payload.loginId,
-      avatarUrl: null,
-      role:      "customer",
-    };
+    // backend trả token string
+    const token = await res.text();
 
-    // Lưu vào localStorage
-    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("token", token);
 
-    // Thông báo cho Header re-render
+    // decode JWT
+    const payload64 = token.split(".")[1];
+    const decoded = JSON.parse(atob(payload64));
+
+    const userName =
+      decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
+      "";
+
+    const role =
+      decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
+      "";
+
+    const userId =
+      decoded[
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+      ] ?? "";
+
+    const basicUser = { userId, userName, role };
+
+    localStorage.setItem("user", JSON.stringify(basicUser));
+    localStorage.setItem("userId", userId);
+
     window.dispatchEvent(new Event("auth-change"));
 
-    return { success: true, message: "Đăng nhập thành công", data: user };
+    return { token, user: basicUser };
   },
 
   async register(payload) {
-    console.log("Register payload:", payload);
+    const res = await fetch(API_ENDPOINTS.ACCOUNT.REGISTER, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userName: payload.userName,
+        fullName: payload.fullName,
+        password: payload.password,
+        rePassword: payload.rePassword,
+      }),
+    });
 
-    // TODO: thay bằng API call thật
-    const user = {
-      id:        "u002",
-      name:      payload.fullName ?? payload.loginId,
-      email:     payload.email ?? payload.loginId,
-      avatarUrl: null,
-      role:      "customer",
-    };
-
-    localStorage.setItem("user", JSON.stringify(user));
-    window.dispatchEvent(new Event("auth-change"));
-
-    return { success: true, message: "Đăng ký thành công", data: user };
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { response: { data } };
+    return data;
   },
 
   logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
     localStorage.removeItem("user");
     window.dispatchEvent(new Event("auth-change"));
   },
