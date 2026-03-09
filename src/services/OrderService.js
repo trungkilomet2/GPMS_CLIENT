@@ -8,6 +8,9 @@ const OrderService = {
     getOrderDetail: (id) => {
         return axiosClient.get(API_ENDPOINTS.ORDER.GET_DETAIL(id));
     },
+    getOrdersByUser: (userId) => {
+        return axiosClient.get(API_ENDPOINTS.ORDER.GET_ORDERS_BY_USER(userId));
+    },
     getUpdateOrderHistory: (orderId) => {
         return axiosClient.get(API_ENDPOINTS.ORDER.GET_UPDATE_ORDER_HISTORY(orderId));
     },

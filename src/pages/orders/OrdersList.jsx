@@ -142,25 +142,6 @@ export default function Orders() {
                         <p className="text-slate-600">Theo dõi tiến độ sản xuất và truy cập chi tiết từng đơn nhanh hơn.</p>
                     </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-h-24 flex flex-col justify-between">
-                            <p className="text-xs text-slate-500">Tổng đơn</p>
-                            <p className="text-2xl font-semibold text-slate-900">{stats.total}</p>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-h-24 flex flex-col justify-between">
-                            <p className="text-xs text-slate-500">Đang xử lý</p>
-                            <p className="text-2xl font-semibold text-amber-600">{stats.inProgress}</p>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-h-24 flex flex-col justify-between">
-                            <p className="text-xs text-slate-500">Hoàn thành / Đã giao</p>
-                            <p className="text-2xl font-semibold text-emerald-600">{stats.done}</p>
-                        </div>
-                        <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 min-h-24 flex flex-col justify-between">
-                            <p className="text-xs text-slate-500">Đang hiển thị</p>
-                            <p className="text-2xl font-semibold text-slate-900">{stats.showing}</p>
-                        </div>
-                    </div>
-
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
                         <div className="grid grid-cols-1 md:grid-cols-[1fr_260px_auto] gap-3">
                             <div className="relative">
