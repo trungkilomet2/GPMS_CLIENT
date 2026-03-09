@@ -147,8 +147,8 @@ export default function EditOrder() {
                             <tbody className="divide-y divide-gray-100">
                                 {materials.map((m, i) => (
                                     <tr key={i} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-700">{m.name}</td>
-                                        <td className="px-4 py-3">{m.qty}</td>
+                                        <td className="px-4 py-3 font-medium text-gray-700">{m.materialName}</td>
+                                        <td className="px-4 py-3">{m.quantity}</td>
                                         <td className="px-4 py-3 text-gray-500">{m.uom}</td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end">
                                             <button type="button" onClick={() => { setEditingIndex(i); setMaterialFormData(materials[i]); setIsModalOpen(true); }} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil size={16} /></button>
