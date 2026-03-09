@@ -42,7 +42,7 @@ export default function Orders() {
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize] = useState(10);
 
-    const [sortBy, setSortBy] = useState({ key: 'id', dir: 'desc' });
+    const [sortBy, setSortBy] = useState({ key: 'id', dir: 'asc' });
 
     useEffect(() => {
         const fetchOrders = async () => {
