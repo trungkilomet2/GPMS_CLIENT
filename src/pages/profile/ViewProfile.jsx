@@ -180,18 +180,19 @@ export default function ViewProfile() {
   const [error,    setError]    = useState(null);
 
   useEffect(() => {
-  const stored = localStorage.getItem("user");
+    const stored = localStorage.getItem("user");
+    const user   = stored ? JSON.parse(stored) : null;
 
-  if (!stored) {
-    navigate("/login");
-    return;
-  }
+    if (!user) {
+      navigate("/login");
+      return;
+    }
 
-  userService.getProfile()
-    .then(data => setProfile(data))
-    .catch(err => setError(err?.response?.data?.message || "Không thể tải hồ sơ."))
-    .finally(() => setLoading(false));
-}, []);
+    userService.getProfile(user.userId ?? user.id)
+      .then(data => setProfile(data))
+      .catch(err => setError(err?.response?.data?.message || "Không thể tải hồ sơ."))
+      .finally(() => setLoading(false));
+  }, []);
 
   // ── Loading state ──
   if (loading) return (

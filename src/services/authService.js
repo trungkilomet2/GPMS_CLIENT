@@ -4,9 +4,9 @@ export const authService = {
 
   async login(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body:    JSON.stringify({
         userName: payload.userName,
         password: payload.password,
       }),
@@ -17,46 +17,40 @@ export const authService = {
       throw { response: { data: err } };
     }
 
-    // backend trả token string
+    // Backend trả về token string thuần
     const token = await res.text();
-
     localStorage.setItem("token", token);
 
-    // decode JWT
-    const payload64 = token.split(".")[1];
-    const decoded = JSON.parse(atob(payload64));
+    // Decode JWT để lấy thông tin
+    const base64  = token.split(".")[1];
+    const decoded = JSON.parse(atob(base64));
 
-    const userName =
-      decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
-      "";
+    const userName = decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ?? "";
+    const role     = decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ?? "";
+    // Lấy userId từ claim "sub" hoặc "nameid"
+    const userId   =
+      decoded["sub"] ??
+      decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] ??
+      decoded["userId"] ??
+      null;
 
-    const role =
-      decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-      "";
-
-    const userId =
-      decoded[
-        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-      ] ?? "";
-
-    const basicUser = { userId, userName, role };
-
-    localStorage.setItem("user", JSON.stringify(basicUser));
-    localStorage.setItem("userId", userId);
+    const user = { userId, userName, role };
+    localStorage.setItem("user",   JSON.stringify(user));
+    localStorage.setItem("userId", String(userId ?? ""));
 
     window.dispatchEvent(new Event("auth-change"));
 
-    return { token, user: basicUser };
+    return { token, user };
   },
 
   async register(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.REGISTER, {
-      method: "POST",
+      method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userName: payload.userName,
-        fullName: payload.fullName,
-        password: payload.password,
+      body:    JSON.stringify({
+        userName:   payload.userName,
+        fullName:   payload.fullName,
+        password:   payload.password,
         rePassword: payload.rePassword,
       }),
     });

@@ -25,8 +25,10 @@ export const API_ENDPOINTS = {
   },
 
   USER: {
-    GET_USER_PROFILE:    (userId) => `${BASE_URL}/api/User/view-profile/${userId}`,
-    UPDATE_USER_PROFILE: (userId) => `${BASE_URL}/api/User/update-profile/${userId}`,
+    // GET — không có ID, backend decode từ token
+    VIEW_PROFILE:   `${BASE_URL}/api/User/view-profile`,
+    // PUT — multipart/form-data
+    UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
   },
 
   // TODO: thêm endpoint thật khi backend có sẵn
