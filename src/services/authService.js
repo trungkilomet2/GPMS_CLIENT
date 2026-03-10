@@ -1,7 +1,6 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
 export const authService = {
-
   async login(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
       method: "POST",
@@ -17,12 +16,11 @@ export const authService = {
       throw { response: { data: err } };
     }
 
-    // backend trả token string
-    const token = await res.text();
+    const rawToken = await res.text();
+    const token = rawToken.replace(/^"|"$/g, "").trim();
 
     localStorage.setItem("token", token);
 
-    // decode JWT
     const payload64 = token.split(".")[1];
     const decoded = JSON.parse(atob(payload64));
 

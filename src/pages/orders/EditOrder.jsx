@@ -6,12 +6,13 @@ import OrderService from '@/services/OrderService';
 import MainLayout from '../../layouts/MainLayout';
 
 export default function EditOrder() {
+    const { userId } = localStorage.getItem("userId") ? JSON.parse(localStorage.getItem("userId")) : {};
     const { id } = useParams();
     const navigate = useNavigate();
 
     const [materials, setMaterials] = useState([]);
     const [orderData, setOrderData] = useState({
-        userId: 2,
+        userId: userId,
         image: '',
         orderName: '',
         type: '',

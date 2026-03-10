@@ -8,13 +8,23 @@ const axiosClient = axios.create({
   },
 });
 
-// Interceptor xử lý dữ liệu trả về cho gọn
+axiosClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+
+    if (token) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 axiosClient.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    // Xử lý lỗi tập trung (ví dụ: Token hết hạn)
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 export default axiosClient;

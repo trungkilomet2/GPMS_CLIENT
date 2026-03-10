@@ -33,6 +33,16 @@ function SortIcon({ direction }) {
 }
 
 export default function Orders() {
+    const getUserId = () => {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            return user.userId ?? user.id ?? null;
+        }
+        return null;
+    };
+
+    const userId = getUserId();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -46,9 +56,15 @@ export default function Orders() {
 
     useEffect(() => {
         const fetchOrders = async () => {
+            if (!userId) {
+                setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+                setLoading(false);
+                return;
+            }
+
             try {
                 setLoading(true);
-                const response = await OrderService.getAllOrders();
+                const response = await OrderService.getOrdersByUser(userId);
                 setOrders(response.data || response || []);
                 setError(null);
             } catch (err) {
@@ -59,7 +75,7 @@ export default function Orders() {
             }
         };
         fetchOrders();
-    }, []);
+    }, [userId]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -177,7 +193,7 @@ export default function Orders() {
                             <table className="min-w-full divide-y divide-slate-200 table-fixed">
                                 <thead className="bg-slate-50">
                                     <tr>
-                                        <th className="w-20 px-4 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('id')}>
+                                        <th className="w-20 px-5 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('id')}>
                                             Mã đơn <SortIcon direction={sortBy.key === 'id' ? sortBy.dir : null} />
                                         </th>
                                         <th className="w-64 px-4 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('orderName')}>
@@ -190,7 +206,7 @@ export default function Orders() {
                                             Màu <SortIcon direction={sortBy.key === 'color' ? sortBy.dir : null} />
                                         </th>
                                         <th className="w-20 px-3 py-3 text-center text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('quantity')}>
-                                            SL <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
+                                            Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                                         </th>
                                         <th className="w-36 px-4 py-3 text-center text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('endDate')}>
                                             Ngày dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
@@ -216,7 +232,7 @@ export default function Orders() {
                                     ) : (
                                         pageData.map((o) => (
                                             <tr key={o.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3 text-sm text-slate-600 font-medium">{o.id}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-600 font-medium">{`#ĐH-${o.id}`}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-900 font-medium truncate">{o.orderName || '—'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700 text-center">{o.size || '—'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700">{o.color || '—'}</td>

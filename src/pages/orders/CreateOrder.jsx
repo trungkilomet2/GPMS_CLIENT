@@ -8,6 +8,17 @@ import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
 
 export default function CreateOrder() {
+    const getUserId = () => {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            return user.userId; // hoặc user.userId tùy cách bạn đặt tên
+        }
+        return null;
+    };
+
+    const userId = getUserId();
+    console.log("User ID from localStorage:", userId);
     const navigate = useNavigate();
 
     // 1. State quản lý danh sách vật liệu
@@ -15,7 +26,7 @@ export default function CreateOrder() {
 
     // 2. State quản lý thông tin đơn hàng
     const [orderData, setOrderData] = useState({
-        userId: 2, // Có thể lấy từ LocalStorage nếu cần
+        userId: userId, // Có thể lấy từ LocalStorage nếu cần
         image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQsTBf5IHNCDXiFB_PjTIuyi9FdnM6-wGyTg&s",
         orderName: '',
         type: '',
