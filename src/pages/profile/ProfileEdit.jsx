@@ -142,17 +142,18 @@ async function buildAvatarFile(avatarFile, avatarPreview) {
 }
 
 /* ─── Input ─── */
-function Input({ name, value, onChange, onBlur, type = "text", placeholder = "", hasError }) {
+function Input({ name, value, onChange, onBlur, type = "text", placeholder = "", hasError, readOnly = false }) {
   return (
     <input
       className="pf-input"
-      type={type} name={name} value={value ?? ""} onChange={onChange} onBlur={onBlur}
+      type={type} name={name} value={value ?? ""} onChange={onChange} onBlur={onBlur} readOnly={readOnly}
       placeholder={placeholder}
       style={{
         width: "100%", padding: ".65rem .9rem",
         border: `1.5px solid ${hasError ? T.red : T.border}`,
         borderRadius: 8, fontSize: ".88rem",
-        background: T.white, color: T.text, transition: ".15s",
+        background: readOnly ? T.sand : T.white, color: T.text, transition: ".15s",
+        cursor: readOnly ? "not-allowed" : "text",
       }}
     />
   );
@@ -239,6 +240,10 @@ export default function ProfileEdit() {
     phoneNumber: user?.phoneNumber ?? user?.phone ?? "",
     location: user?.location ?? user?.address ?? "",
     avatarUrl: user?.avatarUrl ?? user?.avartarUrl ?? "",
+    bio: user?.bio ?? "",
+    cooperationNotes: Array.isArray(user?.cooperationNotes)
+      ? user.cooperationNotes.join("\n")
+      : user?.cooperationNotes ?? "",
   });
 
   // ── form fields khớp đúng tên API ──
@@ -248,6 +253,8 @@ export default function ProfileEdit() {
     Email:       "",
     PhoneNumber: "",
     Location:    "",   // tương ứng với "address" hiển thị
+    Bio:         "",
+    CooperationNotes: "",
   });
 
   const [avatarFile,  setAvatarFile]  = useState(null);   // File object gửi lên API
@@ -278,6 +285,8 @@ export default function ProfileEdit() {
       Email: fallback.email,
       PhoneNumber: fallback.phoneNumber,
       Location: fallback.location,
+      Bio: fallback.bio,
+      CooperationNotes: fallback.cooperationNotes,
     });
     if (fallback.avatarUrl) {
       setAvatarPreview(fallback.avatarUrl);
@@ -290,6 +299,8 @@ export default function ProfileEdit() {
           Email:       data.email       ?? data.Email       ?? "",
           PhoneNumber: data.phoneNumber ?? data.PhoneNumber ?? data.phone ?? "",
           Location:    data.location    ?? data.Location    ?? data.address ?? "",
+          Bio:         fallback.bio,
+          CooperationNotes: fallback.cooperationNotes,
         });
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
@@ -379,6 +390,17 @@ export default function ProfileEdit() {
       fd.append("AvartarUrl", avatarUpload);
 
       await userService.updateProfile(user.userId ?? user.id, fd);
+
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      localStorage.setItem("user", JSON.stringify({
+        ...storedUser,
+        bio: String(form.Bio || "").trim(),
+        cooperationNotes: String(form.CooperationNotes || "")
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      }));
+      window.dispatchEvent(new Event("auth-change"));
 
       setMsg({ type: "success", text: "Lưu hồ sơ thành công!" });
       setTimeout(() => navigate("/profile", { state: { refresh: Date.now() } }), 1400);
@@ -484,14 +506,68 @@ export default function ProfileEdit() {
                   placeholder="email@example.com" hasError={!!(touched.Email && errs.Email)} />
               </FormField>
 
-              <FormField label="Số điện thoại" required error={touched.PhoneNumber && errs.PhoneNumber}>
-                <Input name="PhoneNumber" value={form.PhoneNumber} onChange={handle} onBlur={handleBlur}
-                  placeholder="(+84) 0xx xxx xxx" hasError={!!(touched.PhoneNumber && errs.PhoneNumber)} />
+              <FormField
+                label="Số điện thoại"
+                required
+                error={touched.PhoneNumber && errs.PhoneNumber}
+                hint="Số điện thoại được cố định theo tài khoản và hiện chỉ cho phép xem."
+              >
+                <Input
+                  name="PhoneNumber"
+                  value={form.PhoneNumber}
+                  onChange={handle}
+                  onBlur={handleBlur}
+                  placeholder="(+84) 0xx xxx xxx"
+                  hasError={!!(touched.PhoneNumber && errs.PhoneNumber)}
+                  readOnly
+                />
               </FormField>
 
               <FormField label="Địa chỉ / Khu vực" required error={touched.Location && errs.Location}>
                 <Input name="Location" value={form.Location} onChange={handle} onBlur={handleBlur}
                   placeholder="Số nhà, đường, quận, thành phố" hasError={!!(touched.Location && errs.Location)} />
+              </FormField>
+
+              <FormField label="Giới thiệu khách hàng" hint="Mô tả ngắn về khách hàng hoặc doanh nghiệp.">
+                <textarea
+                  name="Bio"
+                  value={form.Bio ?? ""}
+                  onChange={handle}
+                  onBlur={handleBlur}
+                  placeholder="Ví dụ: Khách hàng chuyên các đơn hàng thời trang công sở, ưu tiên chất lượng ổn định và tiến độ rõ ràng."
+                  style={{
+                    width: "100%",
+                    minHeight: 110,
+                    padding: ".75rem .9rem",
+                    border: `1.5px solid ${T.border}`,
+                    borderRadius: 8,
+                    fontSize: ".88rem",
+                    background: T.white,
+                    color: T.text,
+                    resize: "vertical",
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Ghi chú hợp tác" hint="Mỗi dòng là một ghi chú hiển thị ở trang hồ sơ.">
+                <textarea
+                  name="CooperationNotes"
+                  value={form.CooperationNotes ?? ""}
+                  onChange={handle}
+                  onBlur={handleBlur}
+                  placeholder={"Ưu tiên cập nhật tiến độ theo từng giai đoạn.\nTheo dõi lịch sử tương tác để hỗ trợ báo giá nhanh hơn."}
+                  style={{
+                    width: "100%",
+                    minHeight: 130,
+                    padding: ".75rem .9rem",
+                    border: `1.5px solid ${T.border}`,
+                    borderRadius: 8,
+                    fontSize: ".88rem",
+                    background: T.white,
+                    color: T.text,
+                    resize: "vertical",
+                  }}
+                />
               </FormField>
 
             </CardSection>

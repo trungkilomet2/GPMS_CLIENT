@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
+import OrderService from "@/services/OrderService";
 import Header from "@/components/Header";
 
 const T = {
@@ -114,19 +115,6 @@ function InfoRow({ icon, label, value, last }) {
   );
 }
 
-function Stat({ label, value, borderR, borderB }) {
-  return (
-    <div style={{
-      textAlign:"center",padding:".9rem .5rem",
-      borderRight:borderR?`1px solid ${T.border}`:undefined,
-      borderBottom:borderB?`1px solid ${T.border}`:undefined,
-    }}>
-      <div style={{fontSize:"1.45rem",fontWeight:800,color:T.mid,lineHeight:1}}>{value ?? "—"}</div>
-      <div style={{fontSize:".7rem",color:T.textMid,marginTop:".3rem",fontWeight:600}}>{label}</div>
-    </div>
-  );
-}
-
 function NavItem({ icon, label, active, onClick }) {
   return (
     <button onClick={onClick} style={{
@@ -161,6 +149,12 @@ function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
   ];
 
   const defaultBio = user.bio || `Khách hàng là ${user.companyName || "một doanh nghiệp"} hoạt động trong lĩnh vực may mặc, tập trung vào các đơn hàng yêu cầu tiến độ ổn định, chất lượng đồng đều và khả năng phối hợp sản xuất dài hạn.`;
+  const cooperationNotes = Array.isArray(user.cooperationNotes)
+    ? user.cooperationNotes.filter(Boolean)
+    : String(user.cooperationNotes || "")
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
 
   return (
     <div style={{display:"grid",gridTemplateColumns:"1.05fr .95fr",gap:"1.25rem"}}>
@@ -168,11 +162,6 @@ function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
         <CardSection
           title="Thông tin cá nhân khách hàng"
           mb="1.25rem"
-          action={
-            <button onClick={onEdit} style={{background:"transparent",border:`1.5px solid ${T.base}`,color:T.mid,padding:".35rem .85rem",borderRadius:8,fontSize:".78rem",fontWeight:700,cursor:"pointer"}}>
-              ✏️ Chỉnh sửa
-            </button>
-          }
         >
           <div style={{paddingTop:".2rem"}}>
             {customerProfileRows.map(([icon,label,value],i)=>(
@@ -217,11 +206,11 @@ function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
 
         <CardSection title="Ghi chú hợp tác" mb="0">
           <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-            {[
+            {(cooperationNotes.length ? cooperationNotes : [
               "Ưu tiên cập nhật tiến độ đơn hàng theo từng giai đoạn sản xuất.",
               "Theo dõi lịch sử tương tác để hỗ trợ báo giá và xử lý yêu cầu nhanh hơn.",
               "Phù hợp với khách hàng là công ty may mặc, thương hiệu thời trang hoặc chủ doanh nghiệp lớn.",
-            ].map((item) => (
+            ]).map((item) => (
               <div key={item} style={{display:"flex",gap:".65rem",alignItems:"flex-start",color:T.textMid,fontSize:".84rem",lineHeight:1.7}}>
                 <span style={{color:T.base,fontWeight:800}}>•</span>
                 <span>{item}</span>
@@ -350,12 +339,53 @@ const NAV_ITEMS = [
   {key:"security", icon:"🔒",label:"Bảo mật"},
   {key:"activity", icon:"📋",label:"Lịch sử hoạt động"},
 ];
-const STATS = [
-  {key:"completedOrders",label:"Đơn hoàn thành"},
-  {key:"experience",     label:"Năm kinh nghiệm"},
-  {key:"rating",         label:"Đánh giá tốt"},
-  {key:"activeProjects", label:"Dự án hiện tại"},
-];
+const IN_PROGRESS_STATUSES = ["pending", "producing", "Process", "Chờ Xét Duyệt", "Yêu Cầu Chỉnh Sửa"];
+const DONE_STATUSES = ["completed", "delivered"];
+
+function formatDisplayDate(value) {
+  if (!value) return "Chưa cập nhật";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
+  return date.toLocaleDateString("vi-VN");
+}
+
+function buildOrderSummary(orders = []) {
+  const completedOrders = orders.filter((order) => DONE_STATUSES.includes(order?.status)).length;
+  const activeProjects = orders.filter((order) => IN_PROGRESS_STATUSES.includes(order?.status)).length;
+
+  const latestOrderDate = orders
+    .map((order) => order?.updatedAt || order?.endDate || order?.startDate || order?.createdAt)
+    .filter(Boolean)
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+
+  let rating = "Mới";
+  if (orders.length >= 10) rating = "Rất tốt";
+  else if (orders.length >= 3) rating = "Tốt";
+
+  return {
+    completedOrders,
+    activeProjects,
+    rating,
+    lastOrderAt: latestOrderDate ? formatDisplayDate(latestOrderDate) : "Chưa cập nhật",
+  };
+}
+
+function getCurrentUserId() {
+  const rawUserId = localStorage.getItem("userId");
+  if (rawUserId && rawUserId !== "null") return rawUserId;
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  return storedUser?.userId || storedUser?.id || null;
+}
+
+function getStoredProfileExtras() {
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  return {
+    bio: storedUser?.bio ?? "",
+    cooperationNotes: storedUser?.cooperationNotes ?? [],
+  };
+}
 
 export default function ViewProfile() {
   const navigate = useNavigate();
@@ -377,10 +407,21 @@ export default function ViewProfile() {
 
       setLoading(true);
       setError(null);
+      const userId = getCurrentUserId();
 
-      userService.getProfile()
-        .then(data => {
-          if (active) setProfile(data);
+      Promise.all([
+        userService.getProfile(),
+        userId ? OrderService.getOrdersByUser(userId).catch(() => []) : Promise.resolve([]),
+      ])
+        .then(([profileData, ordersResponse]) => {
+          if (!active) return;
+          const orders = ordersResponse?.data || ordersResponse || [];
+          const extras = getStoredProfileExtras();
+          setProfile({
+            ...profileData,
+            ...extras,
+            ...buildOrderSummary(Array.isArray(orders) ? orders : []),
+          });
         })
         .catch(err => {
           if (!active) return;
@@ -485,13 +526,6 @@ export default function ViewProfile() {
       >
         {/* Sidebar */}
         <aside style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
-          {/* Stats 2×2 */}
-          <div style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,boxShadow:"0 2px 14px rgba(0,0,0,.05)",display:"grid",gridTemplateColumns:"1fr 1fr",overflow:"hidden"}}>
-            {STATS.map((s,i)=>(
-              <Stat key={s.key} label={s.label} value={profile?.[s.key]} borderR={i%2===0} borderB={i<2}/>
-            ))}
-          </div>
-
           {/* Nav tabs */}
           <div style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,boxShadow:"0 2px 14px rgba(0,0,0,.05)",padding:".75rem"}}>
             {NAV_ITEMS.map((item,i)=>(
