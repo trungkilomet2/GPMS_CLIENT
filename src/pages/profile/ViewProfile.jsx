@@ -143,45 +143,95 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
-function SectionInfo({ user, onEdit }) {
-  const INFO_ROWS = [
-    ["✉️","Email",user.email],
-    ["📞","Điện thoại",user.phone],
-    ["📍","Địa chỉ",user.address],
-    ["🏢","Phòng ban",user.department],
-    ["🎭","Vai trò",user.role],
-    ["📅","Ngày tham gia",user.joinDate],
+function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
+  const customerProfileRows = [
+    ["👤", "Người đại diện", user.fullName || user.name],
+    ["✉️", "Email", user.email],
+    ["📞", "Số điện thoại", user.phone],
+    ["📍", "Địa chỉ", user.address],
+    ["🏢", "Doanh nghiệp", user.companyName || user.department || "Đối tác ngành may mặc"],
+    ["🎭", "Vai trò", user.role || "Khách hàng doanh nghiệp"],
   ];
-  return <>
-    {(user.bio || user.skills?.length > 0) && (
-      <CardSection title="Giới thiệu" mb="1.25rem">
-        <p style={{fontSize:".88rem",color:T.textMid,lineHeight:1.75}}>
-          {user.bio || <span style={{fontStyle:"italic",color:T.textLt}}>Chưa có thông tin giới thiệu.</span>}
-        </p>
-        {user.skills?.length > 0 && (
-          <div style={{display:"flex",flexWrap:"wrap",gap:".5rem",marginTop:"1rem"}}>
-            {user.skills.map(s=>(
-              <span key={s} style={{background:T.light,color:T.mid,fontSize:".75rem",fontWeight:700,padding:".3rem .8rem",borderRadius:20,border:`1px solid ${T.border}`}}>{s}</span>
+
+  const orderSummaryRows = [
+    ["📦", "Đơn đã hoàn thành", user.completedOrders ?? "—"],
+    ["🧵", "Đơn đang triển khai", user.activeProjects ?? "—"],
+    ["⭐", "Mức độ hợp tác", user.rating ?? "Tốt"],
+    ["🕒", "Lần tương tác gần nhất", user.lastOrderAt || user.joinDate || "Chưa cập nhật"],
+  ];
+
+  const defaultBio = user.bio || `Khách hàng là ${user.companyName || "một doanh nghiệp"} hoạt động trong lĩnh vực may mặc, tập trung vào các đơn hàng yêu cầu tiến độ ổn định, chất lượng đồng đều và khả năng phối hợp sản xuất dài hạn.`;
+
+  return (
+    <div style={{display:"grid",gridTemplateColumns:"1.05fr .95fr",gap:"1.25rem"}}>
+      <div>
+        <CardSection
+          title="Thông tin cá nhân khách hàng"
+          mb="1.25rem"
+          action={
+            <button onClick={onEdit} style={{background:"transparent",border:`1.5px solid ${T.base}`,color:T.mid,padding:".35rem .85rem",borderRadius:8,fontSize:".78rem",fontWeight:700,cursor:"pointer"}}>
+              ✏️ Chỉnh sửa
+            </button>
+          }
+        >
+          <div style={{paddingTop:".2rem"}}>
+            {customerProfileRows.map(([icon,label,value],i)=>(
+              <InfoRow key={label} icon={icon} label={label} value={value} last={i===customerProfileRows.length-1}/>
             ))}
           </div>
-        )}
-      </CardSection>
-    )}
-    <CardSection
-      title="Thông tin liên hệ" mb="0"
-      action={
-        <button onClick={onEdit} style={{background:"transparent",border:`1.5px solid ${T.base}`,color:T.mid,padding:".35rem .85rem",borderRadius:8,fontSize:".78rem",fontWeight:700,cursor:"pointer"}}>
-          ✏️ Chỉnh sửa
-        </button>
-      }
-    >
-      <div style={{paddingTop:".25rem"}}>
-        {INFO_ROWS.map(([icon,label,value],i)=>(
-          <InfoRow key={label} icon={icon} label={label} value={value} last={i===INFO_ROWS.length-1}/>
-        ))}
+        </CardSection>
+
+        <CardSection title="Giới thiệu khách hàng" mb="0">
+          <p style={{fontSize:".88rem",color:T.textMid,lineHeight:1.8}}>
+            {defaultBio}
+          </p>
+          {!!user.skills?.length && (
+            <div style={{display:"flex",flexWrap:"wrap",gap:".5rem",marginTop:"1rem"}}>
+              {user.skills.map((s)=>(
+                <span key={s} style={{background:T.light,color:T.mid,fontSize:".75rem",fontWeight:700,padding:".3rem .8rem",borderRadius:20,border:`1px solid ${T.border}`}}>
+                  {s}
+                </span>
+              ))}
+            </div>
+          )}
+        </CardSection>
       </div>
-    </CardSection>
-  </>;
+
+      <div>
+        <CardSection title="Tương tác và đơn hàng" mb="1.25rem">
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".75rem",marginBottom:"1rem"}}>
+            {orderSummaryRows.map(([icon,label,value])=>(
+              <div key={label} style={{border:`1px solid ${T.border}`,borderRadius:12,padding:".9rem",background:T.sand}}>
+                <div style={{fontSize:"1rem",marginBottom:".45rem"}}>{icon}</div>
+                <div style={{fontSize:".72rem",fontWeight:700,color:T.textLt,textTransform:"uppercase",letterSpacing:".04em",marginBottom:".25rem"}}>{label}</div>
+                <div style={{fontSize:".95rem",fontWeight:700,color:T.text}}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:".75rem",flexWrap:"wrap"}}>
+            <BtnPrimary onClick={onViewOrders}>📋 Xem đơn hàng</BtnPrimary>
+            <BtnSecondary onClick={onCreateOrder}>➕ Tạo yêu cầu mới</BtnSecondary>
+          </div>
+        </CardSection>
+
+        <CardSection title="Ghi chú hợp tác" mb="0">
+          <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
+            {[
+              "Ưu tiên cập nhật tiến độ đơn hàng theo từng giai đoạn sản xuất.",
+              "Theo dõi lịch sử tương tác để hỗ trợ báo giá và xử lý yêu cầu nhanh hơn.",
+              "Phù hợp với khách hàng là công ty may mặc, thương hiệu thời trang hoặc chủ doanh nghiệp lớn.",
+            ].map((item) => (
+              <div key={item} style={{display:"flex",gap:".65rem",alignItems:"flex-start",color:T.textMid,fontSize:".84rem",lineHeight:1.7}}>
+                <span style={{color:T.base,fontWeight:800}}>•</span>
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+        </CardSection>
+      </div>
+    </div>
+  );
 }
 
 function SectionSecurity() {
@@ -475,7 +525,7 @@ export default function ViewProfile() {
 
         {/* Content */}
         <main>
-          {tab==="info"     && <SectionInfo     user={profile} onEdit={()=>navigate("/profile/edit")}/>}
+          {tab==="info"     && <SectionInfo     user={profile} onEdit={()=>navigate("/profile/edit")} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
           {tab==="security" && <SectionSecurity/>}
           {tab==="activity" && <SectionActivity activities={profile?.activities||[]}/>}
         </main>

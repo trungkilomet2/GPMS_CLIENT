@@ -1239,7 +1239,7 @@ body {
 
 .avatar-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 2px);
   right: 0;
   min-width: 210px;
   background: #fff;
@@ -1366,7 +1366,7 @@ body {
 /* Dropdown */
 .avatar-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 2px);
   right: 0;
   min-width: 210px;
   background: #fff;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
@@ -13,6 +13,7 @@ export default function Header() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
+  const profileCloseTimer = useRef(null);
 
   // Load user từ localStorage khi mount
   // và lắng nghe event "auth-change" để re-render ngay sau login/logout
@@ -37,6 +38,12 @@ export default function Header() {
     return () => window.removeEventListener("click", close);
   }, []);
 
+  useEffect(() => () => {
+    if (profileCloseTimer.current) {
+      clearTimeout(profileCloseTimer.current);
+    }
+  }, []);
+
   const logout = () => {
     localStorage.removeItem("user");
     setUser(null);
@@ -51,6 +58,24 @@ export default function Header() {
     : "U";
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
+
+  const openProfileMenu = () => {
+    if (profileCloseTimer.current) {
+      clearTimeout(profileCloseTimer.current);
+      profileCloseTimer.current = null;
+    }
+    setProfileOpen(true);
+  };
+
+  const closeProfileMenuSoon = () => {
+    if (profileCloseTimer.current) {
+      clearTimeout(profileCloseTimer.current);
+    }
+    profileCloseTimer.current = setTimeout(() => {
+      setProfileOpen(false);
+      profileCloseTimer.current = null;
+    }, 120);
+  };
 
   return (
     <header className="header-root">
@@ -97,11 +122,6 @@ export default function Header() {
 
             {user ? (
               <>
-                {/* Greeting */}
-                <span style={{ fontSize: ".85rem", color: C.textMid, fontWeight: 500 }}>
-                  Xin chào, <strong style={{ color: C.green }}>{user.name}</strong>
-                </span>
-
                 {/* Cart */}
                 <button
                   onClick={() => navigate("/orders")}
@@ -112,21 +132,39 @@ export default function Header() {
                 </button>
 
                 {/* Avatar + dropdown */}
-                <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+                <div
+                  style={{ position: "relative", display: "flex", alignItems: "center" }}
+                  onClick={e => e.stopPropagation()}
+                  onMouseEnter={openProfileMenu}
+                  onMouseLeave={closeProfileMenuSoon}
+                >
                   <button
                     className="avatar-btn"
                     onClick={() => setProfileOpen(o => !o)}
                   >
-                    {user.avatarUrl
-                      ? <img src={user.avatarUrl} alt="avatar" className="avatar-img" />
-                      : <div className="avatar-initials">{initials}</div>
-                    }
-                    <span className="avatar-name">{user.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15 }}>
+                        <span style={{ fontSize: ".68rem", color: C.textMid, fontWeight: 500 }}>
+                          Xin chào,
+                        </span>
+                        <span style={{ fontSize: ".82rem", color: C.green, fontWeight: 700, maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {user.name}
+                        </span>
+                      </div>
+                      {user.avatarUrl
+                        ? <img src={user.avatarUrl} alt="avatar" className="avatar-img" />
+                        : <div className="avatar-initials">{initials}</div>
+                      }
+                    </div>
                     <span style={{ fontSize: ".65rem", opacity: .6 }}>▾</span>
                   </button>
 
                   {profileOpen && (
-                    <div className="avatar-dropdown">
+                    <div
+                      className="avatar-dropdown"
+                      onMouseEnter={openProfileMenu}
+                      onMouseLeave={closeProfileMenuSoon}
+                    >
                       <div className="avatar-dropdown-header">
                         <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{user.name}</div>
                         <div style={{ fontSize: ".75rem", color: C.textLight }}>{user.email}</div>

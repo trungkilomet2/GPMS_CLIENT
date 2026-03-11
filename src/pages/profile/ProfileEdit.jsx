@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
-import Breadcrumbs from "@/components/Breadcrumbs";
 
 /* ─── Design tokens ─── */
 const T = {
@@ -345,7 +344,6 @@ export default function ProfileEdit() {
   if (loading) return (
     <div style={{ fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif", overflowX: "hidden", background: "#fff" }}>
       <Header />
-      <Breadcrumbs />
       <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
         <style>{GLOBAL_CSS}</style>
         <div style={{ height: 150, background: `linear-gradient(120deg,${T.dark},${T.base})` }} />
@@ -365,7 +363,6 @@ export default function ProfileEdit() {
   return (
     <div style={{ fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif", overflowX: "hidden", background: "#fff" }}>
       <Header />
-      <Breadcrumbs />
       <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
         <style>{GLOBAL_CSS}</style>
 
