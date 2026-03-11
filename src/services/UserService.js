@@ -59,6 +59,7 @@ export const userService = {
   async getProfile() {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
       method:  "GET",
+      credentials: "omit",
       headers: authHeadersGet(),
     });
 
@@ -130,6 +131,7 @@ export const userService = {
 
     const res = await fetch(endpoint, {
       method:  "PUT",
+      credentials: "omit",
       headers: authHeadersForm(),
       body:    formData,
     });
