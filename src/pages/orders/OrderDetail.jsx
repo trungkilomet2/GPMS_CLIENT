@@ -242,7 +242,7 @@ export default function OrderDetail() {
                         <button
                             type="button"
                             onClick={() => setIsImageModalOpen(false)}
-                            className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white text-gray-700 shadow flex items-center justify-center"
+                            className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-gray-700 shadow flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-colors"
                         >
                             ×
                         </button>
