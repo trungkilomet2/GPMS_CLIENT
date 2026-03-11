@@ -463,12 +463,6 @@ export default function ProfileEdit() {
             </div>
             <RoleBadge>Đang chỉnh sửa hồ sơ</RoleBadge>
           </div>
-          <div className="pf-actions" style={{ display: "flex", gap: ".65rem", marginBottom: ".5rem" }}>
-            <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ</BtnSecondary>
-            <BtnPrimary onClick={handleSave} disabled={saving}>
-              {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
-            </BtnPrimary>
-          </div>
         </div>
 
         {/* ── Message banner ── */}
