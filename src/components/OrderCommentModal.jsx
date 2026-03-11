@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
 import CommentService from '@/services/CommentService';
+import BASE_URL from '@/lib/apiconfig';
 
 export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const [comments, setComments] = useState([]);
@@ -11,13 +12,68 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const scrollRef = useRef(null);
 
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const CURRENT_USER_ID = user.id || 2;
+    const CURRENT_USER_ID = user.userId ?? user.id ?? null;
+
+    const wsRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && orderId) {
             fetchComments();
         }
     }, [isOpen, orderId]);
+
+    useEffect(() => {
+        if (!isOpen || !orderId) return;
+
+        const base = BASE_URL?.replace(/^http/i, 'ws');
+        const token = localStorage.getItem('token');
+        const qs = new URLSearchParams({
+            orderId: String(orderId),
+            userId: String(CURRENT_USER_ID ?? ''),
+            ...(token ? { token } : {}),
+        }).toString();
+        const wsUrl = (import.meta?.env?.VITE_COMMENT_WS_URL || `${base}/ws/comments`) + `?${qs}`;
+
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+
+        ws.onopen = () => {
+            try {
+                ws.send(JSON.stringify({ type: 'subscribe', orderId, userId: CURRENT_USER_ID }));
+            } catch (err) {
+                // ignore if server doesn't need subscribe message
+            }
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const list = Array.isArray(data) ? data : [data];
+                list.forEach((msg) => {
+                    const msgOrderId = msg.toOrderId ?? msg.orderId ?? msg.OrderId;
+                    if (String(msgOrderId) !== String(orderId)) return;
+                    setComments((prev) => {
+                        const exists = prev.some((c) => c.id && msg.id && c.id === msg.id);
+                        return exists ? prev : [...prev, msg];
+                    });
+                });
+            } catch (err) {
+                // if server sends plain text, ignore
+            }
+        };
+
+        ws.onerror = () => {
+            // fallback: do nothing, keep manual fetch
+        };
+
+        ws.onclose = () => {
+            wsRef.current = null;
+        };
+
+        return () => {
+            ws.close();
+        };
+    }, [isOpen, orderId, CURRENT_USER_ID]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -82,6 +138,8 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
             await CommentService.createComment(commentPayload);
 
             setNewComment("");
+            // Optimistic update; websocket or fetch will sync later
+            setComments((prev) => [...prev, commentPayload]);
             await fetchComments();
         } catch (error) {
             console.error("Lỗi gửi bình luận:", error);

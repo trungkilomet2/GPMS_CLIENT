@@ -118,7 +118,7 @@ export default function OrderDetail() {
                                                 </div>
                                             </button>
                                         ) : (
-                                            <span className="text-[11px] text-gray-400">Chưa có ảnh</span>
+                                            <span className="text-[11px] text-gray-400">-</span>
                                         )}
                                     </div>
                                     <div className="text-xs text-gray-500 leading-relaxed">
@@ -138,7 +138,7 @@ export default function OrderDetail() {
                                 </div>
                                 <div className="p-0">
                                     <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
-                                    <DetailItem label="Đơn giá (CPU)" value={order.cpu ? `${order.cpu} VND/SP` : '---'} />
+                                    <DetailItem label="Đơn giá" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
                                     <DetailItem label="Tổng tiền đơn hàng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
                                     <DetailItem label="Ngày bắt đầu" value={formatDate(order.startDate)} />
                                     <DetailItem label="Ngày kết thúc" value={formatDate(order.endDate)} />
@@ -367,18 +367,19 @@ export default function OrderDetail() {
 
 // Sub-component hiển thị từng dòng thông tin
 function DetailItem({ label, value, isBold = false, isEmerald = false }) {
+    const displayValue = value === null || value === undefined || value === '' ? '-' : value;
     return (
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30">
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{label}</span>
             <span className={`text-sm ${isBold ? 'font-bold text-gray-900' : 'font-medium text-gray-700'} ${isEmerald ? 'text-emerald-700 font-bold' : ''}`}>
-                {value || "---"}
+                {displayValue}
             </span>
         </div>
     );
 }
 
 function formatDate(dateString) {
-    if (!dateString) return "---";
+    if (!dateString) return "-";
     return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateString));
 }
 

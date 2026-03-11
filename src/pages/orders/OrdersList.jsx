@@ -145,7 +145,7 @@ export default function Orders() {
     };
 
     const formatDate = (value) => {
-        if (!value) return '—';
+        if (!value) return '-';
         return new Date(value).toLocaleDateString('vi-VN');
     };
 
@@ -233,24 +233,24 @@ export default function Orders() {
                                     ) : (
                                         pageData.map((o) => (
                                             <tr key={o.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-4 py-3 text-sm text-slate-600 font-medium">{`#ĐH-${o.id}`}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-600 font-medium">{o.id ? `#ĐH-${o.id}` : '-'}</td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <div className="w-12 h-12 border border-slate-200 bg-slate-50 rounded overflow-hidden flex items-center justify-center mx-auto">
-                                                        {o.image ? (
+                                                    {o.image ? (
+                                                        <div className="w-12 h-12 border border-slate-200 bg-slate-50 rounded overflow-hidden flex items-center justify-center mx-auto">
                                                             <img src={o.image} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-400">No image</span>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">-</span>
+                                                    )}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-slate-900 font-medium truncate">{o.orderName || '—'}</td>
-                                                <td className="px-3 py-3 text-sm text-slate-700 text-center">{o.size || '—'}</td>
-                                                <td className="px-3 py-3 text-sm text-slate-700">{o.color || '—'}</td>
-                                                <td className="px-3 py-3 text-sm text-slate-700 text-center font-medium">{o.quantity || '—'}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-900 font-medium truncate">{o.orderName || '-'}</td>
+                                                <td className="px-3 py-3 text-sm text-slate-700 text-center">{o.size || '-'}</td>
+                                                <td className="px-3 py-3 text-sm text-slate-700">{o.color || '-'}</td>
+                                                <td className="px-3 py-3 text-sm text-slate-700 text-center font-medium">{o.quantity ?? '-'}</td>
                                                 <td className="px-4 py-3 text-sm text-slate-700 text-center">{formatDate(o.endDate)}</td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLOR[o.status] || STATUS_COLOR.default}`}>
-                                                        {STATUS_LABEL[o.status] || o.status}
+                                                        {STATUS_LABEL[o.status] || o.status || '-'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">

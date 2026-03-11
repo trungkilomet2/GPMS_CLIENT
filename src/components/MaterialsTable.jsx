@@ -78,21 +78,23 @@ export default function MaterialsTable({
                     <tr key={i} className={styles.row}>
                         {showImage && (
                             <td className="px-4 py-3 text-center align-middle">
-                                <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
-                                    {m.image || m.imagePreview ? (
+                                {m.image || m.imagePreview ? (
+                                    <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
                                         <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                    )}
-                                </div>
+                                    </div>
+                                ) : (
+                                    <span className="text-[11px] text-gray-400 inline-flex w-full justify-center">-</span>
+                                )}
                             </td>
                         )}
                         <td className={styles.name}>{m.materialName}</td>
                         <td className={styles.value}>{m.value}</td>
                         <td className={styles.uom}>{m.uom}</td>
-                        {showNote && <td className={styles.uom}>{m.note || '---'}</td>}
+                        {showNote && (
+                            <td className={styles.uom}>
+                                {m.note ? m.note : <span className="inline-flex w-full justify-center text-gray-400">-</span>}
+                            </td>
+                        )}
                         {showActions && (
                             <td className="px-4 py-3 text-right align-middle">
                                 <div className="flex gap-3 justify-end items-center">
