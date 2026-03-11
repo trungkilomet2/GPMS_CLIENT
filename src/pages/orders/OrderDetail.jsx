@@ -54,6 +54,17 @@ export default function OrderDetail() {
         </MainLayout>
     );
 
+    const templates = order?.templates ?? order?.template ?? order?.files ?? [];
+    const softTemplates = templates.filter((t) => {
+        const type = (t.type ?? '').toString().toLowerCase();
+        return type.includes('soft') || !!t.file || !!t.url;
+    });
+    const hardTemplates = templates.filter((t) => {
+        const type = (t.type ?? '').toString().toLowerCase();
+        return type.includes('hard');
+    });
+    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+
     return (
         <MainLayout>
             <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900">
@@ -91,11 +102,9 @@ export default function OrderDetail() {
                             </div>
 
                             <div className="px-5 py-4 border-b border-gray-100">
-                                <div className="flex items-center justify-between mb-3">
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Ảnh đơn hàng</p>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="w-28 h-28 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
+                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-3">Ảnh đơn hàng</div>
+                                <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
+                                    <div className="w-32 h-32 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
                                         {order.image ? (
                                             <button
                                                 type="button"
@@ -124,15 +133,15 @@ export default function OrderDetail() {
                                     <DetailItem label="Mã đơn hàng" value={`#ĐH-${order.id}`} />
                                     <DetailItem label="Tên đơn hàng" value={order.orderName} isBold />
                                     <DetailItem label="Loại đơn hàng" value={order.type} />
-                                    <DetailItem label="Kích thước (Size)" value={order.size} />
                                     <DetailItem label="Màu sắc" value={order.color} />
+                                    <DetailItem label="Kích thước (Size)" value={order.size} />
                                 </div>
                                 <div className="p-0">
                                     <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="Đơn giá (CPU)" value={order.cpu ? `${order.cpu} VND/SP` : '---'} />
+                                    <DetailItem label="Tổng tiền đơn hàng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
                                     <DetailItem label="Ngày bắt đầu" value={formatDate(order.startDate)} />
                                     <DetailItem label="Ngày kết thúc" value={formatDate(order.endDate)} />
-                                    <DetailItem label="Mẫu thiết kế bản cứng" value={`${order.hardCopy || 0} bản`} />
-                                    <DetailItem label="Đơn giá (CPU)" value={order.cpu ? `${order.cpu} VND/SP` : '---'} />
                                 </div>
                             </div>
 
@@ -162,25 +171,44 @@ export default function OrderDetail() {
 
                     {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                     <div className="space-y-6">
-                        <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
-                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Mẫu thiết kế bản mềm</h2>
-                            <div className="space-y-2">
-                                {order.files?.length > 0 ? (
-                                    order.files.map((file, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 rounded border border-gray-100 hover:border-emerald-200 transition-all">
-                                            <div className="flex items-center gap-3 overflow-hidden">
-                                                <FileText size={18} className="text-emerald-600 shrink-0" />
-                                                <div className="overflow-hidden">
-                                                    <p className="text-sm font-bold text-gray-700 truncate">{file.name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>
+                        <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
+                            <div>
+                                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
+                                <div className="space-y-2">
+                                    {softTemplates.length > 0 ? (
+                                        softTemplates.map((file, idx) => {
+                                            const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
+                                            const fileUrl = file.file ?? file.url ?? '';
+                                            return (
+                                                <div key={idx} className="flex items-center justify-between p-3 rounded border border-gray-100 hover:border-emerald-200 transition-all">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <FileText size={18} className="text-emerald-600 shrink-0" />
+                                                        <div className="overflow-hidden">
+                                                            <p className="text-sm font-bold text-gray-700 truncate">{fileName}</p>
+                                                            {file.size && <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>}
+                                                        </div>
+                                                    </div>
+                                                    {fileUrl ? (
+                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-gray-400 hover:text-emerald-600">
+                                                            <Download size={16} />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-400">Không có link</span>
+                                                    )}
                                                 </div>
-                                            </div>
-                                            <button className="text-gray-400 hover:text-emerald-600"><Download size={16} /></button>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-center py-4 text-gray-400 text-[11px] italic">Không có file thiết kế</p>
-                                )}
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-center py-4 text-gray-400 text-[11px] italic">Không có file thiết kế</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Bản cứng</h2>
+                                <div className="text-sm font-semibold text-gray-700">
+                                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
+                                </div>
                             </div>
                         </div>
 
@@ -205,7 +233,11 @@ export default function OrderDetail() {
             <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
             <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
             {order.image && isImageModalOpen && (
-                <div className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4" onClick={() => setIsImageModalOpen(false)}>
+                <div
+                    className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4 overscroll-none touch-none"
+                    onClick={() => setIsImageModalOpen(false)}
+                    onWheelCapture={(e) => e.preventDefault()}
+                >
                     <div className="relative w-full max-w-4xl h-[80vh]" onClick={(e) => e.stopPropagation()}>
                         <button
                             type="button"
@@ -264,6 +296,15 @@ export default function OrderDetail() {
                             <div
                                 ref={imageContainerRef}
                                 className="flex-1 bg-black/5 flex items-center justify-center p-2 overflow-hidden"
+                                onWheel={(e) => {
+                                    if (!e.ctrlKey && Math.abs(e.deltaY) < 1) return;
+                                    e.preventDefault();
+                                    setImageZoom((z) => {
+                                        const next = Math.min(3, Math.max(1, Number((z + (e.deltaY > 0 ? -0.1 : 0.1)).toFixed(2))));
+                                        if (next === 1) setImagePan({ x: 0, y: 0 });
+                                        return next;
+                                    });
+                                }}
                                 onPointerDown={(e) => {
                                     if (imageZoom <= 1) return;
                                     setIsDragging(true);
