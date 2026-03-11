@@ -69,7 +69,6 @@ export const userService = {
     // Sync localStorage
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
     localStorage.setItem("user", JSON.stringify({ ...stored, ...profile }));
-    window.dispatchEvent(new Event("auth-change"));
 
     return profile;
   },
