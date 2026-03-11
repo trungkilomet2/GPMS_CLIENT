@@ -58,7 +58,7 @@ export default function CreateOrder() {
     // 2. State quản lý thông tin đơn hàng
     const [orderData, setOrderData] = useState({
         userId: userId, // Có thể lấy từ LocalStorage nếu cần
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTQsTBf5IHNCDXiFB_PjTIuyi9FdnM6-wGyTg&s",
+        image: "",
         orderName: '',
         type: '',
         size: '',
@@ -88,6 +88,7 @@ export default function CreateOrder() {
     const validateForm = () => {
         let newErrors = {};
 
+        if (!orderImageFile && !orderData.image) newErrors.image = "Vui lòng chọn ảnh đơn hàng";
         if (!orderData.orderName?.trim()) newErrors.orderName = "Tên đơn hàng không được để trống";
         if (!orderData.type?.trim()) newErrors.type = "Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)";
         if (!orderData.size?.trim()) newErrors.size = "Kích thước không được để trống";
@@ -98,6 +99,12 @@ export default function CreateOrder() {
         if (orderData.size.length > 5) newErrors.size = "Kích thước quá dài, tối đa 5 ký tự";
         if (!orderData.startDate) {
             newErrors.startDate = "Vui lòng chọn ngày bắt đầu";
+        } else {
+            const today = new Date();
+            const todayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().split('T')[0];
+            if (orderData.startDate < todayStr) {
+                newErrors.startDate = "Ngày bắt đầu không được trước ngày hiện tại";
+            }
         }
         if (!orderData.endDate) {
             newErrors.endDate = "Vui lòng chọn ngày kết thúc";
@@ -128,41 +135,66 @@ export default function CreateOrder() {
         }
     };
 
-    const handleSaveMaterial = async () => {
-        let imageUrl = materialFormData.image || '';
-        if (materialFormData.imageFile) {
-            try {
-                const uploadRes = await CloudinaryService.uploadImage(materialFormData.imageFile);
-                imageUrl = uploadRes?.url || '';
-            } catch (err) {
-                alert('Không thể upload ảnh vật liệu. Vui lòng thử lại.');
-                return;
-            }
-        }
+    const parseMaterialValue = (val) => {
+        if (val === null || val === undefined) return 0;
+        const s = String(val).replace(',', '.').trim();
+        const n = Number(s);
+        return Number.isNaN(n) ? 0 : n;
+    };
 
-        const newMaterial = {
+    const handleSaveMaterial = async () => {
+        const pendingMaterial = {
             materialName: materialFormData.materialName,
-            value: Number(materialFormData.value),
+            value: parseMaterialValue(materialFormData.value),
             uom: materialFormData.uom,
-            image: imageUrl,
-            imageFile: null,
-            imagePreview: imageUrl || materialFormData.imagePreview || '',
+            image: materialFormData.image || '',
+            imageFile: materialFormData.imageFile || null,
+            imagePreview: materialFormData.imagePreview || materialFormData.image || '',
             note: materialFormData.note?.trim() || '',
         };
 
+        let targetIndex = editingIndex;
         if (editingIndex === null) {
-            setMaterials([...materials, newMaterial]);
+            setMaterials((prev) => {
+                targetIndex = prev.length;
+                return [...prev, pendingMaterial];
+            });
         } else {
-            const updated = [...materials];
-            updated[editingIndex] = newMaterial;
-            setMaterials(updated);
+            setMaterials((prev) => {
+                const updated = [...prev];
+                updated[editingIndex] = pendingMaterial;
+                return updated;
+            });
         }
 
-        // Xóa lỗi phần vật liệu nếu có
         if (errors.materials) {
             setErrors(prev => ({ ...prev, materials: null }));
         }
         setIsModalOpen(false);
+
+        if (pendingMaterial.imageFile) {
+            try {
+                const uploadRes = await CloudinaryService.uploadImage(pendingMaterial.imageFile);
+                const imageUrl = uploadRes?.url || '';
+                if (imageUrl) {
+                    setMaterials((prev) => {
+                        const updated = [...prev];
+                        const idx = targetIndex;
+                        if (updated[idx]) {
+                            updated[idx] = {
+                                ...updated[idx],
+                                image: imageUrl,
+                                imageFile: null,
+                                imagePreview: imageUrl,
+                            };
+                        }
+                        return updated;
+                    });
+                }
+            } catch (err) {
+                // keep preview; user can edit to retry
+            }
+        }
     };
 
     const totalCost = (Number(orderData.quantity) || 0) * (Number(orderData.cpu) || 0);
@@ -379,6 +411,11 @@ export default function CreateOrder() {
                                         </label>
                                         <div className="text-[11px] text-gray-500">JPG/JPEG/PNG, tối đa 2MB</div>
                                     </div>
+                                    {errors.image && (
+                                        <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold mt-2">
+                                            <AlertCircle size={12} /> {errors.image}
+                                        </div>
+                                    )}
                                 </div>
                                 <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
                                 <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
@@ -393,6 +430,54 @@ export default function CreateOrder() {
                                 <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
                             </div>
                         </div>
+                        {/* 2. Vật liệu cung cấp */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
+                            <div className="flex items-center justify-between mb-4 border-b pb-2">
+                                <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingIndex(null);
+                                        setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
+                                        setIsModalOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                                >
+                                    <Plus size={18} /> Thêm vật liệu
+                                </button>
+                            </div>
+
+                            {errors.materials && (
+                                <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
+                                    <AlertCircle size={16} /> {errors.materials}
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <MaterialsTable
+                                    materials={materials}
+                                    variant="create"
+                                    showImage
+                                    showActions
+                                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
+                                    onEdit={(i) => {
+                                        setEditingIndex(i);
+                                        setMaterialFormData({
+                                            materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                            value: materials[i].value ?? materials[i].quantity ?? '',
+                                            uom: materials[i].uom ?? '',
+                                            image: materials[i].image ?? '',
+                                            imageFile: null,
+                                            imagePreview: '',
+                                            note: materials[i].note ?? '',
+                                        });
+                                        setIsModalOpen(true);
+                                    }}
+                                    onDelete={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                />
+                            </div>
+                        </div>
+
                         {/* 2.5. Mẫu thiết kế */}
                         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
                             <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Mẫu thiết kế</h2>
@@ -440,55 +525,6 @@ export default function CreateOrder() {
                                         className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                     />
                                 </div>
-                            </div>
-                        </div>
-
-
-                        {/* 2. Vật liệu cung cấp */}
-                        <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
-                            <div className="flex items-center justify-between mb-4 border-b pb-2">
-                                <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setEditingIndex(null);
-                                        setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
-                                        setIsModalOpen(true);
-                                    }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
-                                >
-                                    <Plus size={18} /> Thêm vật liệu
-                                </button>
-                            </div>
-
-                            {errors.materials && (
-                                <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
-                                    <AlertCircle size={16} /> {errors.materials}
-                                </div>
-                            )}
-
-                            <div className="overflow-x-auto">
-                                <MaterialsTable
-                                    materials={materials}
-                                    variant="create"
-                                    showImage
-                                    showActions
-                                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
-                                    onEdit={(i) => {
-                                        setEditingIndex(i);
-                                        setMaterialFormData({
-                                            materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                            value: materials[i].value ?? materials[i].quantity ?? '',
-                                            uom: materials[i].uom ?? '',
-                                            image: materials[i].image ?? '',
-                                            imageFile: null,
-                                            imagePreview: materials[i].image ?? '',
-                                            note: materials[i].note ?? '',
-                                        });
-                                        setIsModalOpen(true);
-                                    }}
-                                    onDelete={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
-                                />
                             </div>
                         </div>
 

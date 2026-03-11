@@ -44,14 +44,24 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
         }
     };
 
+    const isDecimalUom = (uom) => ['Mét', 'Kg', 'Yards'].includes(uom);
+    const normalizeNumber = (val) => {
+        if (val === null || val === undefined) return NaN;
+        const s = String(val).replace(',', '.').trim();
+        return Number(s);
+    };
+
     const handleValidateAndSave = async () => {
         let newErrors = {};
 
         if (!formData.materialName?.trim()) {
             newErrors.materialName = "Tên vật liệu không được để trống";
         }
-        if (!formData.value || Number(formData.value) <= 0) {
+        const parsedValue = normalizeNumber(formData.value);
+        if (!formData.value || Number.isNaN(parsedValue) || parsedValue <= 0) {
             newErrors.value = "Số lượng phải lớn hơn 0";
+        } else if (!isDecimalUom(formData.uom) && !Number.isInteger(parsedValue)) {
+            newErrors.value = "Đơn vị này chỉ cho phép số nguyên";
         }
         if (!formData.uom) {
             newErrors.uom = "Vui lòng chọn đơn vị tính";
@@ -131,6 +141,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                                 name="value"
                                 value={formData.value || ''}
                                 onChange={handleInputChange}
+                                step={isDecimalUom(formData.uom) ? '0.01' : '1'}
                                 className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none ${errors.value ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`}
                             />
                             {errors.value && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.value}</p>}
