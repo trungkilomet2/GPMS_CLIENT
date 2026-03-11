@@ -1,5 +1,32 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
+async function loadProfileAfterLogin(token) {
+  try {
+    const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) return null;
+
+    const json = await res.json().catch(() => ({}));
+    const d = json?.data ?? {};
+
+    return {
+      fullName: d.fullName || "",
+      name: d.fullName || "",
+      email: d.email || "",
+      phoneNumber: d.phoneNumber || "",
+      phone: d.phoneNumber || "",
+      avatarUrl: d.avartarUrl || "",
+      location: d.location || "",
+      address: d.location || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export const authService = {
   async login(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
@@ -52,12 +79,21 @@ export const authService = {
       avatarUrl: "",
     };
 
-    localStorage.setItem("user", JSON.stringify(basicUser));
+    const profile = await loadProfileAfterLogin(token);
+    const user = {
+      ...basicUser,
+      ...(profile ?? {}),
+      name: profile?.fullName || profile?.name || basicUser.name,
+      fullName: profile?.fullName || basicUser.fullName,
+      avatarUrl: profile?.avatarUrl || basicUser.avatarUrl,
+    };
+
+    localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("userId", userId);
 
     window.dispatchEvent(new Event("auth-change"));
 
-    return { token, user: basicUser };
+    return { token, user };
   },
 
   async register(payload) {

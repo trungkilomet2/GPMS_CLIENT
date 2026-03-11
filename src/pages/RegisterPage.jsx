@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authService } from "../services/authService";
+import {
+  normalizeSpaces,
+  validateConfirmPassword,
+  validateEmail,
+  validateFullName,
+  validatePassword,
+  validatePhoneNumber,
+  validateUserName,
+} from "@/lib/validators";
 import "../styles/login.css";
 import "../styles/register.css";
 
@@ -23,51 +32,25 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
 
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const validatePhone = (phone) => /^(0|\+84)[0-9]{9,10}$/.test(phone);
+  const validateField = (name, value, nextForm = formData) => {
+    if (name === "fullName") return validateFullName(value);
+    if (name === "userName") return validateUserName(value);
+    if (name === "phoneNumber") return validatePhoneNumber(value);
+    if (name === "email") return validateEmail(value);
+    if (name === "password") return validatePassword(value);
+    if (name === "confirmPassword") {
+      return validateConfirmPassword(nextForm.password, value);
+    }
+    if (name === "agree") return value ? "" : "Bạn phải đồng ý với điều khoản";
+    return "";
+  };
 
   const validateForm = () => {
     const newErrors = {};
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Vui lòng nhập họ và tên";
-    } else if (formData.fullName.trim().length < 2) {
-      newErrors.fullName = "Họ và tên phải có ít nhất 2 ký tự";
-    }
-
-    if (!formData.userName.trim()) {
-      newErrors.userName = "Vui lòng nhập tên đăng nhập";
-    } else if (formData.userName.trim().length < 3) {
-      newErrors.userName = "Tên đăng nhập phải có ít nhất 3 ký tự";
-    }
-
-    if (!formData.phoneNumber.trim()) {
-      newErrors.phoneNumber = "Vui lòng nhập số điện thoại";
-    } else if (!validatePhone(formData.phoneNumber.trim())) {
-      newErrors.phoneNumber = "Số điện thoại không hợp lệ";
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Vui lòng nhập email";
-    } else if (!validateEmail(formData.email.trim())) {
-      newErrors.email = "Email không hợp lệ";
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = "Vui lòng nhập mật khẩu";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
-    }
-
-    if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = "Vui lòng nhập xác nhận mật khẩu";
-    } else if (formData.confirmPassword !== formData.password) {
-      newErrors.confirmPassword = "Mật khẩu xác nhận không khớp";
-    }
-
-    if (!formData.agree) {
-      newErrors.agree = "Bạn phải đồng ý với điều khoản";
-    }
+    Object.keys(formData).forEach((key) => {
+      const message = validateField(key, formData[key], formData);
+      if (message) newErrors[key] = message;
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -75,15 +58,19 @@ export default function RegisterPage() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const nextValue = type === "checkbox" ? checked : value;
+    const nextForm = {
+      ...formData,
+      [name]: nextValue,
+    };
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-
+    setFormData(nextForm);
     setErrors((prev) => ({
       ...prev,
-      [name]: "",
+      [name]: validateField(name, nextValue, nextForm),
+      ...(name === "password"
+        ? { confirmPassword: validateField("confirmPassword", nextForm.confirmPassword, nextForm) }
+        : {}),
     }));
   };
 
@@ -97,7 +84,7 @@ const handleSubmit = async (e) => {
 
     const payload = {
   userName: formData.userName.trim(),
-  fullName: formData.fullName.trim(),
+  fullName: normalizeSpaces(formData.fullName),
   password: formData.password,
   rePassword: formData.confirmPassword,
 };

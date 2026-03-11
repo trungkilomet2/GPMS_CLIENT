@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
+import {
+  normalizeSpaces,
+  validateAvatarFile,
+  validateEmail,
+  validateFullName,
+  validateLocation,
+  validatePhoneNumber,
+} from "@/lib/validators";
 
 /* ─── Design tokens ─── */
 const T = {
@@ -110,12 +118,48 @@ function FormField({ label, required, error, hint, children }) {
   );
 }
 
+function getApiErrorDetails(errData) {
+  const fieldErrors = errData?.errors && typeof errData.errors === "object"
+    ? Object.entries(errData.errors).flatMap(([field, messages]) =>
+        (Array.isArray(messages) ? messages : [messages]).map((message) => ({
+          field,
+          message: String(message),
+        }))
+      )
+    : [];
+
+  const message =
+    fieldErrors[0]?.message ||
+    errData?.detail ||
+    errData?.title ||
+    errData?.message ||
+    "Lưu thất bại. Vui lòng thử lại.";
+
+  return { message, fieldErrors };
+}
+
+async function buildAvatarFile(avatarFile, avatarPreview) {
+  if (avatarFile) return avatarFile;
+  if (typeof avatarPreview !== "string" || !/^https?:\/\//i.test(avatarPreview)) {
+    return null;
+  }
+
+  const response = await fetch(avatarPreview);
+  if (!response.ok) {
+    throw new Error("Không thể tải lại ảnh đại diện hiện tại.");
+  }
+
+  const blob = await response.blob();
+  const extension = blob.type.split("/")[1] || "jpg";
+  return new File([blob], `avatar.${extension}`, { type: blob.type || "image/jpeg" });
+}
+
 /* ─── Input ─── */
-function Input({ name, value, onChange, type = "text", placeholder = "", hasError }) {
+function Input({ name, value, onChange, onBlur, type = "text", placeholder = "", hasError }) {
   return (
     <input
       className="pf-input"
-      type={type} name={name} value={value ?? ""} onChange={onChange}
+      type={type} name={name} value={value ?? ""} onChange={onChange} onBlur={onBlur}
       placeholder={placeholder}
       style={{
         width: "100%", padding: ".65rem .9rem",
@@ -227,6 +271,14 @@ export default function ProfileEdit() {
   const [msg,       setMsg]       = useState(null);   // {type, text}
   const [touched,   setTouched]   = useState({});
 
+  const validateField = (name, value) => {
+    if (name === "FullName") return validateFullName(value);
+    if (name === "Email") return validateEmail(value);
+    if (name === "PhoneNumber") return validatePhoneNumber(value);
+    if (name === "Location") return validateLocation(value);
+    return "";
+  };
+
   /* ── Load profile ── */
   useEffect(() => {
     const stored = localStorage.getItem("user");
@@ -269,26 +321,40 @@ export default function ProfileEdit() {
   const handle = (e) => {
     const { name, value } = e.target;
     setForm(f => ({ ...f, [name]: value }));
-    setTouched(p => ({ ...p, [name]: true }));
-    if (msg?.type === "error") setMsg(null);
+    if (name !== "Avatar") {
+      setMsg(null);
+    }
+  };
+
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
   };
 
   /* ── Avatar: chọn file → preview ngay, lưu File object ── */
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const avatarError = validateAvatarFile(file);
+    if (avatarError) {
+      setTouched((prev) => ({ ...prev, Avatar: true }));
+      setMsg({ type: "error", text: avatarError });
+      e.target.value = "";
+      return;
+    }
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
+    setTouched((prev) => ({ ...prev, Avatar: true }));
+    setMsg(null);
   };
 
   /* ── Validation ── */
   const validate = () => {
     const errs = {};
-    if (!form.FullName.trim())    errs.FullName    = "Bắt buộc nhập họ tên";
-    if (!form.Email.trim())       errs.Email       = "Bắt buộc nhập email";
-    else if (!/\S+@\S+\.\S+/.test(form.Email)) errs.Email = "Email không hợp lệ";
-    if (!form.PhoneNumber.trim()) errs.PhoneNumber = "Bắt buộc nhập số điện thoại";
-    if (!form.Location.trim())    errs.Location    = "Bắt buộc nhập địa chỉ";
+    ["FullName", "Email", "PhoneNumber", "Location"].forEach((key) => {
+      const message = validateField(key, form[key]);
+      if (message) errs[key] = message;
+    });
     return errs;
   };
 
@@ -309,18 +375,21 @@ export default function ProfileEdit() {
 
       const stored = localStorage.getItem("user");
       const user   = stored ? JSON.parse(stored) : null;
+      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview);
+
+      if (!avatarUpload) {
+        setMsg({ type: "error", text: "Vui lòng chọn ảnh đại diện." });
+        setSaving(false);
+        return;
+      }
 
       // Tạo FormData gửi đúng theo API
       const fd = new FormData();
-      fd.append("FullName",    form.FullName);
-      fd.append("PhoneNumber", form.PhoneNumber);
-      fd.append("Location",    form.Location);
-      fd.append("Email",       form.Email);
-
-      // AvartarUrl là file binary — chỉ append nếu user chọn file mới
-      if (avatarFile) {
-        fd.append("AvartarUrl", avatarFile);
-      }
+      fd.append("FullName", normalizeSpaces(form.FullName));
+      fd.append("PhoneNumber", form.PhoneNumber.trim());
+      fd.append("Location", normalizeSpaces(form.Location));
+      fd.append("Email", form.Email.trim());
+      fd.append("AvartarUrl", avatarUpload);
 
       await userService.updateProfile(user.userId ?? user.id, fd);
 
@@ -328,10 +397,15 @@ export default function ProfileEdit() {
       setTimeout(() => navigate("/profile"), 1400);
     } catch (err) {
       const errData = err?.response?.data;
-      const errMsg  = errData?.title || errData?.message
-        || Object.values(errData?.errors || {}).flat()[0]
-        || "Lưu thất bại. Vui lòng thử lại.";
-      setMsg({ type: "error", text: errMsg });
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+
+      if (fieldErrors.length > 0) {
+        const mappedTouched = { FullName: true, Email: true, PhoneNumber: true, Location: true };
+        setTouched((prev) => ({ ...prev, ...mappedTouched }));
+      }
+
+      console.error("update-profile error:", errData);
+      setMsg({ type: "error", text: message });
     } finally {
       setSaving(false);
     }
@@ -426,47 +500,25 @@ export default function ProfileEdit() {
             {/* ─ Thông tin cá nhân ─ */}
             <CardSection title="Thông tin cá nhân" mb="0">
               <FormField label="Họ và tên" required error={touched.FullName && errs.FullName}>
-                <Input name="FullName" value={form.FullName} onChange={handle}
+                <Input name="FullName" value={form.FullName} onChange={handle} onBlur={handleBlur}
                   placeholder="Nguyễn Văn A" hasError={!!(touched.FullName && errs.FullName)} />
               </FormField>
 
               <FormField label="Email" required error={touched.Email && errs.Email}>
-                <Input name="Email" type="email" value={form.Email} onChange={handle}
+                <Input name="Email" type="email" value={form.Email} onChange={handle} onBlur={handleBlur}
                   placeholder="email@example.com" hasError={!!(touched.Email && errs.Email)} />
               </FormField>
 
               <FormField label="Số điện thoại" required error={touched.PhoneNumber && errs.PhoneNumber}>
-                <Input name="PhoneNumber" value={form.PhoneNumber} onChange={handle}
+                <Input name="PhoneNumber" value={form.PhoneNumber} onChange={handle} onBlur={handleBlur}
                   placeholder="(+84) 0xx xxx xxx" hasError={!!(touched.PhoneNumber && errs.PhoneNumber)} />
               </FormField>
 
               <FormField label="Địa chỉ / Khu vực" required error={touched.Location && errs.Location}>
-                <Input name="Location" value={form.Location} onChange={handle}
+                <Input name="Location" value={form.Location} onChange={handle} onBlur={handleBlur}
                   placeholder="Số nhà, đường, quận, thành phố" hasError={!!(touched.Location && errs.Location)} />
               </FormField>
 
-              {/* Avatar file picker — hiển thị tên file đã chọn */}
-              <FormField
-                label="Ảnh đại diện"
-                hint={avatarFile ? `✅ Đã chọn: ${avatarFile.name}` : "Hoặc nhấn vào ảnh đại diện bên trên để chọn ảnh"}
-              >
-                <label style={{
-                  display: "flex", alignItems: "center", gap: ".6rem",
-                  padding: ".6rem .9rem",
-                  border: `1.5px dashed ${T.border}`,
-                  borderRadius: 8, cursor: "pointer",
-                  background: T.sand, fontSize: ".84rem", color: T.textMid,
-                  transition: ".15s",
-                }}>
-                  <span>📁</span>
-                  <span>{avatarFile ? avatarFile.name : "Chọn tệp ảnh…"}</span>
-                  <input
-                    type="file" accept="image/*"
-                    style={{ display: "none" }}
-                    onChange={handleAvatarChange}
-                  />
-                </label>
-              </FormField>
             </CardSection>
 
             {/* ─ Preview avatar + thông tin xem trước ─ */}

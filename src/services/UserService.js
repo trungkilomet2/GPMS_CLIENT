@@ -80,7 +80,12 @@ export const userService = {
    * Fields: FullName, PhoneNumber, AvartarUrl (file binary), Location, Email
    */
   async updateProfile(_userId, formData) {
-    const res = await fetch(API_ENDPOINTS.USER.UPDATE_PROFILE, {
+    const userId = _userId ?? getUserId();
+    const endpoint = userId
+      ? `${API_ENDPOINTS.USER.UPDATE_PROFILE}?id=${encodeURIComponent(userId)}`
+      : API_ENDPOINTS.USER.UPDATE_PROFILE;
+
+    const res = await fetch(endpoint, {
       method:  "PUT",
       headers: authHeadersForm(),
       body:    formData,

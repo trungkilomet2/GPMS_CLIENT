@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authService } from "@/services/authService";
+import { validatePassword, validateUserName } from "@/lib/validators";
 import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
@@ -13,6 +14,12 @@ export default function LoginPage() {
   const [formData,     setFormData]     = useState(initialValues);
   const [errors,       setErrors]       = useState({});
 
+  const validateField = (name, value) => {
+    if (name === "userName") return validateUserName(value);
+    if (name === "password") return validatePassword(value);
+    return "";
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem("rememberUserName");
     if (saved) {
@@ -22,11 +29,11 @@ export default function LoginPage() {
   }, []);
 
   const validate = () => {
-    const e = {};
-    if (!formData.userName.trim())              e.userName = "Vui lòng nhập tên đăng nhập";
-    else if (formData.userName.trim().length < 3) e.userName = "Tên đăng nhập phải có ít nhất 3 ký tự";
-    if (!formData.password.trim())              e.password = "Vui lòng nhập mật khẩu";
-    else if (formData.password.length < 6)      e.password = "Mật khẩu phải có ít nhất 6 ký tự";
+    const e = {
+      userName: validateField("userName", formData.userName),
+      password: validateField("password", formData.password),
+    };
+    Object.keys(e).forEach((key) => !e[key] && delete e[key]);
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -34,7 +41,7 @@ export default function LoginPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(p => ({ ...p, [name]: value }));
-    setErrors(p => ({ ...p, [name]: "" }));
+    setErrors(p => ({ ...p, [name]: validateField(name, value) }));
   };
 
   const handleSubmit = async (e) => {

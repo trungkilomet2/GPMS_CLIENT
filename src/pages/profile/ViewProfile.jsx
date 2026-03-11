@@ -416,22 +416,7 @@ export default function ViewProfile() {
           overflow:"visible",   /* ← FIX: không clip avatar bên dưới */
           zIndex:0,
         }}
-      >
-        {/* Rings chỉ là decor, clip bằng wrapper riêng */}
-        <div style={{position:"absolute",inset:0,overflow:"hidden",borderRadius:"inherit",zIndex:0}}>
-          {[
-            {w:420,h:420,top:-180,right:-80},
-            {w:260,h:260,top:-80,right:40},
-            {w:180,h:180,bottom:-60,left:"10%"},
-          ].map((s,i)=>(
-            <div key={i} style={{
-              position:"absolute",borderRadius:"50%",
-              border:"1px solid rgba(255,255,255,.12)",
-              width:s.w,height:s.h,top:s.top,right:s.right,bottom:s.bottom,left:s.left,
-            }}/>
-          ))}
-        </div>
-      </div>
+      />
 
       {/* ── Avatar row — nổi lên trên cover ── */}
       <div
