@@ -1,5 +1,24 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
+const readAccountStatus = (source = {}) => {
+  const status = String(
+    source.status ??
+    source.accountStatus ??
+    source.userStatus ??
+    ""
+  ).trim().toLowerCase();
+
+  const disabledFlag = source.disabled ?? source.isDisabled ?? source.locked ?? source.isLocked;
+  const activeFlag = source.isActive ?? source.active;
+
+  const isDisabled =
+    disabledFlag === true ||
+    activeFlag === false ||
+    ["disabled", "inactive", "locked", "blocked", "banned"].includes(status);
+
+  return { isDisabled, status };
+};
+
 const getToken  = () => localStorage.getItem("token");
 const getUserId = () => {
   const id = localStorage.getItem("userId");
@@ -54,6 +73,22 @@ export const userService = {
 
     // Unwrap data, map đúng field (kể cả typo avartarUrl)
     const d = json.data ?? {};
+    const accountStatus = readAccountStatus(d);
+
+    if (accountStatus.isDisabled) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userId");
+      throw {
+        response: {
+          data: {
+            status: 403,
+            message: "Tài khoản này đã bị vô hiệu hóa.",
+          },
+        },
+      };
+    }
+
     const profile = {
       id:          getUserId(),
       fullName:    d.fullName    || "",
@@ -64,6 +99,7 @@ export const userService = {
       avatarUrl:   d.avartarUrl  || "",   // ← đọc avartarUrl (typo backend), lưu thành avatarUrl
       location:    d.location    || "",
       address:     d.location    || "",
+      accountStatus,
     };
 
     // Sync localStorage
