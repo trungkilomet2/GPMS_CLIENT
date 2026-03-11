@@ -67,19 +67,6 @@ function RoleBadge({ children }) {
   );
 }
 
-function CoverRings() {
-  return <>
-    {[{ w: 280, h: 280, top: -120, right: -40 }, { w: 180, h: 180, top: -48, right: 28 }, { w: 120, h: 120, bottom: -36, left: "12%" }]
-      .map((s, i) => (
-        <div key={i} style={{
-          position: "absolute", borderRadius: "50%",
-          border: "1px solid rgba(255,255,255,.1)",
-          width: s.w, height: s.h, top: s.top, right: s.right, bottom: s.bottom, left: s.left,
-        }} />
-      ))}
-  </>;
-}
-
 function CardSection({ title, children, mb = "1.25rem" }) {
   return (
     <div style={{
@@ -394,7 +381,7 @@ export default function ProfileEdit() {
       await userService.updateProfile(user.userId ?? user.id, fd);
 
       setMsg({ type: "success", text: "Lưu hồ sơ thành công!" });
-      setTimeout(() => navigate("/profile"), 1400);
+      setTimeout(() => navigate("/profile", { state: { refresh: Date.now() } }), 1400);
     } catch (err) {
       const errData = err?.response?.data;
       const { message, fieldErrors } = getApiErrorDetails(errData);
@@ -440,20 +427,8 @@ export default function ProfileEdit() {
       <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
         <style>{GLOBAL_CSS}</style>
 
-        {/* ── Cover ── */}
-        <div className="pf-cover" style={{ height: 150, background: `linear-gradient(120deg,${T.dark} 0%,${T.mid} 50%,${T.base} 100%)`, position: "relative", overflow: "hidden" }}>
-          <CoverRings />
-          <div style={{
-            position: "absolute", top: ".85rem", right: "1rem",
-            background: "rgba(255,255,255,.15)", backdropFilter: "blur(8px)",
-            borderRadius: 999, padding: ".32rem .72rem",
-            fontSize: ".68rem", fontWeight: 700, color: "#fff",
-            border: "1px solid rgba(255,255,255,.25)", letterSpacing: ".04em",
-          }}>✏️ &nbsp;Chế độ chỉnh sửa</div>
-        </div>
-
         {/* ── Avatar row ── */}
-        <div className="pf-avatar-row" style={{ maxWidth: 960, margin: "-20px auto 1.5rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1rem", animation: "fadeUp .35s ease", position: "relative", zIndex: 2 }}>
+        <div className="pf-avatar-row" style={{ maxWidth: 960, margin: "1.5rem auto 1.5rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1rem", animation: "fadeUp .35s ease", position: "relative", zIndex: 2 }}>
           <AvatarUploader
             src={avatarPreview}
             initials={initials || "?"}

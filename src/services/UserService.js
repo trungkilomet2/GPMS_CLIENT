@@ -69,7 +69,6 @@ export const userService = {
     // Sync localStorage
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
     localStorage.setItem("user", JSON.stringify({ ...stored, ...profile }));
-    window.dispatchEvent(new Event("auth-change"));
 
     return profile;
   },
@@ -101,17 +100,22 @@ export const userService = {
     const json = await res.json().catch(() => ({}));
     if (!res.ok) throw { response: { data: json } };
 
-    // Sync localStorage từ FormData
+    // Sync localStorage từ response backend để tránh lệch dữ liệu hiển thị
+    const d = json.data ?? {};
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
     localStorage.setItem("user", JSON.stringify({
       ...stored,
-      fullName:    formData.get("FullName")     ?? stored.fullName,
-      name:        formData.get("FullName")     ?? stored.name,
-      email:       formData.get("Email")        ?? stored.email,
-      phoneNumber: formData.get("PhoneNumber")  ?? stored.phoneNumber,
-      phone:       formData.get("PhoneNumber")  ?? stored.phone,
-      location:    formData.get("Location")     ?? stored.location,
-      address:     formData.get("Location")     ?? stored.address,
+      id:          d.id          ?? stored.id,
+      userId:      d.id          ?? stored.userId,
+      userName:    d.userName    ?? stored.userName,
+      fullName:    d.fullName    ?? stored.fullName,
+      name:        d.fullName    ?? stored.name,
+      email:       d.email       ?? stored.email,
+      phoneNumber: d.phoneNumber ?? stored.phoneNumber,
+      phone:       d.phoneNumber ?? stored.phone,
+      avatarUrl:   d.avartarUrl  ?? stored.avatarUrl,
+      location:    d.location    ?? stored.location,
+      address:     d.location    ?? stored.address,
     }));
     window.dispatchEvent(new Event("auth-change"));
 

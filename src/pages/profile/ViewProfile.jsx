@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 
@@ -359,30 +359,52 @@ const STATS = [
 
 export default function ViewProfile() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab,     setTab]     = useState("info");
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    // Kiểm tra token trước — nếu không có thì redirect login ngay
-    const token = localStorage.getItem("token");
-    if (!token) { navigate("/login"); return; }
+    let active = true;
 
-    userService.getProfile()
-      .then(data => setProfile(data))
-      .catch(err => {
-        // 401 = token hết hạn → clear và về login
-        if (err?.response?.data?.status === 401 || err?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          navigate("/login");
-          return;
-        }
-        setError(err?.response?.data?.message || "Không thể tải hồ sơ.");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    const loadProfile = () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      userService.getProfile()
+        .then(data => {
+          if (active) setProfile(data);
+        })
+        .catch(err => {
+          if (!active) return;
+          if (err?.response?.data?.status === 401 || err?.status === 401) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            navigate("/login");
+            return;
+          }
+          setError(err?.response?.data?.message || "Không thể tải hồ sơ.");
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    loadProfile();
+    window.addEventListener("auth-change", loadProfile);
+
+    return () => {
+      active = false;
+      window.removeEventListener("auth-change", loadProfile);
+    };
+  }, [navigate, location.state?.refresh]);
 
   if (loading) return <LoadingSkeleton />;
 
