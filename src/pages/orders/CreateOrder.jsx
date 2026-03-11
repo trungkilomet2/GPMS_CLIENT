@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
-import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle } from 'lucide-react';
+import { Plus, ArrowLeft, FileText, Loader2, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
+import MaterialsTable from '@/components/MaterialsTable';
+import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
+import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
 import MainLayout from '../../layouts/MainLayout';
@@ -19,7 +22,6 @@ export default function CreateOrder() {
     };
 
     const userId = getUserId();
-    console.log("User ID from localStorage:", userId);
     const navigate = useNavigate();
 
     const [profileCheck, setProfileCheck] = useState({ checking: true, missing: [] });
@@ -63,7 +65,7 @@ export default function CreateOrder() {
         color: '',
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
-        quantity: 0,
+        quantity: '',
         cpu: '',
         note: '',
         status: "Pending"
@@ -75,8 +77,12 @@ export default function CreateOrder() {
     // States cho Modal và Loading
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingIndex, setEditingIndex] = useState(null);
-    const [materialFormData, setMaterialFormData] = useState({ materialName: '', value: '', uom: '', image: '' });
+    const [materialFormData, setMaterialFormData] = useState({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [orderImageFile, setOrderImageFile] = useState(null);
+    const [orderImagePreview, setOrderImagePreview] = useState('');
+    const [templateFiles, setTemplateFiles] = useState([]);
+    const [hardCopyQty, setHardCopyQty] = useState('');
 
     // Hàm Validate toàn bộ Form
     const validateForm = () => {
@@ -103,14 +109,6 @@ export default function CreateOrder() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const normalizeMaterial = (material = {}) => ({
-        ...material,
-        materialName: material.materialName ?? material.name ?? '',
-        value: Number(material.quantity ?? material.value ?? 0),
-        uom: material.uom ?? '',
-        image: material.image ?? '',
-    });
-
     // Xử lý thay đổi input đơn hàng & xóa lỗi khi user nhập
     const handleOrderChange = (e) => {
         const { name, value } = e.target;
@@ -136,6 +134,9 @@ export default function CreateOrder() {
             value: Number(materialFormData.quantity),
             uom: materialFormData.uom,
             image: materialFormData.image,
+            imageFile: materialFormData.imageFile || null,
+            imagePreview: materialFormData.imagePreview || materialFormData.image || '',
+            note: materialFormData.note?.trim() || '',
         };
 
         if (editingIndex === null) {
@@ -155,6 +156,59 @@ export default function CreateOrder() {
 
     const totalCost = (Number(orderData.quantity) || 0) * (Number(orderData.cpu) || 0);
 
+    const handleOrderImageChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const allowedTypes = ['image/jpeg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Ảnh quá lớn (tối đa 2MB)');
+            return;
+        }
+        const previewUrl = URL.createObjectURL(file);
+        setOrderImageFile(file);
+        setOrderImagePreview(previewUrl);
+    };
+
+    const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx'];
+    const MAX_TEMPLATE_SIZE = 10 * 1024 * 1024;
+
+    const handleTemplateFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        const valid = [];
+        const invalid = [];
+
+        files.forEach((file) => {
+            const lower = file.name.toLowerCase();
+            const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+            const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
+            if (isAllowed && isSizeOk) {
+                valid.push(file);
+            } else {
+                invalid.push(file.name);
+            }
+        });
+
+        if (invalid.length > 0) {
+            alert(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+        }
+
+        if (valid.length > 0) {
+            setTemplateFiles((prev) => [...prev, ...valid]);
+        }
+
+        e.target.value = '';
+    };
+
+    const removeTemplateFile = (index) => {
+        setTemplateFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -170,11 +224,68 @@ export default function CreateOrder() {
 
         try {
             setIsSubmitting(true);
+            let orderImageUrl = orderData.image;
+
+            if (orderImageFile) {
+                const uploadRes = await CloudinaryService.uploadImage(orderImageFile);
+                orderImageUrl = uploadRes?.url || orderImageUrl;
+            }
+
+            const materialsPayload = await Promise.all(
+                materials.map(async (m) => {
+                    if (m.imageFile) {
+                        const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
+                        return {
+                            ...m,
+                            image: uploadRes?.url || '',
+                            imageFile: undefined,
+                            imagePreview: undefined,
+                        };
+                    }
+                    const isRemoteUrl = typeof m.image === 'string' && /^https?:\/\//i.test(m.image);
+                    return {
+                        ...m,
+                        image: isRemoteUrl ? m.image : '',
+                        imageFile: undefined,
+                        imagePreview: undefined,
+                    };
+                })
+            );
+
+            const templatesPayload = [];
+            if (templateFiles.length > 0) {
+                const uploadResults = await Promise.all(
+                    templateFiles.map((file) => CloudinaryService.uploadTemplateFile(file))
+                );
+                uploadResults.forEach((res, idx) => {
+                    const url = res?.url || '';
+                    if (!url) return;
+                    templatesPayload.push({
+                        templateName: templateFiles[idx]?.name || 'Bản mềm',
+                        type: 'SOFT',
+                        file: url,
+                        quantity: null,
+                        note: '',
+                    });
+                });
+            }
+            if (Number(hardCopyQty) > 0) {
+                templatesPayload.push({
+                    templateName: 'Bản cứng',
+                    type: 'HARD',
+                    file: null,
+                    quantity: Number(hardCopyQty),
+                    note: '',
+                });
+            }
+
             const payload = {
                 ...orderData,
-                materials: materials,
-                templates: [{ templateName: "Bản thiết kế gốc" }]
+                image: orderImageUrl,
+                materials: materialsPayload,
+                templates: templatesPayload,
             };
+            console.log('CreateOrder payload:', payload);
 
             await OrderService.createOrder(payload);
             alert('Tạo đơn hàng thành công!');
@@ -236,6 +347,28 @@ export default function CreateOrder() {
                         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
                             <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Thông tin chung</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="md:col-span-2">
+                                    <label className="text-sm font-bold text-gray-700 mb-2 block">Ảnh đơn hàng</label>
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-24 h-24 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                                            {orderImagePreview || orderData.image ? (
+                                                <img src={orderImagePreview || orderData.image} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="text-gray-300 text-[11px]">Chưa có ảnh</span>
+                                            )}
+                                        </div>
+                                        <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">
+                                            <span>Chọn ảnh</span>
+                                            <input
+                                                type="file"
+                                                accept=".jpg,.jpeg,.png"
+                                                onChange={handleOrderImageChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                        <div className="text-[11px] text-gray-500">JPG/JPEG/PNG, tối đa 2MB</div>
+                                    </div>
+                                </div>
                                 <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
                                 <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
                                 <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} error={errors.size} placeholder="M, L, XL, XXL" />
@@ -257,10 +390,10 @@ export default function CreateOrder() {
                                     type="button"
                                     onClick={() => {
                                         setEditingIndex(null);
-                                        setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '' });
+                                        setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
                                         setIsModalOpen(true);
                                     }}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
                                 >
                                     <Plus size={18} /> Thêm vật liệu
                                 </button>
@@ -273,81 +406,77 @@ export default function CreateOrder() {
                             )}
 
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
-                                        <tr>
-                                            {/* Cố định độ rộng cột ảnh để không bị xê dịch */}
-                                            <th className="px-4 py-3 text-center w-24">Ảnh</th>
-                                            <th className="px-4 py-3 text-left">Tên vật liệu</th>
-                                            <th className="px-4 py-3 text-left w-32">Số lượng</th>
-                                            <th className="px-4 py-3 text-left w-32">Đơn vị</th>
-                                            <th className="px-4 py-3 w-24"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 text-sm bg-white">
-                                        {materials.map((m, i) => (
-                                            <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                                {/* Căn giữa ảnh trong ô */}
-                                                <td className="px-4 py-3 text-center align-middle">
-                                                    <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
-                                                        {m.image ? (
-                                                            <img src={m.image} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                            </svg>
-                                                        )}
-                                                    </div>
-                                                </td>
+                                <MaterialsTable
+                                    materials={materials}
+                                    variant="create"
+                                    showImage
+                                    showActions
+                                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
+                                    onEdit={(i) => {
+                                        setEditingIndex(i);
+                                        setMaterialFormData({
+                                            materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                            quantity: materials[i].quantity ?? materials[i].value ?? '',
+                                            uom: materials[i].uom ?? '',
+                                            image: materials[i].image ?? '',
+                                            imageFile: null,
+                                            imagePreview: '',
+                                            note: materials[i].note ?? '',
+                                        });
+                                        setIsModalOpen(true);
+                                    }}
+                                    onDelete={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                />
+                            </div>
+                        </div>
 
-                                                {/* Thêm align-middle để chữ nằm giữa chiều cao hàng */}
-                                                <td className="px-4 py-3 font-semibold text-gray-700 align-middle">
-                                                    {m.materialName}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-600 align-middle">
-                                                    {m.value}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-500 align-middle">
-                                                    {m.uom}
-                                                </td>
-
-                                                <td className="px-4 py-3 text-right align-middle">
-                                                    <div className="flex gap-3 justify-end items-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setEditingIndex(i); setMaterialFormData({
-                                                                    materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                                                    quantity: materials[i].quantity ?? materials[i].value ?? '',
-                                                                    uom: materials[i].uom ?? '',
-                                                                    image: materials[i].image ?? '',
-                                                                }); setIsModalOpen(true);
-                                                            }}
-                                                            className="p-2 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                        >
-                                                            <Pencil size={18} />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))}
-                                                            className="p-2 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                        >
-                                                            <Trash size={18} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-
-                                        {materials.length === 0 && (
-                                            <tr>
-                                                <td colSpan={5} className="px-4 py-10 text-center text-gray-400 italic">
-                                                    Danh sách vật liệu đang trống...
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                        {/* 2.5. Mẫu thiết kế */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+                            <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Mẫu thiết kế</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-sm font-bold text-gray-700 mb-2 block">Bản mềm (upload file)</label>
+                                    <div className="flex items-center gap-3">
+                                        <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">
+                                            <span>Chọn file</span>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".dxf,.iba,.mdl,.plt,.pdf,.docx,.xlsx"
+                                                onChange={handleTemplateFileChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                    </div>
+                                    <p className="text-[11px] text-gray-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx — tối đa 10MB/file</p>
+                                    {templateFiles.length > 0 && (
+                                        <ul className="mt-3 space-y-2">
+                                            {templateFiles.map((file, idx) => (
+                                                <li key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                                                    <span className="truncate">{file.name}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeTemplateFile(idx)}
+                                                        className="text-red-600 text-xs font-semibold hover:text-red-700"
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-bold text-gray-700 mb-2 block">Bản cứng (số lượng đã cung cấp)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={hardCopyQty}
+                                        onChange={(e) => setHardCopyQty(e.target.value)}
+                                        placeholder="Ví dụ: 2"
+                                        className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -372,14 +501,14 @@ export default function CreateOrder() {
                                 type="button"
                                 onClick={() => navigate(-1)}
                                 disabled={isSubmitting}
-                            className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
+                                className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
                             >
                                 Hủy bỏ
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                            className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
+                                className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
                             >
                                 {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
                                 {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
@@ -440,3 +569,6 @@ function Input({ label, name, value, onChange, type = 'text', placeholder, error
         </div>
     );
 }
+
+
+

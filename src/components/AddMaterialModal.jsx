@@ -10,12 +10,16 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
     // Cập nhật ảnh preview khi mở modal hoặc đổi vật liệu
     useEffect(() => {
         setErrors({});
+        if (formData.imagePreview) {
+            setPreview(formData.imagePreview);
+            return;
+        }
         if (formData.image) {
             setPreview(formData.image);
-        } else {
-            setPreview(null);
+            return;
         }
-    }, [isOpen, editingIndex, formData.image]);
+        setPreview(null);
+    }, [isOpen, editingIndex, formData.image, formData.imagePreview]);
 
     if (!isOpen) return null;
 
@@ -23,18 +27,20 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            const allowedTypes = ['image/jpeg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                setErrors(prev => ({ ...prev, image: "Chỉ chấp nhận ảnh JPG/JPEG/PNG" }));
+                return;
+            }
             if (file.size > 2 * 1024 * 1024) { // Giới hạn 2MB
                 setErrors(prev => ({ ...prev, image: "Ảnh quá lớn (tối đa 2MB)" }));
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreview(reader.result);
-                // Gửi dữ liệu base64 về component cha qua hàm onChange
-                onChange({ target: { name: 'image', value: reader.result } });
-            };
-            reader.readAsDataURL(file);
+            const previewUrl = URL.createObjectURL(file);
+            setPreview(previewUrl);
+            onChange({ target: { name: 'imageFile', value: file } });
+            onChange({ target: { name: 'imagePreview', value: previewUrl } });
         }
     };
 
@@ -95,7 +101,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                                 type="file"
                                 ref={fileInputRef}
                                 onChange={handleFileChange}
-                                accept="image/*"
+                                accept=".jpg,.jpeg,.png"
                                 className="hidden"
                             />
                         </div>
@@ -145,6 +151,19 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                                 ))}
                             </select>
                         </div>
+                    </div>
+
+                    {/* Ghi chú */}
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-bold text-gray-700">Ghi chú</label>
+                        <textarea
+                            name="note"
+                            rows={2}
+                            value={formData.note || ''}
+                            onChange={handleInputChange}
+                            className="w-full border rounded-xl px-4 py-2.5 transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                            placeholder="Ví dụ: cắt dư 2%, ưu tiên lô màu #A1B2..."
+                        />
                     </div>
                 </div>
 

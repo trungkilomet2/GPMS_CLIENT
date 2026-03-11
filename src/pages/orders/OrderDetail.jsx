@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import {
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import OrderCommentModal from '@/components/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/OrderHistoryUpdateModal';
+import MaterialsTable from '@/components/MaterialsTable';
+import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
 import OrderService from '@/services/OrderService';
 import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
@@ -20,6 +22,13 @@ export default function OrderDetail() {
     const [error, setError] = useState(null);
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [imageZoom, setImageZoom] = useState(1);
+    const [imagePan, setImagePan] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
+    const [imageNaturalSize, setImageNaturalSize] = useState({ w: 0, h: 0 });
+    const imageContainerRef = useRef(null);
 
     useEffect(() => {
         const fetchOrderDetail = async () => {
@@ -81,6 +90,34 @@ export default function OrderDetail() {
                                 <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin tổng quát đơn hàng</h2>
                             </div>
 
+                            <div className="px-5 py-4 border-b border-gray-100">
+                                <div className="flex items-center justify-between mb-3">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Ảnh đơn hàng</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-28 h-28 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
+                                        {order.image ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setImageZoom(1); setImagePan({ x: 0, y: 0 }); setIsImageModalOpen(true); }}
+                                                className="w-full h-full cursor-zoom-in"
+                                                title="Click để xem & zoom ảnh"
+                                            >
+                                                <img src={order.image} alt="" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <span className="text-[10px] text-white font-semibold">Click để zoom</span>
+                                                </div>
+                                            </button>
+                                        ) : (
+                                            <span className="text-[11px] text-gray-400">Chưa có ảnh</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-gray-500 leading-relaxed">
+                                        Ảnh tham khảo tổng quan đơn hàng, dùng để kiểm tra nhanh trước khi sản xuất.
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Layout Grid 2 cột cho thông tin chi tiết */}
                             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100 font-sans">
                                 <div className="p-0">
@@ -114,28 +151,12 @@ export default function OrderDetail() {
                                 <Package size={16} />
                                 <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
                             </div>
-                            <table className="w-full text-left border-collapse">
-                                <thead className="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                                    <tr>
-                                        <th className="px-6 py-3">Tên vật liệu</th>
-                                        <th className="px-6 py-3 text-center">Định mức/Số lượng</th>
-                                        <th className="px-6 py-3 text-right">Đơn vị (UoM)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 text-sm">
-                                    {order.materials?.length > 0 ? (
-                                        order.materials.map((m, i) => (
-                                            <tr key={i} className="hover:bg-gray-50/80 transition-colors">
-                                                <td className="px-6 py-4 font-semibold text-gray-700">{m.name}</td>
-                                                <td className="px-6 py-4 text-center text-emerald-700 font-bold">{m.value}</td>
-                                                <td className="px-6 py-4 text-right text-gray-500 font-medium uppercase">{m.uom}</td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr><td colSpan="3" className="px-6 py-10 text-center text-gray-400 text-xs italic">Dữ liệu vật liệu chưa được cập nhật</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
+                            <MaterialsTable
+                                materials={order.materials ?? []}
+                                variant="detail"
+                                showImage
+                                emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
+                            />
                         </div>
                     </div>
 
@@ -183,6 +204,122 @@ export default function OrderDetail() {
 
             <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
             <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
+            {order.image && isImageModalOpen && (
+                <div className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4" onClick={() => setIsImageModalOpen(false)}>
+                    <div className="relative w-full max-w-4xl h-[80vh]" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            type="button"
+                            onClick={() => setIsImageModalOpen(false)}
+                            className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white text-gray-700 shadow flex items-center justify-center"
+                        >
+                            ×
+                        </button>
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-2xl h-full flex flex-col">
+                            <div className="flex flex-col items-center justify-center gap-2 px-4 py-3 border-b border-gray-100">
+                                <div className="text-xs font-semibold text-gray-600">Zoom</div>
+                                <div className="flex items-center justify-center gap-3 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setImageZoom((z) => {
+                                                const next = Math.max(1, Number((z - 0.25).toFixed(2)));
+                                                if (next === 1) setImagePan({ x: 0, y: 0 });
+                                                return next;
+                                            });
+                                        }}
+                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
+                                    >
+                                        -
+                                    </button>
+                                    <input
+                                        type="range"
+                                        min="1"
+                                        max="3"
+                                        step="0.05"
+                                        value={imageZoom}
+                                        onChange={(e) => {
+                                            const next = Number(e.target.value);
+                                            setImageZoom(next);
+                                            if (next === 1) setImagePan({ x: 0, y: 0 });
+                                        }}
+                                        className="w-48 accent-emerald-600"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setImageZoom((z) => Math.min(3, Number((z + 0.25).toFixed(2))))}
+                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
+                                    >
+                                        +
+                                    </button>
+                                    <span className="text-xs text-gray-600 w-14 text-center">{Math.round(imageZoom * 100)}%</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setImageZoom(1); setImagePan({ x: 0, y: 0 }); }}
+                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
+                                    >
+                                        Reset
+                                    </button>
+                                </div>
+                            </div>
+                            <div
+                                ref={imageContainerRef}
+                                className="flex-1 bg-black/5 flex items-center justify-center p-2 overflow-hidden"
+                                onPointerDown={(e) => {
+                                    if (imageZoom <= 1) return;
+                                    setIsDragging(true);
+                                    setDragStart({ x: e.clientX, y: e.clientY, panX: imagePan.x, panY: imagePan.y });
+                                    e.currentTarget.setPointerCapture?.(e.pointerId);
+                                }}
+                                onPointerMove={(e) => {
+                                    if (!isDragging || imageZoom <= 1) return;
+                                    const dx = e.clientX - dragStart.x;
+                                    const dy = e.clientY - dragStart.y;
+                                    const container = imageContainerRef.current;
+                                    if (!container || !imageNaturalSize.w || !imageNaturalSize.h) return;
+                                    const containerRect = container.getBoundingClientRect();
+                                    const fitScale = Math.min(containerRect.width / imageNaturalSize.w, containerRect.height / imageNaturalSize.h);
+                                    const baseW = imageNaturalSize.w * fitScale;
+                                    const baseH = imageNaturalSize.h * fitScale;
+                                    const scaledW = baseW * imageZoom;
+                                    const scaledH = baseH * imageZoom;
+                                    const maxX = Math.max(0, (scaledW - containerRect.width) / 2);
+                                    const maxY = Math.max(0, (scaledH - containerRect.height) / 2);
+                                    const nextX = Math.max(-maxX, Math.min(maxX, dragStart.panX + dx));
+                                    const nextY = Math.max(-maxY, Math.min(maxY, dragStart.panY + dy));
+                                    setImagePan({ x: nextX, y: nextY });
+                                }}
+                                onPointerUp={(e) => {
+                                    setIsDragging(false);
+                                    e.currentTarget.releasePointerCapture?.(e.pointerId);
+                                }}
+                                onPointerCancel={(e) => {
+                                    setIsDragging(false);
+                                    e.currentTarget.releasePointerCapture?.(e.pointerId);
+                                }}
+                            >
+                                <div
+                                    className="will-change-transform"
+                                    style={{
+                                        transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${imageZoom})`,
+                                        transformOrigin: 'center',
+                                    }}
+                                >
+                                    <img
+                                        src={order.image}
+                                        alt=""
+                                        className="block max-w-full max-h-[80vh] object-contain select-none"
+                                        onLoad={(e) => {
+                                            const img = e.currentTarget;
+                                            setImageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+                                        }}
+                                        draggable={false}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </MainLayout>
     );
 }

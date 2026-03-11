@@ -196,6 +196,7 @@ export default function Orders() {
                                         <th className="w-20 px-5 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('id')}>
                                             Mã đơn <SortIcon direction={sortBy.key === 'id' ? sortBy.dir : null} />
                                         </th>
+                                        <th className="w-20 px-4 py-3 text-center text-sm font-semibold text-slate-700">Ảnh</th>
                                         <th className="w-64 px-4 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('orderName')}>
                                             Sản phẩm <SortIcon direction={sortBy.key === 'orderName' ? sortBy.dir : null} />
                                         </th>
@@ -218,7 +219,7 @@ export default function Orders() {
                                 <tbody className="divide-y divide-slate-100 bg-white">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan={8} className="py-24 text-center">
+                                            <td colSpan={9} className="py-24 text-center">
                                                 <div className="flex flex-col items-center gap-4">
                                                     <Loader2 className="animate-spin text-emerald-600" size={48} />
                                                     <span className="text-slate-600">Đang tải dữ liệu...</span>
@@ -226,13 +227,22 @@ export default function Orders() {
                                             </td>
                                         </tr>
                                     ) : error ? (
-                                        <tr><td colSpan={8} className="py-16 text-center text-red-600">{error}</td></tr>
+                                        <tr><td colSpan={9} className="py-16 text-center text-red-600">{error}</td></tr>
                                     ) : pageData.length === 0 ? (
-                                        <tr><td colSpan={8} className="py-16 text-center text-slate-600">Không có đơn hàng phù hợp</td></tr>
+                                        <tr><td colSpan={9} className="py-16 text-center text-slate-600">Không có đơn hàng phù hợp</td></tr>
                                     ) : (
                                         pageData.map((o) => (
                                             <tr key={o.id} className="hover:bg-slate-50 transition-colors">
                                                 <td className="px-4 py-3 text-sm text-slate-600 font-medium">{`#ĐH-${o.id}`}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <div className="w-12 h-12 border border-slate-200 bg-slate-50 rounded overflow-hidden flex items-center justify-center mx-auto">
+                                                        {o.image ? (
+                                                            <img src={o.image} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400">No image</span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-4 py-3 text-sm text-slate-900 font-medium truncate">{o.orderName || '—'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700 text-center">{o.size || '—'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700">{o.color || '—'}</td>

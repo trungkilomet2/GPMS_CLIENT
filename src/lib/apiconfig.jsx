@@ -20,6 +20,11 @@ export const API_ENDPOINTS = {
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
   },
 
+  CLOUDINARY: {
+    IMAGE_UPLOAD: `${BASE_URL}/api/Cloudinary/image-upload`,
+    TEMPLATE_UPLOAD: `${BASE_URL}/api/Cloudinary/template-file-upload`,
+  },
+
   COMMENT: {
     GET_BY_ORDER: (orderId) => `${BASE_URL}/api/Comment/get-comment-by-orderId/${orderId}`,
     CREATE_COMMENT: `${BASE_URL}/api/Comment/create-comment`,
