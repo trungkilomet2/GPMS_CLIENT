@@ -7,26 +7,27 @@ const BASE_URL = 'http://26.250.4.244:5229';
 
 export const API_ENDPOINTS = {
   ACCOUNT: {
-    LOGIN:    `${BASE_URL}/api/Account/login`,
+    LOGIN: `${BASE_URL}/api/Account/login`,
     REGISTER: `${BASE_URL}/api/Account/register`,
   },
 
   ORDER: {
-    GET_ALL:                  `${BASE_URL}/api/Order/order-list`,
-    GET_DETAIL:   (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
-    CREATE_ORDER:             `${BASE_URL}/api/Order/create-order`,
-    UPDATE_ORDER:             `${BASE_URL}/api/Order/update-order`,
+    GET_ALL: `${BASE_URL}/api/Order/order-list`,
+    GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
+    GET_ORDERS_BY_USER: (userId) => `${BASE_URL}/api/Order/my-orders/${userId}`,
+    CREATE_ORDER: `${BASE_URL}/api/Order/create-order`,
+    UPDATE_ORDER: `${BASE_URL}/api/Order/update-order`,
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
   },
 
   COMMENT: {
-    GET_BY_ORDER:   (orderId) => `${BASE_URL}/api/Comment/get-comment-by-orderId/${orderId}`,
-    CREATE_COMMENT:             `${BASE_URL}/api/Comment/create-comment`,
+    GET_BY_ORDER: (orderId) => `${BASE_URL}/api/Comment/get-comment-by-orderId/${orderId}`,
+    CREATE_COMMENT: `${BASE_URL}/api/Comment/create-comment`,
   },
 
   USER: {
     // GET — không có ID, backend decode từ token
-    VIEW_PROFILE:   `${BASE_URL}/api/User/view-profile`,
+    VIEW_PROFILE: `${BASE_URL}/api/User/view-profile`,
     // PUT — multipart/form-data
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
   },

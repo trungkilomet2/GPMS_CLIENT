@@ -297,6 +297,7 @@ body {
 /* Main menu items */
 .mnav-item {
   position: relative;
+  padding-bottom: 6px;
 }
 
 .mnav-a {
@@ -337,7 +338,7 @@ body {
 
 .mnav-dropdown {
   position: absolute;
-  top: calc(100% + 2px);
+  top: 100%;
   left: 0;
   min-width: 220px;
   background: #2a3d30;

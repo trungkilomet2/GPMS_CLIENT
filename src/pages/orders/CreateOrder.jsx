@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
 import OrderService from '@/services/OrderService';
+import { userService } from '@/services/userService';
 import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
 
@@ -21,6 +22,34 @@ export default function CreateOrder() {
     console.log("User ID from localStorage:", userId);
     const navigate = useNavigate();
 
+    const [profileCheck, setProfileCheck] = useState({ checking: true, missing: [] });
+
+    useEffect(() => {
+        let active = true;
+
+        const checkProfile = async () => {
+            try {
+                const profile = await userService.getProfile();
+                const email = profile?.email ?? "";
+                const phone = profile?.phoneNumber ?? profile?.phone ?? "";
+                const address = profile?.location ?? profile?.address ?? "";
+
+                const missing = [];
+                if (!String(email).trim()) missing.push("email");
+                if (!String(phone).trim()) missing.push("so dien thoai");
+                if (!String(address).trim()) missing.push("dia chi");
+
+                if (active) setProfileCheck({ checking: false, missing });
+            } catch (error) {
+                if (active) setProfileCheck({ checking: false, missing: ["email", "so dien thoai", "dia chi"] });
+            }
+        };
+
+        checkProfile();
+
+        return () => { active = false; };
+    }, []);
+
     // 1. State quản lý danh sách vật liệu
     const [materials, setMaterials] = useState([]);
 
@@ -35,7 +64,7 @@ export default function CreateOrder() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: new Date().toISOString().split('T')[0],
         quantity: 0,
-        cpu: 0,
+        cpu: '',
         note: '',
         status: "Pending"
     });
@@ -124,8 +153,15 @@ export default function CreateOrder() {
         setIsModalOpen(false);
     };
 
+    const totalCost = (Number(orderData.quantity) || 0) * (Number(orderData.cpu) || 0);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (profileCheck.missing.length > 0) {
+            alert("Vui lòng cập nhật email, số điện thoại và địa chỉ trước khi tạo đơn hàng.");
+            return;
+        }
 
         if (!validateForm()) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -153,168 +189,205 @@ export default function CreateOrder() {
 
     return (
         <MainLayout>
-            <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
-                {/* Header */}
-                <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="text-2xl font-bold text-gray-900">Gửi yêu cầu đặt hàng</h1>
+            {profileCheck.checking && (
+                <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center gap-3">
+                        <Loader2 className="animate-spin text-emerald-600" size={20} />
+                        <div className="text-sm text-gray-600">Dang kiem tra thong tin ho so...</div>
+                    </div>
                 </div>
+            )}
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    {/* 1. Thông tin đơn hàng */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-                        <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Thông tin chung</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
-                            <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
-                            <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} error={errors.size} placeholder="M, L, XL, XXL" />
-                            <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} error={errors.color} placeholder="Trắng, Xanh Navy..." />
-                            <Input label="Số lượng sản xuất" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} error={errors.quantity} />
-                            <Input label="Chi phí dự kiến (CPU)" name="cpu" type="number" value={orderData.cpu} onChange={handleOrderChange} error={errors.cpu} />
-                            <Input label="Ngày bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} error={errors.startDate} />
-                            <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
+            {!profileCheck.checking && profileCheck.missing.length > 0 && (
+                <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
+                    <div className="bg-white rounded-lg shadow-sm border border-amber-200 p-6">
+                        <div className="flex items-start gap-3">
+                            <AlertCircle className="text-amber-500" size={20} />
+                            <div>
+                                <div className="font-bold text-gray-900 mb-1">Can cap nhat thong tin ho so</div>
+                                <div className="text-sm text-gray-600">
+                                    Vui long cap nhat day du email, so dien thoai va dia chi truoc khi tao don hang.
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/profile/edit")}
+                                    className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold"
+                                >
+                                    Di den chinh sua ho so
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    {/* 2. Vật liệu cung cấp */}
-                    <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
-                        <div className="flex items-center justify-between mb-4 border-b pb-2">
-                            <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
+                </div>
+            )}
+
+            {!profileCheck.checking && profileCheck.missing.length === 0 && (
+                <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
+                    {/* Header */}
+                    <div className="flex items-center gap-3 mb-6">
+                        <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <h1 className="text-2xl font-bold text-gray-900">Gửi yêu cầu đặt hàng</h1>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-8">
+                        {/* 1. Thông tin đơn hàng */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+                            <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Thông tin chung</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <Input label="Tên đơn hàng" name="orderName" value={orderData.orderName} onChange={handleOrderChange} error={errors.orderName} placeholder="Ví dụ: Đơn hàng Sơ mi công sở Nam" />
+                                <Input label="Loại sản phẩm" name="type" value={orderData.type} onChange={handleOrderChange} error={errors.type} placeholder="Sơ mi, Quần tây..." />
+                                <Input label="Kích thước" name="size" value={orderData.size} onChange={handleOrderChange} error={errors.size} placeholder="M, L, XL, XXL" />
+                                <Input label="Màu sắc" name="color" value={orderData.color} onChange={handleOrderChange} error={errors.color} placeholder="Trắng, Xanh Navy..." />
+                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <Input label="Số lượng sản xuất" name="quantity" type="number" value={orderData.quantity} onChange={handleOrderChange} error={errors.quantity} placeholder="Ví dụ: 100" suffix="sp" />
+                                    <Input label="Giá / sản phẩm" name="cpu" type="number" value={orderData.cpu} onChange={handleOrderChange} error={errors.cpu} placeholder="Ví dụ: 15000" suffix="VND" />
+                                    <Input label="Tổng tiền đơn hàng" name="totalCost" type="text" value={totalCost.toLocaleString('vi-VN')} readOnly suffix="VND" />
+                                </div>
+                                <Input label="Ngày bắt đầu" name="startDate" type="date" value={orderData.startDate} onChange={handleOrderChange} error={errors.startDate} />
+                                <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
+                            </div>
+                        </div>
+                        {/* 2. Vật liệu cung cấp */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
+                            <div className="flex items-center justify-between mb-4 border-b pb-2">
+                                <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingIndex(null);
+                                        setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '' });
+                                        setIsModalOpen(true);
+                                    }}
+                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                                >
+                                    <Plus size={18} /> Thêm vật liệu
+                                </button>
+                            </div>
+
+                            {errors.materials && (
+                                <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
+                                    <AlertCircle size={16} /> {errors.materials}
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
+                                        <tr>
+                                            {/* Cố định độ rộng cột ảnh để không bị xê dịch */}
+                                            <th className="px-4 py-3 text-center w-24">Ảnh</th>
+                                            <th className="px-4 py-3 text-left">Tên vật liệu</th>
+                                            <th className="px-4 py-3 text-left w-32">Số lượng</th>
+                                            <th className="px-4 py-3 text-left w-32">Đơn vị</th>
+                                            <th className="px-4 py-3 w-24"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 text-sm bg-white">
+                                        {materials.map((m, i) => (
+                                            <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                                {/* Căn giữa ảnh trong ô */}
+                                                <td className="px-4 py-3 text-center align-middle">
+                                                    <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
+                                                        {m.image ? (
+                                                            <img src={m.image} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Thêm align-middle để chữ nằm giữa chiều cao hàng */}
+                                                <td className="px-4 py-3 font-semibold text-gray-700 align-middle">
+                                                    {m.materialName}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-600 align-middle">
+                                                    {m.value}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-500 align-middle">
+                                                    {m.uom}
+                                                </td>
+
+                                                <td className="px-4 py-3 text-right align-middle">
+                                                    <div className="flex gap-3 justify-end items-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingIndex(i); setMaterialFormData({
+                                                                    materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                                                    quantity: materials[i].quantity ?? materials[i].value ?? '',
+                                                                    uom: materials[i].uom ?? '',
+                                                                    image: materials[i].image ?? '',
+                                                                }); setIsModalOpen(true);
+                                                            }}
+                                                            className="p-2 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            <Pencil size={18} />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                                            className="p-2 rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            <Trash size={18} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+
+                                        {materials.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-4 py-10 text-center text-gray-400 italic">
+                                                    Danh sách vật liệu đang trống...
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* 3. Ghi chú */}
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 border-l-4 border-l-emerald-500">
+                            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                                <FileText size={20} className="text-emerald-600" /> Ghi chú sản xuất
+                            </h2>
+                            <textarea
+                                name="note"
+                                rows={3}
+                                value={orderData.note}
+                                onChange={handleOrderChange}
+                                placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
+                                className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
+                            />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-4 justify-end pt-6 border-t">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setEditingIndex(null);
-                                    setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '' });
-                                    setIsModalOpen(true);
-                                }}
-                                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                                onClick={() => navigate(-1)}
+                                disabled={isSubmitting}
+                            className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
                             >
-                                <Plus size={18} /> Thêm vật liệu
+                                Hủy bỏ
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                            className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
+                            >
+                                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+                                {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
                             </button>
                         </div>
-
-                        {errors.materials && (
-                            <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
-                                <AlertCircle size={16} /> {errors.materials}
-                            </div>
-                        )}
-
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider">
-                                    <tr>
-                                        {/* Cố định độ rộng cột ảnh để không bị xê dịch */}
-                                        <th className="px-4 py-3 text-center w-24">Ảnh</th>
-                                        <th className="px-4 py-3 text-left">Tên vật liệu</th>
-                                        <th className="px-4 py-3 text-left w-32">Số lượng</th>
-                                        <th className="px-4 py-3 text-left w-32">Đơn vị</th>
-                                        <th className="px-4 py-3 w-24"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 text-sm bg-white">
-                                    {materials.map((m, i) => (
-                                        <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                            {/* Căn giữa ảnh trong ô */}
-                                            <td className="px-4 py-3 text-center align-middle">
-                                                <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
-                                                    {m.image ? (
-                                                        <img src={m.image} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <svg className="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                        </svg>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            {/* Thêm align-middle để chữ nằm giữa chiều cao hàng */}
-                                            <td className="px-4 py-3 font-semibold text-gray-700 align-middle">
-                                                {m.materialName}
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-600 align-middle">
-                                                {m.value}
-                                            </td>
-                                            <td className="px-4 py-3 text-gray-500 align-middle">
-                                                {m.uom}
-                                            </td>
-
-                                            <td className="px-4 py-3 text-right align-middle">
-                                                <div className="flex gap-3 justify-end items-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setEditingIndex(i); setMaterialFormData({
-                                                                materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                                                quantity: materials[i].quantity ?? materials[i].value ?? '',
-                                                                uom: materials[i].uom ?? '',
-                                                                image: materials[i].image ?? '',
-                                                            }); setIsModalOpen(true);
-                                                        }}
-                                                        className="text-blue-600 hover:text-blue-800 transition-colors"
-                                                    >
-                                                        <Pencil size={18} />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setMaterials(materials.filter((_, idx) => idx !== i))}
-                                                        className="text-red-500 hover:text-red-700 transition-colors"
-                                                    >
-                                                        <Trash size={18} />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-
-                                    {materials.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="px-4 py-10 text-center text-gray-400 italic">
-                                                Danh sách vật liệu đang trống...
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* 3. Ghi chú */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 border-l-4 border-l-emerald-500">
-                        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                            <FileText size={20} className="text-emerald-600" /> Ghi chú sản xuất
-                        </h2>
-                        <textarea
-                            name="note"
-                            rows={3}
-                            value={orderData.note}
-                            onChange={handleOrderChange}
-                            placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
-                            className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
-                        />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-4 justify-end pt-6 border-t">
-                        <button
-                            type="button"
-                            onClick={() => navigate(-1)}
-                            disabled={isSubmitting}
-                            className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
-                        >
-                            Hủy bỏ
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
-                        >
-                            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-                            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+                    </form>
+                </div>
+            )}
 
             <AddMaterialModal
                 isOpen={isModalOpen}
@@ -329,7 +402,7 @@ export default function CreateOrder() {
 }
 
 // Component Input Tái sử dụng (Kèm Logic Hiển thị Lỗi)
-function Input({ label, name, value, onChange, type = 'text', placeholder, error }) {
+function Input({ label, name, value, onChange, type = 'text', placeholder, error, suffix, readOnly = false }) {
     const isRequired = ['orderName', 'type', 'size', 'color', 'quantity', 'cpu', 'startDate', 'endDate'].includes(name);
 
     return (
@@ -337,18 +410,28 @@ function Input({ label, name, value, onChange, type = 'text', placeholder, error
             <label className="text-sm font-bold text-gray-700 flex items-center gap-1">
                 {label} {isRequired && <span className="text-red-500">*</span>}
             </label>
-            <input
-                type={type}
-                name={name}
-                value={value}
-                onChange={onChange}
-                placeholder={placeholder}
-                className={`block w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none
-                    ${error
-                        ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
-                        : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'
-                    }`}
-            />
+            <div className="relative">
+                <input
+                    type={type}
+                    name={name}
+                    value={value}
+                    onChange={onChange}
+                    placeholder={placeholder}
+                    readOnly={readOnly}
+                    className={`block w-full border rounded-xl px-4 ${suffix ? 'pr-16' : 'pr-4'} py-2.5 text-sm transition-all outline-none
+                        ${readOnly
+                            ? 'bg-gray-50 text-gray-600'
+                            : error
+                                ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                                : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'
+                        }`}
+                />
+                {suffix && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">
+                        {suffix}
+                    </span>
+                )}
+            </div>
             {error && (
                 <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold mt-1 animate-in fade-in slide-in-from-top-1">
                     <AlertCircle size={12} /> {error}
