@@ -28,6 +28,12 @@ export const authService = {
       decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
       "";
 
+    const fullName =
+      decoded["fullName"] ??
+      decoded["name"] ??
+      decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"] ??
+      userName;
+
     const role =
       decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
       "";
@@ -37,7 +43,14 @@ export const authService = {
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
       ] ?? "";
 
-    const basicUser = { userId, userName, role };
+    const basicUser = {
+      userId,
+      userName,
+      name: fullName || userName,
+      fullName: fullName || userName,
+      role,
+      avatarUrl: "",
+    };
 
     localStorage.setItem("user", JSON.stringify(basicUser));
     localStorage.setItem("userId", userId);

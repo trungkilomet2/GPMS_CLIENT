@@ -1,231 +1,348 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
-import "@/styles/profile.css";
+import Header from "@/components/Header";
 
-const NAV_ITEMS = [
-  { key: "info",     icon: "👤", label: "Thông tin cá nhân" },
-  { key: "security", icon: "🔒", label: "Bảo mật" },
-  { key: "activity", icon: "📋", label: "Lịch sử hoạt động" },
-];
+const T = {
+  dark:"#0d4225", mid:"#186637", base:"#1e8a47",
+  light:"#eaf4ee", border:"#d0e8d9", sand:"#f4f7f5",
+  white:"#ffffff", text:"#18291f", textMid:"#4a6456",
+  textLt:"#8ca898", red:"#dc2626", redBg:"#fef2f2",
+};
 
-const STATS = [
-  { key: "completedOrders", label: "Đơn hoàn thành", fallback: "—" },
-  { key: "experience",      label: "Năm kinh nghiệm", fallback: "—" },
-  { key: "rating",          label: "Đánh giá tốt",   fallback: "—" },
-  { key: "activeProjects",  label: "Dự án hiện tại", fallback: "—" },
-];
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  button,input,textarea{font-family:inherit}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @media(max-width:768px){
+    .pf-layout{grid-template-columns:1fr!important;padding:0 1rem 3rem!important}
+    .pf-avatar-row{flex-wrap:wrap!important;padding:0 1rem!important}
+    .pf-avatar{width:84px!important;height:84px!important;font-size:2rem!important}
+    .pf-cover{height:160px!important}
+    .pf-actions{flex-wrap:wrap}
+  }
+`;
 
 function getInitials(name = "") {
-  return name.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase();
+  return name.split(" ").map(w => w[0]).filter(Boolean).slice(-2).join("").toUpperCase();
 }
 
-function InfoRow({ icon, label, value }) {
+function Sk({ h = 16, w = "100%", r = 8 }) {
+  return <div style={{
+    height:h, width:w, borderRadius:r,
+    background:`linear-gradient(90deg,${T.light} 25%,${T.border} 50%,${T.light} 75%)`,
+    backgroundSize:"200% 100%", animation:"shimmer 1.4s infinite",
+  }}/>;
+}
+
+function RoleBadge({ children }) {
   return (
-    <div className="profile-info-row">
-      <div className="profile-info-icon-wrap">{icon}</div>
+    <span style={{
+      display:"inline-flex",alignItems:"center",gap:".35rem",
+      background:T.light,color:T.mid,fontSize:".72rem",fontWeight:700,
+      padding:".25rem .75rem",borderRadius:20,border:`1px solid ${T.border}`,
+    }}>
+      <span style={{width:7,height:7,borderRadius:"50%",background:T.base,display:"inline-block"}}/>
+      {children}
+    </span>
+  );
+}
+
+function CardSection({ title, action, children, mb = "1.25rem" }) {
+  return (
+    <div style={{
+      background:T.white,borderRadius:16,border:`1px solid ${T.border}`,
+      boxShadow:"0 2px 14px rgba(0,0,0,.05)",overflow:"hidden",marginBottom:mb,
+    }}>
+      <div style={{
+        display:"flex",alignItems:"center",justifyContent:"space-between",
+        padding:"1rem 1.4rem",borderBottom:`1px solid ${T.border}`,background:T.sand,
+      }}>
+        <div style={{display:"flex",alignItems:"center",gap:".45rem",fontWeight:700,fontSize:".9rem",color:T.text}}>
+          <span style={{width:8,height:8,borderRadius:"50%",background:T.base,display:"inline-block"}}/>
+          {title}
+        </div>
+        {action}
+      </div>
+      <div style={{padding:"1.25rem 1.4rem"}}>{children}</div>
+    </div>
+  );
+}
+
+function BtnPrimary({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      display:"inline-flex",alignItems:"center",gap:".45rem",
+      background:disabled?"#a0c8b0":T.base,
+      color:"#fff",border:"none",padding:".63rem 1.35rem",borderRadius:8,
+      fontWeight:700,fontSize:".84rem",cursor:disabled?"not-allowed":"pointer",
+      boxShadow:disabled?"none":`0 3px 12px rgba(30,138,71,.28)`,transition:".15s",
+    }}>{children}</button>
+  );
+}
+
+function BtnSecondary({ onClick, children }) {
+  return (
+    <button onClick={onClick} style={{
+      display:"inline-flex",alignItems:"center",gap:".45rem",
+      background:"transparent",color:T.mid,border:`2px solid ${T.base}`,
+      padding:".61rem 1.35rem",borderRadius:8,fontWeight:700,fontSize:".84rem",cursor:"pointer",
+    }}>{children}</button>
+  );
+}
+
+function InfoRow({ icon, label, value, last }) {
+  return (
+    <div style={{
+      display:"flex",gap:".85rem",alignItems:"flex-start",
+      padding:".65rem 0",
+      borderBottom:last?"none":`1px solid ${T.border}`,
+    }}>
+      <div style={{
+        width:34,height:34,borderRadius:9,flexShrink:0,
+        background:T.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".9rem",
+      }}>{icon}</div>
       <div>
-        <div className="profile-info-label">{label}</div>
-        <div className="profile-info-value">
-          {value || <span className="muted">Chưa cập nhật</span>}
+        <div style={{fontSize:".7rem",fontWeight:700,color:T.textLt,textTransform:"uppercase",letterSpacing:".05em",marginBottom:".15rem"}}>{label}</div>
+        <div style={{fontSize:".88rem",color:value?T.text:T.textLt,fontStyle:value?"normal":"italic"}}>
+          {value || "Chưa cập nhật"}
         </div>
       </div>
     </div>
   );
 }
 
-// ── Skeleton loader ──
-function Skeleton({ h = 16, w = "100%", radius = 6 }) {
+function Stat({ label, value, borderR, borderB }) {
   return (
     <div style={{
-      height: h, width: w, borderRadius: radius,
-      background: "linear-gradient(90deg,#e8f4ec 25%,#d4ead9 50%,#e8f4ec 75%)",
-      backgroundSize: "200% 100%",
-      animation: "shimmer 1.4s infinite",
-    }} />
+      textAlign:"center",padding:".9rem .5rem",
+      borderRight:borderR?`1px solid ${T.border}`:undefined,
+      borderBottom:borderB?`1px solid ${T.border}`:undefined,
+    }}>
+      <div style={{fontSize:"1.45rem",fontWeight:800,color:T.mid,lineHeight:1}}>{value ?? "—"}</div>
+      <div style={{fontSize:".7rem",color:T.textMid,marginTop:".3rem",fontWeight:600}}>{label}</div>
+    </div>
+  );
+}
+
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      display:"flex",alignItems:"center",gap:".7rem",width:"100%",
+      padding:".7rem 1rem",border:"none",borderRadius:10,cursor:"pointer",
+      textAlign:"left",fontWeight:active?700:500,fontSize:".85rem",
+      background:active?T.light:"transparent",
+      color:active?T.mid:T.textMid,
+      borderLeft:`3px solid ${active?T.base:"transparent"}`,
+      transition:".15s",
+    }}>
+      <span style={{fontSize:"1rem"}}>{icon}</span>{label}
+    </button>
   );
 }
 
 function SectionInfo({ user, onEdit }) {
-  return (
-    <>
-      <div className="profile-card" style={{ marginBottom: "1.25rem" }}>
-        <div className="profile-card-header">
-          <div className="profile-card-title"><div className="profile-card-title-dot" />Giới thiệu</div>
-        </div>
-        <div className="profile-card-body">
-          <p style={{ fontSize: ".88rem", color: "var(--text-mid)", lineHeight: 1.7 }}>
-            {user.bio
-              ? user.bio
-              : <span style={{ fontStyle: "italic", color: "var(--text-light)" }}>Chưa có thông tin giới thiệu.</span>
-            }
-          </p>
-          {user.skills?.length > 0 && (
-            <div className="profile-tags" style={{ marginTop: "1rem" }}>
-              {user.skills.map(s => <span key={s} className="profile-tag">{s}</span>)}
-            </div>
-          )}
-        </div>
+  const INFO_ROWS = [
+    ["✉️","Email",user.email],
+    ["📞","Điện thoại",user.phone],
+    ["📍","Địa chỉ",user.address],
+    ["🏢","Phòng ban",user.department],
+    ["🎭","Vai trò",user.role],
+    ["📅","Ngày tham gia",user.joinDate],
+  ];
+  return <>
+    {(user.bio || user.skills?.length > 0) && (
+      <CardSection title="Giới thiệu" mb="1.25rem">
+        <p style={{fontSize:".88rem",color:T.textMid,lineHeight:1.75}}>
+          {user.bio || <span style={{fontStyle:"italic",color:T.textLt}}>Chưa có thông tin giới thiệu.</span>}
+        </p>
+        {user.skills?.length > 0 && (
+          <div style={{display:"flex",flexWrap:"wrap",gap:".5rem",marginTop:"1rem"}}>
+            {user.skills.map(s=>(
+              <span key={s} style={{background:T.light,color:T.mid,fontSize:".75rem",fontWeight:700,padding:".3rem .8rem",borderRadius:20,border:`1px solid ${T.border}`}}>{s}</span>
+            ))}
+          </div>
+        )}
+      </CardSection>
+    )}
+    <CardSection
+      title="Thông tin liên hệ" mb="0"
+      action={
+        <button onClick={onEdit} style={{background:"transparent",border:`1.5px solid ${T.base}`,color:T.mid,padding:".35rem .85rem",borderRadius:8,fontSize:".78rem",fontWeight:700,cursor:"pointer"}}>
+          ✏️ Chỉnh sửa
+        </button>
+      }
+    >
+      <div style={{paddingTop:".25rem"}}>
+        {INFO_ROWS.map(([icon,label,value],i)=>(
+          <InfoRow key={label} icon={icon} label={label} value={value} last={i===INFO_ROWS.length-1}/>
+        ))}
       </div>
-
-      <div className="profile-card">
-        <div className="profile-card-header">
-          <div className="profile-card-title"><div className="profile-card-title-dot" />Thông tin liên hệ</div>
-          <button className="profile-edit-btn secondary" style={{ padding: ".4rem .9rem", fontSize: ".78rem" }} onClick={onEdit}>
-            ✏️ Chỉnh sửa
-          </button>
-        </div>
-        <div className="profile-card-body">
-          <InfoRow icon="✉️" label="Email"         value={user.email} />
-          <InfoRow icon="📞" label="Điện thoại"    value={user.phone} />
-          <InfoRow icon="📍" label="Địa chỉ"       value={user.address} />
-          <InfoRow icon="🏢" label="Phòng ban"     value={user.department} />
-          <InfoRow icon="🎭" label="Vai trò"       value={user.role} />
-          <InfoRow icon="📅" label="Ngày tham gia" value={user.joinDate} />
-        </div>
-      </div>
-    </>
-  );
+    </CardSection>
+  </>;
 }
 
 function SectionSecurity() {
-  const [form, setForm] = useState({ current: "", next: "", confirm: "" });
-  const [msg,  setMsg]  = useState(null);
-
-  const handle = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
-
-  const handleSubmit = (e) => {
+  const [form,setForm] = useState({current:"",next:"",confirm:""});
+  const [msg,setMsg]   = useState(null);
+  const [show,setShow] = useState({current:false,next:false,confirm:false});
+  const handle = e => setForm(p=>({...p,[e.target.name]:e.target.value}));
+  const submit = e => {
     e.preventDefault();
-    if (form.next !== form.confirm)
-      return setMsg({ type: "error", text: "Mật khẩu mới không khớp." });
-    if (form.next.length < 6)
-      return setMsg({ type: "error", text: "Mật khẩu phải có ít nhất 6 ký tự." });
-    // TODO: gọi API đổi mật khẩu
-    setMsg({ type: "success", text: "Đổi mật khẩu thành công!" });
-    setForm({ current: "", next: "", confirm: "" });
-    setTimeout(() => setMsg(null), 3000);
+    if(form.next!==form.confirm) return setMsg({ok:false,text:"Mật khẩu mới không khớp."});
+    if(form.next.length<6)       return setMsg({ok:false,text:"Mật khẩu phải ít nhất 6 ký tự."});
+    setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
+    setForm({current:"",next:"",confirm:""});
+    setTimeout(()=>setMsg(null),3000);
   };
-
+  const fields = [
+    {name:"current",label:"Mật khẩu hiện tại", placeholder:"Nhập mật khẩu hiện tại"},
+    {name:"next",   label:"Mật khẩu mới", placeholder:"Nhập mật khẩu mới"},
+    {name:"confirm",label:"Xác nhận mật khẩu mới", placeholder:"Nhập lại mật khẩu mới"},
+  ];
   return (
-    <div className="profile-card">
-      <div className="profile-card-header">
-        <div className="profile-card-title"><div className="profile-card-title-dot" />Đổi mật khẩu</div>
-      </div>
-      <div className="profile-card-body">
-        {msg && (
-          <div style={{
-            padding: ".75rem 1rem", borderRadius: 8, marginBottom: "1rem",
-            background: msg.type === "success" ? "var(--green-light)" : "#fef2f2",
-            color:      msg.type === "success" ? "var(--green)"       : "#dc2626",
-            fontSize: ".84rem", fontWeight: 600,
-          }}>
-            {msg.type === "success" ? "✅" : "⚠️"}&nbsp;{msg.text}
+    <CardSection title="Đổi mật khẩu" mb="0">
+      {msg&&(
+        <div style={{padding:".75rem 1rem",borderRadius:8,marginBottom:"1rem",background:msg.ok?T.light:T.redBg,color:msg.ok?T.mid:T.red,fontSize:".84rem",fontWeight:600}}>
+          {msg.ok?"✅":"⚠️"}&nbsp;{msg.text}
+        </div>
+      )}
+      <form onSubmit={submit} style={{maxWidth:400}}>
+        {fields.map(f=>(
+          <div key={f.name} style={{marginBottom:"1rem"}}>
+            <label style={{display:"block",fontSize:".75rem",fontWeight:700,color:T.textMid,marginBottom:".3rem",textTransform:"uppercase",letterSpacing:".04em"}}>{f.label}</label>
+            <div style={{position:"relative"}}>
+              <input
+                type={show[f.name] ? "text" : "password"}
+                name={f.name}
+                value={form[f.name]}
+                onChange={handle}
+                placeholder={f.placeholder}
+                style={{width:"100%",padding:".65rem 2.8rem .65rem .9rem",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:".88rem",outline:"none",background:T.white}}
+              />
+              <button
+                type="button"
+                onClick={() => setShow((p) => ({ ...p, [f.name]: !p[f.name] }))}
+                style={{
+                  position:"absolute",
+                  right:10,
+                  top:"50%",
+                  transform:"translateY(-50%)",
+                  border:"none",
+                  background:"transparent",
+                  color:T.textMid,
+                  cursor:"pointer",
+                  fontSize:".95rem",
+                  padding:0,
+                }}
+              >
+                {show[f.name] ? "🙈" : "👁"}
+              </button>
+            </div>
           </div>
-        )}
-        <form onSubmit={handleSubmit} style={{ maxWidth: 420 }}>
-          {[
-            { name: "current", label: "Mật khẩu hiện tại" },
-            { name: "next",    label: "Mật khẩu mới" },
-            { name: "confirm", label: "Xác nhận mật khẩu mới" },
-          ].map(f => (
-            <div key={f.name} className="profile-form-group">
-              <label className="profile-form-label">{f.label}</label>
-              <input type="password" name={f.name} className="profile-form-input"
-                placeholder="••••••••" value={form[f.name]} onChange={handle} />
-            </div>
-          ))}
-          <button type="submit" className="profile-edit-btn" style={{ marginTop: ".5rem" }}>
-            🔒&nbsp;Cập nhật mật khẩu
-          </button>
-        </form>
-      </div>
-    </div>
+        ))}
+        <BtnPrimary>🔒 Cập nhật mật khẩu</BtnPrimary>
+      </form>
+    </CardSection>
   );
 }
 
-function SectionActivity({ activities = [] }) {
+function SectionActivity({ activities=[] }) {
   return (
-    <div className="profile-card">
-      <div className="profile-card-header">
-        <div className="profile-card-title"><div className="profile-card-title-dot" />Lịch sử hoạt động</div>
-      </div>
-      <div className="profile-card-body">
-        {activities.length === 0
-          ? <p style={{ fontSize: ".85rem", color: "var(--text-light)", fontStyle: "italic" }}>Chưa có hoạt động nào.</p>
-          : activities.map((a, i) => (
-            <div key={i} className="profile-activity-item">
-              <div className="profile-activity-dot-wrap">
-                <div className="profile-activity-dot" />
-                <div className="profile-activity-line" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div className="profile-activity-title">{a.title}</div>
-                <div className="profile-activity-desc">{a.description}</div>
-                <div className="profile-activity-time">🕐 {a.time}</div>
-              </div>
+    <CardSection title="Lịch sử hoạt động" mb="0">
+      {activities.length===0
+        ? <p style={{fontSize:".85rem",color:T.textLt,fontStyle:"italic"}}>Chưa có hoạt động nào.</p>
+        : activities.map((a,i)=>(
+          <div key={i} style={{display:"flex",gap:"1rem",paddingBottom:"1rem",marginBottom:"1rem",borderBottom:i<activities.length-1?`1px solid ${T.border}`:"none"}}>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              <div style={{width:10,height:10,borderRadius:"50%",background:T.base,flexShrink:0}}/>
+              {i<activities.length-1&&<div style={{width:2,flex:1,background:T.border,borderRadius:2}}/>}
             </div>
-          ))
-        }
+            <div style={{flex:1}}>
+              <div style={{fontWeight:700,fontSize:".88rem",color:T.text}}>{a.title}</div>
+              <div style={{fontSize:".82rem",color:T.textMid,margin:".2rem 0"}}>{a.description}</div>
+              <div style={{fontSize:".75rem",color:T.textLt}}>🕐 {a.time}</div>
+            </div>
+          </div>
+        ))
+      }
+    </CardSection>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div style={{minHeight:"100vh",background:T.sand,fontFamily:"'Lexend',sans-serif"}}>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{height:210,background:`linear-gradient(120deg,${T.dark},${T.base})`}}/>
+      <div style={{maxWidth:960,margin:"1rem auto 2rem",padding:"0 2rem",display:"flex",alignItems:"center",gap:"1.5rem"}}>
+        <Sk h={112} w={112} r={56}/>
+        <div style={{flex:1,display:"flex",flexDirection:"column",gap:8}}>
+          <Sk h={26} w={210}/><Sk h={18} w={130}/>
+        </div>
+      </div>
+      <div style={{maxWidth:960,margin:"0 auto",padding:"0 2rem 4rem",display:"grid",gridTemplateColumns:"252px 1fr",gap:"1.5rem"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+          <Sk h={108} r={14}/><Sk h={170} r={14}/><Sk h={100} r={14}/>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+          <Sk h={110} r={14}/><Sk h={260} r={14}/>
+        </div>
       </div>
     </div>
   );
 }
 
-// ══ MAIN ══
+const NAV_ITEMS = [
+  {key:"info",     icon:"👤",label:"Thông tin cá nhân"},
+  {key:"security", icon:"🔒",label:"Bảo mật"},
+  {key:"activity", icon:"📋",label:"Lịch sử hoạt động"},
+];
+const STATS = [
+  {key:"completedOrders",label:"Đơn hoàn thành"},
+  {key:"experience",     label:"Năm kinh nghiệm"},
+  {key:"rating",         label:"Đánh giá tốt"},
+  {key:"activeProjects", label:"Dự án hiện tại"},
+];
+
 export default function ViewProfile() {
   const navigate = useNavigate();
-  const [tab,      setTab]      = useState("info");
-  const [profile,  setProfile]  = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [error,    setError]    = useState(null);
+  const [tab,     setTab]     = useState("info");
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    const user   = stored ? JSON.parse(stored) : null;
+    // Kiểm tra token trước — nếu không có thì redirect login ngay
+    const token = localStorage.getItem("token");
+    if (!token) { navigate("/login"); return; }
 
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-
-    userService.getProfile(user.userId ?? user.id)
+    userService.getProfile()
       .then(data => setProfile(data))
-      .catch(err => setError(err?.response?.data?.message || "Không thể tải hồ sơ."))
+      .catch(err => {
+        // 401 = token hết hạn → clear và về login
+        if (err?.response?.data?.status === 401 || err?.status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          navigate("/login");
+          return;
+        }
+        setError(err?.response?.data?.message || "Không thể tải hồ sơ.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Loading state ──
-  if (loading) return (
-    <div className="profile-page">
-      <div className="profile-cover" />
-      <div className="profile-avatar-row">
-        <Skeleton h={112} w={112} radius={56} />
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-          <Skeleton h={24} w={200} />
-          <Skeleton h={16} w={140} />
-        </div>
-      </div>
-      <div className="profile-layout">
-        <aside style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <Skeleton h={120} radius={12} />
-          <Skeleton h={160} radius={12} />
-        </aside>
-        <main style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <Skeleton h={100} radius={14} />
-          <Skeleton h={260} radius={14} />
-        </main>
-      </div>
-      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
-    </div>
-  );
+  if (loading) return <LoadingSkeleton />;
 
-  // ── Error state ──
   if (error) return (
-    <div className="profile-page" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>⚠️</div>
-        <div style={{ fontWeight: 700, color: "var(--text)", marginBottom: ".5rem" }}>{error}</div>
-        <button className="profile-edit-btn" onClick={() => window.location.reload()}>Thử lại</button>
+    <div style={{minHeight:"100vh",background:T.sand,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Lexend',sans-serif"}}>
+      <style>{GLOBAL_CSS}</style>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:"2.5rem",marginBottom:"1rem"}}>⚠️</div>
+        <div style={{fontWeight:700,color:T.text,marginBottom:".75rem"}}>{error}</div>
+        <BtnPrimary onClick={()=>window.location.reload()}>Thử lại</BtnPrimary>
       </div>
     </div>
   );
@@ -233,100 +350,135 @@ export default function ViewProfile() {
   const name = profile?.fullName || profile?.name || "Người dùng";
 
   return (
-    <div className="profile-page">
-      <style>{`@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}`}</style>
+    <div style={{minHeight:"100vh",background:T.sand,fontFamily:"'Lexend',sans-serif"}}>
+      <style>{GLOBAL_CSS}</style>
 
-      {/* Cover */}
-      <div className="profile-cover">
-        <div className="profile-cover-ring profile-cover-ring-1" />
-        <div className="profile-cover-ring profile-cover-ring-2" />
-        <div className="profile-cover-ring profile-cover-ring-3" />
+      {/* ── Site Header ── */}
+      <Header />
+
+      {/* ── Cover — overflow:visible để không che avatar ── */}
+      <div
+        className="pf-cover"
+        style={{
+          height:210,
+          background:`linear-gradient(120deg,${T.dark} 0%,${T.mid} 50%,${T.base} 100%)`,
+          position:"relative",
+          overflow:"visible",   /* ← FIX: không clip avatar bên dưới */
+          zIndex:0,
+        }}
+      >
+        {/* Rings chỉ là decor, clip bằng wrapper riêng */}
+        <div style={{position:"absolute",inset:0,overflow:"hidden",borderRadius:"inherit",zIndex:0}}>
+          {[
+            {w:420,h:420,top:-180,right:-80},
+            {w:260,h:260,top:-80,right:40},
+            {w:180,h:180,bottom:-60,left:"10%"},
+          ].map((s,i)=>(
+            <div key={i} style={{
+              position:"absolute",borderRadius:"50%",
+              border:"1px solid rgba(255,255,255,.12)",
+              width:s.w,height:s.h,top:s.top,right:s.right,bottom:s.bottom,left:s.left,
+            }}/>
+          ))}
+        </div>
       </div>
 
-      {/* Avatar row */}
-      <div className="profile-avatar-row">
-        <div className="profile-avatar-wrap">
+      {/* ── Avatar row — nổi lên trên cover ── */}
+      <div
+        className="pf-avatar-row"
+        style={{
+          maxWidth:960,
+          margin:"-56px auto 2rem",   /* kéo lên đè lên cover */
+          padding:"0 2rem",
+          display:"flex",
+          alignItems:"flex-end",
+          gap:"1.5rem",
+          position:"relative",
+          zIndex:10,                  /* ← FIX: luôn trên cover */
+          animation:"fadeUp .35s ease",
+        }}
+      >
+        {/* Avatar */}
+        <div style={{position:"relative",flexShrink:0}}>
           {profile?.avatarUrl
-            ? <img src={profile.avatarUrl} alt="avatar" className="profile-avatar" />
-            : <div className="profile-avatar">{getInitials(name)}</div>
+            ? <img src={profile.avatarUrl} alt="avatar" className="pf-avatar"
+                style={{width:112,height:112,borderRadius:"50%",border:"4px solid #fff",objectFit:"cover",boxShadow:"0 8px 28px rgba(0,0,0,.18)"}}/>
+            : <div className="pf-avatar"
+                style={{width:112,height:112,borderRadius:"50%",border:"4px solid #fff",background:T.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2.5rem",fontWeight:800,color:T.mid,boxShadow:"0 8px 28px rgba(0,0,0,.18)"}}>
+                {getInitials(name)}
+              </div>
           }
-          <div className="profile-avatar-badge"><div className="profile-avatar-badge-dot" /></div>
+          {/* Online dot */}
+          <div style={{position:"absolute",bottom:8,right:6,width:14,height:14,borderRadius:"50%",background:"#22c55e",border:"2.5px solid #fff"}}/>
         </div>
 
-        <div className="profile-name-block">
-          <div className="profile-name">{name}</div>
-          <div className="profile-role-badge">
-            <div className="profile-role-dot" />
-            {profile?.role || "Người dùng"}
-            {profile?.department && <>&nbsp;·&nbsp;{profile.department}</>}
-          </div>
+        {/* Name + badge */}
+        <div style={{flex:1,paddingBottom:".5rem"}}>
+          <div style={{fontSize:"1.4rem",fontWeight:800,color:T.text,marginBottom:".4rem"}}>{name}</div>
+          <RoleBadge>
+            {profile?.role || "Khách hàng"}
+            {profile?.department ? ` · ${profile.department}` : ""}
+          </RoleBadge>
         </div>
 
-        <div style={{ display: "flex", gap: ".65rem", marginBottom: ".5rem" }}>
-          <button className="profile-edit-btn secondary" onClick={() => navigate(-1)}>← Quay lại</button>
-          <button className="profile-edit-btn" onClick={() => navigate("/profile/edit")}>✏️ Chỉnh sửa</button>
+        {/* Actions */}
+        <div className="pf-actions" style={{display:"flex",gap:".65rem",marginBottom:".5rem"}}>
+          <BtnSecondary onClick={()=>navigate(-1)}>← Quay lại</BtnSecondary>
+          <BtnPrimary   onClick={()=>navigate("/profile/edit")}>✏️ Chỉnh sửa</BtnPrimary>
         </div>
       </div>
 
-      {/* Layout */}
-      <div className="profile-layout">
-
+      {/* ── Main layout ── */}
+      <div
+        className="pf-layout"
+        style={{
+          maxWidth:960,margin:"0 auto",padding:"0 2rem 4rem",
+          display:"grid",gridTemplateColumns:"252px 1fr",gap:"1.5rem",
+          animation:"fadeUp .4s ease .08s both",
+          position:"relative",zIndex:1,
+        }}
+      >
         {/* Sidebar */}
-        <aside style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <aside style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+          {/* Stats 2×2 */}
+          <div style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,boxShadow:"0 2px 14px rgba(0,0,0,.05)",display:"grid",gridTemplateColumns:"1fr 1fr",overflow:"hidden"}}>
+            {STATS.map((s,i)=>(
+              <Stat key={s.key} label={s.label} value={profile?.[s.key]} borderR={i%2===0} borderB={i<2}/>
+            ))}
+          </div>
 
-          {/* Stats */}
-          <div className="profile-stat-grid">
-            {STATS.map(s => (
-              <div key={s.key} className="profile-stat-item">
-                <div className="profile-stat-val">{profile?.[s.key] ?? s.fallback}</div>
-                <div className="profile-stat-label">{s.label}</div>
+          {/* Nav tabs */}
+          <div style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,boxShadow:"0 2px 14px rgba(0,0,0,.05)",padding:".75rem"}}>
+            {NAV_ITEMS.map((item,i)=>(
+              <div key={item.key}>
+                {i===NAV_ITEMS.length-1&&<div style={{height:1,background:T.border,margin:".4rem 0"}}/>}
+                <NavItem icon={item.icon} label={item.label} active={tab===item.key} onClick={()=>setTab(item.key)}/>
               </div>
             ))}
           </div>
 
-          {/* Nav */}
-          <div className="profile-card">
-            <div className="profile-card-body" style={{ padding: ".75rem" }}>
-              <div className="profile-sidenav">
-                {NAV_ITEMS.map((item, i) => (
-                  <div key={item.key}>
-                    {i === NAV_ITEMS.length - 1 && <div className="profile-sidenav-divider" />}
-                    <button
-                      className={`profile-sidenav-item${tab === item.key ? " active" : ""}`}
-                      onClick={() => setTab(item.key)}
-                    >
-                      <div className="profile-sidenav-icon">{item.icon}</div>
-                      {item.label}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Quick contact */}
-          <div className="profile-card">
-            <div className="profile-card-header">
-              <div className="profile-card-title"><div className="profile-card-title-dot" />Liên hệ nhanh</div>
-            </div>
-            <div className="profile-card-body" style={{ display: "flex", flexDirection: "column", gap: ".6rem" }}>
-              {[["✉️", profile?.email], ["📞", profile?.phone]].map(([ic, val]) => val && (
-                <div key={val} style={{ display: "flex", gap: ".6rem", alignItems: "center", fontSize: ".82rem", color: "var(--text-mid)" }}>
-                  <span>{ic}</span><span style={{ wordBreak: "break-all" }}>{val}</span>
+          <CardSection title="Liên hệ nhanh" mb="0">
+            <div style={{display:"flex",flexDirection:"column",gap:".55rem"}}>
+              {[["✉️",profile?.email],["📞",profile?.phone]].map(([ic,val])=>val&&(
+                <div key={val} style={{display:"flex",gap:".6rem",alignItems:"center",fontSize:".82rem",color:T.textMid}}>
+                  <span style={{width:28,height:28,borderRadius:7,background:T.light,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ic}</span>
+                  <span style={{wordBreak:"break-all"}}>{val}</span>
                 </div>
               ))}
+              {!profile?.email&&!profile?.phone&&(
+                <p style={{fontSize:".82rem",color:T.textLt,fontStyle:"italic"}}>Chưa có thông tin.</p>
+              )}
             </div>
-          </div>
-
+          </CardSection>
         </aside>
 
         {/* Content */}
         <main>
-          {tab === "info"     && <SectionInfo user={profile} onEdit={() => navigate("/profile/edit")} />}
-          {tab === "security" && <SectionSecurity />}
-          {tab === "activity" && <SectionActivity activities={profile?.activities || []} />}
+          {tab==="info"     && <SectionInfo     user={profile} onEdit={()=>navigate("/profile/edit")}/>}
+          {tab==="security" && <SectionSecurity/>}
+          {tab==="activity" && <SectionActivity activities={profile?.activities||[]}/>}
         </main>
-
       </div>
     </div>
   );

@@ -8,21 +8,33 @@ const getUserId = () => {
   return user.userId ?? user.id ?? null;
 };
 
-/* ── GET: chỉ cần Bearer token, không cần Content-Type ── */
-const authHeadersGet = () => ({
+const authHeadersGet  = () => ({
   ...(getToken() && { Authorization: `Bearer ${getToken()}` }),
 });
 
-/* ── multipart/form-data: KHÔNG set Content-Type, browser tự đặt boundary ── */
 const authHeadersForm = () => ({
   ...(getToken() && { Authorization: `Bearer ${getToken()}` }),
+  // KHÔNG set Content-Type — browser tự đặt boundary cho multipart
 });
 
 export const userService = {
 
   /**
    * GET /api/User/view-profile
-   * Backend tự decode userId từ Bearer token — không truyền ID vào URL
+   * Response schema:
+   * {
+   *   data: {
+   *     fullName:    string,
+   *     phoneNumber: string,
+   *     avartarUrl:  string,   ← typo từ backend (thiếu 'a')
+   *     location:    string,
+   *     email:       string
+   *   },
+   *   pageIndex:   number,
+   *   pageSize:    number,
+   *   recordCount: number,
+   *   links:       [...]
+   * }
    */
   async getProfile() {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
@@ -30,17 +42,28 @@ export const userService = {
       headers: authHeadersGet(),
     });
 
-    const data = await res.json();
-    if (!res.ok) throw { response: { data } };
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+      throw { status: 401 };
+    }
 
-    // Chuẩn hoá field names — API trả: fullName, phoneNumber, avartarUrl, location, email
+    const json = await res.json();
+    if (!res.ok) throw { response: { data: json } };
+
+    // Unwrap data, map đúng field (kể cả typo avartarUrl)
+    const d = json.data ?? {};
     const profile = {
-      id:         getUserId(),
-      fullName:   data.data?.fullName    ?? data.fullName    ?? "",
-      email:      data.data?.email       ?? data.email       ?? "",
-      phoneNumber:      data.data?.phoneNumber ?? data.phoneNumber ?? "",
-      avatarUrl:  data.data?.avartarUrl  ?? data.avartarUrl  ?? "",
-      location:    data.data?.location    ?? data.location    ?? "",
+      id:          getUserId(),
+      fullName:    d.fullName    || "",
+      name:        d.fullName    || "",
+      email:       d.email       || "",
+      phoneNumber: d.phoneNumber || "",
+      phone:       d.phoneNumber || "",
+      avatarUrl:   d.avartarUrl  || "",   // ← đọc avartarUrl (typo backend), lưu thành avatarUrl
+      location:    d.location    || "",
+      address:     d.location    || "",
     };
 
     // Sync localStorage
@@ -55,32 +78,38 @@ export const userService = {
    * PUT /api/User/update-profile
    * Body: multipart/form-data
    * Fields: FullName, PhoneNumber, AvartarUrl (file binary), Location, Email
-   *
-   * @param {string|number} _userId  — giữ tham số để không break chỗ gọi cũ, không dùng trong URL
-   * @param {FormData}       formData — đã được build sẵn ở ProfileEdit
    */
   async updateProfile(_userId, formData) {
     const res = await fetch(API_ENDPOINTS.USER.UPDATE_PROFILE, {
       method:  "PUT",
-      headers: authHeadersForm(),  // KHÔNG set Content-Type!
+      headers: authHeadersForm(),
       body:    formData,
     });
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw { response: { data } };
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+      throw { status: 401 };
+    }
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw { response: { data: json } };
 
     // Sync localStorage từ FormData
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
-    const updated = {
+    localStorage.setItem("user", JSON.stringify({
       ...stored,
-      fullName:  formData.get("FullName")    ?? stored.fullName,
-      email:     formData.get("Email")       ?? stored.email,
-      phone:     formData.get("PhoneNumber") ?? stored.phone,
-      address:   formData.get("Location")    ?? stored.address,
-    };
-    localStorage.setItem("user", JSON.stringify(updated));
+      fullName:    formData.get("FullName")     ?? stored.fullName,
+      name:        formData.get("FullName")     ?? stored.name,
+      email:       formData.get("Email")        ?? stored.email,
+      phoneNumber: formData.get("PhoneNumber")  ?? stored.phoneNumber,
+      phone:       formData.get("PhoneNumber")  ?? stored.phone,
+      location:    formData.get("Location")     ?? stored.location,
+      address:     formData.get("Location")     ?? stored.address,
+    }));
     window.dispatchEvent(new Event("auth-change"));
 
-    return data;
+    return json;
   },
 };
