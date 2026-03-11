@@ -68,9 +68,18 @@ export const userService = {
 
     // Sync localStorage
     const stored = JSON.parse(localStorage.getItem("user") || "{}");
-    localStorage.setItem("user", JSON.stringify({ ...stored, ...profile }));
+    localStorage.setItem("user", JSON.stringify({
+      ...stored,
+      ...profile,
+      bio: stored.bio ?? "",
+      cooperationNotes: stored.cooperationNotes ?? [],
+    }));
 
-    return profile;
+    return {
+      ...profile,
+      bio: stored.bio ?? "",
+      cooperationNotes: stored.cooperationNotes ?? [],
+    };
   },
 
   /**
