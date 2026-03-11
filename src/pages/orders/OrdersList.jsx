@@ -51,6 +51,7 @@ export default function Orders() {
     const [statusFilter, setStatusFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [pageSize] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
 
     const [sortBy, setSortBy] = useState({ key: 'id', dir: 'asc' });
 
@@ -64,8 +65,48 @@ export default function Orders() {
 
             try {
                 setLoading(true);
-                const response = await OrderService.getOrdersByUser(userId);
-                setOrders(response.data || response || []);
+                const params = {
+                    PageIndex: Math.max(0, currentPage - 1),
+                    PageSize: pageSize,
+                    SortColumn: sortBy.key === 'orderName' ? 'Name' : sortBy.key,
+                    SortOrder: sortBy.dir.toUpperCase(),
+                };
+                const response = await OrderService.getOrdersByUser(userId, params);
+                const data =
+                    response?.recordCount !== undefined ||
+                    response?.pageIndex !== undefined ||
+                    response?.RecordCount !== undefined ||
+                    response?.PageIndex !== undefined
+                        ? response
+                        : (response?.data ?? response);
+                const items = data?.items ?? data?.data ?? data?.records ?? data?.Items ?? data?.Records ?? data ?? [];
+                const meta = data?.pagination ?? data?.paging ?? data?.meta ?? data?.metadata ?? {};
+                const count =
+                    data?.totalCount ??
+                    data?.TotalCount ??
+                    data?.totalRecords ??
+                    data?.TotalRecords ??
+                    data?.recordCount ??
+                    data?.RecordCount ??
+                    data?.total ??
+                    data?.Total ??
+                    meta?.totalCount ??
+                    meta?.TotalCount ??
+                    meta?.totalRecords ??
+                    meta?.TotalRecords ??
+                    meta?.total ??
+                    meta?.Total ??
+                    (data?.totalPages && data?.pageSize ? data.totalPages * data.pageSize : null) ??
+                    (meta?.totalPages && meta?.pageSize ? meta.totalPages * meta.pageSize : null) ??
+                    items.length;
+                setOrders(items);
+                setTotalCount(count);
+                if (data?.pageIndex !== undefined && data?.pageIndex !== null) {
+                    const serverPage = Number(data.pageIndex) + 1;
+                    if (!Number.isNaN(serverPage) && serverPage !== currentPage) {
+                        setCurrentPage(serverPage);
+                    }
+                }
                 setError(null);
             } catch (err) {
                 console.error('Lỗi lấy dữ liệu:', err);
@@ -75,7 +116,7 @@ export default function Orders() {
             }
         };
         fetchOrders();
-    }, [userId]);
+    }, [userId, currentPage, pageSize, sortBy]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -87,53 +128,32 @@ export default function Orders() {
         });
     }, [search, statusFilter, orders]);
 
-    const sorted = useMemo(() => {
-        return [...filtered].sort((a, b) => {
-            const key = sortBy.key;
-            let va = a[key] ?? (key === 'endDate' ? new Date(0) : '');
-            let vb = b[key] ?? (key === 'endDate' ? new Date(0) : '');
-            if (key === 'quantity') {
-                va = Number(va) || 0;
-                vb = Number(vb) || 0;
-            }
-            if (key === 'endDate') {
-                va = new Date(va);
-                vb = new Date(vb);
-            }
-            if (va < vb) return sortBy.dir === 'asc' ? -1 : 1;
-            if (va > vb) return sortBy.dir === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [filtered, sortBy]);
-
-    const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+    const totalPages = Math.max(1, Math.ceil((totalCount || filtered.length) / pageSize));
 
     useEffect(() => {
         if (currentPage > totalPages) setCurrentPage(totalPages || 1);
     }, [totalPages, currentPage]);
 
-    const pageData = useMemo(() => {
-        const start = (currentPage - 1) * pageSize;
-        return sorted.slice(start, start + pageSize);
-    }, [sorted, currentPage, pageSize]);
+    const pageData = useMemo(() => filtered, [filtered]);
 
     const stats = useMemo(() => {
-        const inProgress = orders.filter((o) => ['pending', 'producing', 'Process', 'Chờ Xét Duyệt', 'Yêu Cầu Chỉnh Sửa'].includes(o.status)).length;
-        const done = orders.filter((o) => ['completed', 'delivered'].includes(o.status)).length;
+        const inProgress = filtered.filter((o) => ['pending', 'producing', 'Process', 'Chờ Xét Duyệt', 'Yêu Cầu Chỉnh Sửa'].includes(o.status)).length;
+        const done = filtered.filter((o) => ['completed', 'delivered'].includes(o.status)).length;
 
         return {
-            total: orders.length,
+            total: totalCount || orders.length,
             showing: filtered.length,
             inProgress,
             done,
         };
-    }, [orders, filtered.length]);
+    }, [orders, filtered.length, totalCount]);
 
     const toggleSort = (key) => {
         setSortBy((prev) => ({
             key,
             dir: prev.key === key && prev.dir === 'asc' ? 'desc' : 'asc',
         }));
+        setCurrentPage(1);
     };
 
     const goToPage = (p) => setCurrentPage(Math.max(1, Math.min(totalPages, p)));
@@ -266,10 +286,10 @@ export default function Orders() {
                         </div>
                     </div>
 
-                    {!loading && !error && sorted.length > 0 && (
+                    {!loading && !error && (totalCount || filtered.length) > 0 && (
                         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-slate-600">
                             <div>
-                                Hiển thị {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, sorted.length)} / {sorted.length}
+                                Hiển thị {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalCount || filtered.length)} / {totalCount || filtered.length}
                             </div>
                             <div className="flex gap-2 flex-wrap justify-center">
                                 <button onClick={() => goToPage(1)} disabled={currentPage === 1} className="px-3 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition">Đầu</button>
