@@ -1,20 +1,12 @@
 const AUTH_KEYS = ["token", "user", "userId"];
 
-function moveLegacyValueToSession(key) {
-  const sessionValue = sessionStorage.getItem(key);
-  if (sessionValue !== null) return sessionValue;
-
-  const legacyValue = localStorage.getItem(key);
-  if (legacyValue === null) return null;
-
-  sessionStorage.setItem(key, legacyValue);
+AUTH_KEYS.forEach((key) => {
   localStorage.removeItem(key);
-  return legacyValue;
-}
+});
 
 export function getAuthItem(key) {
   if (!AUTH_KEYS.includes(key)) return null;
-  return moveLegacyValueToSession(key);
+  return sessionStorage.getItem(key);
 }
 
 export function setAuthItem(key, value) {
