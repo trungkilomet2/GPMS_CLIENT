@@ -90,6 +90,9 @@ export default function CreateOrder() {
 
         if (!orderImageFile && !orderData.image) newErrors.image = "Vui lòng chọn ảnh đơn hàng";
         if (!orderData.orderName?.trim()) newErrors.orderName = "Tên đơn hàng không được để trống";
+        else if (orderData.orderName.trim().length < 3 || orderData.orderName.trim().length > 50) {
+            newErrors.orderName = "Tên đơn hàng phải từ 3 đến 50 ký tự";
+        }
         if (!orderData.type?.trim()) newErrors.type = "Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)";
         if (!orderData.size?.trim()) newErrors.size = "Kích thước không được để trống";
         if (!orderData.color?.trim()) newErrors.color = "Màu sắc không được để trống";
@@ -430,54 +433,6 @@ export default function CreateOrder() {
                                 <Input label="Ngày kết thúc (Dự kiến)" name="endDate" type="date" value={orderData.endDate} onChange={handleOrderChange} error={errors.endDate} />
                             </div>
                         </div>
-                        {/* 2. Vật liệu cung cấp */}
-                        <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
-                            <div className="flex items-center justify-between mb-4 border-b pb-2">
-                                <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setEditingIndex(null);
-                                        setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
-                                        setIsModalOpen(true);
-                                    }}
-                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
-                                >
-                                    <Plus size={18} /> Thêm vật liệu
-                                </button>
-                            </div>
-
-                            {errors.materials && (
-                                <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
-                                    <AlertCircle size={16} /> {errors.materials}
-                                </div>
-                            )}
-
-                            <div className="overflow-x-auto">
-                                <MaterialsTable
-                                    materials={materials}
-                                    variant="create"
-                                    showImage
-                                    showActions
-                                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
-                                    onEdit={(i) => {
-                                        setEditingIndex(i);
-                                        setMaterialFormData({
-                                            materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                            value: materials[i].value ?? materials[i].quantity ?? '',
-                                            uom: materials[i].uom ?? '',
-                                            image: materials[i].image ?? '',
-                                            imageFile: null,
-                                            imagePreview: '',
-                                            note: materials[i].note ?? '',
-                                        });
-                                        setIsModalOpen(true);
-                                    }}
-                                    onDelete={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
-                                />
-                            </div>
-                        </div>
-
                         {/* 2.5. Mẫu thiết kế */}
                         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
                             <h2 className="text-lg font-semibold mb-4 border-b pb-2 text-gray-800">Mẫu thiết kế</h2>
@@ -525,6 +480,54 @@ export default function CreateOrder() {
                                         className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Vật liệu cung cấp */}
+                        <div className="bg-white rounded-lg shadow-sm border p-6 transition-all border-gray-100">
+                            <div className="flex items-center justify-between mb-4 border-b pb-2">
+                                <h2 className="text-lg font-semibold text-gray-800">Vật liệu cung cấp</h2>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingIndex(null);
+                                        setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
+                                        setIsModalOpen(true);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
+                                >
+                                    <Plus size={18} /> Thêm vật liệu
+                                </button>
+                            </div>
+
+                            {errors.materials && (
+                                <div className="mb-4 flex items-center gap-2 text-red-600 text-sm font-medium bg-red-50 p-2 rounded-md">
+                                    <AlertCircle size={16} /> {errors.materials}
+                                </div>
+                            )}
+
+                            <div className="overflow-x-auto">
+                                <MaterialsTable
+                                    materials={materials}
+                                    variant="create"
+                                    showImage
+                                    showActions
+                                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
+                                    onEdit={(i) => {
+                                        setEditingIndex(i);
+                                        setMaterialFormData({
+                                            materialName: materials[i].materialName ?? materials[i].name ?? '',
+                                            value: materials[i].value ?? materials[i].quantity ?? '',
+                                            uom: materials[i].uom ?? '',
+                                            image: materials[i].image ?? '',
+                                            imageFile: null,
+                                            imagePreview: '',
+                                            note: materials[i].note ?? '',
+                                        });
+                                        setIsModalOpen(true);
+                                    }}
+                                    onDelete={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
+                                />
                             </div>
                         </div>
 
