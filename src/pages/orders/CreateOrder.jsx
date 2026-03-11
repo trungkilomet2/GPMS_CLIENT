@@ -128,14 +128,25 @@ export default function CreateOrder() {
         }
     };
 
-    const handleSaveMaterial = () => {
+    const handleSaveMaterial = async () => {
+        let imageUrl = materialFormData.image || '';
+        if (materialFormData.imageFile) {
+            try {
+                const uploadRes = await CloudinaryService.uploadImage(materialFormData.imageFile);
+                imageUrl = uploadRes?.url || '';
+            } catch (err) {
+                alert('Không thể upload ảnh vật liệu. Vui lòng thử lại.');
+                return;
+            }
+        }
+
         const newMaterial = {
             materialName: materialFormData.materialName,
-            value: Number(materialFormData.quantity),
+            value: Number(materialFormData.value),
             uom: materialFormData.uom,
-            image: materialFormData.image,
-            imageFile: materialFormData.imageFile || null,
-            imagePreview: materialFormData.imagePreview || materialFormData.image || '',
+            image: imageUrl,
+            imageFile: null,
+            imagePreview: imageUrl || materialFormData.imagePreview || '',
             note: materialFormData.note?.trim() || '',
         };
 
@@ -390,7 +401,7 @@ export default function CreateOrder() {
                                     type="button"
                                     onClick={() => {
                                         setEditingIndex(null);
-                                        setMaterialFormData({ materialName: '', quantity: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
+                                        setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
                                         setIsModalOpen(true);
                                     }}
                                     className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
@@ -416,11 +427,11 @@ export default function CreateOrder() {
                                         setEditingIndex(i);
                                         setMaterialFormData({
                                             materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                            quantity: materials[i].quantity ?? materials[i].value ?? '',
+                                            value: materials[i].value ?? materials[i].quantity ?? '',
                                             uom: materials[i].uom ?? '',
                                             image: materials[i].image ?? '',
                                             imageFile: null,
-                                            imagePreview: '',
+                                            imagePreview: materials[i].image ?? '',
                                             note: materials[i].note ?? '',
                                         });
                                         setIsModalOpen(true);
@@ -523,7 +534,7 @@ export default function CreateOrder() {
                 onClose={() => setIsModalOpen(false)}
                 onSave={handleSaveMaterial}
                 formData={materialFormData}
-                onChange={(e) => setMaterialFormData({ ...materialFormData, [e.target.name]: e.target.value })}
+                onChange={(e) => setMaterialFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))}
                 editingIndex={editingIndex}
             />
         </MainLayout>

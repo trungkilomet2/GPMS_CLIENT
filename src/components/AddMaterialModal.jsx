@@ -44,14 +44,14 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
         }
     };
 
-    const handleValidateAndSave = () => {
+    const handleValidateAndSave = async () => {
         let newErrors = {};
 
         if (!formData.materialName?.trim()) {
             newErrors.materialName = "Tên vật liệu không được để trống";
         }
-        if (!formData.quantity || Number(formData.quantity) <= 0) {
-            newErrors.quantity = "Số lượng phải lớn hơn 0";
+        if (!formData.value || Number(formData.value) <= 0) {
+            newErrors.value = "Số lượng phải lớn hơn 0";
         }
         if (!formData.uom) {
             newErrors.uom = "Vui lòng chọn đơn vị tính";
@@ -62,7 +62,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
             return;
         }
 
-        onSave();
+        await onSave();
     };
 
     const handleInputChange = (e) => {
@@ -128,12 +128,12 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                             <label className="text-sm font-bold text-gray-700">Số lượng <span className="text-red-500">*</span></label>
                             <input
                                 type="number"
-                                name="quantity"
-                                value={formData.quantity || ''}
+                                name="value"
+                                value={formData.value || ''}
                                 onChange={handleInputChange}
-                                className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none ${errors.quantity ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`}
+                                className={`w-full border rounded-xl px-4 py-2.5 transition-all outline-none ${errors.value ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`}
                             />
-                            {errors.quantity && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.quantity}</p>}
+                            {errors.value && <p className="text-[11px] text-red-600 font-medium ml-1">⚠️ {errors.value}</p>}
                         </div>
 
                         {/* Đơn vị */}
