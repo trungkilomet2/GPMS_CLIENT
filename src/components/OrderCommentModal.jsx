@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
 import CommentService from '@/services/CommentService';
 import BASE_URL from '@/lib/apiconfig';
+import { getAuthItem, getStoredUser } from '@/lib/authStorage';
 
 export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     const [comments, setComments] = useState([]);
@@ -11,7 +12,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
 
     const scrollRef = useRef(null);
 
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = getStoredUser() || {};
     const CURRENT_USER_ID = user.userId ?? user.id ?? null;
 
     const wsRef = useRef(null);
@@ -26,7 +27,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         if (!isOpen || !orderId) return;
 
         const base = BASE_URL?.replace(/^http/i, 'ws');
-        const token = localStorage.getItem('token');
+        const token = getAuthItem('token');
         const qs = new URLSearchParams({
             orderId: String(orderId),
             userId: String(CURRENT_USER_ID ?? ''),

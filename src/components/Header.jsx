@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
+import { getStoredUser, removeAuthItem } from "@/lib/authStorage";
 import "@/styles/homepage.css";
 
 const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.1 4H2V2H0v2h2l3.6 7.59L4.25 14C4.09 14.31 4 14.65 4 15c0 1.1.9 2 2 2h14v-2H6.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.1z";
@@ -20,8 +21,7 @@ export default function Header() {
   // và lắng nghe event "auth-change" để re-render ngay sau login/logout
   useEffect(() => {
     const load = () => {
-      const data = localStorage.getItem("user");
-      setUser(data ? JSON.parse(data) : null);
+      setUser(getStoredUser());
     };
     load();
     window.addEventListener("auth-change", load);
@@ -46,7 +46,9 @@ export default function Header() {
   }, []);
 
   const logout = () => {
-    localStorage.removeItem("user");
+    removeAuthItem("user");
+    removeAuthItem("token");
+    removeAuthItem("userId");
     setUser(null);
     setProfileOpen(false);
     window.dispatchEvent(new Event("auth-change"));

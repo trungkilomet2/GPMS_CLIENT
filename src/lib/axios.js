@@ -1,5 +1,6 @@
 import axios from 'axios';
 import BASE_URL from './apiconfig';
+import { getAuthItem } from './authStorage';
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
@@ -10,7 +11,7 @@ const axiosClient = axios.create({
 
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getAuthItem('token');
 
     if (token) {
       config.headers = config.headers ?? {};

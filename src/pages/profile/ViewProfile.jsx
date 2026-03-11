@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import OrderService from "@/services/OrderService";
 import Header from "@/components/Header";
+import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";
 
 const T = {
   dark:"#0d4225", mid:"#186637", base:"#1e8a47",
@@ -373,14 +374,14 @@ function buildOrderSummary(orders = []) {
 }
 
 function getCurrentUserId() {
-  const rawUserId = localStorage.getItem("userId");
+  const rawUserId = getAuthItem("userId");
   if (rawUserId && rawUserId !== "null") return rawUserId;
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const storedUser = getStoredUser() || {};
   return storedUser?.userId || storedUser?.id || null;
 }
 
 function getStoredProfileExtras() {
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const storedUser = getStoredUser() || {};
   return {
     bio: storedUser?.bio ?? "",
     cooperationNotes: storedUser?.cooperationNotes ?? [],
@@ -399,7 +400,7 @@ export default function ViewProfile() {
     let active = true;
 
     const loadProfile = () => {
-      const token = localStorage.getItem("token");
+      const token = getAuthItem("token");
       if (!token) {
         navigate("/login");
         return;
@@ -426,8 +427,7 @@ export default function ViewProfile() {
         .catch(err => {
           if (!active) return;
           if (err?.response?.data?.status === 401 || err?.status === 401) {
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            clearAuthStorage();
             navigate("/login");
             return;
           }

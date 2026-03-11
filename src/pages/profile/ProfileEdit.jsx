@@ -10,6 +10,7 @@ import {
   validateLocation,
   validatePhoneNumber,
 } from "@/lib/validators";
+import { getStoredUser, setStoredUser } from "@/lib/authStorage";
 
 /* ─── Design tokens ─── */
 const T = {
@@ -275,8 +276,7 @@ export default function ProfileEdit() {
 
   /* ── Load profile ── */
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    const user   = stored ? JSON.parse(stored) : null;
+    const user = getStoredUser();
     if (!user) { navigate("/login"); return; }
 
     const fallback = buildLocalProfile(user);
@@ -371,8 +371,7 @@ export default function ProfileEdit() {
       setSaving(true);
       setMsg(null);
 
-      const stored = localStorage.getItem("user");
-      const user   = stored ? JSON.parse(stored) : null;
+      const user = getStoredUser();
       const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview);
 
       if (!avatarUpload) {
@@ -391,15 +390,15 @@ export default function ProfileEdit() {
 
       await userService.updateProfile(user.userId ?? user.id, fd);
 
-      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-      localStorage.setItem("user", JSON.stringify({
+      const storedUser = getStoredUser() || {};
+      setStoredUser({
         ...storedUser,
         bio: String(form.Bio || "").trim(),
         cooperationNotes: String(form.CooperationNotes || "")
           .split("\n")
           .map((item) => item.trim())
           .filter(Boolean),
-      }));
+      });
       window.dispatchEvent(new Event("auth-change"));
 
       setMsg({ type: "success", text: "Lưu hồ sơ thành công!" });

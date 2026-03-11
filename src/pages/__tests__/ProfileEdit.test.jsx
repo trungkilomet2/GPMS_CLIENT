@@ -13,9 +13,9 @@ vi.mock('react-router-dom', async () => {
 });
 
 describe('ProfileEdit', () => {
-  it('updates user in localStorage and redirects to /profile', () => {
+  it('updates user in sessionStorage and redirects to /profile', () => {
     vi.useFakeTimers();
-    localStorage.setItem('user', JSON.stringify({ name: 'Old Name', email: 'old@test.com' }));
+    sessionStorage.setItem('user', JSON.stringify({ name: 'Old Name', email: 'old@test.com' }));
 
     const { container } = render(
       <MemoryRouter>
@@ -28,7 +28,7 @@ describe('ProfileEdit', () => {
     });
     fireEvent.click(container.querySelector('button[type="submit"]'));
 
-    const savedUser = JSON.parse(localStorage.getItem('user'));
+    const savedUser = JSON.parse(sessionStorage.getItem('user'));
     expect(savedUser.name).toBe('New Name');
 
     act(() => {

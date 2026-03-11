@@ -27,7 +27,7 @@ describe('Header', () => {
   });
 
   it('shows user menu when user exists and can logout', () => {
-    localStorage.setItem('user', JSON.stringify({ name: 'Tester', email: 't@mail.com' }));
+    sessionStorage.setItem('user', JSON.stringify({ name: 'Tester', email: 't@mail.com' }));
 
     const { container } = render(
       <MemoryRouter>
@@ -41,7 +41,7 @@ describe('Header', () => {
     const logoutLink = Array.from(container.querySelectorAll('a')).find((a) => a.textContent.includes('Đăng xuất'));
     fireEvent.click(logoutLink);
 
-    expect(localStorage.getItem('user')).toBeNull();
+    expect(sessionStorage.getItem('user')).toBeNull();
     expect(mockNavigate).toHaveBeenCalledWith('/home');
   });
 });

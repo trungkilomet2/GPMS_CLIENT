@@ -4,6 +4,7 @@
 ═══════════════════════════════════════════════════════ */
 
 import { NavLink, useNavigate } from "react-router-dom";
+import { clearAuthStorage } from "@/lib/authStorage";
 
 const T = {
   dark:    "#0d4225",
@@ -69,7 +70,7 @@ export default function CustomerSidebar() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    localStorage.removeItem("user");
+    clearAuthStorage();
     window.dispatchEvent(new Event("auth-change"));
     navigate("/login");
   };

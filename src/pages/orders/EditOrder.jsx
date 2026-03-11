@@ -3,10 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash, ArrowLeft, FileText, Loader2, Pencil, AlertCircle, Save } from 'lucide-react';
 import AddMaterialModal from '@/components/AddMaterialModal';
 import OrderService from '@/services/OrderService';
+import { getAuthItem } from '@/lib/authStorage';
 import MainLayout from '../../layouts/MainLayout';
 
 export default function EditOrder() {
-    const { userId } = localStorage.getItem("userId") ? JSON.parse(localStorage.getItem("userId")) : {};
+    const userId = getAuthItem("userId");
     const { id } = useParams();
     const navigate = useNavigate();
 

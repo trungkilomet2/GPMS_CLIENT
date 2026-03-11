@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { STATS } from "../../lib/constants";
 import { useNavigate } from "react-router-dom";
+import { getStoredUser } from "@/lib/authStorage";
 
 export default function Hero() {
   const navigate = useNavigate();
@@ -9,8 +10,7 @@ export default function Hero() {
 
   useEffect(() => {
     const load = () => {
-      const data = localStorage.getItem("user");
-      setUser(data ? JSON.parse(data) : null);
+      setUser(getStoredUser());
     };
 
     load();

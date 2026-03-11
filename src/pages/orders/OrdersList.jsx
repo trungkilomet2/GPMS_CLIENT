@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import OrderService from '@/services/OrderService';
+import { getStoredUser } from '@/lib/authStorage';
 import MainLayout from '../../layouts/MainLayout';
 import '../../styles/homepage.css';
 
@@ -34,12 +35,8 @@ function SortIcon({ direction }) {
 
 export default function Orders() {
     const getUserId = () => {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const user = JSON.parse(userData);
-            return user.userId ?? user.id ?? null;
-        }
-        return null;
+        const user = getStoredUser();
+        return user?.userId ?? user?.id ?? null;
     };
 
     const userId = getUserId();

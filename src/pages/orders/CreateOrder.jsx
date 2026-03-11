@@ -8,17 +8,14 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
+import { getStoredUser } from '@/lib/authStorage';
 import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
 
 export default function CreateOrder() {
     const getUserId = () => {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const user = JSON.parse(userData);
-            return user.userId; // hoặc user.userId tùy cách bạn đặt tên
-        }
-        return null;
+        const user = getStoredUser();
+        return user?.userId ?? user?.id ?? null;
     };
 
     const userId = getUserId();
