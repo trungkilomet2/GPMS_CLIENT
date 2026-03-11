@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { clearAuthStorage, setAuthItem, setStoredUser } from "@/lib/authStorage";
 
 function readAccountStatus(source = {}) {
   const status = String(
@@ -64,16 +65,35 @@ export const authService = {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw { response: { data: err } };
+      throw {
+        status: res.status,
+        response: {
+          status: res.status,
+          data: {
+            status: res.status,
+            ...err,
+          },
+        },
+      };
     }
 
     const rawToken = await res.text();
     const token = rawToken.replace(/^"|"$/g, "").trim();
-
-    localStorage.setItem("token", token);
-
-    const payload64 = token.split(".")[1];
-    const decoded = JSON.parse(atob(payload64));
+    let decoded;
+    try {
+      const payload64 = token.split(".")[1];
+      if (!payload64) throw new Error("Missing token payload");
+      decoded = JSON.parse(atob(payload64));
+    } catch {
+      clearAuthStorage();
+      throw {
+        response: {
+          data: {
+            message: "Không thể xác thực phiên đăng nhập. Vui lòng thử lại.",
+          },
+        },
+      };
+    }
 
     const userName =
       decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
@@ -117,9 +137,7 @@ export const authService = {
     };
 
     if (user.accountStatus?.isDisabled) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("userId");
-      localStorage.removeItem("user");
+      clearAuthStorage();
       throw {
         response: {
           data: {
@@ -129,8 +147,9 @@ export const authService = {
       };
     }
 
-    localStorage.setItem("user", JSON.stringify(user));
-    localStorage.setItem("userId", userId);
+    setAuthItem("token", token);
+    setStoredUser(user);
+    setAuthItem("userId", String(userId));
 
     window.dispatchEvent(new Event("auth-change"));
 
@@ -155,9 +174,7 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("user");
+    clearAuthStorage();
     window.dispatchEvent(new Event("auth-change"));
   },
 };

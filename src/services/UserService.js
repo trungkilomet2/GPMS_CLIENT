@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { clearAuthStorage, getAuthItem, getStoredUser, removeAuthItem, setStoredUser } from "@/lib/authStorage";
 
 const readAccountStatus = (source = {}) => {
   const status = String(
@@ -19,11 +20,11 @@ const readAccountStatus = (source = {}) => {
   return { isDisabled, status };
 };
 
-const getToken  = () => localStorage.getItem("token");
+const getToken  = () => getAuthItem("token");
 const getUserId = () => {
-  const id = localStorage.getItem("userId");
+  const id = getAuthItem("userId");
   if (id && id !== "null") return Number(id);
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = getStoredUser() || {};
   return user.userId ?? user.id ?? null;
 };
 
@@ -62,8 +63,8 @@ export const userService = {
     });
 
     if (res.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      removeAuthItem("token");
+      removeAuthItem("user");
       window.location.href = "/login";
       throw { status: 401 };
     }
@@ -76,9 +77,7 @@ export const userService = {
     const accountStatus = readAccountStatus(d);
 
     if (accountStatus.isDisabled) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userId");
+      clearAuthStorage();
       throw {
         response: {
           data: {
@@ -103,13 +102,13 @@ export const userService = {
     };
 
     // Sync localStorage
-    const stored = JSON.parse(localStorage.getItem("user") || "{}");
-    localStorage.setItem("user", JSON.stringify({
+    const stored = getStoredUser() || {};
+    setStoredUser({
       ...stored,
       ...profile,
       bio: stored.bio ?? "",
       cooperationNotes: stored.cooperationNotes ?? [],
-    }));
+    });
 
     return {
       ...profile,
@@ -136,8 +135,8 @@ export const userService = {
     });
 
     if (res.status === 401) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      removeAuthItem("token");
+      removeAuthItem("user");
       window.location.href = "/login";
       throw { status: 401 };
     }
@@ -147,8 +146,8 @@ export const userService = {
 
     // Sync localStorage từ response backend để tránh lệch dữ liệu hiển thị
     const d = json.data ?? {};
-    const stored = JSON.parse(localStorage.getItem("user") || "{}");
-    localStorage.setItem("user", JSON.stringify({
+    const stored = getStoredUser() || {};
+    setStoredUser({
       ...stored,
       id:          d.id          ?? stored.id,
       userId:      d.id          ?? stored.userId,
@@ -161,7 +160,7 @@ export const userService = {
       avatarUrl:   d.avartarUrl  ?? stored.avatarUrl,
       location:    d.location    ?? stored.location,
       address:     d.location    ?? stored.address,
-    }));
+    });
     window.dispatchEvent(new Event("auth-change"));
 
     return json;

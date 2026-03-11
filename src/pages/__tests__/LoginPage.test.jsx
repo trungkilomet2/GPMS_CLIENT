@@ -1,4 +1,4 @@
-﻿import { fireEvent, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LoginPage from '@/pages/LoginPage';
 import { authService } from '@/services/authService';
@@ -20,6 +20,11 @@ vi.mock('@/services/authService', () => ({
 }));
 
 describe('LoginPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
   it('submits login form and navigates to /home', async () => {
     authService.login.mockResolvedValue({
       token: 'token-1',
@@ -33,7 +38,7 @@ describe('LoginPage', () => {
     );
 
     fireEvent.change(container.querySelector('input[name="userName"]'), {
-      target: { value: '  tester  ' },
+      target: { value: 'tester01' },
     });
     fireEvent.change(container.querySelector('input[name="password"]'), {
       target: { value: '123456' },
@@ -42,12 +47,11 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       expect(authService.login).toHaveBeenCalledWith({
-        userName: 'tester',
+        userName: 'tester01',
         password: '123456',
       });
     });
 
-    expect(localStorage.getItem('token')).toBe('token-1');
     expect(mockNavigate).toHaveBeenCalledWith('/home');
   });
 
@@ -62,6 +66,34 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       expect(authService.login).not.toHaveBeenCalled();
+    });
+  });
+
+  it('shows field errors when login credentials are invalid', async () => {
+    authService.login.mockRejectedValue({
+      response: {
+        data: {
+          message: 'Tài khoản hoặc mật khẩu không chính xác',
+        },
+      },
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>
+    );
+
+    fireEvent.change(container.querySelector('input[name="userName"]'), {
+      target: { value: 'tester01' },
+    });
+    fireEvent.change(container.querySelector('input[name="password"]'), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(container.querySelector('button[type="submit"]'));
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Tài khoản hoặc mật khẩu không chính xác')).toHaveLength(2);
     });
   });
 });

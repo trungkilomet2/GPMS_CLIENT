@@ -1,10 +1,11 @@
  import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { getAuthItem } from "@/lib/authStorage";
 
 export const productService = {
 
   async getAll() {
 
-    const token = localStorage.getItem("token");
+    const token = getAuthItem("token");
 
     const res = await fetch(API_ENDPOINTS.PRODUCT.GET_ALL, {
       method: "GET",

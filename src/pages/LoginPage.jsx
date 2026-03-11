@@ -5,6 +5,64 @@ import { validatePassword, validateUserName } from "@/lib/validators";
 import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
+const INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác";
+
+function mapLoginError(err) {
+  const status = err?.response?.data?.status ?? err?.status;
+  const message = String(
+    err?.response?.data?.message ||
+    err?.response?.data?.title ||
+    ""
+  ).trim();
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("vô hiệu hóa") ||
+    normalized.includes("disabled") ||
+    normalized.includes("inactive") ||
+    normalized.includes("locked") ||
+    normalized.includes("blocked")
+  ) {
+    return { userName: message };
+  }
+
+  if (status === 401 || status === 400 || !message) {
+    return {
+      userName: INVALID_CREDENTIALS_MESSAGE,
+      password: INVALID_CREDENTIALS_MESSAGE,
+    };
+  }
+
+  if (
+    (normalized.includes("tên đăng nhập") || normalized.includes("username") || normalized.includes("user name")) &&
+    (normalized.includes("mật khẩu") || normalized.includes("password"))
+  ) {
+    return {
+      userName: INVALID_CREDENTIALS_MESSAGE,
+      password: INVALID_CREDENTIALS_MESSAGE,
+    };
+  }
+
+  if (
+    normalized.includes("tên đăng nhập") ||
+    normalized.includes("username") ||
+    normalized.includes("user name")
+  ) {
+    return { userName: message };
+  }
+
+  if (normalized.includes("mật khẩu") || normalized.includes("password")) {
+    return {
+      userName: INVALID_CREDENTIALS_MESSAGE,
+      password: INVALID_CREDENTIALS_MESSAGE,
+    };
+  }
+
+  return {
+    userName: INVALID_CREDENTIALS_MESSAGE,
+    password: INVALID_CREDENTIALS_MESSAGE,
+  };
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -41,7 +99,23 @@ export default function LoginPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(p => ({ ...p, [name]: value }));
-    setErrors(p => ({ ...p, [name]: validateField(name, value) }));
+    setErrors((prev) => {
+      const nextErrors = { ...prev };
+      const fieldError = validateField(name, value);
+
+      if (
+        prev.userName === INVALID_CREDENTIALS_MESSAGE ||
+        prev.password === INVALID_CREDENTIALS_MESSAGE
+      ) {
+        delete nextErrors.userName;
+        delete nextErrors.password;
+      }
+
+      if (fieldError) nextErrors[name] = fieldError;
+      else delete nextErrors[name];
+
+      return nextErrors;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -57,11 +131,7 @@ export default function LoginPage() {
       else          localStorage.removeItem("rememberUserName");
       navigate("/home");
     } catch (err) {
-      alert(
-        err?.response?.data?.message ||
-        err?.response?.data?.title   ||
-        "Đăng nhập thất bại. Vui lòng kiểm tra lại."
-      );
+      setErrors(mapLoginError(err));
     } finally {
       setLoading(false);
     }

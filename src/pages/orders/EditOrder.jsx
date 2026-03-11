@@ -6,10 +6,11 @@ import MaterialsTable from '@/components/MaterialsTable';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
+import { getAuthItem } from '@/lib/authStorage';
 import MainLayout from '../../layouts/MainLayout';
 
 export default function EditOrder() {
-    const { userId } = localStorage.getItem("userId") ? JSON.parse(localStorage.getItem("userId")) : {};
+    const userId = getAuthItem("userId");
     const { id } = useParams();
     const navigate = useNavigate();
 
