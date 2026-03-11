@@ -1,5 +1,4 @@
 import { lazy } from "react";
-import CustomerLayout from "@/components/layout/CustomerLayout";
 
 /* ── HOMEPAGE ── */
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -38,19 +37,11 @@ export const routes = [
   /* PROFILE */
   {
     path: "/profile",
-    element: (
-      <CustomerLayout title="Hồ sơ cá nhân">
-        <ViewProfile />
-      </CustomerLayout>
-    ),
+    element: <ViewProfile />,
   },
   {
     path: "/profile/edit",
-    element: (
-      <CustomerLayout title="Chỉnh sửa hồ sơ">
-        <ProfileEdit />
-      </CustomerLayout>
-    ),
+    element: <ProfileEdit />,
   },
 
   /* 404 */

@@ -143,7 +143,13 @@ const handleSubmit = async (e) => {
 
       <div className="login-right">
         <form className="login-card register-card" onSubmit={handleSubmit}>
-          <div className="register-logo">🏭</div>
+          <button
+            type="button"
+            className="auth-back-btn"
+            onClick={() => navigate("/home")}
+          >
+            ← Về trang chủ
+          </button>
 
           <h2>Tạo tài khoản mới</h2>
           <p>Hệ thống quản lý sản xuất may mặc</p>

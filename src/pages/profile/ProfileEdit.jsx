@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
+import Header from "@/components/Header";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 /* ─── Design tokens ─── */
 const T = {
@@ -60,7 +62,7 @@ function RoleBadge({ children }) {
 
 function CoverRings() {
   return <>
-    {[{ w: 420, h: 420, top: -180, right: -80 }, { w: 260, h: 260, top: -80, right: 40 }, { w: 180, h: 180, bottom: -60, left: "10%" }]
+    {[{ w: 280, h: 280, top: -120, right: -40 }, { w: 180, h: 180, top: -48, right: 28 }, { w: 120, h: 120, bottom: -36, left: "12%" }]
       .map((s, i) => (
         <div key={i} style={{
           position: "absolute", borderRadius: "50%",
@@ -164,8 +166,8 @@ function AvatarUploader({ src, initials, uploading, onChange }) {
       title="Nhấn để đổi ảnh đại diện"
     >
       {src
-        ? <img src={src} alt="avatar" style={{ width: 112, height: 112, borderRadius: "50%", border: "4px solid #fff", objectFit: "cover", boxShadow: "0 8px 28px rgba(0,0,0,.16)" }} />
-        : <div style={{ width: 112, height: 112, borderRadius: "50%", border: "4px solid #fff", background: T.light, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2.5rem", fontWeight: 800, color: T.mid, boxShadow: "0 8px 28px rgba(0,0,0,.16)" }}>{initials}</div>
+        ? <img src={src} alt="avatar" style={{ width: 80, height: 80, borderRadius: "50%", border: "3px solid #fff", objectFit: "cover", boxShadow: "0 6px 18px rgba(0,0,0,.14)" }} />
+        : <div style={{ width: 80, height: 80, borderRadius: "50%", border: "3px solid #fff", background: T.light, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: T.mid, boxShadow: "0 6px 18px rgba(0,0,0,.14)" }}>{initials}</div>
       }
 
       {/* hover overlay */}
@@ -174,20 +176,20 @@ function AvatarUploader({ src, initials, uploading, onChange }) {
         background: "rgba(0,0,0,.42)",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         opacity: uploading ? 1 : 0, transition: ".2s",
-        border: "4px solid #fff", pointerEvents: "none",
+        border: "3px solid #fff", pointerEvents: "none",
       }}>
         {uploading
           ? <span style={{ color: "#fff", fontSize: ".7rem", fontWeight: 700 }}>Đang tải…</span>
-          : <><span style={{ fontSize: "1.2rem" }}>📷</span><span style={{ color: "#fff", fontSize: ".65rem", fontWeight: 700, marginTop: 2 }}>Đổi ảnh</span></>
+          : <><span style={{ fontSize: "1rem" }}>📷</span><span style={{ color: "#fff", fontSize: ".58rem", fontWeight: 700, marginTop: 2 }}>Đổi ảnh</span></>
         }
       </div>
 
       {/* badge */}
       <div style={{
-        position: "absolute", bottom: 4, right: 4, width: 28, height: 28,
+        position: "absolute", bottom: 2, right: 2, width: 22, height: 22,
         borderRadius: "50%", background: T.base, border: "2px solid #fff",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: ".75rem", pointerEvents: "none",
+        fontSize: ".62rem", pointerEvents: "none",
       }}>📷</div>
 
       <input ref={ref} type="file" accept="image/*" style={{ display: "none" }} onChange={onChange} />
@@ -200,6 +202,14 @@ function AvatarUploader({ src, initials, uploading, onChange }) {
 ═════════════════════════════ */
 export default function ProfileEdit() {
   const navigate = useNavigate();
+
+  const buildLocalProfile = (user) => ({
+    fullName: user?.fullName ?? user?.name ?? "",
+    email: user?.email ?? "",
+    phoneNumber: user?.phoneNumber ?? user?.phone ?? "",
+    location: user?.location ?? user?.address ?? "",
+    avatarUrl: user?.avatarUrl ?? user?.avartarUrl ?? "",
+  });
 
   // ── form fields khớp đúng tên API ──
   // API fields: FullName, PhoneNumber, AvartarUrl (file), Location, Email
@@ -224,6 +234,17 @@ export default function ProfileEdit() {
     const user   = stored ? JSON.parse(stored) : null;
     if (!user) { navigate("/login"); return; }
 
+    const fallback = buildLocalProfile(user);
+    setForm({
+      FullName: fallback.fullName,
+      Email: fallback.email,
+      PhoneNumber: fallback.phoneNumber,
+      Location: fallback.location,
+    });
+    if (fallback.avatarUrl) {
+      setAvatarPreview(fallback.avatarUrl);
+    }
+
     userService.getProfile(user.userId ?? user.id)
       .then(data => {
         setForm({
@@ -237,7 +258,11 @@ export default function ProfileEdit() {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);
         }
       })
-      .catch(() => setMsg({ type: "error", text: "Không thể tải hồ sơ." }))
+      .catch(() => {
+        if (!fallback.fullName && !fallback.email) {
+          setMsg({ type: "error", text: "Không thể tải hồ sơ." });
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -318,78 +343,85 @@ export default function ProfileEdit() {
 
   /* ── Loading ── */
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
-      <style>{GLOBAL_CSS}</style>
-      <div style={{ height: 210, background: `linear-gradient(120deg,${T.dark},${T.base})` }} />
-      <div style={{ maxWidth: 960, margin: "-56px auto 2rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1.5rem" }}>
-        <Sk h={112} w={112} r={56} />
-        <div style={{ flex: 1, paddingBottom: ".5rem", display: "flex", flexDirection: "column", gap: 8 }}>
-          <Sk h={26} w={200} /><Sk h={18} w={130} />
+    <div style={{ fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif", overflowX: "hidden", background: "#fff" }}>
+      <Header />
+      <Breadcrumbs />
+      <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
+        <style>{GLOBAL_CSS}</style>
+        <div style={{ height: 150, background: `linear-gradient(120deg,${T.dark},${T.base})` }} />
+        <div style={{ maxWidth: 960, margin: "-20px auto 1.5rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1rem", position: "relative", zIndex: 2 }}>
+          <Sk h={80} w={80} r={40} />
+          <div style={{ flex: 1, paddingBottom: ".5rem", display: "flex", flexDirection: "column", gap: 8 }}>
+            <Sk h={26} w={200} /><Sk h={18} w={130} />
+          </div>
         </div>
-      </div>
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem 4rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-        <Sk h={260} r={14} /><Sk h={200} r={14} />
+        <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem 4rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <Sk h={260} r={14} /><Sk h={200} r={14} />
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
-      <style>{GLOBAL_CSS}</style>
+    <div style={{ fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif", overflowX: "hidden", background: "#fff" }}>
+      <Header />
+      <Breadcrumbs />
+      <div style={{ minHeight: "100vh", background: T.sand, fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif" }}>
+        <style>{GLOBAL_CSS}</style>
 
-      {/* ── Cover ── */}
-      <div className="pf-cover" style={{ height: 210, background: `linear-gradient(120deg,${T.dark} 0%,${T.mid} 50%,${T.base} 100%)`, position: "relative", overflow: "hidden" }}>
-        <CoverRings />
-        <div style={{
-          position: "absolute", top: "1rem", right: "1.5rem",
-          background: "rgba(255,255,255,.15)", backdropFilter: "blur(8px)",
-          borderRadius: 10, padding: ".4rem .9rem",
-          fontSize: ".74rem", fontWeight: 700, color: "#fff",
-          border: "1px solid rgba(255,255,255,.25)", letterSpacing: ".04em",
-        }}>✏️ &nbsp;Chế độ chỉnh sửa</div>
-      </div>
-
-      {/* ── Avatar row ── */}
-      <div className="pf-avatar-row" style={{ maxWidth: 960, margin: "-56px auto 2rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1.5rem", animation: "fadeUp .35s ease" }}>
-        <AvatarUploader
-          src={avatarPreview}
-          initials={initials || "?"}
-          uploading={false}
-          onChange={handleAvatarChange}
-        />
-        <div style={{ flex: 1, paddingBottom: ".5rem" }}>
-          <div style={{ fontSize: "1.4rem", fontWeight: 800, color: T.text, marginBottom: ".4rem" }}>
-            {form.FullName || <span style={{ color: T.textLt, fontStyle: "italic" }}>Chưa nhập họ tên</span>}
-          </div>
-          <RoleBadge>Đang chỉnh sửa hồ sơ</RoleBadge>
-        </div>
-        <div className="pf-actions" style={{ display: "flex", gap: ".65rem", marginBottom: ".5rem" }}>
-          <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ</BtnSecondary>
-          <BtnPrimary onClick={handleSave} disabled={saving}>
-            {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
-          </BtnPrimary>
-        </div>
-      </div>
-
-      {/* ── Message banner ── */}
-      {msg && (
-        <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
+        {/* ── Cover ── */}
+        <div className="pf-cover" style={{ height: 150, background: `linear-gradient(120deg,${T.dark} 0%,${T.mid} 50%,${T.base} 100%)`, position: "relative", overflow: "hidden" }}>
+          <CoverRings />
           <div style={{
-            padding: ".85rem 1.1rem", borderRadius: 10,
-            background: msg.type === "success" ? T.light : T.redBg,
-            color: msg.type === "success" ? T.mid : T.red,
-            border: `1px solid ${msg.type === "success" ? T.border : T.redBd}`,
-            fontWeight: 700, fontSize: ".88rem",
-            display: "flex", alignItems: "center", gap: ".6rem",
-          }}>
-            {msg.type === "success" ? "✅" : "⚠️"}&nbsp;{msg.text}
+            position: "absolute", top: ".85rem", right: "1rem",
+            background: "rgba(255,255,255,.15)", backdropFilter: "blur(8px)",
+            borderRadius: 999, padding: ".32rem .72rem",
+            fontSize: ".68rem", fontWeight: 700, color: "#fff",
+            border: "1px solid rgba(255,255,255,.25)", letterSpacing: ".04em",
+          }}>✏️ &nbsp;Chế độ chỉnh sửa</div>
+        </div>
+
+        {/* ── Avatar row ── */}
+        <div className="pf-avatar-row" style={{ maxWidth: 960, margin: "-20px auto 1.5rem", padding: "0 2rem", display: "flex", alignItems: "flex-end", gap: "1rem", animation: "fadeUp .35s ease", position: "relative", zIndex: 2 }}>
+          <AvatarUploader
+            src={avatarPreview}
+            initials={initials || "?"}
+            uploading={false}
+            onChange={handleAvatarChange}
+          />
+          <div style={{ flex: 1, paddingBottom: ".5rem" }}>
+            <div style={{ fontSize: "1.2rem", fontWeight: 800, color: T.text, marginBottom: ".25rem" }}>
+              {form.FullName || <span style={{ color: T.textLt, fontStyle: "italic" }}>Chưa nhập họ tên</span>}
+            </div>
+            <RoleBadge>Đang chỉnh sửa hồ sơ</RoleBadge>
+          </div>
+          <div className="pf-actions" style={{ display: "flex", gap: ".65rem", marginBottom: ".5rem" }}>
+            <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ</BtnSecondary>
+            <BtnPrimary onClick={handleSave} disabled={saving}>
+              {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
+            </BtnPrimary>
           </div>
         </div>
-      )}
 
-      {/* ── Form ── */}
-      <form onSubmit={handleSave}>
-        <div className="pf-layout-single" style={{ maxWidth: 960, margin: "0 auto", padding: "1rem 2rem 4rem" }}>
+        {/* ── Message banner ── */}
+        {msg && (
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
+            <div style={{
+              padding: ".85rem 1.1rem", borderRadius: 10,
+              background: msg.type === "success" ? T.light : T.redBg,
+              color: msg.type === "success" ? T.mid : T.red,
+              border: `1px solid ${msg.type === "success" ? T.border : T.redBd}`,
+              fontWeight: 700, fontSize: ".88rem",
+              display: "flex", alignItems: "center", gap: ".6rem",
+            }}>
+              {msg.type === "success" ? "✅" : "⚠️"}&nbsp;{msg.text}
+            </div>
+          </div>
+        )}
+
+        {/* ── Form ── */}
+        <form onSubmit={handleSave}>
+          <div className="pf-layout-single" style={{ maxWidth: 960, margin: "0 auto", padding: "1rem 2rem 4rem" }}>
 
           {/* 2-col grid */}
           <div className="pf-edit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.25rem" }}>
@@ -471,15 +503,16 @@ export default function ProfileEdit() {
             </CardSection>
           </div>
 
-          {/* Bottom actions */}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: ".75rem" }}>
-            <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
-            <BtnPrimary type="submit" disabled={saving}>
-              {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
-            </BtnPrimary>
+            {/* Bottom actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: ".75rem" }}>
+              <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+              <BtnPrimary type="submit" disabled={saving}>
+                {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
+              </BtnPrimary>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

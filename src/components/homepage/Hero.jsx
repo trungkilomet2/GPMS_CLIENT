@@ -1,8 +1,23 @@
 import { useState, useEffect } from "react";
 import { STATS } from "../../lib/constants";
+import { useNavigate } from "react-router-dom";
 
 export default function Hero() {
+  const navigate = useNavigate();
   const [animIn, setAnimIn] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const load = () => {
+      const data = localStorage.getItem("user");
+      setUser(data ? JSON.parse(data) : null);
+    };
+
+    load();
+    window.addEventListener("auth-change", load);
+    return () => window.removeEventListener("auth-change", load);
+  }, []);
+
   useEffect(() => { const t = setTimeout(() => setAnimIn(true), 80); return () => clearTimeout(t); }, []);
 
   return (
@@ -28,8 +43,17 @@ export default function Hero() {
           </p>
 
           <div className="hero-actions">
-            <button className="btn-green">Đăng nhập ngay</button>
-            <button className="btn-outline-white">Đăng ký miễn phí</button>
+            {user ? (
+              <>
+                <button className="btn-green" onClick={() => navigate("/orders")}>Xem đơn hàng</button>
+                <button className="btn-outline-white" onClick={() => navigate("/profile")}>Hồ sơ của tôi</button>
+              </>
+            ) : (
+              <>
+                <button className="btn-green" onClick={() => navigate("/login")}>Đăng nhập ngay</button>
+                <button className="btn-outline-white" onClick={() => navigate("/register")}>Đăng ký miễn phí</button>
+              </>
+            )}
           </div>
         </div>
       </div>

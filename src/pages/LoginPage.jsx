@@ -92,6 +92,14 @@ export default function LoginPage() {
 
       <div className="login-right">
         <form className="login-card" onSubmit={handleSubmit}>
+          <button
+            type="button"
+            className="auth-back-btn"
+            onClick={() => navigate("/home")}
+          >
+            ← Về trang chủ
+          </button>
+
           <h2>Đăng nhập</h2>
           <p>Chào mừng trở lại! Vui lòng đăng nhập để tiếp tục</p>
 
