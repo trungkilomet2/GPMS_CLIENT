@@ -9,6 +9,7 @@ export const productService = {
 
     const res = await fetch(API_ENDPOINTS.PRODUCT.GET_ALL, {
       method: "GET",
+      credentials: "omit",
       headers: {
         "Content-Type": "application/json",
         Authorization: token ? `Bearer ${token}` : ""

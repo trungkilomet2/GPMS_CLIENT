@@ -27,6 +27,7 @@ async function loadProfileAfterLogin(token) {
   try {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
       method: "GET",
+      cache: "no-store",
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -56,6 +57,7 @@ export const authService = {
   async login(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
       method: "POST",
+      credentials: "omit",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userName: payload.userName,
@@ -98,6 +100,19 @@ export const authService = {
     const userName =
       decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"] ??
       "";
+    const requestedUserName = String(payload.userName ?? "").trim().toLowerCase();
+    const decodedUserName = String(userName).trim().toLowerCase();
+
+    if (requestedUserName && decodedUserName && requestedUserName !== decodedUserName) {
+      clearAuthStorage();
+      throw {
+        response: {
+          data: {
+            message: "Token trả về không khớp với tài khoản vừa đăng nhập.",
+          },
+        },
+      };
+    }
 
     const fullName =
       decoded["fullName"] ??
@@ -129,10 +144,14 @@ export const authService = {
     const profile = await loadProfileAfterLogin(token);
     const user = {
       ...basicUser,
-      ...(profile ?? {}),
       name: profile?.fullName || profile?.name || basicUser.name,
       fullName: profile?.fullName || basicUser.fullName,
+      email: profile?.email || "",
+      phoneNumber: profile?.phoneNumber || "",
+      phone: profile?.phone || "",
       avatarUrl: profile?.avatarUrl || basicUser.avatarUrl,
+      location: profile?.location || "",
+      address: profile?.address || "",
       accountStatus: profile?.accountStatus || basicUser.accountStatus,
     };
 
@@ -159,6 +178,7 @@ export const authService = {
   async register(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.REGISTER, {
       method: "POST",
+      credentials: "omit",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userName: payload.userName,
