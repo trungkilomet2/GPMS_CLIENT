@@ -406,30 +406,18 @@ export default function ViewProfile() {
       {/* ── Site Header ── */}
       <Header />
 
-      {/* ── Cover — overflow:visible để không che avatar ── */}
-      <div
-        className="pf-cover"
-        style={{
-          height:210,
-          background:`linear-gradient(120deg,${T.dark} 0%,${T.mid} 50%,${T.base} 100%)`,
-          position:"relative",
-          overflow:"visible",   /* ← FIX: không clip avatar bên dưới */
-          zIndex:0,
-        }}
-      />
-
       {/* ── Avatar row — nổi lên trên cover ── */}
       <div
         className="pf-avatar-row"
         style={{
           maxWidth:960,
-          margin:"-56px auto 2rem",   /* kéo lên đè lên cover */
+          margin:"1.5rem auto 2rem",
           padding:"0 2rem",
           display:"flex",
           alignItems:"flex-end",
           gap:"1.5rem",
           position:"relative",
-          zIndex:10,                  /* ← FIX: luôn trên cover */
+          zIndex:10,
           animation:"fadeUp .35s ease",
         }}
       >
