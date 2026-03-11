@@ -1,5 +1,27 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
+function readAccountStatus(source = {}) {
+  const status = String(
+    source.status ??
+    source.accountStatus ??
+    source.userStatus ??
+    ""
+  ).trim().toLowerCase();
+
+  const disabledFlag = source.disabled ?? source.isDisabled ?? source.locked ?? source.isLocked;
+  const activeFlag = source.isActive ?? source.active;
+
+  const isDisabled =
+    disabledFlag === true ||
+    activeFlag === false ||
+    ["disabled", "inactive", "locked", "blocked", "banned"].includes(status);
+
+  return {
+    isDisabled,
+    status,
+  };
+}
+
 async function loadProfileAfterLogin(token) {
   try {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
@@ -11,6 +33,7 @@ async function loadProfileAfterLogin(token) {
 
     const json = await res.json().catch(() => ({}));
     const d = json?.data ?? {};
+    const accountStatus = readAccountStatus(d);
 
     return {
       fullName: d.fullName || "",
@@ -21,6 +44,7 @@ async function loadProfileAfterLogin(token) {
       avatarUrl: d.avartarUrl || "",
       location: d.location || "",
       address: d.location || "",
+      accountStatus,
     };
   } catch {
     return null;
@@ -70,6 +94,8 @@ export const authService = {
         "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
       ] ?? "";
 
+    const tokenAccountStatus = readAccountStatus(decoded);
+
     const basicUser = {
       userId,
       userName,
@@ -77,6 +103,7 @@ export const authService = {
       fullName: fullName || userName,
       role,
       avatarUrl: "",
+      accountStatus: tokenAccountStatus,
     };
 
     const profile = await loadProfileAfterLogin(token);
@@ -86,7 +113,21 @@ export const authService = {
       name: profile?.fullName || profile?.name || basicUser.name,
       fullName: profile?.fullName || basicUser.fullName,
       avatarUrl: profile?.avatarUrl || basicUser.avatarUrl,
+      accountStatus: profile?.accountStatus || basicUser.accountStatus,
     };
+
+    if (user.accountStatus?.isDisabled) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      localStorage.removeItem("user");
+      throw {
+        response: {
+          data: {
+            message: "Tài khoản này đã bị vô hiệu hóa.",
+          },
+        },
+      };
+    }
 
     localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("userId", userId);
