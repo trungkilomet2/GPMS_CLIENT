@@ -13,6 +13,7 @@ import { getOrderStatusStyle } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
+import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
 import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
 
@@ -28,6 +29,8 @@ export default function OrderDetail() {
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [zoomImageUrl, setZoomImageUrl] = useState('');
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState('');
     const user = getStoredUser();
     const roleLower = String(user?.role ?? '').toLowerCase();
     const isOwner = roleLower === 'owner';
@@ -91,11 +94,16 @@ export default function OrderDetail() {
         (orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId)) ||
         (!!currentUserName && !!orderUserName && currentUserName === orderUserName);
 
-    const updateOrderStatus = async (nextStatus) => {
+    const updateOrderStatus = async (nextStatus, reason) => {
         if (!order?.id) return;
         try {
             setIsUpdatingStatus(true);
-            const payload = { ...order, status: nextStatus };
+            const payload = {
+                ...order,
+                status: nextStatus,
+                reason,
+                statusReason: reason,
+            };
             await OrderService.updateOrder(order.id, payload);
             setOrder((prev) => ({ ...prev, status: nextStatus }));
         } catch (err) {
@@ -104,6 +112,11 @@ export default function OrderDetail() {
         } finally {
             setIsUpdatingStatus(false);
         }
+    };
+
+    const openReasonModal = (status) => {
+        setPendingStatus(status);
+        setIsReasonModalOpen(true);
     };
 
     return (
@@ -129,7 +142,7 @@ export default function OrderDetail() {
                                 <button
                                     type="button"
                                     disabled={isUpdatingStatus}
-                                    onClick={() => updateOrderStatus('Từ chối')}
+                                    onClick={() => openReasonModal('Từ chối')}
                                     className="px-3 py-2 text-xs font-bold rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition disabled:opacity-50"
                                 >
                                     Từ chối
@@ -137,7 +150,7 @@ export default function OrderDetail() {
                                 <button
                                     type="button"
                                     disabled={isUpdatingStatus}
-                                    onClick={() => updateOrderStatus('Cần cập nhật')}
+                                    onClick={() => openReasonModal('Cần cập nhật')}
                                     className="px-3 py-2 text-xs font-bold rounded border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition disabled:opacity-50"
                                 >
                                     Yêu cầu chỉnh sửa
@@ -332,6 +345,21 @@ export default function OrderDetail() {
                 isOpen={isImageModalOpen}
                 imageUrl={zoomImageUrl}
                 onClose={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
+            />
+            <OrderStatusReasonModal
+                isOpen={isReasonModalOpen}
+                onClose={() => setIsReasonModalOpen(false)}
+                onSubmit={async (reason) => {
+                    await updateOrderStatus(pendingStatus, reason);
+                    setIsReasonModalOpen(false);
+                }}
+                title={pendingStatus === 'Từ chối' ? 'Từ chối đơn hàng' : 'Yêu cầu chỉnh sửa'}
+                description={pendingStatus === 'Từ chối'
+                    ? 'Vui lòng nhập lý do từ chối để khách hàng nắm rõ.'
+                    : 'Vui lòng nhập lý do yêu cầu chỉnh sửa.'}
+                confirmText={pendingStatus === 'Từ chối' ? 'Xác nhận từ chối' : 'Gửi yêu cầu'}
+                loading={isUpdatingStatus}
+                tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
             />
         </MainLayout>
     );

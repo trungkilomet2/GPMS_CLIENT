@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import OrderService from '@/services/OrderService';
-import { getStoredUser } from '@/lib/authStorage';
+import { getAuthItem, getStoredUser } from '@/lib/authStorage';
 import Pagination from '@/components/Pagination';
 import { formatOrderDate } from '@/lib/orders/formatters';
 import { getOrderStatusLabel, getOrderStatusStyle, ORDER_STATUS_LABELS } from '@/lib/orders/status';
@@ -21,7 +21,8 @@ export default function Orders({
     subtitle = 'Theo dõi tiến độ sản xuất và truy cập chi tiết từng đơn nhanh hơn.',
 }) {
     const user = getStoredUser();
-    const userId = user?.userId ?? user?.id ?? null;
+    const tokenUserId = getAuthItem('userId');
+    const userId = tokenUserId ?? user?.userId ?? user?.id ?? null;
     const role = String(user?.role ?? '').toLowerCase();
     const isOwner = forceOwner || role === 'owner';
     const [orders, setOrders] = useState([]);
@@ -48,7 +49,7 @@ export default function Orders({
                 };
                 const response = isOwner
                     ? await OrderService.getAllOrders(params)
-                    : await OrderService.getOrdersByUser(userId, params);
+                    : await OrderService.getOrdersByUser(params);
                 const data =
                     response?.recordCount !== undefined ||
                         response?.pageIndex !== undefined ||
