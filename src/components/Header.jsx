@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
-import { buildAuthHandoffPath, getStoredUser, removeAuthItem } from "@/lib/authStorage";
+import { getStoredUser, removeAuthItem } from "@/lib/authStorage";
 import "@/styles/homepage.css";
 
 const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.1 4H2V2H0v2h2l3.6 7.59L4.25 14C4.09 14.31 4 14.65 4 15c0 1.1.9 2 2 2h14v-2H6.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.1z";
@@ -172,10 +172,10 @@ export default function Header() {
                         <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{user.name}</div>
                         <div style={{ fontSize: ".75rem", color: C.textLight }}>{user.email}</div>
                       </div>
-                      <Link to={buildAuthHandoffPath("/profile")} className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>
+                      <Link to="/profile" className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>
                         👤 &nbsp;Hồ sơ
                       </Link>
-                      <Link to={buildAuthHandoffPath("/orders")} className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>
+                      <Link to="/orders" className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>
                         📦 &nbsp;Đơn hàng
                       </Link>
                       <div className="avatar-dropdown-divider" />
@@ -281,7 +281,7 @@ export default function Header() {
                         {item.children.map((child) => (
                           <Link
                             key={child.path}
-                            to={buildAuthHandoffPath(child.path)}
+                            to={child.path}
                             onClick={() => {
                               setOpenMenu(null);
                             }}
