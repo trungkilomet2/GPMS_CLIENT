@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import OrderService from '@/services/OrderService';
+import { getStoredUser } from '@/lib/authStorage';
 import Pagination from '@/components/Pagination';
 import MainLayout from '../../layouts/MainLayout';
 import '../../styles/homepage.css';
@@ -29,12 +30,8 @@ function SortIcon({ direction }) {
 
 export default function Orders() {
     const getUserId = () => {
-        const userData = localStorage.getItem('user');
-        if (userData) {
-            const user = JSON.parse(userData);
-            return user.userId ?? user.id ?? null;
-        }
-        return null;
+        const user = getStoredUser();
+        return user?.userId ?? user?.id ?? null;
     };
 
     const userId = getUserId();
@@ -69,9 +66,9 @@ export default function Orders() {
                 const response = await OrderService.getOrdersByUser(userId, params);
                 const data =
                     response?.recordCount !== undefined ||
-                    response?.pageIndex !== undefined ||
-                    response?.RecordCount !== undefined ||
-                    response?.PageIndex !== undefined
+                        response?.pageIndex !== undefined ||
+                        response?.RecordCount !== undefined ||
+                        response?.PageIndex !== undefined
                         ? response
                         : (response?.data ?? response);
                 const items = data?.items ?? data?.data ?? data?.records ?? data?.Items ?? data?.Records ?? data ?? [];
