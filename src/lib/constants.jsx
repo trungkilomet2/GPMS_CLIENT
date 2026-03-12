@@ -1,4 +1,4 @@
-// --------------------------------------------------
+﻿// --------------------------------------------------
 // GPMS - Shared constants
 // --------------------------------------------------
 
@@ -125,26 +125,3 @@ export const PROCESS_CARDS = [
   { rng: "03-04", title: "Thiết kế & Sản xuất", desc: "Duyệt mẫu, cắt vải, may thành phẩm theo tiêu chuẩn kỹ thuật đã thỏa thuận.", icon: "✂️" },
   { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "KCS kiểm tra 100% sản phẩm trước khi đóng gói và giao hàng đúng tiến độ.", icon: "🚚" },
 ];
-
-// Order materials table
-export const MATERIALS_TABLE_LABELS = {
-  create: {
-    image: "Ảnh",
-    name: "Tên vật liệu",
-    value: "Số lượng",
-    uom: "Đơn vị",
-    note: "Ghi chú",
-  },
-  detail: {
-    image: "Ảnh",
-    name: "Tên vật liệu",
-    value: "Định mức/Số lượng",
-    uom: "Đơn vị (UoM)",
-    note: "Ghi chú",
-  },
-};
-
-export const MATERIALS_TABLE_EMPTY_TEXT = {
-  create: "Danh sách vật liệu đang trống...",
-  detail: "Dữ liệu vật liệu chưa được cập nhật",
-};

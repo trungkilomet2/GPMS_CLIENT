@@ -1,9 +1,9 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, ArrowLeft, FileText, Loader2, AlertCircle, Save } from 'lucide-react';
-import AddMaterialModal from '@/components/AddMaterialModal';
-import MaterialsTable from '@/components/MaterialsTable';
-import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
+import AddMaterialModal from '@/components/orders/AddMaterialModal';
+import MaterialsTable from '@/components/orders/MaterialsTable';
+import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { getAuthItem } from '@/lib/authStorage';

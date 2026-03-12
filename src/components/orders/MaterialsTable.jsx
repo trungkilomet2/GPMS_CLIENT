@@ -1,5 +1,5 @@
 import { Pencil, Trash } from 'lucide-react';
-import { MATERIALS_TABLE_LABELS } from '@/lib/constants';
+import { MATERIALS_TABLE_LABELS } from '@/lib/orders/materials';
 
 const VARIANT_STYLES = {
     create: {

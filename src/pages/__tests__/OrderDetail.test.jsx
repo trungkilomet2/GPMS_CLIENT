@@ -18,11 +18,11 @@ vi.mock('../../layouts/MainLayout', () => ({
   default: ({ children }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/OrderCommentModal', () => ({
+vi.mock('@/components/orders/OrderCommentModal', () => ({
   default: ({ isOpen }) => (isOpen ? <div>Comment Modal Open</div> : null),
 }));
 
-vi.mock('@/components/OrderHistoryUpdateModal', () => ({
+vi.mock('@/components/orders/OrderHistoryUpdateModal', () => ({
   default: ({ isOpen }) => (isOpen ? <div>History Modal Open</div> : null),
 }));
 

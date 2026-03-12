@@ -132,7 +132,7 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
 
                                     <div className="col-span-4 bg-red-50 p-2 rounded-lg text-center">
                                         <p className="text-[10px] text-red-400 uppercase font-semibold">Giá trị cũ</p>
-                                        <p className="text-red-600 text-sm line-through break-words whitespace-pre-wrap">
+                                        <p className="text-red-600 text-sm line-through wrap-break-word whitespace-pre-wrap">
                                             {item.oldValue || 'Trống'}
                                         </p>
                                     </div>
@@ -143,7 +143,7 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
 
                                     <div className="col-span-4 bg-emerald-50 p-2 rounded-lg text-center border border-emerald-100">
                                         <p className="text-[10px] text-emerald-400 uppercase font-semibold">Giá trị mới</p>
-                                        <p className="text-emerald-700 text-sm font-bold break-words whitespace-pre-wrap">
+                                        <p className="text-emerald-700 text-sm font-bold wrap-break-word whitespace-pre-wrap">
                                             {item.newValue || 'Trống'}
                                         </p>
                                     </div>

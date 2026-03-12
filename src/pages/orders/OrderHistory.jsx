@@ -5,23 +5,10 @@ import { Link } from 'react-router-dom';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import Pagination from '@/components/Pagination';
+import { formatOrderDate } from '@/lib/orders/formatters';
+import { getOrderStatusLabel, getOrderStatusStyle, ORDER_STATUS_LABELS } from '@/lib/orders/status';
 import MainLayout from '../../layouts/MainLayout';
 import '../../styles/homepage.css';
-
-const STATUS_LABEL = {
-    'Chờ xét duyệt': 'Chờ xét duyệt',
-    'Cần cập nhật': 'Cần cập nhật',
-    'Từ chối': 'Từ chối',
-    'Chấp nhận': 'Chấp nhận',
-};
-
-const STATUS_COLOR = {
-    'Chờ xét duyệt': 'bg-amber-50 text-amber-700 border-amber-200',
-    'Cần cập nhật': 'bg-blue-50 text-blue-700 border-blue-200',
-    'Từ chối': 'bg-red-50 text-red-700 border-red-200',
-    'Chấp nhận': 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    default: 'bg-gray-50 text-gray-700 border-gray-200',
-};
 
 function SortIcon({ direction }) {
     if (!direction) return <ChevronDown size={14} className="opacity-50 inline ml-1" />;
@@ -159,11 +146,6 @@ export default function Orders({
         setCurrentPage(1);
     };
 
-    const formatDate = (value) => {
-        if (!value) return '-';
-        return new Date(value).toLocaleDateString('vi-VN');
-    };
-
     return (
         <MainLayout>
             <div className="min-h-screen bg-slate-50">
@@ -196,7 +178,7 @@ export default function Orders({
                                 className="w-full py-2.5 px-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             >
                                 <option value="">Tất cả trạng thái</option>
-                                {Object.entries(STATUS_LABEL).map(([k, v]) => (
+                                {Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => (
                                     <option key={k} value={k}>{v}</option>
                                 ))}
                             </select>
@@ -205,7 +187,7 @@ export default function Orders({
 
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-slate-200 table-fixed">
+                            <table className="min-w-275 w-full divide-y divide-slate-200 table-auto">
                                 <thead className="bg-slate-50">
                                     <tr>
                                         <th className="w-20 px-5 py-3 text-left text-sm font-semibold text-slate-700 cursor-pointer" onClick={() => toggleSort('id')}>
@@ -262,10 +244,10 @@ export default function Orders({
                                                 <td className="px-3 py-3 text-sm text-slate-700 text-center">{o.size || '-'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700">{o.color || '-'}</td>
                                                 <td className="px-3 py-3 text-sm text-slate-700 text-center font-medium">{o.quantity ?? '-'}</td>
-                                                <td className="px-4 py-3 text-sm text-slate-700 text-center">{formatDate(o.endDate)}</td>
+                                                <td className="px-4 py-3 text-sm text-slate-700 text-center">{formatOrderDate(o.endDate)}</td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLOR[o.status] || STATUS_COLOR.default}`}>
-                                                        {STATUS_LABEL[o.status] || o.status || '-'}
+                                                    <span className={`inline-block px-3.5 py-1 rounded-full text-xs font-medium border ${getOrderStatusStyle(o.status)}`}>
+                                                        {getOrderStatusLabel(o.status)}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">

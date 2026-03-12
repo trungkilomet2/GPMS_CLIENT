@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import DashboardLayout from '@/layouts/DashboardLayout';
 import {
     ArrowLeft, FileText, MessageSquare, History,
     Loader2, Edit3, Download, Package, Info
 } from 'lucide-react';
-import OrderCommentModal from '@/components/OrderCommentModal';
-import OrderHistoryUpdateModal from '@/components/OrderHistoryUpdateModal';
-import MaterialsTable from '@/components/MaterialsTable';
-import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/constants';
+import OrderCommentModal from '@/components/orders/OrderCommentModal';
+import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal';
+import MaterialsTable from '@/components/orders/MaterialsTable';
+import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
+import { formatOrderDate } from '@/lib/orders/formatters';
+import { getOrderStatusStyle } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
+import { getStoredUser } from '@/lib/authStorage';
+import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import MainLayout from '../../layouts/MainLayout';
 import '@/styles/homepage.css';
 
@@ -24,12 +27,12 @@ export default function OrderDetail() {
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [zoomImageUrl, setZoomImageUrl] = useState('');
-    const [imageZoom, setImageZoom] = useState(1);
-    const [imagePan, setImagePan] = useState({ x: 0, y: 0 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 });
-    const [imageNaturalSize, setImageNaturalSize] = useState({ w: 0, h: 0 });
-    const imageContainerRef = useRef(null);
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const user = getStoredUser();
+    const roleLower = String(user?.role ?? '').toLowerCase();
+    const isOwner = roleLower === 'owner';
+    const isAdmin = roleLower === 'admin';
+    const canModerate = isOwner || isAdmin;
 
     useEffect(() => {
         const fetchOrderDetail = async () => {
@@ -37,6 +40,7 @@ export default function OrderDetail() {
                 setLoading(true);
                 const response = await OrderService.getOrderDetail(id);
                 setOrder(response.data.data || response.data);
+                setError(null);
             } catch (err) {
                 setError("Không thể tải thông tin đơn hàng.");
             } finally {
@@ -54,6 +58,13 @@ export default function OrderDetail() {
             </div>
         </MainLayout>
     );
+    if (error) return (
+        <MainLayout>
+            <div className="flex flex-col items-center justify-center min-h-400px">
+                <p className="text-red-600 text-sm font-semibold">{error}</p>
+            </div>
+        </MainLayout>
+    );
 
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
     const softTemplates = templates.filter((t) => {
@@ -65,6 +76,35 @@ export default function OrderDetail() {
         return type.includes('hard');
     });
     const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const orderOwnerId =
+        order?.userId ??
+        order?.customerId ??
+        order?.ownerId ??
+        order?.user?.id ??
+        order?.user?.userId ??
+        null;
+    const currentUserId = user?.userId ?? user?.id ?? null;
+    const currentUserName = String(user?.userName ?? user?.name ?? user?.fullName ?? '').trim().toLowerCase();
+    const orderUserName = String(order?.userName ?? order?.fullName ?? order?.customerName ?? order?.user?.name ?? order?.user?.fullName ?? '').trim().toLowerCase();
+    const canEdit =
+        isAdmin ||
+        (orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId)) ||
+        (!!currentUserName && !!orderUserName && currentUserName === orderUserName);
+
+    const updateOrderStatus = async (nextStatus) => {
+        if (!order?.id) return;
+        try {
+            setIsUpdatingStatus(true);
+            const payload = { ...order, status: nextStatus };
+            await OrderService.updateOrder(order.id, payload);
+            setOrder((prev) => ({ ...prev, status: nextStatus }));
+        } catch (err) {
+            console.error('Lỗi cập nhật trạng thái:', err);
+            alert('Không thể cập nhật trạng thái đơn hàng.');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
 
     return (
         <MainLayout>
@@ -81,17 +121,39 @@ export default function OrderDetail() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getStatusStyle(order.status)}`}>
+                        <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getOrderStatusStyle(order.status, 'detail')}`}>
                             {order.statusName || order.status}
                         </span>
-                        <button
+                        {canModerate && (
+                            <>
+                                <button
+                                    type="button"
+                                    disabled={isUpdatingStatus}
+                                    onClick={() => updateOrderStatus('Từ chối')}
+                                    className="px-3 py-2 text-xs font-bold rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition disabled:opacity-50"
+                                >
+                                    Từ chối
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isUpdatingStatus}
+                                    onClick={() => updateOrderStatus('Cần cập nhật')}
+                                    className="px-3 py-2 text-xs font-bold rounded border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition disabled:opacity-50"
+                                >
+                                    Yêu cầu chỉnh sửa
+                                </button>
+                            </>
+                        )}
+                        {canEdit && (<button
                             onClick={() => navigate(`/orders/edit/${order.id}`)}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-all text-sm font-bold shadow-sm"
                         >
                             <Edit3 size={16} /> Chỉnh sửa
-                        </button>
+                        </button>)}
                     </div>
                 </div>
+
+
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* KHỐI THÔNG TIN CHI TIẾT (2/3) */}
@@ -109,7 +171,7 @@ export default function OrderDetail() {
                                         {order.image ? (
                                             <button
                                                 type="button"
-                                                onClick={() => { setZoomImageUrl(order.image); setImageZoom(1); setImagePan({ x: 0, y: 0 }); setIsImageModalOpen(true); }}
+                                                onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
                                                 className="w-full h-full cursor-zoom-in"
                                                 title="Click để xem & zoom ảnh"
                                             >
@@ -141,8 +203,8 @@ export default function OrderDetail() {
                                     <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
                                     <DetailItem label="Đơn giá" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
                                     <DetailItem label="Tổng tiền đơn hàng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
-                                    <DetailItem label="Ngày bắt đầu" value={formatDate(order.startDate)} />
-                                    <DetailItem label="Ngày kết thúc" value={formatDate(order.endDate)} />
+                                    <DetailItem label="Ngày bắt đầu" value={formatOrderDate(order.startDate)} />
+                                    <DetailItem label="Ngày kết thúc" value={formatOrderDate(order.endDate)} />
                                 </div>
                             </div>
 
@@ -169,8 +231,6 @@ export default function OrderDetail() {
                                 onImageClick={(url) => {
                                     if (!url) return;
                                     setZoomImageUrl(url);
-                                    setImageZoom(1);
-                                    setImagePan({ x: 0, y: 0 });
                                     setIsImageModalOpen(true);
                                 }}
                             />
@@ -179,6 +239,34 @@ export default function OrderDetail() {
 
                     {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                     <div className="space-y-6">
+                        {canModerate && (
+                            <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
+                                <div className="flex items-center gap-2 text-gray-600 mb-3">
+                                    <Info size={16} />
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
+                                </div>
+                                <div className="space-y-2 text-sm text-gray-700">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-gray-400 uppercase">Họ và tên</span>
+                                        <span className="font-semibold text-gray-800 text-right">
+                                            {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || '-'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-gray-400 uppercase">Số điện thoại</span>
+                                        <span className="font-semibold text-gray-800 text-right">
+                                            {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || '-'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-gray-400 uppercase">Địa chỉ</span>
+                                        <span className="font-semibold text-gray-800 text-right">
+                                            {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
                             <div>
                                 <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
@@ -238,137 +326,13 @@ export default function OrderDetail() {
                 </div>
             </div>
 
-            <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
-            <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
-            {zoomImageUrl && isImageModalOpen && (
-                <div
-                    className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4 overscroll-none touch-none"
-                    onClick={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
-                    onWheelCapture={(e) => e.preventDefault()}
-                >
-                    <div className="relative w-full max-w-4xl h-[80vh]" onClick={(e) => e.stopPropagation()}>
-                        <button
-                            type="button"
-                            onClick={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
-                            className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-gray-700 shadow flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-colors"
-                        >
-                            ×
-                        </button>
-                        <div className="bg-white rounded-2xl overflow-hidden shadow-2xl h-full flex flex-col">
-                            <div className="flex flex-col items-center justify-center gap-2 px-4 py-3 border-b border-gray-100">
-                                <div className="text-xs font-semibold text-gray-600">Zoom</div>
-                                <div className="flex items-center justify-center gap-3 flex-wrap">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setImageZoom((z) => {
-                                                const next = Math.max(1, Number((z - 0.25).toFixed(2)));
-                                                if (next === 1) setImagePan({ x: 0, y: 0 });
-                                                return next;
-                                            });
-                                        }}
-                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
-                                    >
-                                        -
-                                    </button>
-                                    <input
-                                        type="range"
-                                        min="1"
-                                        max="3"
-                                        step="0.05"
-                                        value={imageZoom}
-                                        onChange={(e) => {
-                                            const next = Number(e.target.value);
-                                            setImageZoom(next);
-                                            if (next === 1) setImagePan({ x: 0, y: 0 });
-                                        }}
-                                        className="w-48 accent-emerald-600"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setImageZoom((z) => Math.min(3, Number((z + 0.25).toFixed(2))))}
-                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
-                                    >
-                                        +
-                                    </button>
-                                    <span className="text-xs text-gray-600 w-14 text-center">{Math.round(imageZoom * 100)}%</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setImageZoom(1); setImagePan({ x: 0, y: 0 }); }}
-                                        className="px-2.5 py-1.5 text-xs border rounded-lg hover:bg-gray-50"
-                                    >
-                                        Reset
-                                    </button>
-                                </div>
-                            </div>
-                            <div
-                                ref={imageContainerRef}
-                                className="flex-1 bg-black/5 flex items-center justify-center p-2 overflow-hidden"
-                                onWheel={(e) => {
-                                    if (!e.ctrlKey && Math.abs(e.deltaY) < 1) return;
-                                    e.preventDefault();
-                                    setImageZoom((z) => {
-                                        const next = Math.min(3, Math.max(1, Number((z + (e.deltaY > 0 ? -0.1 : 0.1)).toFixed(2))));
-                                        if (next === 1) setImagePan({ x: 0, y: 0 });
-                                        return next;
-                                    });
-                                }}
-                                onPointerDown={(e) => {
-                                    if (imageZoom <= 1) return;
-                                    setIsDragging(true);
-                                    setDragStart({ x: e.clientX, y: e.clientY, panX: imagePan.x, panY: imagePan.y });
-                                    e.currentTarget.setPointerCapture?.(e.pointerId);
-                                }}
-                                onPointerMove={(e) => {
-                                    if (!isDragging || imageZoom <= 1) return;
-                                    const dx = e.clientX - dragStart.x;
-                                    const dy = e.clientY - dragStart.y;
-                                    const container = imageContainerRef.current;
-                                    if (!container || !imageNaturalSize.w || !imageNaturalSize.h) return;
-                                    const containerRect = container.getBoundingClientRect();
-                                    const fitScale = Math.min(containerRect.width / imageNaturalSize.w, containerRect.height / imageNaturalSize.h);
-                                    const baseW = imageNaturalSize.w * fitScale;
-                                    const baseH = imageNaturalSize.h * fitScale;
-                                    const scaledW = baseW * imageZoom;
-                                    const scaledH = baseH * imageZoom;
-                                    const maxX = Math.max(0, (scaledW - containerRect.width) / 2);
-                                    const maxY = Math.max(0, (scaledH - containerRect.height) / 2);
-                                    const nextX = Math.max(-maxX, Math.min(maxX, dragStart.panX + dx));
-                                    const nextY = Math.max(-maxY, Math.min(maxY, dragStart.panY + dy));
-                                    setImagePan({ x: nextX, y: nextY });
-                                }}
-                                onPointerUp={(e) => {
-                                    setIsDragging(false);
-                                    e.currentTarget.releasePointerCapture?.(e.pointerId);
-                                }}
-                                onPointerCancel={(e) => {
-                                    setIsDragging(false);
-                                    e.currentTarget.releasePointerCapture?.(e.pointerId);
-                                }}
-                            >
-                                <div
-                                    className="will-change-transform"
-                                    style={{
-                                        transform: `translate(${imagePan.x}px, ${imagePan.y}px) scale(${imageZoom})`,
-                                        transformOrigin: 'center',
-                                    }}
-                                >
-                                    <img
-                                        src={zoomImageUrl}
-                                        alt=""
-                                        className="block max-w-full max-h-[80vh] object-contain select-none"
-                                        onLoad={(e) => {
-                                            const img = e.currentTarget;
-                                            setImageNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-                                        }}
-                                        draggable={false}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order?.id ?? id} />
+            <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order?.id ?? id} />
+            <OrderImageZoomModal
+                isOpen={isImageModalOpen}
+                imageUrl={zoomImageUrl}
+                onClose={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
+            />
         </MainLayout>
     );
 }
@@ -386,17 +350,5 @@ function DetailItem({ label, value, isBold = false, isEmerald = false }) {
     );
 }
 
-function formatDate(dateString) {
-    if (!dateString) return "-";
-    return new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(dateString));
-}
 
-function getStatusStyle(status) {
-    const s = status?.toLowerCase();
-    if (s === 'chờ xét duyệt') return 'bg-amber-100 text-amber-800 border border-amber-200';
-    if (s === 'cần cập nhật') return 'bg-blue-100 text-blue-800 border border-blue-200';
-    if (s === 'từ chối') return 'bg-red-100 text-red-800 border border-red-200';
-    if (s === 'chấp nhận') return 'bg-emerald-600 text-white';
-    return 'bg-gray-100 text-gray-700';
-}
 

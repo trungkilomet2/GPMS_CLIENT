@@ -18,7 +18,7 @@ vi.mock('../../layouts/MainLayout', () => ({
   default: ({ children }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/AddMaterialModal', () => ({
+vi.mock('@/components/orders/AddMaterialModal', () => ({
   default: () => null,
 }));
 
