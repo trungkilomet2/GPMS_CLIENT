@@ -14,7 +14,7 @@ export const API_ENDPOINTS = {
   ORDER: {
     GET_ALL: `${BASE_URL}/api/Order/order-list`,
     GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
-    GET_ORDERS_BY_USER: (userId) => `${BASE_URL}/api/Order/my-orders/${userId}`,
+    GET_ORDERS_BY_USER: `${BASE_URL}/api/Order/my-orders`,
     CREATE_ORDER: `${BASE_URL}/api/Order/create-order`,
     UPDATE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/update`,
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,

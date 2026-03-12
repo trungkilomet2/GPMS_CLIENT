@@ -412,7 +412,7 @@ export default function ViewProfile() {
 
       Promise.all([
         userService.getProfile(),
-        userId ? OrderService.getOrdersByUser(userId).catch(() => []) : Promise.resolve([]),
+        userId ? OrderService.getOrdersByUser().catch(() => []) : Promise.resolve([]),
       ])
         .then(([profileData, ordersResponse]) => {
           if (!active) return;
@@ -562,4 +562,5 @@ export default function ViewProfile() {
     </div>
   );
 }
+
 
