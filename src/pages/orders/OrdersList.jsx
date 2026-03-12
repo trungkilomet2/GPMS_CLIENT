@@ -3,28 +3,22 @@ import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import OrderService from '@/services/OrderService';
-import { getStoredUser } from '@/lib/authStorage';
+import Pagination from '@/components/Pagination';
 import MainLayout from '../../layouts/MainLayout';
 import '../../styles/homepage.css';
 
 const STATUS_LABEL = {
-    pending: 'Chờ xác nhận',
-    producing: 'Đang sản xuất',
-    completed: 'Hoàn thành',
-    delivered: 'Đã giao',
-    Process: 'Đang xử lý',
-    'Chờ Xét Duyệt': 'Chờ xét duyệt',
-    'Yêu Cầu Chỉnh Sửa': 'Yêu cầu chỉnh sửa',
+    'Chờ xét duyệt': 'Chờ xét duyệt',
+    'Cần cập nhật': 'Cần cập nhật',
+    'Từ chối': 'Từ chối',
+    'Chấp nhận': 'Chấp nhận',
 };
 
 const STATUS_COLOR = {
-    pending: 'bg-blue-50 text-blue-700 border-blue-200',
-    producing: 'bg-amber-50 text-amber-700 border-amber-200',
-    Process: 'bg-amber-50 text-amber-700 border-amber-200',
-    completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    delivered: 'bg-gray-100 text-gray-700 border-gray-200',
-    'Chờ Xét Duyệt': 'bg-orange-50 text-orange-700 border-orange-200',
-    'Yêu Cầu Chỉnh Sửa': 'bg-red-50 text-red-700 border-red-200',
+    'Chờ xét duyệt': 'bg-amber-50 text-amber-700 border-amber-200',
+    'Cần cập nhật': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Từ chối': 'bg-red-50 text-red-700 border-red-200',
+    'Chấp nhận': 'bg-emerald-50 text-emerald-700 border-emerald-200',
     default: 'bg-gray-50 text-gray-700 border-gray-200',
 };
 
@@ -35,8 +29,12 @@ function SortIcon({ direction }) {
 
 export default function Orders() {
     const getUserId = () => {
-        const user = getStoredUser();
-        return user?.userId ?? user?.id ?? null;
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const user = JSON.parse(userData);
+            return user.userId ?? user.id ?? null;
+        }
+        return null;
     };
 
     const userId = getUserId();
@@ -134,8 +132,8 @@ export default function Orders() {
     const pageData = useMemo(() => filtered, [filtered]);
 
     const stats = useMemo(() => {
-        const inProgress = filtered.filter((o) => ['pending', 'producing', 'Process', 'Chờ Xét Duyệt', 'Yêu Cầu Chỉnh Sửa'].includes(o.status)).length;
-        const done = filtered.filter((o) => ['completed', 'delivered'].includes(o.status)).length;
+        const inProgress = filtered.filter((o) => ['Chờ xét duyệt', 'Cần cập nhật'].includes(o.status)).length;
+        const done = filtered.filter((o) => ['Chấp nhận', 'Từ chối'].includes(o.status)).length;
 
         return {
             total: totalCount || orders.length,
@@ -284,35 +282,13 @@ export default function Orders() {
                     </div>
 
                     {!loading && !error && (totalCount || filtered.length) > 0 && (
-                        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-slate-600">
-                            <div>
-                                Hiển thị {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalCount || filtered.length)} / {totalCount || filtered.length}
-                            </div>
-                            <div className="flex gap-2 flex-wrap justify-center">
-                                <button onClick={() => goToPage(1)} disabled={currentPage === 1} className="px-3 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition">Đầu</button>
-                                <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="px-3 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition">Trước</button>
-
-                                {Array.from({ length: totalPages }).map((_, i) => {
-                                    const p = i + 1;
-                                    if (p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2) {
-                                        return (
-                                            <button
-                                                key={p}
-                                                onClick={() => goToPage(p)}
-                                                className={`px-3 py-2 min-w-10 rounded-lg border ${p === currentPage ? 'bg-emerald-600 text-white border-emerald-600' : 'hover:bg-slate-50'}`}
-                                            >
-                                                {p}
-                                            </button>
-                                        );
-                                    }
-                                    if (Math.abs(p - currentPage) === 3) return <span key={p}>...</span>;
-                                    return null;
-                                })}
-
-                                <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-3 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition">Sau</button>
-                                <button onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} className="px-3 py-2 border rounded-lg disabled:opacity-40 hover:bg-slate-50 transition">Cuối</button>
-                            </div>
-                        </div>
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={goToPage}
+                            totalCount={totalCount || filtered.length}
+                            pageSize={pageSize}
+                        />
                     )}
                 </div>
             </div>

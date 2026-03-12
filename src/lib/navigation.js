@@ -4,6 +4,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
   { path: "/orders/create", label: "Tạo đơn hàng", parent: "/orders" },
+  { path: "/orders/manual-create", label: "Tao don thu cong", parent: "/orders" },
   {
     path: "/orders/edit/:id",
     label: ({ id }) => `Sửa đơn #${id}`,
@@ -62,6 +63,7 @@ export const AUTH_NAV_TREE = [
     children: [
       { label: "Danh sách đơn hàng", path: "/orders" },
       { label: "Tạo đơn hàng", path: "/orders/create" },
+      { label: "Tạo đơn thủ công", path: "/orders/manual-create" },
     ],
   },
   {

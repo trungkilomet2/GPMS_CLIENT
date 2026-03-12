@@ -340,8 +340,8 @@ const NAV_ITEMS = [
   {key:"security", icon:"🔒",label:"Bảo mật"},
   {key:"activity", icon:"📋",label:"Lịch sử hoạt động"},
 ];
-const IN_PROGRESS_STATUSES = ["pending", "producing", "Process", "Chờ Xét Duyệt", "Yêu Cầu Chỉnh Sửa"];
-const DONE_STATUSES = ["completed", "delivered"];
+const IN_PROGRESS_STATUSES = ["Ch? x�t duy?t", "C?n c?p nh?t"];
+const DONE_STATUSES = ["Ch?p nh?n", "T? ch?i"];
 
 function formatDisplayDate(value) {
   if (!value) return "Chưa cập nhật";
@@ -562,3 +562,4 @@ export default function ViewProfile() {
     </div>
   );
 }
+
