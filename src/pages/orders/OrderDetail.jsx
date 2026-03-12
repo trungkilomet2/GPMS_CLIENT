@@ -385,8 +385,9 @@ function formatDate(dateString) {
 
 function getStatusStyle(status) {
     const s = status?.toLowerCase();
-    if (s === 'completed') return 'bg-emerald-600 text-white';
-    if (s === 'pending') return 'bg-amber-100 text-amber-800 border border-amber-200';
-    if (s === 'processing') return 'bg-blue-600 text-white';
+    if (s === 'chờ xét duyệt') return 'bg-amber-100 text-amber-800 border border-amber-200';
+    if (s === 'cần cập nhật') return 'bg-blue-100 text-blue-800 border border-blue-200';
+    if (s === 'từ chối') return 'bg-red-100 text-red-800 border border-red-200';
+    if (s === 'chấp nhận') return 'bg-emerald-600 text-white';
     return 'bg-gray-100 text-gray-700';
 }

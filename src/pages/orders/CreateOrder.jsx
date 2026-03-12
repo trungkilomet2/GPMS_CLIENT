@@ -68,7 +68,7 @@ export default function CreateOrder() {
         quantity: '',
         cpu: '',
         note: '',
-        status: "Pending"
+        status: "Chờ xét duyệt"
     });
 
     // 3. State quản lý lỗi (Validation)

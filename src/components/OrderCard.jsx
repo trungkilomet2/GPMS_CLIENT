@@ -1,10 +1,14 @@
 // src/components/OrderCard.jsx
 export default function OrderCard({ order }) {
     const statusMap = {
-        pending: { label: 'Chờ xác nhận', color: 'bg-yellow-100 text-yellow-800' },
-        producing: { label: 'Đang sản xuất', color: 'bg-blue-100 text-blue-800' },
-        completed: { label: 'Hoàn thành', color: 'bg-green-100 text-green-800' },
-        delivered: { label: 'Đã giao', color: 'bg-gray-100 text-gray-800' },
+        "Ch? x�t duy?t": { label: "Ch? x�t duy?t", color: "bg-amber-100 text-amber-800" },
+        "Cho xet duyet": { label: "Ch? x�t duy?t", color: "bg-amber-100 text-amber-800" },
+        "C?n c?p nh?t": { label: "C?n c?p nh?t", color: "bg-blue-100 text-blue-800" },
+        "Can cap nhat": { label: "C?n c?p nh?t", color: "bg-blue-100 text-blue-800" },
+        "T? ch?i": { label: "T? ch?i", color: "bg-red-100 text-red-800" },
+        "Tu choi": { label: "T? ch?i", color: "bg-red-100 text-red-800" },
+        "Ch?p nh?n": { label: "Ch?p nh?n", color: "bg-green-100 text-green-800" },
+        "Chap nhan": { label: "Ch?p nh?n", color: "bg-green-100 text-green-800" },
     };
 
     const status = statusMap[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-800' };
@@ -30,3 +34,4 @@ export default function OrderCard({ order }) {
         </div>
     );
 }
+
