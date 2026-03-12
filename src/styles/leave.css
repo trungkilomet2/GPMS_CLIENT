@@ -1,0 +1,80 @@
+.leave-page {
+  --leave-green: #1e6e43;
+  --leave-green-dark: #164f31;
+  --leave-green-light: #e6f4ec;
+  --leave-sand: #f5f3ee;
+  --leave-sand-dark: #ede9e1;
+  --leave-border: #dde8e2;
+  --leave-text: #1a2e23;
+  --leave-text-mid: #4a5e53;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top right, rgba(111, 222, 160, 0.18), transparent 22%),
+    linear-gradient(180deg, #f6fbf8 0 11rem, #f5f3ee 11rem 100%);
+}
+
+.leave-shell {
+  width: 100%;
+}
+
+.leave-page .rounded-2xl,
+.leave-page .rounded-3xl {
+  border-color: var(--leave-border);
+}
+
+.leave-page .bg-white {
+  box-shadow: 0 18px 40px rgba(30, 110, 67, 0.08);
+}
+
+.leave-page .bg-slate-50 {
+  background: #f8fbf9;
+}
+
+.leave-page .text-slate-900 {
+  color: var(--leave-text);
+}
+
+.leave-page .text-slate-800,
+.leave-page .text-slate-700 {
+  color: var(--leave-text-mid);
+}
+
+.leave-page .text-slate-600,
+.leave-page .text-slate-500 {
+  color: #5f7168;
+}
+
+.leave-page .border-slate-200,
+.leave-page .divide-slate-200,
+.leave-page .divide-slate-100 {
+  border-color: var(--leave-border);
+}
+
+.leave-list-page .leave-shell > div:first-child h1,
+.leave-detail-page .leave-shell > div:first-child h1 {
+  letter-spacing: -0.03em;
+}
+
+.leave-list-page .leave-shell,
+.leave-detail-page .leave-shell {
+  animation: leave-fade-up 180ms ease-out;
+}
+
+@keyframes leave-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1024px) {
+  .leave-shell {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}

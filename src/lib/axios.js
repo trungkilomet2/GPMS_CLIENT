@@ -1,6 +1,6 @@
 import axios from 'axios';
 import BASE_URL from './apiconfig';
-import { getAuthItem } from './authStorage';
+import { clearAuthStorage, getAuthItem } from './authStorage';
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
@@ -25,7 +25,22 @@ axiosClient.interceptors.request.use(
 
 axiosClient.interceptors.response.use(
   (response) => response.data,
-  (error) => Promise.reject(error)
+  (error) => {
+    const status = error?.response?.status;
+    const authHeader = String(error?.response?.headers?.['www-authenticate'] ?? '').toLowerCase();
+
+    if (status === 401) {
+      clearAuthStorage();
+      window.dispatchEvent(new Event('auth-change'));
+
+      if (window.location.pathname !== '/login') {
+        const reason = authHeader.includes('expired') ? 'expired' : 'unauthorized';
+        window.location.href = `/login?reason=${reason}`;
+      }
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 export default axiosClient;

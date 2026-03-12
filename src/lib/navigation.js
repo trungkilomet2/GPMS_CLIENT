@@ -3,6 +3,12 @@ import { matchPath } from "react-router-dom";
 export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
+  { path: "/leave", label: "Đơn xin nghỉ", parent: "/home" },
+  {
+    path: "/leave/:id",
+    label: ({ id }) => `Chi tiết đơn ${id}`,
+    parent: "/leave",
+  },
   { path: "/orders/create", label: "Tạo đơn hàng", parent: "/orders" },
   { path: "/orders/owner", label: "Danh sach don hang", parent: "/orders" },
   { path: "/orders/manual-create", label: "Tao don thu cong", parent: "/orders" },

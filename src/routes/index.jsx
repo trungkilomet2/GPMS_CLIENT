@@ -19,6 +19,10 @@ const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
 const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 
+/* ── LEAVE ── */
+const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
+const LeaveDetail = lazy(() => import("@/pages/leave/LeaveDetail"));
+
 export const routes = [
 
   { path: "/", element: <HomePage /> },
@@ -46,6 +50,16 @@ export const routes = [
   {
     path: "/profile/edit",
     element: <ProfileEdit />,
+  },
+
+  /* LEAVE */
+  {
+    path: "/leave",
+    element: <LeaveList />,
+  },
+  {
+    path: "/leave/:id",
+    element: <LeaveDetail />,
   },
 
   /* 404 */

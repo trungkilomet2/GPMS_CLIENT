@@ -37,6 +37,10 @@ export const API_ENDPOINTS = {
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
   },
 
+  LEAVE_REQUEST: {
+    GET_LIST: `${BASE_URL}/api/LeaveRequest/leave-request-list`,
+  },
+
   // TODO: thêm endpoint thật khi backend có sẵn
   PRODUCT: {
     GET_ALL: `${BASE_URL}/api/Product/product-list`,
