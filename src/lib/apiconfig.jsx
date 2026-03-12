@@ -37,6 +37,13 @@ export const API_ENDPOINTS = {
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
   },
 
+  WORKER: {
+    GET_ALL_EMPLOYEES: `${BASE_URL}/api/Worker/get-all-employees`,
+    GET_BY_ID: (userId) => `${BASE_URL}/api/Worker/get-employee-by-id/${userId}`,
+    CREATE: `${BASE_URL}/api/Worker/create-employee`,
+    UPDATE: (userId) => `${BASE_URL}/api/Worker/update-employee/${userId}`,
+  },
+
   LEAVE_REQUEST: {
     GET_LIST: `${BASE_URL}/api/LeaveRequest/leave-request-list`,
     GET_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/leave-request-detail/${id}`,

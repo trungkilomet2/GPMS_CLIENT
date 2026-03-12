@@ -77,6 +77,11 @@
   transition: background-color 140ms ease, color 140ms ease, transform 140ms ease;
 }
 
+.dashboard-sidebar__item--compact span {
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+}
+
 .dashboard-sidebar__item:hover {
   background: rgba(255, 255, 255, 0.72);
   color: #1a2e23;

@@ -15,6 +15,10 @@ const CreateOrder = lazy(() => import("@/pages/orders/CreateOrder"));
 const CreateManualOrder = lazy(() => import("@/pages/orders/CreateManualOrder"));
 const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
+const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
+const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
+const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
+const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 
 /* ── PROFILE ── */
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -43,6 +47,10 @@ export const routes = [
   { path: "/orders/edit/:id", element: <EditOrder /> },
   { path: "/orders/detail/:id", element: <OrderDetail /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
+  { path: "/employees", element: <EmployeeList /> },
+  { path: "/employees/create", element: <EmployeeCreate /> },
+  { path: "/employees/:id/edit", element: <EmployeeUpdate /> },
+  { path: "/employees/:id", element: <EmployeeDetail /> },
 
   /* PROFILE */
   {

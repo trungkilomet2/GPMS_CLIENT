@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { to: "/home", label: "Dashboard", icon: ChartPie, disabled: false },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
   { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
-  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: true },
+  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];
@@ -78,10 +78,14 @@ export default function Sidebar() {
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, disabled }) => {
+        {NAV_ITEMS.map(({ to, label, icon: Icon, disabled, compactLabel }) => {
           if (disabled) {
             return (
-              <div key={label} className="dashboard-sidebar__item is-disabled" title={label}>
+              <div
+                key={label}
+                className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
+                title={label}
+              >
                 <Icon size={22} />
                 {!collapsed && <span>{label}</span>}
               </div>
@@ -93,7 +97,9 @@ export default function Sidebar() {
               key={to}
               to={to}
               title={label}
-              className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
+              className={({ isActive }) =>
+                `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
+              }
             >
               <Icon size={22} />
               {!collapsed && <span>{label}</span>}
