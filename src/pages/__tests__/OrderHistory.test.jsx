@@ -1,6 +1,6 @@
 ﻿import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import OrdersList from '@/pages/orders/OrdersList';
+import OrderHistory from '@/pages/orders/OrderHistory';
 import OrderService from '@/services/OrderService';
 
 vi.mock('../../layouts/MainLayout', () => ({
@@ -13,7 +13,7 @@ vi.mock('@/services/OrderService', () => ({
   },
 }));
 
-describe('OrdersList', () => {
+describe('OrderHistory', () => {
   it('renders orders and filters by search text', async () => {
     OrderService.getAllOrders.mockResolvedValue({
       data: [
@@ -24,7 +24,7 @@ describe('OrdersList', () => {
 
     const { container } = render(
       <MemoryRouter>
-        <OrdersList />
+        <OrderHistory />
       </MemoryRouter>
     );
 
@@ -46,7 +46,7 @@ describe('OrdersList', () => {
 
     const { container } = render(
       <MemoryRouter>
-        <OrdersList />
+        <OrderHistory />
       </MemoryRouter>
     );
 

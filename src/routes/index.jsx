@@ -8,7 +8,8 @@ const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
 /* ── ORDERS ── */
-const OrdersList = lazy(() => import("@/pages/orders/OrdersList"));
+const OrdersList = lazy(() => import("@/pages/orders/OrderHistory"));
+const OwnerOrdersList = lazy(() => import("@/pages/orders/OwnerOrdersList"));
 const OrderDetail = lazy(() => import("@/pages/orders/OrderDetail"));
 const CreateOrder = lazy(() => import("@/pages/orders/CreateOrder"));
 const CreateManualOrder = lazy(() => import("@/pages/orders/CreateManualOrder"));
@@ -31,6 +32,7 @@ export const routes = [
 
   /* ORDERS */
   { path: "/orders", element: <OrdersList /> },
+  { path: "/orders/owner", element: <OwnerOrdersList /> },
   { path: "/orders/create", element: <CreateOrder /> },
   { path: "/orders/manual-create", element: <CreateManualOrder /> },
   { path: "/orders/edit/:id", element: <EditOrder /> },

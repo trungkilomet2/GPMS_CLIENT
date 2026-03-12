@@ -2,8 +2,8 @@ import axiosClient from '../lib/axios';
 import { API_ENDPOINTS } from '../lib/apiconfig';
 
 const OrderService = {
-    getAllOrders: () => {
-        return axiosClient.get(API_ENDPOINTS.ORDER.GET_ALL);
+    getAllOrders: (params) => {
+        return axiosClient.get(API_ENDPOINTS.ORDER.GET_ALL, params ? { params } : undefined);
     },
     getOrderDetail: (id) => {
         return axiosClient.get(API_ENDPOINTS.ORDER.GET_DETAIL(id));

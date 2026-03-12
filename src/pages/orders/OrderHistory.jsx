@@ -28,13 +28,15 @@ function SortIcon({ direction }) {
     return direction === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />;
 }
 
-export default function Orders() {
-    const getUserId = () => {
-        const user = getStoredUser();
-        return user?.userId ?? user?.id ?? null;
-    };
-
-    const userId = getUserId();
+export default function Orders({
+    forceOwner = false,
+    title = 'Lịch sử đặt hàng',
+    subtitle = 'Theo dõi tiến độ sản xuất và truy cập chi tiết từng đơn nhanh hơn.',
+}) {
+    const user = getStoredUser();
+    const userId = user?.userId ?? user?.id ?? null;
+    const role = String(user?.role ?? '').toLowerCase();
+    const isOwner = forceOwner || role === 'owner';
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -49,12 +51,6 @@ export default function Orders() {
 
     useEffect(() => {
         const fetchOrders = async () => {
-            if (!userId) {
-                setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
-                setLoading(false);
-                return;
-            }
-
             try {
                 setLoading(true);
                 const params = {
@@ -63,7 +59,9 @@ export default function Orders() {
                     SortColumn: sortBy.key === 'orderName' ? 'Name' : sortBy.key,
                     SortOrder: sortBy.dir.toUpperCase(),
                 };
-                const response = await OrderService.getOrdersByUser(userId, params);
+                const response = isOwner
+                    ? await OrderService.getAllOrders(params)
+                    : await OrderService.getOrdersByUser(userId, params);
                 const data =
                     response?.recordCount !== undefined ||
                         response?.pageIndex !== undefined ||
@@ -107,8 +105,13 @@ export default function Orders() {
                 setLoading(false);
             }
         };
+        if (!isOwner && !userId) {
+            setError('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.');
+            setLoading(false);
+            return;
+        }
         fetchOrders();
-    }, [userId, currentPage, pageSize, sortBy]);
+    }, [userId, isOwner, currentPage, pageSize, sortBy]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -166,8 +169,8 @@ export default function Orders() {
             <div className="min-h-screen bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 space-y-6">
                     <div className="flex flex-col gap-2">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách đơn hàng</h1>
-                        <p className="text-slate-600">Theo dõi tiến độ sản xuất và truy cập chi tiết từng đơn nhanh hơn.</p>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{title}</h1>
+                        <p className="text-slate-600">{subtitle}</p>
                     </div>
 
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
