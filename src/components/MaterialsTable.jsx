@@ -51,6 +51,7 @@ export default function MaterialsTable({
     showImage = false,
     showActions = false,
     showNote = true,
+    onImageClick,
     onEdit,
     onDelete,
     emptyText = 'Danh sách vật liệu đang trống...',
@@ -79,9 +80,20 @@ export default function MaterialsTable({
                         {showImage && (
                             <td className="px-4 py-3 text-center align-middle">
                                 {m.image || m.imagePreview ? (
-                                    <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
-                                        <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
-                                    </div>
+                                    onImageClick ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onImageClick(m.imagePreview || m.image)}
+                                            className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded cursor-zoom-in"
+                                            title="Click de zoom"
+                                        >
+                                            <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
+                                        </button>
+                                    ) : (
+                                        <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
+                                            <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
+                                        </div>
+                                    )
                                 ) : (
                                     <span className="text-[11px] text-gray-400 inline-flex w-full justify-center">-</span>
                                 )}
@@ -129,4 +141,8 @@ export default function MaterialsTable({
         </table>
     );
 }
+
+
+
+
 

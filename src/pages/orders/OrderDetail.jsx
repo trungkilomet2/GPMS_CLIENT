@@ -23,6 +23,7 @@ export default function OrderDetail() {
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [zoomImageUrl, setZoomImageUrl] = useState('');
     const [imageZoom, setImageZoom] = useState(1);
     const [imagePan, setImagePan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -108,7 +109,7 @@ export default function OrderDetail() {
                                         {order.image ? (
                                             <button
                                                 type="button"
-                                                onClick={() => { setImageZoom(1); setImagePan({ x: 0, y: 0 }); setIsImageModalOpen(true); }}
+                                                onClick={() => { setZoomImageUrl(order.image); setImageZoom(1); setImagePan({ x: 0, y: 0 }); setIsImageModalOpen(true); }}
                                                 className="w-full h-full cursor-zoom-in"
                                                 title="Click để xem & zoom ảnh"
                                             >
@@ -165,6 +166,13 @@ export default function OrderDetail() {
                                 variant="detail"
                                 showImage
                                 emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
+                                onImageClick={(url) => {
+                                    if (!url) return;
+                                    setZoomImageUrl(url);
+                                    setImageZoom(1);
+                                    setImagePan({ x: 0, y: 0 });
+                                    setIsImageModalOpen(true);
+                                }}
                             />
                         </div>
                     </div>
@@ -232,16 +240,16 @@ export default function OrderDetail() {
 
             <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order.id} />
             <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
-            {order.image && isImageModalOpen && (
+            {zoomImageUrl && isImageModalOpen && (
                 <div
                     className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4 overscroll-none touch-none"
-                    onClick={() => setIsImageModalOpen(false)}
+                    onClick={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
                     onWheelCapture={(e) => e.preventDefault()}
                 >
                     <div className="relative w-full max-w-4xl h-[80vh]" onClick={(e) => e.stopPropagation()}>
                         <button
                             type="button"
-                            onClick={() => setIsImageModalOpen(false)}
+                            onClick={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
                             className="absolute -top-4 -right-4 w-10 h-10 rounded-full bg-white text-gray-700 shadow flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-colors"
                         >
                             ×
@@ -346,7 +354,7 @@ export default function OrderDetail() {
                                     }}
                                 >
                                     <img
-                                        src={order.image}
+                                        src={zoomImageUrl}
                                         alt=""
                                         className="block max-w-full max-h-[80vh] object-contain select-none"
                                         onLoad={(e) => {
@@ -391,3 +399,4 @@ function getStatusStyle(status) {
     if (s === 'chấp nhận') return 'bg-emerald-600 text-white';
     return 'bg-gray-100 text-gray-700';
 }
+
