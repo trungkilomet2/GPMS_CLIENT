@@ -7,7 +7,7 @@ import { getAuthItem, getStoredUser } from '@/lib/authStorage';
 import Pagination from '@/components/Pagination';
 import { formatOrderDate } from '@/lib/orders/formatters';
 import { getOrderStatusLabel, getOrderStatusStyle, ORDER_STATUS_LABELS } from '@/lib/orders/status';
-import MainLayout from '../../layouts/MainLayout';
+import OwnerLayout from '@/layouts/OwnerLayout';
 import '../../styles/homepage.css';
 
 function SortIcon({ direction }) {
@@ -148,7 +148,7 @@ export default function Orders({
     };
 
     return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="min-h-screen bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 space-y-6">
                     <div className="flex flex-col gap-2">
@@ -275,6 +275,6 @@ export default function Orders({
                     )}
                 </div>
             </div>
-        </MainLayout>
+        </OwnerLayout>
     );
 }

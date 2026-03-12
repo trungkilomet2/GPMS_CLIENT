@@ -14,7 +14,7 @@ import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
-import MainLayout from '../../layouts/MainLayout';
+import OwnerLayout from '@/layouts/OwnerLayout';
 import '@/styles/homepage.css';
 
 export default function OrderDetail() {
@@ -54,19 +54,19 @@ export default function OrderDetail() {
     }, [id]);
 
     if (loading) return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
                 <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
                 <p className="text-gray-500 text-sm font-medium">Đang truy xuất dữ liệu...</p>
             </div>
-        </MainLayout>
+        </OwnerLayout>
     );
     if (error) return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
                 <p className="text-red-600 text-sm font-semibold">{error}</p>
             </div>
-        </MainLayout>
+        </OwnerLayout>
     );
 
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
@@ -120,7 +120,7 @@ export default function OrderDetail() {
     };
 
     return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900">
                 {/* Header thanh mảnh, tập trung vào ID và Nút sửa */}
                 <div className="flex items-center justify-between mb-6 border-b pb-4 border-gray-200">
@@ -361,7 +361,7 @@ export default function OrderDetail() {
                 loading={isUpdatingStatus}
                 tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
             />
-        </MainLayout>
+        </OwnerLayout>
     );
 }
 

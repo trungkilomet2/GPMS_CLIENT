@@ -3,9 +3,9 @@ import { matchPath } from "react-router-dom";
 export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
-  { path: "/orders/create", label: "Tạo đơn hàng", parent: "/orders" },
-  { path: "/orders/owner", label: "Danh sach don hang", parent: "/orders" },
-  { path: "/orders/manual-create", label: "Tao don thu cong", parent: "/orders" },
+  //{ path: "/orders/create", label: "Tạo đơn hàng", parent: "/orders" },
+  { path: "/orders/owner", label: "Danh sách đơn hàng", parent: "/orders" },
+  { path: "/orders/manual-create", label: "Tạo đơn hàng thủ công", parent: "/orders" },
   {
     path: "/orders/edit/:id",
     label: ({ id }) => `Sửa đơn #${id}`,
@@ -62,10 +62,10 @@ export const AUTH_NAV_TREE = [
     label: "Đơn hàng",
     path: "/orders",
     children: [
-      { label: "Danh sách đơn hàng", path: "/orders/owner" },
+      // { label: "Danh sách đơn hàng", path: "/orders/owner" },
       { label: "Lịch sử đặt hàng", path: "/orders" },
       { label: "Tạo đơn hàng", path: "/orders/create" },
-      { label: "Tạo đơn thủ công", path: "/orders/manual-create" },
+      // { label: "Tạo đơn thủ công", path: "/orders/manual-create" },
     ],
   },
   {

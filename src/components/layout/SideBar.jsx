@@ -1,9 +1,36 @@
 // src/components/layout/Sidebar.jsx
-import { useState, useEffect, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Home, ShoppingCart, Activity, Menu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { ShoppingCart, History, FileText, Edit3, LogOut } from 'lucide-react';
+import { clearAuthStorage, getStoredUser } from '@/lib/authStorage';
+import '@/styles/homepage.css';
+
+const SIDEBAR_CSS = `
+  .osb-item:hover {
+    background: var(--green-light);
+    color: var(--green-mid);
+  }
+  .osb-item:hover svg { stroke: var(--green-mid); }
+  .osb-logout:hover {
+    background: #fef2f2;
+    color: #dc2626;
+  }
+  .osb-logout:hover svg { stroke: #dc2626; }
+`;
+
+const NAV_ITEMS = [
+    { to: "/orders/manual-create", label: "Tạo đơn thủ công", icon: <Edit3 size={18} />, end: true },
+    { to: "/orders/owner", label: "Danh sách đơn hàng", icon: <ShoppingCart size={18} />, end: true },
+    //{ to: "/orders", label: "Lịch sử tạo đơn", icon: <History size={18} />, end: true },
+    { to: "/leave-requests", label: "Đơn xin nghỉ phép", icon: <FileText size={18} />, end: true },
+
+];
 
 export default function Sidebar() {
+    const navigate = useNavigate();
+    const user = getStoredUser();
+    const userName = user?.fullName || user?.name || user?.userName || "Owner";
+
     const [collapsed, setCollapsed] = useState(() => {
         try {
             const raw = localStorage.getItem('gpms-sidebar-collapsed');
@@ -19,101 +46,110 @@ export default function Sidebar() {
         } catch { }
     }, [collapsed]);
 
-    const asideRef = useRef(null);
+    const handleLogout = () => {
+        clearAuthStorage();
+        window.dispatchEvent(new Event("auth-change"));
+        navigate("/login");
+    };
 
     return (
-        <aside
-            ref={asideRef}
-            className={`flex flex-col h-screen transition-all duration-200 ease-in-out
-        ${collapsed ? 'w-16' : 'w-64'}`}
-            aria-expanded={!collapsed}
-        >
-            <div
-                className={`flex flex-col h-full
-          backdrop-blur-sm
-          bg-white/30 dark:bg-black/30
-          border-r border-white/10 dark:border-black/10
-          shadow-sm`}
+        <>
+            <style>{SIDEBAR_CSS}</style>
+            <aside
+                aria-expanded={!collapsed}
+                style={{
+                    width: collapsed ? 64 : 256,
+                    height: "100vh",
+                    position: "sticky",
+                    top: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    flexShrink: 0,
+                    transition: "width .2s ease-in-out",
+                    background: "var(--nav-dark)",
+                    borderRight: "1px solid rgba(255,255,255,.08)",
+                    fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif",
+                }}
             >
-                {/* Header: click logo to toggle */}
-                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                {/* Header / Brand */}
+                <div
+                    className="flex items-center justify-between p-4"
+                    style={{ borderBottom: "1px solid rgba(255,255,255,.08)" }}
+                >
                     <div className="flex items-center gap-3">
                         <div
                             onClick={() => setCollapsed(v => !v)}
                             role="button"
                             aria-pressed={collapsed}
                             title={collapsed ? 'Mở sidebar' : 'Thu gọn sidebar'}
-                            className={`cursor-pointer flex items-center justify-center text-white font-bold rounded-lg
-                ${collapsed ? 'w-10 h-10 bg-emerald-600' : 'w-10 h-10 bg-emerald-600'}`}
+                            className="cursor-pointer flex items-center justify-center text-white font-bold rounded-lg w-10 h-10"
+                            style={{ background: "var(--green)", boxShadow: "0 4px 14px rgba(30,110,67,.4)" }}
                         >
                             GP
                         </div>
 
                         <div className={`${collapsed ? 'hidden' : 'block'}`}>
-                            <h1 className="font-bold text-lg text-gray-900 dark:text-white">GPMS</h1>
-                            <p className="text-xs text-gray-600 dark:text-gray-300">Quản lý sản xuất</p>
+                            <h1 className="font-bold text-lg text-white">GPMS</h1>
+                            <p className="text-xs text-white/60">Owner workspace</p>
                         </div>
                     </div>
-
-                    {/* Removed chevrons button as requested; keep a small placeholder for spacing on wide view */}
-                    <div className={`${collapsed ? 'hidden' : 'block'}`} aria-hidden="true" />
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 px-2 py-4">
-                    <ul className="space-y-1">
-                        <li>
-                            <NavLink
-                                to="/dashboard"
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150
-                   ${isActive ? 'bg-emerald-100/20 text-emerald-800 font-medium' : 'text-gray-700 hover:bg-white/5 dark:text-gray-200'}`
-                                }
-                                title="Dashboard"
-                            >
-                                <Home size={18} />
-                                <span className={`${collapsed ? 'sr-only' : ''}`}>Dashboard</span>
-                            </NavLink>
-                        </li>
-
-                        <li>
-                            <NavLink
-                                to="/orders"
-                                className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150
-                   ${isActive ? 'bg-orange-100/20 text-orange-800 font-medium' : 'text-gray-700 hover:bg-white/5 dark:text-gray-200'}`
-                                }
-                                title="Danh sách đơn hàng"
-                            >
-                                <ShoppingCart size={18} />
-                                <span className={`${collapsed ? 'sr-only' : ''}`}>Danh sách đơn hàng</span>
-                            </NavLink>
-                        </li>
-
-                        <li>
-                            <NavLink
-                                to="/monitoring"
-                                className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-white/5 transition-colors duration-150 dark:text-gray-200"
-                                title="Giám sát hoạt động"
-                            >
-                                <Activity size={18} />
-                                <span className={`${collapsed ? 'sr-only' : ''}`}>Giám sát hoạt động</span>
-                            </NavLink>
-                        </li>
-                    </ul>
+                <nav style={{ flex: 1, padding: "1rem .75rem", display: "flex", flexDirection: "column", gap: ".25rem" }}>
+                    {NAV_ITEMS.map((item) => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            end={item.end}
+                            className="osb-item"
+                            style={({ isActive }) => ({
+                                display: "flex",
+                                alignItems: "center",
+                                gap: ".7rem",
+                                padding: ".65rem .9rem",
+                                borderRadius: 10,
+                                textDecoration: "none",
+                                fontSize: ".84rem",
+                                fontWeight: isActive ? 700 : 500,
+                                color: isActive ? "var(--green-mid)" : "rgba(255,255,255,.75)",
+                                background: isActive ? "var(--green-light)" : "transparent",
+                                borderLeft: `3px solid ${isActive ? "var(--green)" : "transparent"}`,
+                                transition: ".15s",
+                            })}
+                        >
+                            <span style={{ display: "flex", flexShrink: 0 }}>{item.icon}</span>
+                            <span style={{ display: collapsed ? "none" : "inline" }}>{item.label}</span>
+                        </NavLink>
+                    ))}
                 </nav>
 
                 {/* Footer / profile */}
-                <div className="p-4 border-t border-white/10">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-300/80 flex items-center justify-center text-gray-800">👤</div>
-                        <div className={`${collapsed ? 'hidden' : 'block'}`}>
-                            <p className="font-medium text-gray-900 dark:text-white">Nguyễn Văn An</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-300">Khách hàng</p>
+                <div className="p-4" style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+                    <NavLink
+                        to="#"
+                        className="osb-item w-full flex items-center gap-3 p-2 rounded-lg transition"
+                        style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white">
+                            👤
                         </div>
-                    </div>
+                        <div style={{ display: collapsed ? "none" : "block" }}>
+                            <p className="font-medium text-white">{userName}</p>
+                            <p className="text-xs text-white/60">Owner</p>
+                        </div>
+                    </NavLink>
+
+                    <button
+                        onClick={handleLogout}
+                        className="osb-logout mt-4 w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/70 hover:text-red-600 transition"
+                        type="button"
+                    >
+                        <LogOut size={16} />
+                        <span style={{ display: collapsed ? "none" : "inline" }}>Đăng xuất</span>
+                    </button>
                 </div>
-            </div>
-        </aside>
+            </aside>
+        </>
     );
 }
