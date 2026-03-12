@@ -123,13 +123,15 @@ export default function LoginPage() {
     if (!validate()) return;
     try {
       setLoading(true);
-      await authService.login({
+      const result = await authService.login({
         userName: formData.userName.trim(),
         password: formData.password,
       });
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
-      navigate("/home");
+      const role = String(result?.user?.role ?? "").toLowerCase();
+      if (role === "owner") navigate("/orders/owner");
+      else navigate("/home");
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {

@@ -7,7 +7,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { getAuthItem } from '@/lib/authStorage';
-import MainLayout from '../../layouts/MainLayout';
+import OwnerLayout from '@/layouts/OwnerLayout';
 
 export default function EditOrder() {
     const userId = getAuthItem("userId");
@@ -364,17 +364,17 @@ export default function EditOrder() {
 
     if (isFetching) {
         return (
-            <MainLayout>
+            <OwnerLayout>
                 <div className="flex flex-col items-center justify-center min-h-[60vh]">
                     <Loader2 className="animate-spin text-emerald-600 mb-2" size={40} />
                     <p className="text-gray-500">Đang tải dữ liệu đơn hàng...</p>
                 </div>
-            </MainLayout>
+            </OwnerLayout>
         );
     }
 
     return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
@@ -581,7 +581,7 @@ export default function EditOrder() {
                 onChange={(e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
                 editingIndex={editingIndex}
             />
-        </MainLayout>
+        </OwnerLayout>
     );
 }
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DashboardLayout from '@/layouts/DashboardLayout';
 import { Plus, ArrowLeft, FileText, Loader2, AlertCircle } from 'lucide-react';
 import AddMaterialModal from '@/components/orders/AddMaterialModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
@@ -9,7 +8,7 @@ import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
 import { getStoredUser } from '@/lib/authStorage';
-import MainLayout from '../../layouts/MainLayout';
+import OwnerLayout from '@/layouts/OwnerLayout';
 import '@/styles/homepage.css';
 
 export default function CreateOrder() {
@@ -342,7 +341,7 @@ export default function CreateOrder() {
     };
 
     return (
-        <MainLayout>
+        <OwnerLayout>
             {profileCheck.checking && (
                 <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
                     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center gap-3">
@@ -574,7 +573,7 @@ export default function CreateOrder() {
                 onChange={(e) => setMaterialFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))}
                 editingIndex={editingIndex}
             />
-        </MainLayout>
+        </OwnerLayout>
     );
 }
 

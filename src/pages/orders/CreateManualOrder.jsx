@@ -5,7 +5,7 @@ import AddMaterialModal from '@/components/orders/AddMaterialModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import CloudinaryService from '@/services/CloudinaryService';
-import MainLayout from '../../layouts/MainLayout';
+import OwnerLayout from '@/layouts/OwnerLayout';
 import '@/styles/homepage.css';
 
 export default function CreateManualOrder() {
@@ -323,7 +323,7 @@ export default function CreateManualOrder() {
     };
 
     return (
-        <MainLayout>
+        <OwnerLayout>
             <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 <div className="flex items-center gap-3 mb-6">
                     <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
@@ -525,7 +525,7 @@ export default function CreateManualOrder() {
                 onChange={(e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }))}
                 editingIndex={editingIndex}
             />
-        </MainLayout>
+        </OwnerLayout>
     );
 }
 
