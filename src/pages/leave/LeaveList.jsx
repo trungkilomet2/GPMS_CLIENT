@@ -49,13 +49,14 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Không hợp lệ";
 
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
+  return date.toLocaleDateString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  });
+  }) + ` ${date.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 function StatusBadge({ status }) {
@@ -77,15 +78,24 @@ function SummaryCard({ label, value, icon, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
         active ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
       }`}
     >
-      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-        <Icon size={20} />
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-500">{label}</div>
+          <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{value}</div>
+        </div>
+
+        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border transition-colors ${
+          active
+            ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+            : "border-emerald-100 bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100"
+        }`}>
+          <Icon size={26} strokeWidth={2.1} />
+        </div>
       </div>
-      <div className="text-sm font-medium text-slate-500">{label}</div>
-      <div className="mt-1 text-3xl font-bold text-slate-900">{value}</div>
     </button>
   );
 }
@@ -175,9 +185,6 @@ export default function LeaveList() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Quản lý nghỉ phép</h1>
-            <p className="max-w-3xl text-sm leading-6 text-slate-600">
-              Danh sách này đang lấy từ API `leave-request-list`, bám theo dữ liệu đơn nghỉ thực tế của hệ thống.
-            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -188,22 +195,24 @@ export default function LeaveList() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_220px_200px_auto]">
+            <div className="grid items-end gap-3 lg:grid-cols-[1.4fr_220px_200px_auto]">
               <label className="relative block">
-                <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tên nhân viên</span>
+                <Search size={18} className="pointer-events-none absolute left-3 top-[calc(50%+0.8rem)] -translate-y-1/2 text-slate-400" />
                 <input
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="Tìm mã đơn, họ tên, username hoặc nội dung..."
+                  placeholder="Tìm theo tên nhân viên..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
 
               <label className="relative block">
-                <Filter size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
+                <Filter size={16} className="pointer-events-none absolute left-3 top-[calc(50%+0.8rem)] -translate-y-1/2 text-slate-400" />
                 <select
                   value={statusFilter}
                   onChange={(e) => {
@@ -220,7 +229,8 @@ export default function LeaveList() {
               </label>
 
               <label className="relative block">
-                <CalendarDays size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày gửi</span>
+                <CalendarDays size={16} className="pointer-events-none absolute left-3 top-[calc(50%+0.8rem)] -translate-y-1/2 text-slate-400" />
                 <input
                   type="date"
                   value={dateFilter}
@@ -228,12 +238,12 @@ export default function LeaveList() {
                     setDateFilter(e.target.value);
                     setPage(1);
                   }}
+                  aria-label="Ngày gửi"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
 
-              <div className="flex items-center justify-between gap-3 lg:justify-end">
-                <div className="text-sm text-slate-500">{totalCount || items.length} kết quả</div>
+              <div className="flex items-center justify-end gap-3">
                 {(search || statusFilter !== "all" || dateFilter) && (
                   <button
                     type="button"
@@ -247,17 +257,23 @@ export default function LeaveList() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="leave-table-card__header">
+              <div>
+                <h2 className="leave-table-card__title">Danh sách đơn nghỉ</h2>
+                <p className="leave-table-card__subtitle">Theo dõi trạng thái xử lý và truy cập chi tiết từng đơn nhanh hơn.</p>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
+                <thead className="leave-table-head">
                   <tr>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nhân viên</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung đơn</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày tạo</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày phản hồi</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</th>
-                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Thao tác</th>
+                    <th className="leave-table-th px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nhân viên</th>
+                    <th className="leave-table-th px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Nội dung đơn</th>
+                    <th className="leave-table-th px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày tạo</th>
+                    <th className="leave-table-th px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày phản hồi</th>
+                    <th className="leave-table-th px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</th>
+                    <th className="leave-table-th px-5 py-4 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -287,11 +303,9 @@ export default function LeaveList() {
                     </tr>
                   ) : (
                     paginated.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/80">
+                      <tr key={item.id} className="leave-table-row hover:bg-slate-50/80">
                         <td className="px-5 py-4 align-top">
                           <div className="font-semibold text-slate-900">{item.userFullName}</div>
-                          <div className="mt-1 text-sm text-slate-500">User ID: {item.userId ?? "N/A"}</div>
-                          <div className="mt-1 text-xs text-slate-400">#{item.id}</div>
                         </td>
                         <td className="px-5 py-4 align-top">
                           <p className="line-clamp-3 max-w-xl text-sm leading-6 text-slate-700">{item.content}</p>
@@ -306,7 +320,7 @@ export default function LeaveList() {
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />
                         </td>
-                        <td className="px-5 py-4 text-right align-top">
+                        <td className="px-5 py-4 text-center align-top">
                           <button
                             type="button"
                             onClick={() => navigate(`/leave/${item.id}`, { state: { leave: item } })}

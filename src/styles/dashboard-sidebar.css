@@ -90,7 +90,8 @@
 }
 
 .dashboard-sidebar__item.is-disabled {
-  opacity: 0.8;
+  color: #2b4636;
+  opacity: 0.78;
   cursor: default;
 }
 

@@ -41,15 +41,23 @@ const LeaveService = {
   },
 
   async getLeaveRequestById(id) {
-    const response = await this.getLeaveRequests({
-      PageIndex: 0,
-      PageSize: 50,
-      SortColumn: "DateCreate",
-      SortOrder: "DESC",
-      FilterQuery: String(id ?? ""),
-    });
+    const rawResponse = await axiosClient.get(API_ENDPOINTS.LEAVE_REQUEST.GET_DETAIL(id));
+    const response =
+      typeof rawResponse === "string"
+        ? JSON.parse(rawResponse)
+        : rawResponse;
 
-    return response.data.find((item) => String(item.id) === String(id)) ?? null;
+    return response?.data ? normalizeLeaveItem(response.data) : null;
+  },
+
+  async denyLeaveRequest(id, payload) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.DENY(id), payload);
+    const response =
+      typeof rawResponse === "string"
+        ? JSON.parse(rawResponse)
+        : rawResponse;
+
+    return response;
   },
 };
 

@@ -39,6 +39,8 @@ export const API_ENDPOINTS = {
 
   LEAVE_REQUEST: {
     GET_LIST: `${BASE_URL}/api/LeaveRequest/leave-request-list`,
+    GET_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/leave-request-detail/${id}`,
+    DENY: (id) => `${BASE_URL}/api/LeaveRequest/${id}/deny`,
   },
 
   // TODO: thêm endpoint thật khi backend có sẵn

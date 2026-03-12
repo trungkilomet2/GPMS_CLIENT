@@ -55,6 +55,47 @@
   letter-spacing: -0.03em;
 }
 
+.leave-table-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.4rem 1rem;
+  background: linear-gradient(180deg, rgba(230, 244, 236, 0.95) 0%, rgba(245, 243, 238, 0.72) 100%);
+  border-bottom: 1px solid var(--leave-border);
+}
+
+.leave-table-card__title {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--leave-text);
+}
+
+.leave-table-card__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.86rem;
+  color: #5f7168;
+}
+
+.leave-table-head {
+  background: linear-gradient(180deg, #edf6f0 0%, #e2efe8 100%);
+}
+
+.leave-table-th {
+  color: #486256;
+  border-bottom: 1px solid #d4e3da;
+  letter-spacing: 0.08em;
+}
+
+.leave-table-row {
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.leave-table-row:hover {
+  background: rgba(230, 244, 236, 0.42);
+}
+
 .leave-list-page .leave-shell,
 .leave-detail-page .leave-shell {
   animation: leave-fade-up 180ms ease-out;

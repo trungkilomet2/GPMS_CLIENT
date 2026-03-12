@@ -9,7 +9,6 @@ import {
   Mail,
   MapPin,
   Phone,
-  ShieldAlert,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -79,20 +78,46 @@ function DetailItem({ icon, label, value }) {
   );
 }
 
+function getTimelineItems(leave) {
+  const isApproved = leave?.status === "approved";
+  const isRejected = leave?.status === "rejected";
+  const isPending = leave?.status === "pending";
+
+  return [
+    {
+      title: "Đơn được gửi",
+      value: formatDateTime(leave?.dateCreate),
+      tone: "done",
+    },
+    {
+      title: isPending ? "Đang chờ phản hồi" : "Đã phản hồi",
+      value: isPending ? "Đơn đang chờ duyệt" : formatDateTime(leave?.dateReply),
+      tone: isPending ? "current" : "done",
+    },
+    {
+      title: isApproved ? "Đã phê duyệt" : isRejected ? "Đã từ chối" : "Kết quả xử lý",
+      value: isApproved
+        ? "Đơn nghỉ đã được phê duyệt."
+        : isRejected
+          ? leave?.denyContent || "Đơn nghỉ đã bị từ chối."
+          : "Chưa có kết quả cuối cùng.",
+      tone: isApproved ? "done" : isRejected ? "rejected" : "upcoming",
+    },
+  ];
+}
+
 export default function LeaveDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
   const [leave, setLeave] = useState(location.state?.leave ?? null);
-  const [loading, setLoading] = useState(!location.state?.leave);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (location.state?.leave) return;
-
     let active = true;
 
     const fetchLeaveDetail = async () => {
@@ -123,12 +148,13 @@ export default function LeaveDetail() {
     return () => {
       active = false;
     };
-  }, [id, location.state?.leave]);
+  }, [id]);
 
   const statusConfig = useMemo(
     () => STATUS_MAP[leave?.status] ?? STATUS_MAP.pending,
     [leave?.status]
   );
+  const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
   const canReview = leave?.status === "pending";
 
   const handleApprove = async () => {
@@ -146,17 +172,28 @@ export default function LeaveDetail() {
   const handleReject = async () => {
     if (!rejectReason.trim()) return;
 
-    setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setLeave((prev) => ({
-      ...prev,
-      status: "rejected",
-      dateReply: new Date().toISOString(),
-      denyContent: rejectReason.trim(),
-    }));
-    setRejectOpen(false);
-    setRejectReason("");
-    setSubmitting(false);
+    try {
+      setSubmitting(true);
+      await LeaveService.denyLeaveRequest(id, {
+        denyContent: rejectReason.trim(),
+      });
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "rejected",
+          dateReply: new Date().toISOString(),
+          denyContent: rejectReason.trim(),
+        }
+      );
+      setRejectOpen(false);
+      setRejectReason("");
+    } catch {
+      setError("Không thể từ chối đơn nghỉ. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -201,7 +238,7 @@ export default function LeaveDetail() {
               <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                 <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người gửi</div>
                 <div className="mt-2 text-lg font-semibold">{leave.userFullName}</div>
-                <div className="mt-1 text-sm text-emerald-100/90">User ID: {leave.userId ?? "N/A"}</div>
+                <div className="mt-1 text-sm text-emerald-100/90">{statusConfig.label}</div>
               </div>
               <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                 <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
@@ -295,7 +332,6 @@ export default function LeaveDetail() {
                 <h2 className="text-lg font-bold text-slate-900">Thông tin người gửi</h2>
                 <div className="mt-5 grid gap-3">
                   <DetailItem icon={UserRound} label="Họ và tên" value={leave.userFullName} />
-                  <DetailItem icon={ShieldAlert} label="User ID" value={leave.userId} />
                   <DetailItem icon={Phone} label="Số điện thoại" value="" />
                   <DetailItem icon={Mail} label="Email" value="" />
                   <DetailItem icon={MapPin} label="Địa chỉ" value="" />
@@ -305,32 +341,23 @@ export default function LeaveDetail() {
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <h2 className="text-lg font-bold text-slate-900">Timeline xử lý</h2>
                 <div className="mt-5 space-y-4">
-                  {[
-                    {
-                      title: "Đơn được tạo",
-                      value: formatDateTime(leave.dateCreate),
-                      active: true,
-                    },
-                    {
-                      title: leave.status === "pending" ? "Chờ phản hồi" : "Đã phản hồi",
-                      value: leave.status === "pending" ? "Đang chờ duyệt" : formatDateTime(leave.dateReply),
-                      active: leave.status !== "pending",
-                    },
-                    {
-                      title: leave.status === "rejected" ? "Lý do từ chối" : "Kết quả xử lý",
-                      value:
-                        leave.status === "rejected"
-                          ? leave.denyContent || "Chưa có lý do"
-                          : leave.status === "approved"
-                            ? "Đơn đã được phê duyệt"
-                            : "Chưa có kết quả cuối cùng",
-                      active: leave.status !== "pending",
-                    },
-                  ].map((item, index) => (
+                  {timelineItems.map((item, index) => (
                     <div key={item.title} className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div className={`mt-1 h-3 w-3 rounded-full ${item.active ? "bg-emerald-500" : "bg-slate-300"}`} />
-                        {index < 2 && <div className="mt-2 h-full w-px bg-slate-200" />}
+                        <div
+                          className={`mt-1 h-3 w-3 rounded-full ${
+                            item.tone === "done"
+                              ? "bg-emerald-500"
+                              : item.tone === "current"
+                                ? "bg-amber-500"
+                                : item.tone === "rejected"
+                                  ? "bg-rose-500"
+                                  : "bg-slate-300"
+                          }`}
+                        />
+                        {index < timelineItems.length - 1 && (
+                          <div className="mt-2 h-full w-px bg-slate-200" />
+                        )}
                       </div>
                       <div className="pb-4">
                         <div className="text-sm font-semibold text-slate-800">{item.title}</div>
