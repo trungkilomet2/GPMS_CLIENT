@@ -1,13 +1,13 @@
-import { lazy } from "react";
+﻿import { lazy } from "react";
 
-/* ── HOMEPAGE ── */
+/* â”€â”€ HOMEPAGE â”€â”€ */
 const HomePage = lazy(() => import("@/pages/HomePage"));
 
-/* ── AUTH ── */
+/* â”€â”€ AUTH â”€â”€ */
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
-/* ── ORDERS ── */
+/* â”€â”€ ORDERS â”€â”€ */
 const OrdersList = lazy(() => import("@/pages/orders/OrderHistory"));
 const OwnerOrdersList = lazy(() => import("@/pages/orders/OwnerOrdersList"));
 const OrderDetail = lazy(() => import("@/pages/orders/OrderDetail"));
@@ -16,17 +16,18 @@ const CreateManualOrder = lazy(() => import("@/pages/orders/CreateManualOrder"))
 const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
 const CreateProduction = lazy(() => import("@/pages/production/CreateProduction"));
 const ProductionList = lazy(() => import("@/pages/production/ProductionList"));
+const ProductionDetail = lazy(() => import("@/pages/production/ProductionDetail"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 
-/* ── PROFILE ── */
+/* â”€â”€ PROFILE â”€â”€ */
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
 const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 
-/* ── LEAVE ── */
+/* â”€â”€ LEAVE â”€â”€ */
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
 const LeaveDetail = lazy(() => import("@/pages/leave/LeaveDetail"));
 
@@ -48,8 +49,10 @@ export const routes = [
   { path: "/orders/manual-create", element: <CreateManualOrder /> },
   { path: "/orders/edit/:id", element: <EditOrder /> },
   { path: "/orders/detail/:id", element: <OrderDetail /> },
+  { path: "/production/create", element: <CreateProduction /> },
   { path: "/production/create/:orderId", element: <CreateProduction /> },
   { path: "/production", element: <ProductionList /> },
+  { path: "/production/:id", element: <ProductionDetail /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
   { path: "/employees/create", element: <EmployeeCreate /> },
@@ -81,7 +84,7 @@ export const routes = [
     path: "*",
     element: (
       <div className="flex items-center justify-center h-screen text-2xl font-bold text-gray-600">
-        Trang không tồn tại (404)
+        Trang khÃ´ng tá»“n táº¡i (404)
       </div>
     ),
   },

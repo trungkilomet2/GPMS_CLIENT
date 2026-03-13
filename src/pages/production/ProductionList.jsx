@@ -92,6 +92,11 @@ export default function ProductionList() {
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Production List</h1>
             <p className="text-slate-600">Danh sách kế hoạch sản xuất đang theo dõi.</p>
+            <div className="mt-2">
+              <Link className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700" to="/production/create">
+                + Tạo production
+              </Link>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
@@ -155,7 +160,7 @@ export default function ProductionList() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Link to={`/orders/detail/${item.orderId}`} className="text-emerald-600 hover:text-emerald-800 text-sm font-medium">
+                          <Link to={`/production/${item.productionId}`} className="text-emerald-600 hover:text-emerald-800 text-sm font-medium">
                             Chi tiết →
                           </Link>
                         </td>
@@ -181,3 +186,5 @@ export default function ProductionList() {
     </OwnerLayout>
   );
 }
+
+

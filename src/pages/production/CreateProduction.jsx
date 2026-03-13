@@ -11,22 +11,90 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 
+const MOCK_ORDERS = [
+  {
+    id: 29,
+    orderName: "Đồng phục công ty ABC",
+    type: "Đồng phục",
+    size: "L",
+    color: "Trắng",
+    quantity: 100,
+    cpu: 15000,
+    startDate: "2026-04-15",
+    endDate: "2026-05-05",
+    status: "Đã chấp nhận",
+    image: "",
+    note: "Giao trong giờ hành chính.",
+    materials: [
+      { materialName: "Vải cotton", value: 120, uom: "m", note: "Cotton 65/35" },
+      { materialName: "Cúc áo", value: 100, uom: "cái", note: "Màu trắng" },
+    ],
+    templates: [
+      { templateName: "Mẫu áo", type: "SOFT", file: "" },
+    ],
+    customerName: "Công ty ABC",
+    customerPhone: "0901234567",
+    customerAddress: "Q.1, TP.HCM",
+  },
+  {
+    id: 30,
+    orderName: "Áo hoodie mùa đông",
+    type: "Hoodie",
+    size: "M",
+    color: "Đen",
+    quantity: 80,
+    cpu: 22000,
+    startDate: "2026-04-10",
+    endDate: "2026-04-30",
+    status: "Đã chấp nhận",
+    image: "",
+    note: "In logo trước ngực.",
+    materials: [],
+    templates: [],
+    customerName: "Shop XYZ",
+    customerPhone: "0912345678",
+    customerAddress: "Q.3, TP.HCM",
+  },
+  {
+    id: 31,
+    orderName: "Áo sơ mi nữ",
+    type: "Sơ mi",
+    size: "S",
+    color: "Xanh nhạt",
+    quantity: 60,
+    cpu: 18000,
+    startDate: "2026-04-12",
+    endDate: "2026-04-25",
+    status: "Chờ xét duyệt",
+    image: "",
+    note: "May bo viền cổ.",
+    materials: [],
+    templates: [],
+    customerName: "Shop LMN",
+    customerPhone: "0987654321",
+    customerAddress: "Q.5, TP.HCM",
+  },
+];
+
 export default function CreateProduction() {
   const { orderId } = useParams();
   const navigate = useNavigate();
 
   const [order, setOrder] = useState(null);
-  const [loadingOrder, setLoadingOrder] = useState(true);
+  const [loadingOrder, setLoadingOrder] = useState(!!orderId);
   const [orderError, setOrderError] = useState(null);
 
   const [pmUsers, setPmUsers] = useState([]);
   const [loadingPM, setLoadingPM] = useState(true);
   const [pmError, setPmError] = useState(null);
 
+  const [selectedOrderId, setSelectedOrderId] = useState(orderId ? String(orderId) : "");
+
   const [form, setForm] = useState({
     pmId: "",
     pStartDate: "",
     pEndDate: "",
+    productionNote: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -35,6 +103,12 @@ export default function CreateProduction() {
   useEffect(() => {
     let active = true;
     const fetchOrder = async () => {
+      if (!orderId) {
+        setLoadingOrder(false);
+        setOrder(null);
+        setOrderError(null);
+        return;
+      }
       try {
         setLoadingOrder(true);
         const response = await OrderService.getOrderDetail(orderId);
@@ -54,7 +128,7 @@ export default function CreateProduction() {
         if (active) setLoadingOrder(false);
       }
     };
-    if (orderId) fetchOrder();
+    fetchOrder();
     return () => { active = false; };
   }, [orderId]);
 
@@ -82,6 +156,19 @@ export default function CreateProduction() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!selectedOrderId || orderId) return;
+    const picked = MOCK_ORDERS.find((item) => String(item.id) === String(selectedOrderId));
+    setOrder(picked || null);
+    if (picked) {
+      setForm((prev) => ({
+        ...prev,
+        pStartDate: picked.startDate ? String(picked.startDate).slice(0, 10) : prev.pStartDate,
+        pEndDate: picked.endDate ? String(picked.endDate).slice(0, 10) : prev.pEndDate,
+      }));
+    }
+  }, [selectedOrderId, orderId]);
+
   const orderSummaryRows = useMemo(() => ([
     ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
     ["Tên đơn hàng", order?.orderName ?? "-"],
@@ -108,6 +195,7 @@ export default function CreateProduction() {
 
   const validate = () => {
     const nextErrors = {};
+    if (!order?.id) nextErrors.orderId = "Vui lòng chọn đơn hàng.";
     if (!form.pmId) nextErrors.pmId = "Vui lòng chọn PM quản lý.";
     if (!form.pStartDate) nextErrors.pStartDate = "Vui lòng chọn ngày bắt đầu.";
     if (!form.pEndDate) nextErrors.pEndDate = "Vui lòng chọn ngày kết thúc.";
@@ -144,6 +232,7 @@ export default function CreateProduction() {
       orderId: Number(order?.id ?? orderId),
       pStartDate: form.pStartDate,
       pEndDate: form.pEndDate,
+      note: form.productionNote?.trim() || "",
     };
 
     try {
@@ -188,7 +277,7 @@ export default function CreateProduction() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-bold">Tạo Production cho đơn hàng #{order?.id}</h1>
+            <h1 className="text-xl font-bold">Tạo Production cho đơn hàng #{order?.id ?? "--"}</h1>
             <p className="text-xs text-gray-500 font-medium uppercase tracking-tighter">
               Hệ thống quản lý sản xuất GPMS
             </p>
@@ -203,13 +292,34 @@ export default function CreateProduction() {
                 <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
               </div>
 
-              {!isAccepted && (
+              {!isAccepted && order?.id && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
                   Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã chấp nhận</strong>.
                 </div>
               )}
 
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {!orderId && (
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-bold text-gray-700 mb-2 block">Chọn đơn hàng</label>
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
+                    >
+                      <option value="">Chọn đơn hàng</option>
+                      {MOCK_ORDERS.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          #{o.id} - {o.orderName}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.orderId && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
+                    )}
+                  </div>
+                )}
+
                 <div className="md:col-span-2">
                   <label className="text-sm font-bold text-gray-700 mb-2 block">PM quản lý</label>
                   <select
@@ -268,6 +378,18 @@ export default function CreateProduction() {
                   {errors.pEndDate && (
                     <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
                   )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="text-sm font-bold text-gray-700 mb-2 block">Ghi chú Production</label>
+                  <textarea
+                    name="productionNote"
+                    rows={3}
+                    value={form.productionNote}
+                    onChange={handleChange}
+                    placeholder="Nhập ghi chú cho production..."
+                    className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
+                  />
                 </div>
 
                 <div className="md:col-span-2 flex justify-end gap-3 pt-2">
@@ -331,7 +453,6 @@ export default function CreateProduction() {
                 />
               </div>
             </div>
-
           </div>
 
           <div className="space-y-6">
@@ -407,8 +528,3 @@ export default function CreateProduction() {
     </OwnerLayout>
   );
 }
-
-
-
-
-
