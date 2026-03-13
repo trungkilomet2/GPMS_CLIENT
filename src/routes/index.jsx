@@ -19,6 +19,8 @@ const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
+const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
+const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
 
 /* ── PROFILE ── */
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -27,6 +29,8 @@ const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 /* ── LEAVE ── */
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
 const LeaveDetail = lazy(() => import("@/pages/leave/LeaveDetail"));
+const LeaveRequestHistoryList = lazy(() => import("@/pages/leave-history/LeaveRequestHistoryList"));
+const LeaveRequestHistoryDetail = lazy(() => import("@/pages/leave-history/LeaveRequestHistoryDetail"));
 
 export const routes = [
 
@@ -51,6 +55,8 @@ export const routes = [
   { path: "/employees/create", element: <EmployeeCreate /> },
   { path: "/employees/:id/edit", element: <EmployeeUpdate /> },
   { path: "/employees/:id", element: <EmployeeDetail /> },
+  { path: "/worker-roles", element: <WorkerRoleList /> },
+  { path: "/worker-roles/create", element: <WorkerRoleCreate /> },
 
   /* PROFILE */
   {
@@ -70,6 +76,14 @@ export const routes = [
   {
     path: "/leave/:id",
     element: <LeaveDetail />,
+  },
+  {
+    path: "/leave-history",
+    element: <LeaveRequestHistoryList />,
+  },
+  {
+    path: "/leave-history/:id",
+    element: <LeaveRequestHistoryDetail />,
   },
 
   /* 404 */
