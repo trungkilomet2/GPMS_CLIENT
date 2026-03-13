@@ -9,7 +9,7 @@ import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal
 import MaterialsTable from '@/components/orders/MaterialsTable';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import { formatOrderDate } from '@/lib/orders/formatters';
-import { getOrderStatusStyle } from '@/lib/orders/status';
+import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
@@ -137,6 +137,16 @@ export default function OrderDetail() {
                         <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getOrderStatusStyle(order.status, 'detail')}`}>
                             {order.statusName || order.status}
                         </span>
+                        {canModerate && (
+                            <button
+                                type="button"
+                                onClick={() => navigate(`/production/create/${order.id}`)}
+                                disabled={normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
+                                className="px-3 py-2 text-xs font-bold rounded border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Tạo production
+                            </button>
+                        )}
                         {canModerate && (
                             <>
                                 <button
