@@ -128,6 +128,13 @@ export default function ProductionDetail() {
             </span>
             <button
               type="button"
+              onClick={() => navigate(`/production/${production.productionId}/edit`)}
+              className="px-3 py-2 text-xs font-bold rounded border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition"
+            >
+              Chỉnh sửa
+            </button>
+            <button
+              type="button"
               onClick={() => { setPendingAction("reject"); setIsReasonModalOpen(true); }}
               className="px-3 py-2 text-xs font-bold rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
             >
@@ -151,6 +158,7 @@ export default function ProductionDetail() {
           <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100">
             <DetailRow label="Production ID" value={`#PR-${production.productionId}`} />
             <DetailRow label="Trạng thái" value={production.status} />
+            <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
             <DetailRow label="Ngày bắt đầu (Production)" value={production.pStartDate} />
             <DetailRow label="Ngày kết thúc (Production)" value={production.pEndDate} />
           </div>

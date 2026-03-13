@@ -89,14 +89,14 @@ export default function ProductionList() {
     <OwnerLayout>
       <div className="min-h-screen bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 space-y-6">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Production List</h1>
-            <p className="text-slate-600">Danh sách kế hoạch sản xuất đang theo dõi.</p>
-            <div className="mt-2">
-              <Link className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700" to="/production/create">
-                + Tạo production
-              </Link>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Production List</h1>
+              <p className="text-slate-600">Danh sách kế hoạch sản xuất đang theo dõi.</p>
             </div>
+            <Link className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700" to="/production/create">
+              + Tạo production
+            </Link>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">

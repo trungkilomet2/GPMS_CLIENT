@@ -17,6 +17,7 @@ const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
 const CreateProduction = lazy(() => import("@/pages/production/CreateProduction"));
 const ProductionList = lazy(() => import("@/pages/production/ProductionList"));
 const ProductionDetail = lazy(() => import("@/pages/production/ProductionDetail"));
+const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
@@ -53,6 +54,7 @@ export const routes = [
   { path: "/production/create/:orderId", element: <CreateProduction /> },
   { path: "/production", element: <ProductionList /> },
   { path: "/production/:id", element: <ProductionDetail /> },
+  { path: "/production/:id/edit", element: <UpdateProduction /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
   { path: "/employees/create", element: <EmployeeCreate /> },

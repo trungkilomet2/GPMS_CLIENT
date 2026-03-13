@@ -198,9 +198,19 @@ export default function Orders({
         <OwnerLayout>
             <div className="min-h-screen bg-slate-50">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 space-y-6">
-                    <div className="flex flex-col gap-2">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{title}</h1>
-                        <p className="text-slate-600">{subtitle}</p>
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">{title}</h1>
+                            <p className="text-slate-600">{subtitle}</p>
+                        </div>
+                        {isOwner && (
+                            <Link
+                                to="/orders/manual-create"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+                            >
+                                + Tạo đơn hàng thủ công
+                            </Link>
+                        )}
                     </div>
 
                     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
