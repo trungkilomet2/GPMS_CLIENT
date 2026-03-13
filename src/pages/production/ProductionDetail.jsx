@@ -1,10 +1,11 @@
-﻿import { useMemo } from "react";
+﻿import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
+import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import "@/styles/homepage.css";
 
 const MOCK_PRODUCTIONS = [
@@ -77,7 +78,8 @@ const STATUS_STYLES = {
 export default function ProductionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-
+  const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState("");
   const production = useMemo(() => {
     const pid = Number(id);
     return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
@@ -120,9 +122,25 @@ export default function ProductionDetail() {
               </p>
             </div>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${STATUS_STYLES[production.status] || STATUS_STYLES.default}`}>
-            {production.status}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${STATUS_STYLES[production.status] || STATUS_STYLES.default}`}>
+              {production.status}
+            </span>
+            <button
+              type="button"
+              onClick={() => { setPendingAction("reject"); setIsReasonModalOpen(true); }}
+              className="px-3 py-2 text-xs font-bold rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition"
+            >
+              Từ chối
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPendingAction("revise"); setIsReasonModalOpen(true); }}
+              className="px-3 py-2 text-xs font-bold rounded border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition"
+            >
+              Yêu cầu chỉnh sửa
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
@@ -271,6 +289,21 @@ export default function ProductionDetail() {
           </div>
         </div>
       </div>
+      <OrderStatusReasonModal
+        isOpen={isReasonModalOpen}
+        onClose={() => setIsReasonModalOpen(false)}
+        onSubmit={(reason) => {
+          const actionLabel = pendingAction === "reject" ? "Từ chối" : "Yêu cầu chỉnh sửa";
+          alert(`${actionLabel} production với lý do: ${reason}`);
+          setIsReasonModalOpen(false);
+        }}
+        title={pendingAction === "reject" ? "Từ chối production" : "Yêu cầu chỉnh sửa production"}
+        description={pendingAction === "reject"
+          ? "Vui lòng nhập lý do từ chối để lưu vào hệ thống."
+          : "Vui lòng nhập lý do yêu cầu chỉnh sửa."}
+        confirmText={pendingAction === "reject" ? "Xác nhận từ chối" : "Gửi yêu cầu"}
+        tone={pendingAction === "reject" ? "danger" : "warning"}
+      />
     </OwnerLayout>
   );
 }
@@ -283,3 +316,9 @@ function DetailRow({ label, value }) {
     </div>
   );
 }
+
+
+
+
+
+
