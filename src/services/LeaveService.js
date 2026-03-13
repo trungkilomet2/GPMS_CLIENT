@@ -50,6 +50,16 @@ const LeaveService = {
     return response?.data ? normalizeLeaveItem(response.data) : null;
   },
 
+  async approveLeaveRequest(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.APPROVE(id));
+    const response =
+      typeof rawResponse === "string"
+        ? rawResponse
+        : rawResponse;
+
+    return response;
+  },
+
   async denyLeaveRequest(id, payload) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.DENY(id), payload);
     const response =

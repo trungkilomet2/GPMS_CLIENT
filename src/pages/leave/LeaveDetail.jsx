@@ -158,15 +158,27 @@ export default function LeaveDetail() {
   const canReview = leave?.status === "pending";
 
   const handleApprove = async () => {
-    setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setLeave((prev) => ({
-      ...prev,
-      status: "approved",
-      dateReply: new Date().toISOString(),
-      denyContent: "",
-    }));
-    setSubmitting(false);
+    try {
+      setSubmitting(true);
+      setError("");
+      await LeaveService.approveLeaveRequest(id);
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "approved",
+          dateReply: new Date().toISOString(),
+          denyContent: "",
+        }
+      );
+      setRejectOpen(false);
+      setRejectReason("");
+    } catch {
+      setError("Không thể phê duyệt đơn nghỉ. Vui lòng thử lại.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleReject = async () => {
