@@ -1,13 +1,13 @@
 ﻿import { lazy } from "react";
 
-/* â”€â”€ HOMEPAGE â”€â”€ */
+// HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
 
-/* â”€â”€ AUTH â”€â”€ */
+// AUTH
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
-/* â”€â”€ ORDERS â”€â”€ */
+// ORDERS
 const OrdersList = lazy(() => import("@/pages/orders/OrderHistory"));
 const OwnerOrdersList = lazy(() => import("@/pages/orders/OwnerOrdersList"));
 const OrderDetail = lazy(() => import("@/pages/orders/OrderDetail"));
@@ -18,32 +18,32 @@ const CreateProduction = lazy(() => import("@/pages/production/CreateProduction"
 const ProductionList = lazy(() => import("@/pages/production/ProductionList"));
 const ProductionDetail = lazy(() => import("@/pages/production/ProductionDetail"));
 const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"));
+const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 
-/* â”€â”€ PROFILE â”€â”€ */
+// PROFILE
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
 const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 
-/* â”€â”€ LEAVE â”€â”€ */
+// LEAVE
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
 const LeaveDetail = lazy(() => import("@/pages/leave/LeaveDetail"));
 
 export const routes = [
-
   { path: "/", element: <HomePage /> },
 
-  /* HOMEPAGE */
+  // HOMEPAGE
   { path: "/home", element: <HomePage /> },
 
-  /* AUTH */
+  // AUTH
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
 
-  /* ORDERS */
+  // ORDERS
   { path: "/orders", element: <OrdersList /> },
   { path: "/orders/owner", element: <OwnerOrdersList /> },
   { path: "/orders/create", element: <CreateOrder /> },
@@ -55,38 +55,27 @@ export const routes = [
   { path: "/production", element: <ProductionList /> },
   { path: "/production/:id", element: <ProductionDetail /> },
   { path: "/production/:id/edit", element: <UpdateProduction /> },
+  { path: "/monitoring", element: <ProductionPlan /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
   { path: "/employees/create", element: <EmployeeCreate /> },
   { path: "/employees/:id/edit", element: <EmployeeUpdate /> },
   { path: "/employees/:id", element: <EmployeeDetail /> },
 
-  /* PROFILE */
-  {
-    path: "/profile",
-    element: <ViewProfile />,
-  },
-  {
-    path: "/profile/edit",
-    element: <ProfileEdit />,
-  },
+  // PROFILE
+  { path: "/profile", element: <ViewProfile /> },
+  { path: "/profile/edit", element: <ProfileEdit /> },
 
-  /* LEAVE */
-  {
-    path: "/leave",
-    element: <LeaveList />,
-  },
-  {
-    path: "/leave/:id",
-    element: <LeaveDetail />,
-  },
+  // LEAVE
+  { path: "/leave", element: <LeaveList /> },
+  { path: "/leave/:id", element: <LeaveDetail /> },
 
-  /* 404 */
+  // 404
   {
     path: "*",
     element: (
       <div className="flex items-center justify-center h-screen text-2xl font-bold text-gray-600">
-        Trang khÃ´ng tá»“n táº¡i (404)
+        Trang không tồn tại (404)
       </div>
     ),
   },

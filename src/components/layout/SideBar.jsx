@@ -15,8 +15,8 @@ import "@/styles/dashboard-sidebar.css";
 const NAV_ITEMS = [
   { to: "/home", label: "Dashboard", icon: ChartPie, disabled: false },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
-  { to: "/production", label: "Danh sách production", icon: ClipboardList, disabled: false },
-  { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
+  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false },
+  { to: "/monitoring", label: "Kế hoạch sản xuất", icon: ClipboardList, disabled: false },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
