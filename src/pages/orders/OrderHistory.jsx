@@ -6,7 +6,7 @@ import OrderService from '@/services/OrderService';
 import { getAuthItem, getStoredUser } from '@/lib/authStorage';
 import Pagination from '@/components/Pagination';
 import { formatOrderDate } from '@/lib/orders/formatters';
-import { getOrderStatusLabel, getOrderStatusStyle, ORDER_STATUS_LABELS } from '@/lib/orders/status';
+import { getOrderStatusLabel, getOrderStatusStyle, normalizeOrderStatus, ORDER_STATUS_LABELS } from '@/lib/orders/status';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import '../../styles/homepage.css';
 
@@ -106,7 +106,7 @@ export default function Orders({
         return orders.filter((o) => {
             return (
                 (!q || String(o.id || '').includes(q) || (o.orderName || '').toLowerCase().includes(q))
-                && (!statusFilter || statusFilter === o.status)
+                && (!statusFilter || statusFilter === normalizeOrderStatus(o.status))
             );
         });
     }, [search, statusFilter, orders]);
@@ -114,10 +114,57 @@ export default function Orders({
     const totalPages = Math.max(1, Math.ceil((totalCount || filtered.length) / pageSize));
 
     useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter]);
+
+    useEffect(() => {
         if (currentPage > totalPages) setCurrentPage(totalPages || 1);
     }, [totalPages, currentPage]);
 
-    const pageData = useMemo(() => filtered, [filtered]);
+    const pageData = useMemo(() => {
+        if (!sortBy?.key) return filtered;
+        const dir = sortBy.dir === 'desc' ? -1 : 1;
+        const parseDate = (value) => {
+            if (!value) return null;
+            if (value instanceof Date) return value;
+            const d = new Date(value);
+            return Number.isNaN(d.getTime()) ? null : d;
+        };
+        const safeString = (value) => String(value ?? '').trim().toLowerCase();
+        const compare = (a, b) => {
+            switch (sortBy.key) {
+                case 'id':
+                case 'quantity': {
+                    const av = Number(a?.[sortBy.key]);
+                    const bv = Number(b?.[sortBy.key]);
+                    const an = Number.isNaN(av) ? 0 : av;
+                    const bn = Number.isNaN(bv) ? 0 : bv;
+                    return an === bn ? 0 : an > bn ? 1 : -1;
+                }
+                case 'endDate': {
+                    const ad = parseDate(a?.endDate);
+                    const bd = parseDate(b?.endDate);
+                    if (!ad && !bd) return 0;
+                    if (!ad) return -1;
+                    if (!bd) return 1;
+                    return ad.getTime() === bd.getTime() ? 0 : ad.getTime() > bd.getTime() ? 1 : -1;
+                }
+                case 'orderName':
+                case 'size':
+                case 'color': {
+                    const av = safeString(a?.[sortBy.key]);
+                    const bv = safeString(b?.[sortBy.key]);
+                    if (!av && !bv) return 0;
+                    if (!av) return -1;
+                    if (!bv) return 1;
+                    return av.localeCompare(bv, 'vi');
+                }
+                default:
+                    return 0;
+            }
+        };
+        return [...filtered].sort((a, b) => dir * compare(a, b));
+    }, [filtered, sortBy]);
 
     const stats = useMemo(() => {
         const inProgress = filtered.filter((o) => ['Chờ xét duyệt', 'Cần cập nhật'].includes(o.status)).length;

@@ -346,7 +346,7 @@ export default function CreateOrder() {
                 <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
                     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center gap-3">
                         <Loader2 className="animate-spin text-emerald-600" size={20} />
-                        <div className="text-sm text-gray-600">Dang kiem tra thong tin ho so...</div>
+                        <div className="text-sm text-gray-600">Đang kiểm tra thông tin hồ sơ...</div>
                     </div>
                 </div>
             )}
@@ -357,16 +357,16 @@ export default function CreateOrder() {
                         <div className="flex items-start gap-3">
                             <AlertCircle className="text-amber-500" size={20} />
                             <div>
-                                <div className="font-bold text-gray-900 mb-1">Can cap nhat thong tin ho so</div>
+                                <div className="font-bold text-gray-900 mb-1">Cần cập nhật thông tin hồ sơ</div>
                                 <div className="text-sm text-gray-600">
-                                    Vui long cap nhat day du email, so dien thoai va dia chi truoc khi tao don hang.
+                                    Vui lòng cập nhật đầy đủ email, số điện thoại và địa chỉ trước khi tạo đơn hàng.
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => navigate("/profile/edit")}
                                     className="mt-4 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold"
                                 >
-                                    Di den chinh sua ho so
+                                    Đi đến chỉnh sửa hồ sơ
                                 </button>
                             </div>
                         </div>
