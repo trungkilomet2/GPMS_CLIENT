@@ -79,19 +79,15 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
   return (
     <div className={`employee-summary employee-summary--${tone}`}>
       <div className="employee-summary__top">
-        <p className="employee-summary__label">{label}</p>
+        <div className="employee-summary__heading">
+          <p className="employee-summary__label">{label}</p>
+          <div className="employee-summary__value">{value}</div>
+        </div>
         <div className="employee-summary__icon">
           <Icon size={22} />
         </div>
       </div>
-
-      <div className="employee-summary__body">
-        <div className="employee-summary__value-row">
-          <div className="employee-summary__value">{value}</div>
-          <span className="employee-summary__unit">nhân sự</span>
-        </div>
-        <p className="employee-summary__meta">{meta}</p>
-      </div>
+      <p className="employee-summary__meta">{meta}</p>
     </div>
   );
 }

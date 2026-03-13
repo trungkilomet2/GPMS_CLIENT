@@ -6,6 +6,7 @@ import {
   ChartPie,
   ClipboardList,
   LogOut,
+  Shapes,
   Users,
 } from "lucide-react";
 import { authService } from "@/services/authService";
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
   { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true },
+  { to: "/worker-roles", label: "Vai trò thợ", icon: Shapes, disabled: false },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];

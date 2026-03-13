@@ -201,9 +201,6 @@ export default function EmployeeUpdate() {
                 <div className="employee-create-card__header">
                   <div>
                     <h2 className="employee-create-card__title">Thông tin tài khoản nhân viên</h2>
-                    <p className="employee-create-card__subtitle">
-                      Chỉ hiển thị các trường hiện đang có thể cập nhật.
-                    </p>
                   </div>
                 </div>
 
