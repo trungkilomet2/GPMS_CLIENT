@@ -1,30 +1,50 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import WorkerService from "@/services/WorkerService";
 import "@/styles/homepage.css";
 
-const MOCK_PRODUCTION = {
-  productionId: 1001,
-  orderId: 29,
-  orderName: "Đồng phục công ty ABC",
-  pStartDate: "2026-04-21",
-  pEndDate: "2026-05-05",
-  status: "Đang sản xuất",
-  pmName: "Nguyễn Văn An",
-};
-
-const MOCK_PRODUCT = {
-  productCode: "PRD-ABC-01",
-  productName: "Áo thun đồng phục cổ tròn",
-  type: "Áo thun",
-  size: "L",
-  color: "Trắng",
-  quantity: 100,
-  cpu: 15000,
-  image: "",
-};
+const MOCK_PRODUCTIONS = [
+  {
+    productionId: 1001,
+    orderId: 29,
+    orderName: "Đồng phục công ty ABC",
+    pStartDate: "2026-04-21",
+    pEndDate: "2026-05-05",
+    status: "Đang sản xuất",
+    pmName: "Nguyễn Văn An",
+    product: {
+      productCode: "PRD-ABC-01",
+      productName: "Áo thun đồng phục cổ tròn",
+      type: "Áo thun",
+      size: "L",
+      color: "Trắng",
+      quantity: 100,
+      cpu: 15000,
+      image: "",
+    },
+  },
+  {
+    productionId: 1002,
+    orderId: 30,
+    orderName: "Áo hoodie mùa đông",
+    pStartDate: "2026-04-18",
+    pEndDate: "2026-04-30",
+    status: "Planned",
+    pmName: "Trần Ngọc Bích",
+    product: {
+      productCode: "PRD-HOOD-02",
+      productName: "Áo hoodie",
+      type: "Hoodie",
+      size: "M",
+      color: "Đen",
+      quantity: 80,
+      cpu: 22000,
+      image: "",
+    },
+  },
+];
 
 const DEFAULT_ROWS = [
   { partName: "Diễu nẹp cổ", cpu: 800, teamLeaderId: "TL-01", startDate: "2026-04-22", endDate: "2026-04-23", ppsId: "" },
@@ -38,12 +58,14 @@ const DEFAULT_ROWS = [
 ];
 
 export default function ProductionPlan() {
+  const { id } = useParams();
   const navigate = useNavigate();
+  const [selectedProductionId, setSelectedProductionId] = useState(() => (id ? String(id) : ""));
   const [rows, setRows] = useState(() =>
     DEFAULT_ROWS.map((row, index) => ({
       ...row,
       ppId: 2000 + index,
-      productionId: MOCK_PRODUCTION.productionId,
+      productionId: id ? Number(id) : null,
     }))
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -66,6 +88,12 @@ export default function ProductionPlan() {
     () => rows.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0),
     [rows]
   );
+
+  const selectedProduction = useMemo(() => {
+    const pid = Number(selectedProductionId);
+    if (!pid) return null;
+    return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
+  }, [selectedProductionId]);
 
   const teamLeaderMap = useMemo(() => {
     const map = new Map();
@@ -138,7 +166,7 @@ export default function ProductionPlan() {
 
   const handleSaveStep = () => {
     const name = form.partName.trim();
-    if (!name) return;
+    if (!name || !selectedProductionId) return;
     const leaderName = teamLeaderMap.get(String(form.teamLeaderId)) || "";
     setRows((prev) => {
       if (editingIndex === null) {
@@ -146,7 +174,7 @@ export default function ProductionPlan() {
           ...prev,
           {
             ppId: 2000 + prev.length,
-            productionId: MOCK_PRODUCTION.productionId,
+            productionId: Number(selectedProductionId),
             partName: name,
             cpu: form.cpu.trim(),
             teamLeaderId: form.teamLeaderId.trim(),
@@ -166,6 +194,7 @@ export default function ProductionPlan() {
         cpu: form.cpu.trim(),
         teamLeaderId: form.teamLeaderId.trim(),
         teamLeaderName: leaderName,
+        productionId: Number(selectedProductionId),
         startDate: form.startDate,
         endDate: form.endDate,
       };
@@ -203,6 +232,24 @@ export default function ProductionPlan() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
+              <div className="text-xs font-semibold text-slate-500 uppercase">Chọn production</div>
+              <select
+                value={selectedProductionId}
+                onChange={(event) => setSelectedProductionId(event.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+              >
+                <option value="">Chọn production...</option>
+                {MOCK_PRODUCTIONS.map((item) => (
+                  <option key={item.productionId} value={item.productionId}>
+                    {`#PR-${item.productionId} - ${item.orderName}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
             <button
               type="button"
               onClick={() => setShowProductionInfo((prev) => !prev)}
@@ -210,19 +257,21 @@ export default function ProductionPlan() {
             >
               <div>
                 <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin production</div>
-                <div className="text-lg font-semibold text-slate-900">#PR-{MOCK_PRODUCTION.productionId}</div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
+                </div>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
-                {MOCK_PRODUCTION.status}
+                {selectedProduction?.status || "Chưa chọn"}
               </span>
             </button>
             {showProductionInfo && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-700">
-                <InfoItem label="Đơn hàng" value={`#ĐH-${MOCK_PRODUCTION.orderId}`} />
-                <InfoItem label="Tên đơn" value={MOCK_PRODUCTION.orderName} />
-                <InfoItem label="PM quản lý" value={MOCK_PRODUCTION.pmName} />
-                <InfoItem label="Ngày bắt đầu" value={MOCK_PRODUCTION.pStartDate} />
-                <InfoItem label="Ngày kết thúc" value={MOCK_PRODUCTION.pEndDate} />
+                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
+                <InfoItem label="Tên đơn" value={selectedProduction?.orderName || "-"} />
+                <InfoItem label="PM quản lý" value={selectedProduction?.pmName || "-"} />
+                <InfoItem label="Ngày bắt đầu" value={selectedProduction?.pStartDate || "-"} />
+                <InfoItem label="Ngày kết thúc" value={selectedProduction?.pEndDate || "-"} />
               </div>
             )}
           </div>
@@ -235,25 +284,32 @@ export default function ProductionPlan() {
             >
               <div>
                 <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin sản phẩm</div>
-                <div className="text-lg font-semibold text-slate-900">{MOCK_PRODUCT.productName}</div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {selectedProduction?.product?.productName || "-"}
+                </div>
               </div>
-              <div className="text-xs font-semibold text-slate-500 uppercase">#{MOCK_PRODUCT.productCode}</div>
+              <div className="text-xs font-semibold text-slate-500 uppercase">
+                #{selectedProduction?.product?.productCode || "-"}
+              </div>
             </button>
             {showProductInfo && (
               <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
                 <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
-                  {MOCK_PRODUCT.image ? (
-                    <img src={MOCK_PRODUCT.image} alt="" className="w-full h-full object-cover" />
+                  {selectedProduction?.product?.image ? (
+                    <img src={selectedProduction.product.image} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-[11px] text-slate-400">Chưa có ảnh</span>
                   )}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
-                  <InfoItem label="Loại sản phẩm" value={MOCK_PRODUCT.type} />
-                  <InfoItem label="Kích thước" value={MOCK_PRODUCT.size} />
-                  <InfoItem label="Màu sắc" value={MOCK_PRODUCT.color} />
-                  <InfoItem label="Số lượng" value={MOCK_PRODUCT.quantity} />
-                  <InfoItem label="Giá/SP" value={`${MOCK_PRODUCT.cpu?.toLocaleString("vi-VN") ?? "-"} VNS`} />
+                  <InfoItem label="Loại sản phẩm" value={selectedProduction?.product?.type || "-"} />
+                  <InfoItem label="Kích thước" value={selectedProduction?.product?.size || "-"} />
+                  <InfoItem label="Màu sắc" value={selectedProduction?.product?.color || "-"} />
+                  <InfoItem label="Số lượng" value={selectedProduction?.product?.quantity || "-"} />
+                  <InfoItem
+                    label="Giá/SP"
+                    value={`${selectedProduction?.product?.cpu?.toLocaleString("vi-VN") ?? "-"} VND`}
+                  />
                 </div>
               </div>
             )}
@@ -267,6 +323,7 @@ export default function ProductionPlan() {
               </div>
               <button
                 onClick={openAddModal}
+                disabled={!selectedProductionId}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
               >
                 <Plus size={16} /> Thêm công đoạn
@@ -300,7 +357,7 @@ export default function ProductionPlan() {
                       <td className="px-3 py-2 text-center text-slate-600">{row.startDate || "-"}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{row.endDate || "-"}</td>
                       <td className="px-3 py-2 text-center font-semibold text-slate-700">
-                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VNS` : "-"}
+                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex items-center justify-center gap-2">
@@ -331,7 +388,7 @@ export default function ProductionPlan() {
                   <tr className="bg-slate-50">
                     <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">TOTAL</td>
                     <td className="px-3 py-3 text-center font-semibold text-slate-700">
-                      {`${totalCpu.toLocaleString("vi-VN")} VNS`}
+                      {`${totalCpu.toLocaleString("vi-VN")} VND`}
                     </td>
                     <td></td>
                   </tr>
@@ -419,6 +476,7 @@ export default function ProductionPlan() {
               </button>
               <button
                 onClick={handleSaveStep}
+                disabled={!selectedProductionId}
                 className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
               >
                 {editingIndex === null ? "Thêm" : "Lưu"}
