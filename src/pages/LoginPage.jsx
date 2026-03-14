@@ -7,6 +7,15 @@ import "../styles/login.css";
 const initialValues = { userName: "", password: "" };
 const INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác";
 
+function splitRoles(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function mapLoginError(err) {
   const status = err?.response?.data?.status ?? err?.status;
   const message = String(
@@ -129,9 +138,10 @@ export default function LoginPage() {
       });
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
-      const role = String(result?.user?.role ?? "").toLowerCase();
-      if (role === "owner") navigate("/orders/owner");
-      else navigate("/home");
+      const roles = splitRoles(result?.user?.role);
+      const isInternalUser = roles.includes("Owner") || roles.includes("PM");
+
+      navigate(isInternalUser ? "/dashboard" : "/home");
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {

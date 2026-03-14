@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { normalizeSpaces, validateFullName } from "@/lib/validators";
-import WorkerService from "@/services/WorkerService";
+import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
 
 const ROLE_PRIORITY = ["Owner", "PM", "Team Leader", "Worker", "KCS", "Admin", "Customer"];
@@ -83,8 +83,10 @@ export default function EmployeeUpdate() {
       } catch (err) {
         if (!mounted) return;
         setError(
-          err?.response?.data?.message ||
+          getEmployeeModuleErrorMessage(
+            err,
             "Không tải được thông tin nhân viên. Vui lòng thử lại."
+          )
         );
       } finally {
         if (mounted) setLoading(false);
@@ -140,9 +142,10 @@ export default function EmployeeUpdate() {
       navigate(`/employees/${id}`);
     } catch (err) {
       setSubmitError(
-        err?.response?.data?.message ||
-          err?.response?.data?.title ||
+        getEmployeeModuleErrorMessage(
+          err,
           "Không thể cập nhật nhân viên. Vui lòng thử lại."
+        )
       );
     } finally {
       setIsSubmitting(false);
@@ -201,9 +204,6 @@ export default function EmployeeUpdate() {
                 <div className="employee-create-card__header">
                   <div>
                     <h2 className="employee-create-card__title">Thông tin tài khoản nhân viên</h2>
-                    <p className="employee-create-card__subtitle">
-                      Chỉ hiển thị các trường hiện đang có thể cập nhật.
-                    </p>
                   </div>
                 </div>
 

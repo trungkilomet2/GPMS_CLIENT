@@ -1,6 +1,14 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
+export const getEmployeeModuleErrorMessage = (error, fallbackMessage) => {
+  if (error?.response?.status === 403) {
+    return "Bạn không có quyền truy cập chức năng này.";
+  }
+
+  return error?.response?.data?.message || error?.response?.data?.title || fallbackMessage;
+};
+
 const normalizeEmployeeStatus = (value) => {
   const normalized = String(value ?? "inactive").trim().toLowerCase();
 
@@ -17,6 +25,8 @@ const INTERNAL_ROLE_PRIORITY = [
   "Admin",
   "Customer",
 ];
+
+const HIDDEN_DIRECTORY_ROLES = ["Admin", "Customer"];
 
 const ROLE_LABEL_MAP = {
   Admin: "Quản trị viên",
@@ -54,6 +64,11 @@ const getRoleLabel = (role) => ROLE_LABEL_MAP[role] ?? role;
 
 const getWorkerRoleLabel = (role) => WORKER_ROLE_LABEL_MAP[role] ?? role;
 
+const shouldHideFromEmployeeDirectory = (employee = {}) => {
+  const roles = Array.isArray(employee.roles) ? employee.roles : [];
+  return roles.some((role) => HIDDEN_DIRECTORY_ROLES.includes(role));
+};
+
 const normalizeEmployee = (item = {}) => {
   const workerRole = String(item.workerRole ?? "").trim();
   const role = String(item.role ?? "").trim();
@@ -88,9 +103,13 @@ const WorkerService = {
 
     const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
 
+    const employees = Array.isArray(rawItems)
+      ? rawItems.map(normalizeEmployee).filter((employee) => !shouldHideFromEmployeeDirectory(employee))
+      : [];
+
     return {
       ...response,
-      data: Array.isArray(rawItems) ? rawItems.map(normalizeEmployee) : [],
+      data: employees,
     };
   },
 
@@ -101,7 +120,10 @@ const WorkerService = {
         ? JSON.parse(rawResponse)
         : rawResponse;
 
-    return response?.data ? normalizeEmployee(response.data) : null;
+    if (!response?.data) return null;
+
+    const employee = normalizeEmployee(response.data);
+    return shouldHideFromEmployeeDirectory(employee) ? null : employee;
   },
 
   async createEmployee(payload) {

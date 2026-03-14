@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
-import WorkerService from "@/services/WorkerService";
+import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
 
 const ROLE_ID_MAP = {
@@ -88,10 +88,10 @@ export default function EmployeeCreate() {
 
       navigate("/employees");
     } catch (error) {
-      const message =
-        error?.response?.data?.message ||
-        error?.response?.data?.title ||
-        "Không thể tạo nhân viên mới. Vui lòng thử lại.";
+      const message = getEmployeeModuleErrorMessage(
+        error,
+        "Không thể tạo nhân viên mới. Vui lòng thử lại."
+      );
       setSubmitError(message);
     } finally {
       setIsSubmitting(false);
@@ -135,9 +135,6 @@ export default function EmployeeCreate() {
               <div className="employee-create-card__header">
                 <div>
                   <h2 className="employee-create-card__title">Thông tin tài khoản nhân viên</h2>
-                  <p className="employee-create-card__subtitle">
-                    Chỉ hiển thị các trường hiện đang có trong hệ thống.
-                  </p>
                 </div>
               </div>
 

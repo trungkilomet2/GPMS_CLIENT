@@ -2,6 +2,7 @@
 
 // HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
+const InternalDashboard = lazy(() => import("@/pages/dashboard/InternalDashboard"));
 
 // AUTH
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
@@ -40,6 +41,7 @@ export const routes = [
 
   // HOMEPAGE
   { path: "/home", element: <HomePage /> },
+  { path: "/dashboard", element: <InternalDashboard /> },
 
   // AUTH
   { path: "/login", element: <LoginPage /> },

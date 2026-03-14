@@ -12,7 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import WorkerService from "@/services/WorkerService";
+import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-detail.css";
 
 const STATUS_MAP = {
@@ -35,6 +35,8 @@ export default function EmployeeDetail() {
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notFound, setNotFound] = useState(false);
+  const [reloadSeed, setReloadSeed] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -42,12 +44,14 @@ export default function EmployeeDetail() {
     const fetchEmployee = async () => {
       setLoading(true);
       setError("");
+      setNotFound(false);
 
       try {
         const found = await WorkerService.getEmployeeById(id);
         if (!mounted) return;
 
         if (!found) {
+          setNotFound(true);
           setError("Không tìm thấy nhân viên phù hợp.");
           setEmployee(null);
           return;
@@ -57,9 +61,10 @@ export default function EmployeeDetail() {
       } catch (err) {
         if (!mounted) return;
 
-        const message =
-          err?.response?.data?.message ||
-          "Không tải được thông tin nhân viên. Vui lòng thử lại.";
+        const message = getEmployeeModuleErrorMessage(
+          err,
+          "Không tải được thông tin nhân viên. Vui lòng thử lại."
+        );
         setError(message);
       } finally {
         if (mounted) setLoading(false);
@@ -71,7 +76,11 @@ export default function EmployeeDetail() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, reloadSeed]);
+
+  const handleRetry = () => {
+    setReloadSeed((current) => current + 1);
+  };
 
   const statusConfig = employee ? STATUS_MAP[employee.status] ?? STATUS_MAP.active : STATUS_MAP.active;
   const roles = useMemo(() => employee?.roleLabels ?? [], [employee]);
@@ -99,12 +108,39 @@ export default function EmployeeDetail() {
           {loading ? (
             <div className="employee-detail-state">
               <LoaderCircle size={18} className="employee-detail-state__spin" />
-              <span>Đang tải thông tin nhân viên...</span>
+              <div className="employee-detail-state__content">
+                <strong>Đang tải thông tin nhân viên...</strong>
+                <span>Hồ sơ đang được lấy từ hệ thống.</span>
+              </div>
             </div>
           ) : error ? (
             <div className="employee-detail-state employee-detail-state--error">
               <CircleAlert size={18} />
-              <span>{error}</span>
+              <div className="employee-detail-state__content">
+                <strong>
+                  {notFound
+                    ? "Không tìm thấy nhân viên trong danh sách quản lý"
+                    : "Không tải được thông tin nhân viên"}
+                </strong>
+                <span>{error}</span>
+              </div>
+              <div className="employee-detail-state__actions">
+                {!notFound ? (
+                  <button
+                    type="button"
+                    className="employee-detail-state-btn employee-detail-state-btn--primary"
+                    onClick={handleRetry}
+                  >
+                    Thử lại
+                  </button>
+                ) : null}
+                <Link
+                  to="/employees"
+                  className="employee-detail-state-btn employee-detail-state-btn--secondary"
+                >
+                  Quay lại danh sách
+                </Link>
+              </div>
             </div>
           ) : employee ? (
             <div className="employee-detail-grid employee-detail-grid--simple">
