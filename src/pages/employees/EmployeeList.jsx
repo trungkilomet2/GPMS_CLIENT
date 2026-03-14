@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import WorkerService from "@/services/WorkerService";
+import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
 const STATUS_MAP = {
@@ -40,7 +40,17 @@ function getInitials(name = "") {
     .toUpperCase();
 }
 
-function getEmployeeTone(employee) {
+function normalizeSearchText(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+function getEmployeeSpecialty(employee) {
   if (employee.workerRole) {
     return {
       label: employee.workerRoleLabel,
@@ -49,8 +59,8 @@ function getEmployeeTone(employee) {
   }
 
   return {
-    label: employee.primaryRoleLabel,
-    className: "employee-status employee-status--new",
+    label: "Chưa cập nhật",
+    className: "employee-status employee-status--neutral",
   };
 }
 
@@ -96,9 +106,11 @@ export default function EmployeeList() {
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [specialtyFilter, setSpecialtyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadSeed, setReloadSeed] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -115,9 +127,10 @@ export default function EmployeeList() {
       } catch (err) {
         if (!mounted) return;
 
-        const message =
-          err?.response?.data?.message ||
-          "Không tải được danh sách nhân viên. Vui lòng thử lại.";
+        const message = getEmployeeModuleErrorMessage(
+          err,
+          "Không tải được danh sách nhân viên. Vui lòng thử lại."
+        );
         setError(message);
       } finally {
         if (mounted) setLoading(false);
@@ -129,25 +142,45 @@ export default function EmployeeList() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadSeed]);
+
+  const handleRetry = () => {
+    setReloadSeed((current) => current + 1);
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setRoleFilter("all");
+    setSpecialtyFilter("all");
+    setStatusFilter("all");
+  };
 
   const filteredEmployees = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword = normalizeSearchText(search);
 
     return employees.filter((employee) => {
+      const searchableText = normalizeSearchText(
+        [
+          employee.fullName,
+          employee.userName,
+          employee.phoneNumber,
+          employee.email,
+          ...(employee.roleLabels ?? []),
+          employee.workerRoleLabel,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      );
       const matchSearch =
-        !keyword ||
-        employee.fullName.toLowerCase().includes(keyword) ||
-        employee.userName.toLowerCase().includes(keyword);
-      const matchRole =
-        roleFilter === "all" ||
-        employee.primaryRole === roleFilter ||
-        employee.workerRole === roleFilter;
+        !keyword || searchableText.includes(keyword);
+      const matchRole = roleFilter === "all" || employee.roles.includes(roleFilter);
+      const matchSpecialty =
+        specialtyFilter === "all" || employee.workerRole === specialtyFilter;
       const matchStatus = statusFilter === "all" || employee.status === statusFilter;
 
-      return matchSearch && matchRole && matchStatus;
+      return matchSearch && matchRole && matchSpecialty && matchStatus;
     });
-  }, [employees, roleFilter, search, statusFilter]);
+  }, [employees, roleFilter, search, specialtyFilter, statusFilter]);
 
   const stats = useMemo(() => {
     const total = employees.length;
@@ -156,15 +189,52 @@ export default function EmployeeList() {
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
     const skilled = employees.filter((employee) => Boolean(employee.workerRole)).length;
-    const inactive = employees.filter((employee) => employee.status === "inactive").length;
 
-    return { total, active, management, skilled, inactive };
+    return { total, active, management, skilled };
   }, [employees]);
 
-  const roleOptions = useMemo(
-    () => ["all", ...new Set(employees.map((employee) => employee.primaryRole).filter(Boolean))],
-    [employees]
-  );
+  const roleOptions = useMemo(() => {
+    const optionsMap = new Map();
+
+    employees.forEach((employee) => {
+      employee.roles.forEach((role, index) => {
+        if (!optionsMap.has(role)) {
+          optionsMap.set(role, employee.roleLabels?.[index] || role);
+        }
+      });
+    });
+
+    return [
+      { value: "all", label: "Tất cả vai trò" },
+      ...Array.from(optionsMap.entries())
+        .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [employees]);
+
+  const specialtyOptions = useMemo(() => {
+    const optionsMap = new Map();
+
+    employees.forEach((employee) => {
+      if (employee.workerRole) {
+        optionsMap.set(employee.workerRole, employee.workerRoleLabel || employee.workerRole);
+      }
+    });
+
+    return [
+      { value: "all", label: "Tất cả chuyên môn" },
+      ...Array.from(optionsMap.entries())
+        .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
+        .map(([value, label]) => ({ value, label })),
+    ];
+  }, [employees]);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) ||
+    roleFilter !== "all" ||
+    specialtyFilter !== "all" ||
+    statusFilter !== "all";
+  const hasAnyEmployee = employees.length > 0;
 
   return (
     <DashboardLayout>
@@ -188,24 +258,38 @@ export default function EmployeeList() {
             <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
             <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
             <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng, quản lý và tổ trưởng" tone="warning" />
-            <SummaryCard icon={Sparkles} label="Có chuyên môn" value={stats.skilled} meta={`${stats.inactive} nhân viên ngừng hoạt động`} tone="accent" />
+            <SummaryCard
+              icon={Sparkles}
+              label="Có chuyên môn"
+              value={stats.skilled}
+              meta={
+                stats.total
+                  ? `${stats.total - stats.skilled} nhân viên chưa cập nhật chuyên môn`
+                  : "Chưa có dữ liệu chuyên môn"
+              }
+              tone="accent"
+            />
           </div>
 
+          <p className="employee-summary-note">
+            Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.
+          </p>
+
           <div className="employee-filter-card">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_220px_220px_auto]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]">
               <label className="employee-filter-field employee-filter-field--search">
-                <span className="employee-filter-field__label">Tên nhân viên</span>
+                <span className="employee-filter-field__label">Tìm kiếm nhân viên</span>
                 <Search size={18} className="employee-filter-field__icon" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm theo họ tên hoặc tên đăng nhập..."
+                  placeholder="Tên, tài khoản, số điện thoại, email..."
                   className="employee-filter-field__control"
                 />
               </label>
 
               <label className="employee-filter-field">
-                <span className="employee-filter-field__label">Vai trò</span>
+                <span className="employee-filter-field__label">Vai trò hệ thống</span>
                 <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
                 <select
                   value={roleFilter}
@@ -213,10 +297,24 @@ export default function EmployeeList() {
                   className="employee-filter-field__control"
                 >
                   {roleOptions.map((role) => (
-                    <option key={role} value={role}>
-                      {role === "all"
-                        ? "Tất cả vai trò"
-                        : employees.find((employee) => employee.primaryRole === role)?.primaryRoleLabel || role}
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="employee-filter-field">
+                <span className="employee-filter-field__label">Chuyên môn</span>
+                <Sparkles size={17} className="employee-filter-field__icon" />
+                <select
+                  value={specialtyFilter}
+                  onChange={(event) => setSpecialtyFilter(event.target.value)}
+                  className="employee-filter-field__control"
+                >
+                  {specialtyOptions.map((specialty) => (
+                    <option key={specialty.value} value={specialty.value}>
+                      {specialty.label}
                     </option>
                   ))}
                 </select>
@@ -236,9 +334,20 @@ export default function EmployeeList() {
                 </select>
               </label>
 
-              <div className="employee-filter-info">
-                <Users size={16} />
-                <span>{filteredEmployees.length} kết quả</span>
+              <div className="employee-filter-actions">
+                <div className="employee-filter-info">
+                  <Users size={16} />
+                  <span>{filteredEmployees.length} kết quả</span>
+                </div>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    className="employee-filter-reset"
+                    onClick={clearFilters}
+                  >
+                    Xóa bộ lọc
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -255,17 +364,61 @@ export default function EmployeeList() {
               {loading ? (
                 <div className="employee-table-state">
                   <LoaderCircle size={18} className="employee-table-state__spin" />
-                  <span>Đang tải danh sách nhân viên...</span>
+                  <div className="employee-table-state__content">
+                    <strong>Đang tải danh sách nhân viên...</strong>
+                    <span>Dữ liệu nhân sự đang được đồng bộ từ hệ thống.</span>
+                  </div>
                 </div>
               ) : error ? (
                 <div className="employee-table-state employee-table-state--error">
                   <CircleAlert size={18} />
-                  <span>{error}</span>
+                  <div className="employee-table-state__content">
+                    <strong>Không tải được danh sách nhân viên</strong>
+                    <span>{error}</span>
+                  </div>
+                  <div className="employee-table-state__actions">
+                    <button
+                      type="button"
+                      className="employee-state-btn employee-state-btn--primary"
+                      onClick={handleRetry}
+                    >
+                      Thử lại
+                    </button>
+                  </div>
                 </div>
               ) : filteredEmployees.length === 0 ? (
                 <div className="employee-table-state">
                   <Users size={18} />
-                  <span>Không có nhân viên nào phù hợp với bộ lọc hiện tại.</span>
+                  <div className="employee-table-state__content">
+                    <strong>
+                      {hasAnyEmployee
+                        ? "Không có nhân viên nào phù hợp với bộ lọc hiện tại"
+                        : "Chưa có nhân viên nào trong hệ thống"}
+                    </strong>
+                    <span>
+                      {hasAnyEmployee
+                        ? "Thử xóa bớt điều kiện lọc để xem lại đầy đủ danh sách."
+                        : "Tạo nhân viên đầu tiên để bắt đầu quản lý nhân sự nội bộ."}
+                    </span>
+                  </div>
+                  <div className="employee-table-state__actions">
+                    {hasAnyEmployee ? (
+                      <button
+                        type="button"
+                        className="employee-state-btn employee-state-btn--secondary"
+                        onClick={clearFilters}
+                      >
+                        Xóa bộ lọc
+                      </button>
+                    ) : (
+                      <Link
+                        to="/employees/create"
+                        className="employee-state-btn employee-state-btn--primary"
+                      >
+                        Thêm nhân viên
+                      </Link>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <table className="employee-table min-w-full divide-y divide-slate-200">
@@ -284,7 +437,7 @@ export default function EmployeeList() {
                 <tbody className="divide-y divide-slate-100">
                   {filteredEmployees.map((employee) => {
                     const statusConfig = STATUS_MAP[employee.status] ?? STATUS_MAP.active;
-                    const roleTone = getEmployeeTone(employee);
+                    const specialty = getEmployeeSpecialty(employee);
                     const roleSummary = getRoleSummary(employee.roleLabels);
 
                     return (
@@ -310,7 +463,7 @@ export default function EmployeeList() {
                           </div>
                         </td>
                         <td className="employee-table-td employee-table-td--specialty px-5 py-5 align-middle">
-                          <span className={roleTone.className}>{roleTone.label}</span>
+                          <span className={specialty.className}>{specialty.label}</span>
                         </td>
                         <td className="employee-table-td employee-table-td--phone px-5 py-5 align-middle text-sm text-slate-600">
                           {employee.phoneNumber || "Chưa cập nhật"}

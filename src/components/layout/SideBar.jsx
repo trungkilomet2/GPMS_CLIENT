@@ -14,14 +14,29 @@ import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
-  { to: "/home", label: "Dashboard", icon: ChartPie, disabled: false },
+  { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
   { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
-  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true },
+  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/worker-roles", label: "Vai trò thợ", icon: Shapes, disabled: false },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];
+
+function splitRoles(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function hasRequiredRole(user, requiredRole) {
+  if (!requiredRole) return true;
+  const roles = splitRoles(user?.role);
+  return roles.includes(requiredRole);
+}
 
 function getInitials(name = "") {
   return name
@@ -80,7 +95,11 @@ export default function Sidebar() {
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, disabled, compactLabel }) => {
+        {NAV_ITEMS.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
+          if (!hasRequiredRole(user, requiredRole)) {
+            return null;
+          }
+
           if (disabled) {
             return (
               <div

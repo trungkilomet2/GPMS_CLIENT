@@ -428,6 +428,7 @@
 
 .employee-detail-state {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.7rem;
@@ -439,14 +440,87 @@
   padding: 2rem;
   font-weight: 600;
   box-shadow: 0 18px 40px rgba(30, 110, 67, 0.08);
+  text-align: center;
 }
 
 .employee-detail-state--error {
   color: #b74a3a;
 }
 
+.employee-detail-state__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 34rem;
+}
+
+.employee-detail-state__content strong {
+  color: #1a2e23;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.employee-detail-state--error .employee-detail-state__content strong {
+  color: #913324;
+}
+
+.employee-detail-state__content span {
+  color: #5f7168;
+  font-size: 0.94rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.employee-detail-state--error .employee-detail-state__content span {
+  color: #b74a3a;
+}
+
+.employee-detail-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.employee-detail-state-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  padding: 0.7rem 1.15rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.employee-detail-state-btn:hover {
+  transform: translateY(-1px);
+}
+
+.employee-detail-state-btn--primary {
+  border: 1px solid #2d9058;
+  background: linear-gradient(135deg, #1e6e43 0%, #2d9058 100%);
+  color: #fff;
+}
+
+.employee-detail-state-btn--secondary {
+  border: 1px solid #cfe0d7;
+  background: #fff;
+  color: #315043;
+}
+
 .employee-detail-state__spin {
   animation: employee-detail-spin 900ms linear infinite;
+}
+
+.employee-detail-hero__back:focus-visible,
+.employee-detail-btn:focus-visible,
+.employee-detail-state-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(45, 144, 88, 0.18);
 }
 
 @keyframes employee-detail-spin {

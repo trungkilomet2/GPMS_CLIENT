@@ -2,8 +2,9 @@ import { matchPath } from "react-router-dom";
 
 export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
+  { path: "/dashboard", label: "Dashboard" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
-  { path: "/employees", label: "Danh sách nhân viên", parent: "/home" },
+  { path: "/employees", label: "Danh sách nhân viên", parent: "/dashboard" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
   {
     path: "/employees/:id/edit",
@@ -15,13 +16,13 @@ export const BREADCRUMB_CONFIG = [
     label: ({ id }) => `Nhân viên #${id}`,
     parent: "/employees",
   },
-  { path: "/leave", label: "Đơn xin nghỉ", parent: "/home" },
+  { path: "/leave", label: "Đơn xin nghỉ", parent: "/dashboard" },
   {
     path: "/leave/:id",
     label: ({ id }) => `Chi tiết đơn ${id}`,
     parent: "/leave",
   },
-  { path: "/orders/owner", label: "Danh sách đơn hàng", parent: "/orders" },
+  { path: "/orders/owner", label: "Danh sách đơn hàng", parent: "/dashboard" },
   { path: "/orders/manual-create", label: "Tạo đơn hàng thủ công", parent: "/orders" },
   {
     path: "/orders/edit/:id",
