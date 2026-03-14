@@ -119,3 +119,23 @@
     padding-right: 1rem;
   }
 }
+
+.order-create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: none;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #1e6e43 0%, #2d9058 100%);
+  color: #fff;
+  padding: 0.9rem 1.25rem;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 14px 28px rgba(30, 110, 67, 0.2);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.order-create-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(30, 110, 67, 0.25);
+}

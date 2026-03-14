@@ -16,7 +16,7 @@ import "@/styles/dashboard-sidebar.css";
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
-  { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
+  { to: "/production", label: "Giám sát hoạt động", icon: ClipboardList, disabled: false },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/worker-roles", label: "Vai trò thợ", icon: Shapes, disabled: false },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
