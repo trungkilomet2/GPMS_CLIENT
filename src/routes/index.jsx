@@ -27,6 +27,12 @@ const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
+const AdminUserList = lazy(() => import("@/pages/admin/AdminUserList"));
+const AdminUserCreate = lazy(() => import("@/pages/admin/AdminUserCreate"));
+const AdminUserDetail = lazy(() => import("@/pages/admin/AdminUserDetail"));
+const AdminUserUpdate = lazy(() => import("@/pages/admin/AdminUserUpdate"));
+const AdminSystemLog = lazy(() => import("@/pages/admin/AdminSystemLog"));
+const AdminManagePermission = lazy(() => import("@/pages/admin/AdminManagePermission"));
 
 // PROFILE
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -67,6 +73,12 @@ export const routes = [
   { path: "/employees/create", element: <EmployeeCreate /> },
   { path: "/employees/:id/edit", element: <EmployeeUpdate /> },
   { path: "/employees/:id", element: <EmployeeDetail /> },
+  { path: "/admin/users", element: <AdminUserList /> },
+  { path: "/admin/users/create", element: <AdminUserCreate /> },
+  { path: "/admin/users/:id/edit", element: <AdminUserUpdate /> },
+  { path: "/admin/users/:id", element: <AdminUserDetail /> },
+  { path: "/admin/logs", element: <AdminSystemLog /> },
+  { path: "/admin/permissions", element: <AdminManagePermission /> },
 
   // PROFILE
   { path: "/profile", element: <ViewProfile /> },

@@ -6,6 +6,7 @@ import {
   ChartPie,
   ClipboardList,
   LogOut,
+  ShieldCheck,
   Shapes,
   Users,
 } from "lucide-react";
@@ -15,6 +16,9 @@ import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
+  { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false, requiredRole: "Admin" },
+  { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false, requiredRole: "Admin" },
+  { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false, requiredRole: "Admin" },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
   { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },

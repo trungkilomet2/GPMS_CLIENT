@@ -4,6 +4,20 @@ export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
   { path: "/dashboard", label: "Dashboard" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
+  { path: "/admin/users", label: "Quản lý user", parent: "/dashboard" },
+  { path: "/admin/users/create", label: "Thêm user mới", parent: "/admin/users" },
+  {
+    path: "/admin/users/:id/edit",
+    label: ({ id }) => `Cập nhật user #${id}`,
+    parent: "/admin/users",
+  },
+  {
+    path: "/admin/users/:id",
+    label: ({ id }) => `User #${id}`,
+    parent: "/admin/users",
+  },
+  { path: "/admin/logs", label: "Nhật ký hệ thống", parent: "/dashboard" },
+  { path: "/admin/permissions", label: "Quản lý phân quyền", parent: "/dashboard" },
   { path: "/employees", label: "Danh sách nhân viên", parent: "/dashboard" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
   {
