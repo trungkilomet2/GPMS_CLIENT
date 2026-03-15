@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, LoaderCircle, PencilLine, Shapes } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import WorkerRoleService from "@/services/WorkerRoleService";
+import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import "@/styles/worker-roles.css";
 
 export default function WorkerRoleCreate() {
@@ -44,7 +44,7 @@ export default function WorkerRoleCreate() {
       await WorkerRoleService.createWorkerRole({ name });
       navigate("/worker-roles");
     } catch (err) {
-      setError(err?.message || "Không thể tạo vai trò thợ mới.");
+      setError(getWorkerRoleErrorMessage(err, "Không thể tạo vai trò thợ mới."));
     } finally {
       setSubmitting(false);
     }

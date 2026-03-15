@@ -11,7 +11,7 @@ import {
   Waypoints,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import WorkerRoleService from "@/services/WorkerRoleService";
+import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import "@/styles/worker-roles.css";
 
 function SummaryCard({ icon: Icon, label, value, meta, tone }) {
@@ -69,9 +69,9 @@ export default function WorkerRoleList() {
         if (!mounted) return;
 
         setRoles(data);
-      } catch {
+      } catch (err) {
         if (!mounted) return;
-        setError("Không tải được danh mục vai trò thợ.");
+        setError(getWorkerRoleErrorMessage(err, "Không tải được danh mục vai trò thợ."));
       } finally {
         if (mounted) setLoading(false);
       }
