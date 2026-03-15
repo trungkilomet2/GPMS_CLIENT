@@ -16,6 +16,11 @@ function splitRoles(value) {
     .filter(Boolean);
 }
 
+function hasAnyRole(roles, targets) {
+  const normalized = roles.map((item) => String(item).toLowerCase());
+  return targets.some((role) => normalized.includes(role));
+}
+
 function mapLoginError(err) {
   const status = err?.response?.data?.status ?? err?.status;
   const message = String(
@@ -139,8 +144,18 @@ export default function LoginPage() {
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
       const roles = splitRoles(result?.user?.role);
-      const isInternalUser = roles.includes("Owner") || roles.includes("PM");
 
+      if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
+        navigate("/monitoring/assign");
+        return;
+      }
+
+      if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
+        navigate("/worker/assignments");
+        return;
+      }
+
+      const isInternalUser = roles.includes("Owner") || roles.includes("PM");
       navigate(isInternalUser ? "/dashboard" : "/home");
     } catch (err) {
       setErrors(mapLoginError(err));

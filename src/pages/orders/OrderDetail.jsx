@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FileText, MessageSquare, History,
@@ -16,6 +16,7 @@ import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import '@/styles/homepage.css';
+import '@/styles/leave.css';
 
 export default function OrderDetail() {
     const { id } = useParams();
@@ -45,7 +46,7 @@ export default function OrderDetail() {
                 setOrder(response.data.data || response.data);
                 setError(null);
             } catch (err) {
-                setError("Không thể tải thông tin đơn hàng.");
+                setError("KhÃ´ng thá»ƒ táº£i thÃ´ng tin Ä‘Æ¡n hÃ ng.");
             } finally {
                 setLoading(false);
             }
@@ -57,7 +58,7 @@ export default function OrderDetail() {
         <OwnerLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
                 <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
-                <p className="text-gray-500 text-sm font-medium">Đang truy xuất dữ liệu...</p>
+                <p className="text-slate-500 text-sm font-medium">Äang truy xuáº¥t dá»¯ liá»‡u...</p>
             </div>
         </OwnerLayout>
     );
@@ -107,8 +108,8 @@ export default function OrderDetail() {
             await OrderService.updateOrder(order.id, payload);
             setOrder((prev) => ({ ...prev, status: nextStatus }));
         } catch (err) {
-            console.error('Lỗi cập nhật trạng thái:', err);
-            alert('Không thể cập nhật trạng thái đơn hàng.');
+            console.error('Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:', err);
+            alert('KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.');
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -121,20 +122,25 @@ export default function OrderDetail() {
 
     return (
         <OwnerLayout>
-            <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900">
-                {/* Header thanh mảnh, tập trung vào ID và Nút sửa */}
-                <div className="flex items-center justify-between mb-6 border-b pb-4 border-gray-200">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded text-gray-400">
-                            <ArrowLeft size={20} />
+            <div className="leave-page leave-list-page">
+                <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+                        >
+                            <ArrowLeft size={18} />
                         </button>
-                        <div>
-                            <h1 className="text-xl font-bold">Chi tiết đơn hàng #{order.id}</h1>
-                            <p className="text-xs text-gray-500 font-medium uppercase tracking-tighter">Hệ thống quản lý sản xuất GPMS</p>
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                                Chi tiết đơn hàng #{order.id}
+                            </h1>
+                            <p className="text-slate-600">Theo dõi thông tin đơn hàng và trạng thái xử lý.</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${getOrderStatusStyle(order.status, 'detail')}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status, 'detail')}`}>
                             {order.statusName || order.status}
                         </span>
                         {canModerate && (
@@ -142,7 +148,7 @@ export default function OrderDetail() {
                                 type="button"
                                 onClick={() => navigate(`/production/create/${order.id}`)}
                                 disabled={normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
-                                className="px-3 py-2 text-xs font-bold rounded border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Tạo production
                             </button>
@@ -153,7 +159,7 @@ export default function OrderDetail() {
                                     type="button"
                                     disabled={isUpdatingStatus}
                                     onClick={() => openReasonModal('Từ chối')}
-                                    className="px-3 py-2 text-xs font-bold rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 transition disabled:opacity-50"
+                                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                                 >
                                     Từ chối
                                 </button>
@@ -161,90 +167,88 @@ export default function OrderDetail() {
                                     type="button"
                                     disabled={isUpdatingStatus}
                                     onClick={() => openReasonModal('Cần cập nhật')}
-                                    className="px-3 py-2 text-xs font-bold rounded border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 transition disabled:opacity-50"
+                                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
                                 >
                                     Yêu cầu chỉnh sửa
                                 </button>
                             </>
                         )}
-                        {canEdit && (<button
-                            onClick={() => navigate(`/orders/edit/${order.id}`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-all text-sm font-bold shadow-sm"
-                        >
-                            <Edit3 size={16} /> Chỉnh sửa
-                        </button>)}
+                        {canEdit && (
+                            <button
+                                onClick={() => navigate(`/orders/edit/${order.id}`)}
+                                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                            >
+                                <Edit3 size={16} /> Chỉnh sửa
+                            </button>
+                        )}
                     </div>
-                </div>
-
-
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* KHỐI THÔNG TIN CHI TIẾT (2/3) */}
+                </div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* KHá»I THÃ”NG TIN CHI TIáº¾T (2/3) */}
                     <div className="lg:col-span-2 space-y-6">
-                        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 text-gray-600">
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Info size={16} />
-                                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin tổng quát đơn hàng</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin tá»•ng quÃ¡t Ä‘Æ¡n hÃ ng</h2>
                             </div>
 
-                            <div className="px-5 py-4 border-b border-gray-100">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-3">Ảnh đơn hàng</div>
+                            <div className="px-5 py-4 border-b border-slate-100">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">áº¢nh Ä‘Æ¡n hÃ ng</div>
                                 <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
-                                    <div className="w-32 h-32 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
+                                    <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
                                         {order.image ? (
                                             <button
                                                 type="button"
                                                 onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
                                                 className="w-full h-full cursor-zoom-in"
-                                                title="Click để xem & zoom ảnh"
+                                                title="Click Ä‘á»ƒ xem & zoom áº£nh"
                                             >
                                                 <img src={order.image} alt="" className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <span className="text-[10px] text-white font-semibold">Click để zoom</span>
+                                                    <span className="text-[10px] text-white font-semibold">Click Ä‘á»ƒ zoom</span>
                                                 </div>
                                             </button>
                                         ) : (
-                                            <span className="text-[11px] text-gray-400">-</span>
+                                            <span className="text-[11px] text-slate-400">-</span>
                                         )}
                                     </div>
-                                    <div className="text-xs text-gray-500 leading-relaxed">
-                                        Ảnh tham khảo tổng quan đơn hàng, dùng để kiểm tra nhanh trước khi sản xuất.
+                                    <div className="text-xs text-slate-500 leading-relaxed">
+                                        áº¢nh tham kháº£o tá»•ng quan Ä‘Æ¡n hÃ ng, dÃ¹ng Ä‘á»ƒ kiá»ƒm tra nhanh trÆ°á»›c khi sáº£n xuáº¥t.
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Layout Grid 2 cột cho thông tin chi tiết */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100 font-sans">
+                            {/* Layout Grid 2 cá»™t cho thÃ´ng tin chi tiáº¿t */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 font-sans">
                                 <div className="p-0">
-                                    <DetailItem label="Mã đơn hàng" value={`#ĐH-${order.id}`} />
-                                    <DetailItem label="Tên đơn hàng" value={order.orderName} isBold />
-                                    <DetailItem label="Loại đơn hàng" value={order.type} />
-                                    <DetailItem label="Màu sắc" value={order.color} />
-                                    <DetailItem label="Kích thước (Size)" value={order.size} />
+                                    <DetailItem label="MÃ£ Ä‘Æ¡n hÃ ng" value={`#ÄH-${order.id}`} />
+                                    <DetailItem label="TÃªn Ä‘Æ¡n hÃ ng" value={order.orderName} isBold />
+                                    <DetailItem label="Loáº¡i Ä‘Æ¡n hÃ ng" value={order.type} />
+                                    <DetailItem label="MÃ u sáº¯c" value={order.color} />
+                                    <DetailItem label="KÃ­ch thÆ°á»›c (Size)" value={order.size} />
                                 </div>
                                 <div className="p-0">
-                                    <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
-                                    <DetailItem label="Đơn giá" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
-                                    <DetailItem label="Tổng tiền đơn hàng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
-                                    <DetailItem label="Ngày bắt đầu" value={formatOrderDate(order.startDate)} />
-                                    <DetailItem label="Ngày kết thúc" value={formatOrderDate(order.endDate)} />
+                                    <DetailItem label="Sá»‘ lÆ°á»£ng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="ÄÆ¡n giÃ¡" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
+                                    <DetailItem label="Tá»•ng tiá»n Ä‘Æ¡n hÃ ng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
+                                    <DetailItem label="NgÃ y báº¯t Ä‘áº§u" value={formatOrderDate(order.startDate)} />
+                                    <DetailItem label="NgÃ y káº¿t thÃºc" value={formatOrderDate(order.endDate)} />
                                 </div>
                             </div>
 
-                            {/* Ghi chú chiếm toàn bộ chiều ngang phía dưới */}
-                            <div className="p-5 border-t border-gray-100 bg-amber-50/30">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Ghi chú</p>
-                                <p className="text-sm text-gray-700 leading-relaxed italic">
-                                    {order.note ? `"${order.note}"` : "Không có ghi chú bổ sung cho đơn hàng này."}
+                            {/* Ghi chÃº chiáº¿m toÃ n bá»™ chiá»u ngang phÃ­a dÆ°á»›i */}
+                            <div className="p-5 border-t border-slate-100 bg-amber-50/30">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chÃº</p>
+                                <p className="text-sm text-slate-700 leading-relaxed italic">
+                                    {order.note ? `"${order.note}"` : "KhÃ´ng cÃ³ ghi chÃº bá»• sung cho Ä‘Æ¡n hÃ ng nÃ y."}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Bảng vật liệu - Thực dụng và rõ ràng */}
-                        <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-                            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 text-gray-600">
+                        {/* Báº£ng váº­t liá»‡u - Thá»±c dá»¥ng vÃ  rÃµ rÃ ng */}
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Package size={16} />
-                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sÃ¡ch váº­t liá»‡u sáº£n xuáº¥t</h2>
                             </div>
                             <MaterialsTable
                                 materials={order.materials ?? []}
@@ -260,73 +264,73 @@ export default function OrderDetail() {
                         </div>
                     </div>
 
-                    {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
+                    {/* Cá»˜T PHáº¢I (1/3): FILE & THáº¢O LUáº¬N */}
                     <div className="space-y-6">
                         {canModerate && (
-                            <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
-                                <div className="flex items-center gap-2 text-gray-600 mb-3">
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                                <div className="flex items-center gap-2 text-slate-600 mb-3">
                                     <Info size={16} />
-                                    <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin ngÆ°á»i Ä‘áº·t hÃ ng</h2>
                                 </div>
-                                <div className="space-y-2 text-sm text-gray-700">
+                                <div className="space-y-2 text-sm text-slate-700">
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-gray-400 uppercase">Họ và tên</span>
-                                        <span className="font-semibold text-gray-800 text-right">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Há» vÃ  tÃªn</span>
+                                        <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || '-'}
                                         </span>
                                     </div>
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-gray-400 uppercase">Số điện thoại</span>
-                                        <span className="font-semibold text-gray-800 text-right">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Sá»‘ Ä‘iá»‡n thoáº¡i</span>
+                                        <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || '-'}
                                         </span>
                                     </div>
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-gray-400 uppercase">Địa chỉ</span>
-                                        <span className="font-semibold text-gray-800 text-right">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Äá»‹a chá»‰</span>
+                                        <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || '-'}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                         )}
-                        <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                             <div>
-                                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Máº«u thiáº¿t káº¿ báº£n má»m</h2>
                                 <div className="space-y-2">
                                     {softTemplates.length > 0 ? (
                                         softTemplates.map((file, idx) => {
                                             const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
                                             const fileUrl = file.file ?? file.url ?? '';
                                             return (
-                                                <div key={idx} className="flex items-center justify-between p-3 rounded border border-gray-100 hover:border-emerald-200 transition-all">
+                                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all">
                                                     <div className="flex items-center gap-3 overflow-hidden">
                                                         <FileText size={18} className="text-emerald-600 shrink-0" />
                                                         <div className="overflow-hidden">
-                                                            <p className="text-sm font-bold text-gray-700 truncate">{fileName}</p>
-                                                            {file.size && <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>}
+                                                            <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
+                                                            {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
                                                         </div>
                                                     </div>
                                                     {fileUrl ? (
-                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-gray-400 hover:text-emerald-600">
+                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
                                                             <Download size={16} />
                                                         </a>
                                                     ) : (
-                                                        <span className="text-[10px] text-gray-400">Không có link</span>
+                                                        <span className="text-[10px] text-slate-400">KhÃ´ng cÃ³ link</span>
                                                     )}
                                                 </div>
                                             );
                                         })
                                     ) : (
-                                        <p className="text-center py-4 text-gray-400 text-[11px] italic">Không có file thiết kế</p>
+                                        <p className="text-center py-4 text-slate-400 text-[11px] italic">KhÃ´ng cÃ³ file thiáº¿t káº¿</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="border-t pt-4">
-                                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                                <div className="text-sm font-semibold text-gray-700">
-                                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Báº£n cá»©ng</h2>
+                                <div className="text-sm font-semibold text-slate-700">
+                                    Sá»‘ lÆ°á»£ng báº£n cá»©ng: <span className="text-emerald-700">{hardCopyTotal}</span>
                                 </div>
                             </div>
                         </div>
@@ -334,18 +338,19 @@ export default function OrderDetail() {
                         <div className="space-y-3">
                             <button
                                 onClick={() => setIsCommentModalOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 text-sm font-bold"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
                             >
-                                <MessageSquare size={16} /> Thảo luận đơn hàng
+                                <MessageSquare size={16} /> Tháº£o luáº­n Ä‘Æ¡n hÃ ng
                             </button>
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded text-gray-700 hover:bg-gray-50 text-sm font-medium"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
                             >
-                                <History size={16} /> Lịch sử chỉnh sửa
+                                <History size={16} /> Lá»‹ch sá»­ chá»‰nh sá»­a
                             </button>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -363,30 +368,33 @@ export default function OrderDetail() {
                     await updateOrderStatus(pendingStatus, reason);
                     setIsReasonModalOpen(false);
                 }}
-                title={pendingStatus === 'Từ chối' ? 'Từ chối đơn hàng' : 'Yêu cầu chỉnh sửa'}
-                description={pendingStatus === 'Từ chối'
-                    ? 'Vui lòng nhập lý do từ chối để khách hàng nắm rõ.'
-                    : 'Vui lòng nhập lý do yêu cầu chỉnh sửa.'}
-                confirmText={pendingStatus === 'Từ chối' ? 'Xác nhận từ chối' : 'Gửi yêu cầu'}
+                title={pendingStatus === 'Tá»« chá»‘i' ? 'Tá»« chá»‘i Ä‘Æ¡n hÃ ng' : 'YÃªu cáº§u chá»‰nh sá»­a'}
+                description={pendingStatus === 'Tá»« chá»‘i'
+                    ? 'Vui lÃ²ng nháº­p lÃ½ do tá»« chá»‘i Ä‘á»ƒ khÃ¡ch hÃ ng náº¯m rÃµ.'
+                    : 'Vui lÃ²ng nháº­p lÃ½ do yÃªu cáº§u chá»‰nh sá»­a.'}
+                confirmText={pendingStatus === 'Tá»« chá»‘i' ? 'XÃ¡c nháº­n tá»« chá»‘i' : 'Gá»­i yÃªu cáº§u'}
                 loading={isUpdatingStatus}
-                tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
+                tone={pendingStatus === 'Tá»« chá»‘i' ? 'danger' : 'warning'}
             />
         </OwnerLayout>
     );
 }
 
-// Sub-component hiển thị từng dòng thông tin
+// Sub-component hiá»ƒn thá»‹ tá»«ng dÃ²ng thÃ´ng tin
 function DetailItem({ label, value, isBold = false, isEmerald = false }) {
     const displayValue = value === null || value === undefined || value === '' ? '-' : value;
     return (
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{label}</span>
-            <span className={`text-sm ${isBold ? 'font-bold text-gray-900' : 'font-medium text-gray-700'} ${isEmerald ? 'text-emerald-700 font-bold' : ''}`}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
+            <span className={`text-sm ${isBold ? 'font-bold text-slate-900' : 'font-medium text-slate-700'} ${isEmerald ? 'text-emerald-700 font-bold' : ''}`}>
                 {displayValue}
             </span>
         </div>
     );
 }
+
+
+
 
 
 

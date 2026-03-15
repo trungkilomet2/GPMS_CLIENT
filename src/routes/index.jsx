@@ -22,6 +22,10 @@ const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
+const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
+const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
+const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
+const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
@@ -62,6 +66,11 @@ export const routes = [
   { path: "/monitoring", element: <ProductionPlanList /> },
   { path: "/monitoring/create", element: <ProductionPlan /> },
   { path: "/monitoring/:id", element: <ProductionPlanDetail /> },
+  { path: "/monitoring/assign", element: <ProductionAssignment /> },
+  { path: "/monitoring/assign/:id", element: <ProductionAssignment /> },
+  { path: "/worker/assignments", element: <WorkerAssignment /> },
+  { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
   { path: "/employees/create", element: <EmployeeCreate /> },
