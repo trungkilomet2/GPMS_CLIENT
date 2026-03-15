@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   BriefcaseBusiness,
+  CircleAlert,
   KeyRound,
+  LoaderCircle,
   Plus,
   Search,
   ShieldAlert,
@@ -10,7 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { ADMIN_STATUS_META, getAdminRoleOptions, getAdminUsers } from "@/lib/admin/adminMockStore";
+import { ADMIN_STATUS_META } from "@/lib/admin/adminMockStore";
+import AdminUserService, { getAdminUserErrorMessage } from "@/services/AdminUserService";
 import {
   AdminBanner,
   AdminRoleBadge,
@@ -31,12 +34,80 @@ function normalizeSearchText(value = "") {
 }
 
 export default function AdminUserList() {
-  const [users] = useState(() => getAdminUsers());
+  const location = useLocation();
+  const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState(location.state?.notice || "");
+  const [noticeTone, setNoticeTone] = useState(location.state?.notice ? "success" : "info");
+  const [disablingId, setDisablingId] = useState(null);
+  const [reloadSeed, setReloadSeed] = useState(0);
 
-  const roleOptions = useMemo(() => getAdminRoleOptions(), []);
+  useEffect(() => {
+    if (location.state?.notice) {
+      setNotice(location.state.notice);
+      setNoticeTone("success");
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchUsers = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await AdminUserService.getUsers();
+        if (!mounted) return;
+
+        setUsers(response?.data ?? []);
+      } catch (err) {
+        if (!mounted) return;
+
+        setError(
+          getAdminUserErrorMessage(
+            err,
+            "Không tải được danh sách user admin. Vui lòng thử lại."
+          )
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchUsers();
+
+    return () => {
+      mounted = false;
+    };
+  }, [reloadSeed]);
+
+  const roleOptions = useMemo(() => {
+    const optionsMap = new Map();
+
+    users.forEach((user) => {
+      if (user.roleKey) {
+        optionsMap.set(user.roleKey, user.roleLabel);
+      }
+    });
+
+    const nextOptions = [
+      { value: "all", label: "Tất cả role" },
+      ...Array.from(optionsMap.entries())
+        .sort(([, leftLabel], [, rightLabel]) => leftLabel.localeCompare(rightLabel, "vi"))
+        .map(([value, label]) => ({ value, label })),
+    ];
+
+    if (users.some((user) => !user.hasKnownRole)) {
+      nextOptions.push({ value: "unknown", label: "Chưa đồng bộ role" });
+    }
+
+    return nextOptions;
+  }, [users]);
 
   const filteredUsers = useMemo(() => {
     const keyword = normalizeSearchText(search);
@@ -48,8 +119,7 @@ export default function AdminUserList() {
           user.userName,
           user.email,
           user.phoneNumber,
-          user.department,
-          user.title,
+          user.location,
           user.roleLabel,
         ]
           .filter(Boolean)
@@ -57,7 +127,9 @@ export default function AdminUserList() {
       );
 
       const matchesSearch = !keyword || searchableText.includes(keyword);
-      const matchesRole = roleFilter === "all" || user.roleKey === roleFilter;
+      const matchesRole =
+        roleFilter === "all" ||
+        (roleFilter === "unknown" ? !user.hasKnownRole : user.roleKey === roleFilter);
       const matchesStatus = statusFilter === "all" || user.status === statusFilter;
 
       return matchesSearch && matchesRole && matchesStatus;
@@ -68,10 +140,10 @@ export default function AdminUserList() {
     const total = users.length;
     const active = users.filter((user) => user.status === "active").length;
     const privileged = users.filter((user) => ["Admin", "Owner"].includes(user.roleKey)).length;
-    const atRisk = users.filter((user) => ["locked", "suspended"].includes(user.status)).length;
-    const withMfa = users.filter((user) => user.twoFactorEnabled).length;
+    const missingRole = users.filter((user) => !user.hasKnownRole).length;
+    const needsReview = users.filter((user) => user.status !== "active" || !user.hasKnownRole).length;
 
-    return { total, active, privileged, atRisk, withMfa };
+    return { total, active, privileged, missingRole, needsReview };
   }, [users]);
 
   const hasActiveFilters = Boolean(search.trim()) || roleFilter !== "all" || statusFilter !== "all";
@@ -80,6 +152,48 @@ export default function AdminUserList() {
     setSearch("");
     setRoleFilter("all");
     setStatusFilter("all");
+  };
+
+  const handleRetry = () => {
+    setReloadSeed((current) => current + 1);
+  };
+
+  const handleDisableUser = async (user) => {
+    if (!user?.id || user.status === "inactive" || disablingId === user.id) {
+      return;
+    }
+
+    const shouldDisable = window.confirm(
+      `Bạn có chắc muốn vô hiệu hóa tài khoản của ${user.fullName || user.userName || "user này"} không?`
+    );
+
+    if (!shouldDisable) return;
+
+    setDisablingId(user.id);
+    setNotice("");
+
+    try {
+      await AdminUserService.disableUser(user.id);
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id
+            ? { ...item, status: "inactive", statusId: 2 }
+            : item
+        )
+      );
+      setNotice(`Đã vô hiệu hóa user ${user.fullName || user.userName}.`);
+      setNoticeTone("success");
+    } catch (err) {
+      setNotice(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể vô hiệu hóa user. Vui lòng thử lại."
+        )
+      );
+      setNoticeTone("warning");
+    } finally {
+      setDisablingId(null);
+    }
   };
 
   return (
@@ -103,16 +217,24 @@ export default function AdminUserList() {
           </div>
 
           <AdminBanner
-            title="Bộ màn admin này đang chạy bằng dữ liệu demo trên web."
-            description="Tạo user, cập nhật user và lưu permission sẽ được giữ trong localStorage để bạn review flow thiết kế ngay trên trình duyệt."
+            title="Danh sách user đang lấy từ API admin thật."
+            description="Role hiển thị ưu tiên từ backend; nếu endpoint chưa trả role, web sẽ giữ role vừa gán gần nhất để Admin vẫn review được flow."
             tone="info"
           />
 
+          {notice ? (
+            <AdminBanner
+              title={notice}
+              description="Các màn permission và system log vẫn đang dùng dữ liệu demo cho tới khi có endpoint tương ứng."
+              tone={noticeTone}
+            />
+          ) : null}
+
           <div className="admin-stats-grid">
-            <AdminStatCard icon={Users} label="Tổng user" value={stats.total} meta="Tất cả account nội bộ đang quản trị" tone="primary" />
-            <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Account có thể đăng nhập ngay" tone="success" />
-            <AdminStatCard icon={KeyRound} label="Role đặc quyền" value={stats.privileged} meta={`${stats.withMfa} user đã bật MFA`} tone="warning" />
-            <AdminStatCard icon={ShieldAlert} label="Cần xử lý" value={stats.atRisk} meta="User bị khóa hoặc tạm suspend" tone="danger" />
+            <AdminStatCard icon={Users} label="Tổng user" value={stats.total} meta="Tất cả account đang lấy từ user-list" tone="primary" />
+            <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Account vẫn có thể đăng nhập" tone="success" />
+            <AdminStatCard icon={KeyRound} label="Role đặc quyền" value={stats.privileged} meta="Admin và Owner hiện có trong hệ thống" tone="warning" />
+            <AdminStatCard icon={ShieldAlert} label="Cần rà soát" value={stats.needsReview} meta={`${stats.missingRole} user chưa có role từ API`} tone="danger" />
           </div>
 
           <div className="admin-filter-card">
@@ -136,9 +258,8 @@ export default function AdminUserList() {
                   onChange={(event) => setRoleFilter(event.target.value)}
                   className="admin-field__control"
                 >
-                  <option value="all">Tất cả role</option>
                   {roleOptions.map((role) => (
-                    <option key={role.key} value={role.key}>
+                    <option key={role.value} value={role.value}>
                       {role.label}
                     </option>
                   ))}
@@ -187,7 +308,30 @@ export default function AdminUserList() {
             </div>
 
             <div className="admin-table-wrap">
-              {filteredUsers.length === 0 ? (
+              {loading ? (
+                <div className="admin-state">
+                  <div className="admin-state__content">
+                    <strong>Đang tải danh sách user...</strong>
+                    <span>Dữ liệu admin đang được đồng bộ từ backend.</span>
+                  </div>
+                  <div className="admin-state__actions">
+                    <LoaderCircle size={20} className="animate-spin" />
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="admin-state">
+                  <div className="admin-state__content">
+                    <strong>Không tải được danh sách user</strong>
+                    <span>{error}</span>
+                  </div>
+                  <div className="admin-state__actions">
+                    <button type="button" className="admin-btn admin-btn--primary admin-focusable" onClick={handleRetry}>
+                      <CircleAlert size={18} />
+                      <span>Thử lại</span>
+                    </button>
+                  </div>
+                </div>
+              ) : filteredUsers.length === 0 ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
                     <strong>Không có user nào phù hợp với bộ lọc hiện tại</strong>
@@ -207,7 +351,7 @@ export default function AdminUserList() {
                       <th>Thông tin liên hệ</th>
                       <th>Role & quyền</th>
                       <th>Trạng thái</th>
-                      <th>Lần truy cập cuối</th>
+                      <th>Đồng bộ hệ thống</th>
                       <th className="text-right">Thao tác</th>
                     </tr>
                   </thead>
@@ -216,39 +360,44 @@ export default function AdminUserList() {
                       <tr key={user.id}>
                         <td>
                           <div className="admin-table__user">
-                            <div className="admin-avatar">{getAdminInitials(user.fullName)}</div>
+                            <div className="admin-avatar">
+                              {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt={user.fullName} className="h-full w-full rounded-full object-cover" />
+                              ) : (
+                                getAdminInitials(user.fullName)
+                              )}
+                            </div>
                             <div>
                               <div className="admin-table__primary">{user.fullName}</div>
-                              <div className="admin-table__secondary">@{user.userName}</div>
+                              <div className="admin-table__secondary">@{user.userName || "chua-co-username"}</div>
                             </div>
                           </div>
                         </td>
                         <td>
-                          <div className="admin-table__primary">{user.email}</div>
+                          <div className="admin-table__primary">{user.email || "Chưa cập nhật email"}</div>
                           <div className="admin-table__secondary">
-                            {user.phoneNumber} · {user.department}
+                            {[user.phoneNumber || "Chưa có số điện thoại", user.location || "Chưa có địa điểm"]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </div>
                         </td>
                         <td>
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
-                            <span className="admin-badge admin-badge--tone-info">{user.grantedPermissionCount} quyền bật</span>
+                            <span className="admin-badge admin-badge--tone-info">
+                              {user.hasKnownRole ? `${user.grantedPermissionCount} quyền preview` : "API chưa trả role"}
+                            </span>
                           </div>
-                          <div className="admin-table__secondary">{user.title}</div>
+                          <div className="admin-table__secondary">{user.roleDescription}</div>
                         </td>
                         <td>
                           <div className="admin-chips">
                             <AdminStatusBadge status={user.status} />
-                            {user.twoFactorEnabled ? (
-                              <span className="admin-badge admin-badge--tone-success">MFA</span>
-                            ) : (
-                              <span className="admin-badge admin-badge--tone-warning">Chưa bật MFA</span>
-                            )}
                           </div>
                         </td>
                         <td>
-                          <div className="admin-table__primary">{formatAdminDateTime(user.lastLogin)}</div>
-                          <div className="admin-table__secondary">Cập nhật {formatAdminDateTime(user.updatedAt)}</div>
+                          <div className="admin-table__primary">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</div>
+                          <div className="admin-table__secondary">ID: {user.id ?? "Chưa có"}</div>
                         </td>
                         <td>
                           <div className="admin-table__actions">
@@ -258,6 +407,18 @@ export default function AdminUserList() {
                             <Link to={`/admin/users/${user.id}/edit`} className="admin-link-btn admin-link-btn--secondary">
                               Update User
                             </Link>
+                            <button
+                              type="button"
+                              className="admin-link-btn admin-link-btn--secondary"
+                              onClick={() => handleDisableUser(user)}
+                              disabled={user.status === "inactive" || disablingId === user.id}
+                            >
+                              {disablingId === user.id
+                                ? "Disabling..."
+                                : user.status === "inactive"
+                                  ? "Disabled"
+                                  : "Disable"}
+                            </button>
                           </div>
                         </td>
                       </tr>

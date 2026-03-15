@@ -35,7 +35,7 @@ export function buildAdminUserFormValues(user = {}) {
     phoneNumber: user.phoneNumber || "",
     department: user.department || "",
     title: user.title || "",
-    roleKey: user.roleKey || "Support",
+    roleKey: user.roleKey || "PM",
     status: user.status || "invited",
     twoFactorEnabled: user.twoFactorEnabled ?? true,
     location: user.location || "",

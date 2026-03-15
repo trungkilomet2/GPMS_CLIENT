@@ -2,47 +2,42 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
-  Building2,
-  KeyRound,
   LoaderCircle,
-  Mail,
-  MapPin,
-  Phone,
   ShieldCheck,
   UserRound,
   UserRoundCog,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  createAdminUser,
-  getAdminRoleOptions,
-  getAdminUsers,
-  getPermissionProfile,
-} from "@/lib/admin/adminMockStore";
+import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
+import AdminUserService, {
+  getAdminRoleProfile,
+  getAdminSupportedRoleOptions,
+  getAdminUserErrorMessage,
+} from "@/services/AdminUserService";
 import {
   AdminBanner,
   AdminRoleBadge,
-  buildAdminUserFormValues,
-  sanitizeAdminUserForm,
-  validateAdminUserForm,
 } from "@/pages/admin/adminShared";
 
 export default function AdminUserCreate() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(() => buildAdminUserFormValues());
+  const [form, setForm] = useState({
+    fullName: "",
+    userName: "",
+    password: "",
+    roleKey: "PM",
+  });
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const roleOptions = useMemo(() => getAdminRoleOptions(), []);
-  const permissionProfile = useMemo(() => getPermissionProfile(form.roleKey), [form.roleKey]);
+  const roleOptions = useMemo(() => getAdminSupportedRoleOptions(), []);
+  const permissionProfile = useMemo(() => getAdminRoleProfile(form.roleKey), [form.roleKey]);
 
   const handleChange = (field) => (event) => {
-    const value = field === "twoFactorEnabled" ? event.target.checked : event.target.value;
     setForm((current) => ({
       ...current,
-      [field]: value,
+      [field]: event.target.value,
     }));
     setFieldErrors((current) => ({
       ...current,
@@ -54,16 +49,23 @@ export default function AdminUserCreate() {
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    const { values, errors, isValid } = validateAdminUserForm(form);
-    const normalizedValues = sanitizeAdminUserForm(values);
+    const normalizedValues = {
+      fullName: normalizeSpaces(form.fullName),
+      userName: String(form.userName ?? "").trim(),
+      password: String(form.password ?? ""),
+      roleKey: form.roleKey,
+    };
 
-    if (getAdminUsers().some((user) => user.userName === normalizedValues.userName)) {
-      errors.userName = "Username này đã tồn tại trong dữ liệu demo.";
-    }
+    const errors = {
+      fullName: validateFullName(normalizedValues.fullName),
+      userName: validateUserName(normalizedValues.userName),
+      password: validatePassword(normalizedValues.password),
+      roleKey: normalizedValues.roleKey ? "" : "Vui lòng chọn role.",
+    };
 
     setFieldErrors(errors);
 
-    if (!isValid || Object.values(errors).some(Boolean)) {
+    if (Object.values(errors).some(Boolean)) {
       setSubmitError("Vui lòng kiểm tra lại thông tin trước khi tạo user.");
       return;
     }
@@ -71,13 +73,27 @@ export default function AdminUserCreate() {
     setIsSubmitting(true);
     setSubmitError("");
 
-    const createdUser = createAdminUser(normalizedValues);
+    AdminUserService.createUser(normalizedValues)
+      .then((createdUser) => {
+        const nextPath = createdUser?.id != null ? `/admin/users/${createdUser.id}` : "/admin/users";
 
-    navigate(`/admin/users/${createdUser.id}`, {
-      state: {
-        notice: `Đã tạo user ${createdUser.fullName} thành công trong admin module.`,
-      },
-    });
+        navigate(nextPath, {
+          state: {
+            notice: `Đã tạo user ${createdUser.fullName} thành công.`,
+          },
+        });
+      })
+      .catch((error) => {
+        setSubmitError(
+          getAdminUserErrorMessage(
+            error,
+            "Không thể tạo user mới. Vui lòng thử lại."
+          )
+        );
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   return (
@@ -92,7 +108,7 @@ export default function AdminUserCreate() {
               </Link>
               <h1 className="admin-hero__title">Add New User Screen</h1>
               <p className="admin-hero__subtitle">
-                Form onboarding cho Admin tạo account nội bộ mới, gán role, bật MFA và kiểm tra phạm vi truy cập trước khi cấp quyền.
+                Form onboarding cho Admin tạo account mới bằng API `create-user` và gán role ngay từ bước khởi tạo.
               </p>
             </div>
 
@@ -118,7 +134,7 @@ export default function AdminUserCreate() {
                 <div className="admin-card__header">
                   <div>
                     <h2 className="admin-card__title">Thông tin account</h2>
-                    <p className="admin-card__subtitle">Nhập các thông tin nhận diện chính của user nội bộ.</p>
+                    <p className="admin-card__subtitle">API hiện hỗ trợ tạo user với họ tên, username, password và role.</p>
                   </div>
                 </div>
 
@@ -138,31 +154,10 @@ export default function AdminUserCreate() {
                   </label>
 
                   <label className="admin-field">
-                    <span className="admin-field__label">Email</span>
-                    <Mail size={18} className="admin-field__icon" />
-                    <input value={form.email} onChange={handleChange("email")} className="admin-field__control" placeholder="user@gpms.vn" />
-                    {fieldErrors.email ? <span className="admin-field__error">{fieldErrors.email}</span> : null}
-                  </label>
-
-                  <label className="admin-field">
-                    <span className="admin-field__label">Số điện thoại</span>
-                    <Phone size={18} className="admin-field__icon" />
-                    <input value={form.phoneNumber} onChange={handleChange("phoneNumber")} className="admin-field__control" placeholder="09xx xxx xxx" />
-                    {fieldErrors.phoneNumber ? <span className="admin-field__error">{fieldErrors.phoneNumber}</span> : null}
-                  </label>
-
-                  <label className="admin-field">
-                    <span className="admin-field__label">Bộ phận</span>
-                    <Building2 size={18} className="admin-field__icon" />
-                    <input value={form.department} onChange={handleChange("department")} className="admin-field__control" placeholder="Nền tảng vận hành" />
-                    {fieldErrors.department ? <span className="admin-field__error">{fieldErrors.department}</span> : null}
-                  </label>
-
-                  <label className="admin-field">
-                    <span className="admin-field__label">Chức danh</span>
-                    <BriefcaseBusiness size={18} className="admin-field__icon" />
-                    <input value={form.title} onChange={handleChange("title")} className="admin-field__control" placeholder="System Administrator" />
-                    {fieldErrors.title ? <span className="admin-field__error">{fieldErrors.title}</span> : null}
+                    <span className="admin-field__label">Password</span>
+                    <ShieldCheck size={18} className="admin-field__icon" />
+                    <input type="password" value={form.password} onChange={handleChange("password")} className="admin-field__control" placeholder="Nhập mật khẩu ban đầu" />
+                    {fieldErrors.password ? <span className="admin-field__error">{fieldErrors.password}</span> : null}
                   </label>
 
                   <label className="admin-field">
@@ -177,40 +172,14 @@ export default function AdminUserCreate() {
                     </select>
                     {fieldErrors.roleKey ? <span className="admin-field__error">{fieldErrors.roleKey}</span> : null}
                   </label>
-
-                  <label className="admin-field">
-                    <span className="admin-field__label">Trạng thái</span>
-                    <KeyRound size={18} className="admin-field__icon" />
-                    <select value={form.status} onChange={handleChange("status")} className="admin-field__control">
-                      <option value="invited">Chờ kích hoạt</option>
-                      <option value="active">Đang hoạt động</option>
-                      <option value="suspended">Tạm khóa</option>
-                      <option value="locked">Khóa bảo mật</option>
-                    </select>
-                    {fieldErrors.status ? <span className="admin-field__error">{fieldErrors.status}</span> : null}
-                  </label>
-
-                  <label className="admin-field admin-field--full">
-                    <span className="admin-field__label">Khu vực làm việc</span>
-                    <MapPin size={18} className="admin-field__icon" />
-                    <input value={form.location} onChange={handleChange("location")} className="admin-field__control" placeholder="Hà Nội / TP. Hồ Chí Minh / Đà Nẵng..." />
-                  </label>
-
-                  <label className="admin-field admin-field--full">
-                    <span className="admin-field__label">Ghi chú onboarding</span>
-                    <UserRoundCog size={18} className="admin-field__icon" />
-                    <textarea value={form.notes} onChange={handleChange("notes")} className="admin-field__control" placeholder="Mô tả phạm vi công việc, deadline kích hoạt, hoặc lưu ý bảo mật..." />
-                  </label>
                 </div>
 
                 <div className="mt-4">
-                  <label className="admin-checkbox-card">
-                    <input type="checkbox" checked={form.twoFactorEnabled} onChange={handleChange("twoFactorEnabled")} />
-                    <div>
-                      <strong>Bật MFA ngay khi tạo account</strong>
-                      <span>Khuyến nghị bật với mọi user có quyền truy cập dữ liệu vận hành hoặc phân quyền.</span>
-                    </div>
-                  </label>
+                  <AdminBanner
+                    title="Các trường liên hệ, MFA và ghi chú chưa có trong API create-user."
+                    description="Sau khi backend bổ sung endpoint chi tiết/update user, mình có thể nối tiếp các trường đó vào form admin này."
+                    tone="info"
+                  />
                 </div>
 
                 {submitError ? (
@@ -239,8 +208,8 @@ export default function AdminUserCreate() {
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Phạm vi quyền</strong>
-                    <span>{permissionProfile?.shortLabel}</span>
-                    <span>{permissionProfile ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} capability bật` : "Chưa gán quyền"}</span>
+                    <span>{permissionProfile?.shortLabel || "Chưa có preview"}</span>
+                    <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} capability bật` : "Role này chưa có permission profile demo"}</span>
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Mô tả role</strong>
@@ -260,15 +229,15 @@ export default function AdminUserCreate() {
                 <div className="admin-preview-list">
                   <div className="admin-preview-list__item">
                     <strong>1. Xác minh nhu cầu truy cập</strong>
-                    <span>Đảm bảo role phản ánh đúng công việc và không cấp thừa quyền cấu hình.</span>
+                    <span>Đảm bảo role phản ánh đúng công việc và không cấp thừa quyền so với nhu cầu thật.</span>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>2. Kích hoạt MFA</strong>
-                    <span>Ưu tiên bật cho user có quyền xem log, quyền user hoặc quyền approve.</span>
+                    <strong>2. Ghi nhớ giới hạn API</strong>
+                    <span>Form này hiện mới lưu được 4 trường mà backend `create-user` đang hỗ trợ.</span>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>3. Gắn ghi chú onboarding</strong>
-                    <span>Ghi rõ bộ phận, deadline kích hoạt và đầu mối chịu trách nhiệm.</span>
+                    <strong>3. Kiểm tra lại role sau khi tạo</strong>
+                    <span>Nếu cần đổi role ngay sau đó, Admin có thể vào màn Update User để gán lại bằng API assign-roles.</span>
                   </div>
                 </div>
               </section>

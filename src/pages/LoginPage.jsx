@@ -139,9 +139,10 @@ export default function LoginPage() {
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
       const roles = splitRoles(result?.user?.role);
+      const isAdmin = roles.includes("Admin");
       const isInternalUser = roles.includes("Owner") || roles.includes("PM");
 
-      navigate(isInternalUser ? "/dashboard" : "/home");
+      navigate(isAdmin ? "/admin/users" : isInternalUser ? "/dashboard" : "/home");
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {

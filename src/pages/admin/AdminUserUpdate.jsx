@@ -1,10 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
-  Building2,
-  KeyRound,
   LoaderCircle,
   Mail,
   MapPin,
@@ -15,35 +12,114 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  getAdminRoleOptions,
-  getAdminUserById,
-  getPermissionProfile,
-  updateAdminUser,
-} from "@/lib/admin/adminMockStore";
+  normalizeSpaces,
+  validateAvatarFile,
+  validateEmail,
+  validateFullName,
+  validateLocation,
+  validatePhoneNumber,
+} from "@/lib/validators";
+import AdminUserService, {
+  getAdminRoleProfile,
+  getAdminSupportedRoleOptions,
+  getAdminUserErrorMessage,
+} from "@/services/AdminUserService";
 import {
   AdminBanner,
   AdminRoleBadge,
-  buildAdminUserFormValues,
-  sanitizeAdminUserForm,
-  validateAdminUserForm,
+  AdminStatusBadge,
+  getAdminInitials,
 } from "@/pages/admin/adminShared";
 
 export default function AdminUserUpdate() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const user = useMemo(() => getAdminUserById(id), [id]);
-  const [form, setForm] = useState(() => buildAdminUserFormValues(user || {}));
+  const [user, setUser] = useState(null);
+  const [form, setForm] = useState({
+    fullName: "",
+    userName: "",
+    email: "",
+    phoneNumber: "",
+    location: "",
+    roleKey: "",
+  });
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const roleOptions = useMemo(() => getAdminRoleOptions(), []);
-  const permissionProfile = useMemo(() => getPermissionProfile(form.roleKey), [form.roleKey]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [isDisabling, setIsDisabling] = useState(false);
+  const roleOptions = useMemo(() => getAdminSupportedRoleOptions(), []);
+  const selectRoleOptions = useMemo(() => {
+    if (!user?.roleKey || roleOptions.some((role) => role.key === user.roleKey)) {
+      return roleOptions;
+    }
+
+    return [
+      {
+        key: user.roleKey,
+        label: `${user.roleLabel} (role hiện tại)`,
+      },
+      ...roleOptions,
+    ];
+  }, [roleOptions, user]);
+  const permissionProfile = useMemo(() => getAdminRoleProfile(form.roleKey), [form.roleKey]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchUser = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const foundUser = await AdminUserService.getUserById(id);
+        if (!mounted) return;
+
+        if (!foundUser) {
+          setError("Không tìm thấy user để cập nhật.");
+          setUser(null);
+          return;
+        }
+
+        setUser(foundUser);
+        setForm({
+          fullName: foundUser.fullName || "",
+          userName: foundUser.userName || "",
+          email: foundUser.email || "",
+          phoneNumber: foundUser.phoneNumber || "",
+          location: foundUser.location || "",
+          roleKey: foundUser.roleKey || "",
+        });
+        setAvatarPreview(foundUser.avatarUrl || "");
+        setAvatarFile(null);
+      } catch (err) {
+        if (!mounted) return;
+
+        setError(
+          getAdminUserErrorMessage(
+            err,
+            "Không tải được thông tin user. Vui lòng thử lại."
+          )
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, [id]);
 
   const handleChange = (field) => (event) => {
-    const value = field === "twoFactorEnabled" ? event.target.checked : event.target.value;
     setForm((current) => ({
       ...current,
-      [field]: value,
+      [field]: event.target.value,
     }));
     setFieldErrors((current) => ({
       ...current,
@@ -52,27 +128,121 @@ export default function AdminUserUpdate() {
     setSubmitError("");
   };
 
-  const handleSubmit = (event) => {
+  const handleAvatarChange = (event) => {
+    const nextFile = event.target.files?.[0];
+    if (!nextFile) return;
+
+    const avatarError = validateAvatarFile(nextFile);
+    if (avatarError) {
+      setFieldErrors((current) => ({
+        ...current,
+        avatarFile: avatarError,
+      }));
+      return;
+    }
+
+    setAvatarFile(nextFile);
+    setAvatarPreview(URL.createObjectURL(nextFile));
+    setFieldErrors((current) => ({
+      ...current,
+      avatarFile: "",
+    }));
+    setSubmitError("");
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const { values, errors, isValid } = validateAdminUserForm(form);
+    const normalizedValues = {
+      fullName: normalizeSpaces(form.fullName),
+      email: String(form.email ?? "").trim().toLowerCase(),
+      phoneNumber: String(form.phoneNumber ?? "").trim(),
+      location: normalizeSpaces(form.location),
+      roleKey: String(form.roleKey ?? "").trim(),
+    };
+
+    const errors = {
+      fullName: validateFullName(normalizedValues.fullName),
+      email: validateEmail(normalizedValues.email),
+      phoneNumber: validatePhoneNumber(normalizedValues.phoneNumber),
+      location: validateLocation(normalizedValues.location),
+      roleKey: normalizedValues.roleKey ? "" : "Vui lòng chọn role để gán.",
+      avatarFile: fieldErrors.avatarFile || "",
+    };
+
     setFieldErrors(errors);
 
-    if (!isValid) {
-      setSubmitError("Vui lòng kiểm tra lại các trường bắt buộc trước khi lưu.");
+    if (Object.values(errors).some(Boolean)) {
+      setSubmitError("Vui lòng kiểm tra lại thông tin trước khi lưu.");
       return;
     }
 
     setIsSubmitting(true);
     setSubmitError("");
 
-    const updatedUser = updateAdminUser(id, sanitizeAdminUserForm(values));
+    try {
+      const updatedUser = await AdminUserService.updateUser(id, {
+        fullName: normalizedValues.fullName,
+        email: normalizedValues.email,
+        phoneNumber: normalizedValues.phoneNumber,
+        location: normalizedValues.location,
+        avatarFile,
+      });
 
-    navigate(`/admin/users/${updatedUser.id}`, {
-      state: {
-        notice: `Đã cập nhật hồ sơ user ${updatedUser.fullName}.`,
-      },
-    });
+      if (normalizedValues.roleKey !== user?.roleKey) {
+        await AdminUserService.assignRoles(id, [normalizedValues.roleKey]);
+      }
+
+      navigate(`/admin/users/${id}`, {
+        state: {
+          notice:
+            normalizedValues.roleKey !== user?.roleKey
+              ? `Đã cập nhật hồ sơ và gán lại role cho ${updatedUser.fullName}.`
+              : `Đã cập nhật hồ sơ user ${updatedUser.fullName}.`,
+        },
+      });
+    } catch (err) {
+      setSubmitError(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể cập nhật user. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDisableUser = async () => {
+    if (!user?.id || user.status === "inactive" || isDisabling) {
+      return;
+    }
+
+    const shouldDisable = window.confirm(
+      `Bạn có chắc muốn vô hiệu hóa tài khoản của ${user.fullName || user.userName || "user này"} không?`
+    );
+
+    if (!shouldDisable) return;
+
+    setIsDisabling(true);
+
+    try {
+      await AdminUserService.disableUser(user.id);
+      navigate(`/admin/users/${id}`, {
+        state: {
+          notice: `Đã vô hiệu hóa user ${user.fullName || user.userName}.`,
+        },
+      });
+    } catch (err) {
+      setSubmitError(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể vô hiệu hóa user. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setIsDisabling(false);
+    }
   };
 
   return (
@@ -87,11 +257,11 @@ export default function AdminUserUpdate() {
               </Link>
               <h1 className="admin-hero__title">Update User Screen</h1>
               <p className="admin-hero__subtitle">
-                Màn chỉnh sửa để Admin cập nhật role, trạng thái truy cập, thông tin liên hệ và ghi chú kiểm soát cho user hiện có.
+                Màn chỉnh sửa để Admin cập nhật hồ sơ bằng endpoint `update-user-for-admin` và gán lại role khi cần.
               </p>
             </div>
 
-            {user ? (
+            {user && !loading ? (
               <div className="admin-hero__actions">
                 <Link to={`/admin/users/${user.id}`} className="admin-btn admin-btn--secondary">
                   Hủy
@@ -105,16 +275,37 @@ export default function AdminUserUpdate() {
                   {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
                   <span>{isSubmitting ? "Đang lưu..." : "Save Changes"}</span>
                 </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-focusable"
+                  onClick={handleDisableUser}
+                  disabled={user.status === "inactive" || isDisabling}
+                >
+                  {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
+                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}</span>
+                </button>
               </div>
             ) : null}
           </div>
 
-          {!user ? (
+          {loading ? (
+            <section className="admin-card">
+              <div className="admin-state">
+                <div className="admin-state__content">
+                  <strong>Đang tải hồ sơ user...</strong>
+                  <span>Thông tin đang được đồng bộ từ endpoint detail cho admin.</span>
+                </div>
+                <div className="admin-state__actions">
+                  <LoaderCircle size={20} className="animate-spin" />
+                </div>
+              </div>
+            </section>
+          ) : error ? (
             <section className="admin-card">
               <div className="admin-state">
                 <div className="admin-state__content">
                   <strong>Không tìm thấy user để cập nhật</strong>
-                  <span>Kiểm tra lại id hoặc quay về danh sách user để chọn hồ sơ cần chỉnh sửa.</span>
+                  <span>{error}</span>
                 </div>
                 <div className="admin-state__actions">
                   <Link to="/admin/users" className="admin-btn admin-btn--primary">
@@ -130,11 +321,36 @@ export default function AdminUserUpdate() {
                   <div className="admin-card__header">
                     <div>
                       <h2 className="admin-card__title">Thông tin user hiện tại</h2>
-                      <p className="admin-card__subtitle">Admin có thể cập nhật role, trạng thái và thông tin vận hành, riêng username được giữ cố định.</p>
+                      <p className="admin-card__subtitle">Endpoint update yêu cầu đầy đủ họ tên, số điện thoại, email và địa điểm. Role vẫn được lưu qua API assign-roles.</p>
                     </div>
                   </div>
 
                   <div className="admin-form-grid">
+                    <label className="admin-field admin-field--full">
+                      <span className="admin-field__label">Ảnh đại diện</span>
+                      <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                        <div className="admin-avatar h-20 w-20">
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt={form.fullName || form.userName} className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            getAdminInitials(form.fullName || form.userName)
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="admin-field__control"
+                          />
+                          <div className="mt-2 text-sm text-slate-500">
+                            Chỉ upload khi bạn muốn thay ảnh mới. Nếu bỏ trống, hệ thống sẽ giữ ảnh hiện tại.
+                          </div>
+                          {fieldErrors.avatarFile ? <span className="admin-field__error">{fieldErrors.avatarFile}</span> : null}
+                        </div>
+                      </div>
+                    </label>
+
                     <label className="admin-field">
                       <span className="admin-field__label">Họ và tên</span>
                       <UserRoundCog size={18} className="admin-field__icon" />
@@ -163,63 +379,39 @@ export default function AdminUserUpdate() {
                     </label>
 
                     <label className="admin-field">
-                      <span className="admin-field__label">Bộ phận</span>
-                      <Building2 size={18} className="admin-field__icon" />
-                      <input value={form.department} onChange={handleChange("department")} className="admin-field__control" />
-                      {fieldErrors.department ? <span className="admin-field__error">{fieldErrors.department}</span> : null}
-                    </label>
-
-                    <label className="admin-field">
-                      <span className="admin-field__label">Chức danh</span>
-                      <BriefcaseBusiness size={18} className="admin-field__icon" />
-                      <input value={form.title} onChange={handleChange("title")} className="admin-field__control" />
-                      {fieldErrors.title ? <span className="admin-field__error">{fieldErrors.title}</span> : null}
-                    </label>
-
-                    <label className="admin-field">
-                      <span className="admin-field__label">Role</span>
+                      <span className="admin-field__label">Role đang chọn</span>
                       <ShieldCheck size={18} className="admin-field__icon" />
                       <select value={form.roleKey} onChange={handleChange("roleKey")} className="admin-field__control">
-                        {roleOptions.map((role) => (
+                        <option value="">Chọn role để gán</option>
+                        {selectRoleOptions.map((role) => (
                           <option key={role.key} value={role.key}>
                             {role.label}
                           </option>
                         ))}
                       </select>
+                      {fieldErrors.roleKey ? <span className="admin-field__error">{fieldErrors.roleKey}</span> : null}
                     </label>
 
                     <label className="admin-field">
-                      <span className="admin-field__label">Trạng thái</span>
-                      <KeyRound size={18} className="admin-field__icon" />
-                      <select value={form.status} onChange={handleChange("status")} className="admin-field__control">
-                        <option value="active">Đang hoạt động</option>
-                        <option value="invited">Chờ kích hoạt</option>
-                        <option value="suspended">Tạm khóa</option>
-                        <option value="locked">Khóa bảo mật</option>
-                      </select>
+                      <span className="admin-field__label">Trạng thái hiện tại</span>
+                      <ShieldCheck size={18} className="admin-field__icon" />
+                      <input value={user.status === "active" ? "Đang hoạt động" : "Đã vô hiệu hóa"} disabled className="admin-field__control" />
                     </label>
 
                     <label className="admin-field admin-field--full">
-                      <span className="admin-field__label">Khu vực làm việc</span>
+                      <span className="admin-field__label">Địa điểm</span>
                       <MapPin size={18} className="admin-field__icon" />
                       <input value={form.location} onChange={handleChange("location")} className="admin-field__control" />
-                    </label>
-
-                    <label className="admin-field admin-field--full">
-                      <span className="admin-field__label">Ghi chú kiểm soát</span>
-                      <UserRoundCog size={18} className="admin-field__icon" />
-                      <textarea value={form.notes} onChange={handleChange("notes")} className="admin-field__control" />
+                      {fieldErrors.location ? <span className="admin-field__error">{fieldErrors.location}</span> : null}
                     </label>
                   </div>
 
                   <div className="mt-4">
-                    <label className="admin-checkbox-card">
-                      <input type="checkbox" checked={form.twoFactorEnabled} onChange={handleChange("twoFactorEnabled")} />
-                      <div>
-                        <strong>Duy trì xác thực đa lớp</strong>
-                        <span>Giữ bật cho account có quyền xem log, phân quyền hoặc thực hiện thao tác approve.</span>
-                      </div>
-                    </label>
+                    <AdminBanner
+                      title="Màn update admin đang dùng 3 API thật."
+                      description="`get-user-detail-for-admin/{id}` để load hồ sơ, `update-user-for-admin/{id}` để lưu thông tin cơ bản, và `assign-roles/{id}` để đổi role."
+                      tone="info"
+                    />
                   </div>
 
                   {submitError ? (
@@ -248,8 +440,12 @@ export default function AdminUserUpdate() {
                     </div>
                     <div className="admin-preview-list__item">
                       <strong>Permission preview</strong>
-                      <span>{permissionProfile?.shortLabel}</span>
-                      <span>{permissionProfile?.description}</span>
+                      <span>{permissionProfile?.shortLabel || "Chưa có preview"}</span>
+                      <span>{permissionProfile?.description || "Role này chưa có permission profile demo trên web."}</span>
+                    </div>
+                    <div className="admin-preview-list__item">
+                      <strong>Worker role hiện tại</strong>
+                      <span>{user.workerRole || "Chưa gán worker role"}</span>
                     </div>
                   </div>
                 </section>
@@ -257,23 +453,25 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Checklist cập nhật</h2>
-                      <p className="admin-card__subtitle">Những điểm Admin nên xác nhận trước khi save.</p>
+                      <h2 className="admin-card__title">Snapshot user</h2>
+                      <p className="admin-card__subtitle">Đối chiếu nhanh thông tin trước khi bấm lưu.</p>
                     </div>
                   </div>
 
                   <div className="admin-preview-list">
                     <div className="admin-preview-list__item">
-                      <strong>Role mới có cần phê duyệt không?</strong>
-                      <span>Nếu thay đổi từ Support/PM sang Admin hoặc Owner, nên kiểm tra lại lý do cấp quyền.</span>
+                      <strong>Trạng thái</strong>
+                      <div className="mt-3">
+                        <AdminStatusBadge status={user.status} />
+                      </div>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Trạng thái account</strong>
-                      <span>Locked và Suspended nên luôn đi kèm ghi chú vận hành hoặc lý do kiểm soát.</span>
+                      <strong>Role backend hiện tại</strong>
+                      <span>{user.roleNames?.join(", ") || user.roleLabel}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>MFA</strong>
-                      <span>Không nên tắt MFA nếu user có quyền System Logs hoặc Permissions.</span>
+                      <strong>Checklist</strong>
+                      <span>Nếu cần khóa tài khoản, dùng nút Disable User. Nếu chỉ sửa hồ sơ, form này sẽ không động vào trạng thái account.</span>
                     </div>
                   </div>
                 </section>

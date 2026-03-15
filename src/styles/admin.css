@@ -370,6 +370,11 @@ textarea.admin-field__control {
   color: #1e6e43;
 }
 
+.admin-badge--inactive {
+  background: #fff6dd;
+  color: #a87410;
+}
+
 .admin-badge--invited {
   background: #eaf2ff;
   color: #356bd8;

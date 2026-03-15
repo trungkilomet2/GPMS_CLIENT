@@ -7,22 +7,23 @@ import {
   ClipboardList,
   LogOut,
   ShieldCheck,
-  Shapes,
   Users,
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
-const NAV_ITEMS = [
+const ADMIN_NAV_ITEMS = [
+  { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false },
+  { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false },
+  { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false },
+];
+
+const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
-  { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false, requiredRole: "Admin" },
-  { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false, requiredRole: "Admin" },
-  { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false, requiredRole: "Admin" },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
   { to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
-  { to: "/worker-roles", label: "Vai trò thợ", icon: Shapes, disabled: false },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];
@@ -40,6 +41,20 @@ function hasRequiredRole(user, requiredRole) {
   if (!requiredRole) return true;
   const roles = splitRoles(user?.role);
   return roles.includes(requiredRole);
+}
+
+function resolveSidebarItems(user) {
+  const roles = splitRoles(user?.role);
+
+  if (roles.includes("Admin")) {
+    return ADMIN_NAV_ITEMS;
+  }
+
+  if (roles.includes("Owner") || roles.includes("PM")) {
+    return OPERATION_NAV_ITEMS;
+  }
+
+  return [];
 }
 
 function getInitials(name = "") {
@@ -64,6 +79,7 @@ export default function Sidebar() {
   });
 
   const user = getStoredUser();
+  const navItems = resolveSidebarItems(user);
 
   useEffect(() => {
     try {
@@ -99,7 +115,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
+        {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
           if (!hasRequiredRole(user, requiredRole)) {
             return null;
           }

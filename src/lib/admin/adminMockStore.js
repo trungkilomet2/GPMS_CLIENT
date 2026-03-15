@@ -3,9 +3,12 @@ import { getStoredUser } from "@/lib/authStorage";
 const USERS_STORAGE_KEY = "gpms-admin-users";
 const LOGS_STORAGE_KEY = "gpms-admin-logs";
 const PERMISSIONS_STORAGE_KEY = "gpms-admin-permissions";
+const ADMIN_MOCK_VERSION_KEY = "gpms-admin-version";
+const ADMIN_MOCK_VERSION = "2026-03-15-role-alignment";
 
 export const ADMIN_STATUS_META = {
   active: { label: "Đang hoạt động", tone: "success" },
+  inactive: { label: "Ngừng hoạt động", tone: "warning" },
   invited: { label: "Chờ kích hoạt", tone: "info" },
   suspended: { label: "Tạm khóa", tone: "warning" },
   locked: { label: "Khóa bảo mật", tone: "danger" },
@@ -116,34 +119,50 @@ const DEFAULT_PERMISSION_PROFILES = [
     },
   },
   {
-    key: "Auditor",
-    label: "Kiểm soát nội bộ",
-    shortLabel: "Đọc và đối soát",
+    key: "Team Leader",
+    label: "Tổ trưởng",
+    shortLabel: "Điều phối chuyền",
     tone: "info",
-    description: "Đọc dữ liệu, xuất báo cáo, rà soát log và kiểm tra thay đổi quyền truy cập.",
-    updatedAt: "2026-03-09T10:05:00+07:00",
+    description: "Điều phối tổ, theo dõi nhân sự chuyền và phối hợp tiến độ với PM.",
+    updatedAt: "2026-03-10T15:10:00+07:00",
     permissions: {
-      dashboard: { view: true, create: false, update: false, approve: false, export: true, configure: false },
-      users: { view: true, create: false, update: false, approve: false, export: true, configure: false },
-      orders: { view: true, create: false, update: false, approve: false, export: true, configure: false },
-      employees: { view: true, create: false, update: false, approve: false, export: true, configure: false },
-      logs: { view: true, create: false, update: false, approve: false, export: true, configure: false },
-      permissions: { view: true, create: false, update: false, approve: false, export: true, configure: false },
+      dashboard: { view: true, create: false, update: true, approve: false, export: true, configure: false },
+      users: { view: true, create: false, update: false, approve: false, export: false, configure: false },
+      orders: { view: true, create: false, update: true, approve: false, export: false, configure: false },
+      employees: { view: true, create: false, update: true, approve: false, export: true, configure: false },
+      logs: { view: false, create: false, update: false, approve: false, export: false, configure: false },
+      permissions: { view: false, create: false, update: false, approve: false, export: false, configure: false },
     },
   },
   {
-    key: "Support",
-    label: "Hỗ trợ vận hành",
-    shortLabel: "Hỗ trợ tuyến đầu",
+    key: "KCS",
+    label: "Kiểm soát chất lượng",
+    shortLabel: "Kiểm tra chất lượng",
     tone: "success",
-    description: "Tiếp nhận yêu cầu hỗ trợ, khóa tạm user, theo dõi log và escalte cho Admin.",
+    description: "Theo dõi chất lượng thành phẩm, ghi nhận lỗi và phối hợp xử lý sự cố chất lượng.",
+    updatedAt: "2026-03-09T10:05:00+07:00",
+    permissions: {
+      dashboard: { view: true, create: false, update: false, approve: false, export: false, configure: false },
+      users: { view: true, create: false, update: false, approve: false, export: false, configure: false },
+      orders: { view: true, create: false, update: true, approve: false, export: true, configure: false },
+      employees: { view: true, create: false, update: false, approve: false, export: false, configure: false },
+      logs: { view: false, create: false, update: false, approve: false, export: false, configure: false },
+      permissions: { view: false, create: false, update: false, approve: false, export: false, configure: false },
+    },
+  },
+  {
+    key: "Worker",
+    label: "Nhân viên",
+    shortLabel: "Nhân sự vận hành",
+    tone: "primary",
+    description: "Tài khoản tác nghiệp hàng ngày, nhận việc và cập nhật tiến độ công việc được giao.",
     updatedAt: "2026-03-08T09:30:00+07:00",
     permissions: {
       dashboard: { view: true, create: false, update: false, approve: false, export: false, configure: false },
-      users: { view: true, create: true, update: true, approve: false, export: false, configure: false },
+      users: { view: false, create: false, update: false, approve: false, export: false, configure: false },
       orders: { view: true, create: false, update: false, approve: false, export: false, configure: false },
-      employees: { view: true, create: false, update: false, approve: false, export: false, configure: false },
-      logs: { view: true, create: false, update: false, approve: false, export: false, configure: false },
+      employees: { view: false, create: false, update: false, approve: false, export: false, configure: false },
+      logs: { view: false, create: false, update: false, approve: false, export: false, configure: false },
       permissions: { view: false, create: false, update: false, approve: false, export: false, configure: false },
     },
   },
@@ -207,12 +226,12 @@ const DEFAULT_ADMIN_USERS = [
   {
     id: "USR-1004",
     fullName: "Phạm Gia Hân",
-    userName: "giahan.support",
-    email: "giahan.support@gpms.vn",
+    userName: "giahan.teamlead",
+    email: "giahan.teamlead@gpms.vn",
     phoneNumber: "0966 152 008",
-    department: "Hỗ trợ vận hành",
-    title: "Operation Support Lead",
-    roleKey: "Support",
+    department: "Chuyền may A",
+    title: "Team Leader",
+    roleKey: "Team Leader",
     status: "locked",
     twoFactorEnabled: true,
     location: "Đà Nẵng",
@@ -225,30 +244,30 @@ const DEFAULT_ADMIN_USERS = [
   {
     id: "USR-1005",
     fullName: "Đỗ Thanh Bình",
-    userName: "thanhbinh.audit",
-    email: "thanhbinh.audit@gpms.vn",
+    userName: "thanhbinh.kcs",
+    email: "thanhbinh.kcs@gpms.vn",
     phoneNumber: "0977 620 114",
-    department: "Kiểm soát nội bộ",
-    title: "Internal Auditor",
-    roleKey: "Auditor",
+    department: "Kiểm soát chất lượng",
+    title: "Quality Inspector",
+    roleKey: "KCS",
     status: "active",
     twoFactorEnabled: true,
     location: "Hà Nội",
-    notes: "Đối soát log truy cập, lịch sử thay đổi quyền và báo cáo kiểm toán nội bộ.",
+    notes: "Kiểm tra chất lượng thành phẩm và phối hợp xử lý các lỗi chất lượng phát sinh.",
     createdAt: "2026-01-15T08:40:00+07:00",
     updatedAt: "2026-03-13T21:12:00+07:00",
     lastLogin: "2026-03-13T21:12:00+07:00",
-    tags: ["Read only", "Audit trail"],
+    tags: ["Inspection", "Quality gate"],
   },
   {
     id: "USR-1006",
     fullName: "Võ Mỹ Linh",
-    userName: "mylinh.support",
-    email: "mylinh.support@gpms.vn",
+    userName: "mylinh.worker",
+    email: "mylinh.worker@gpms.vn",
     phoneNumber: "0984 883 500",
-    department: "Hỗ trợ vận hành",
-    title: "Support Specialist",
-    roleKey: "Support",
+    department: "Chuyền may A",
+    title: "Sewing Worker",
+    roleKey: "Worker",
     status: "invited",
     twoFactorEnabled: false,
     location: "Hải Phòng",
@@ -323,7 +342,7 @@ const DEFAULT_ADMIN_LOGS = [
     targetLabel: "Phạm Gia Hân",
     outcome: "warning",
     ipAddress: "203.113.7.46",
-    description: "Hệ thống phát hiện đăng nhập từ IP ngoài whitelist của bộ phận Support.",
+    description: "Hệ thống phát hiện đăng nhập từ IP ngoài whitelist của tài khoản tổ trưởng chuyền.",
   },
   {
     id: "LOG-20260313-010",
@@ -331,15 +350,15 @@ const DEFAULT_ADMIN_LOGS = [
     severity: "info",
     moduleKey: "logs",
     moduleLabel: "System Logs",
-    action: "Xem log truy cập",
+    action: "Kiểm tra biên bản chất lượng",
     actorName: "Đỗ Thanh Bình",
-    actorUserName: "thanhbinh.audit",
+    actorUserName: "thanhbinh.kcs",
     actorUserId: "USR-1005",
-    targetId: "log-batch-881",
-    targetLabel: "Batch xác minh đăng nhập",
+    targetId: "quality-batch-881",
+    targetLabel: "Biên bản chất lượng lô 881",
     outcome: "success",
     ipAddress: "10.24.7.22",
-    description: "Rà soát lịch sử đăng nhập ngoài giờ làm việc của nhóm Support.",
+    description: "Đối chiếu biên bản chất lượng cuối ca để xác nhận lỗi đã được xử lý.",
   },
   {
     id: "LOG-20260313-009",
@@ -371,7 +390,7 @@ const DEFAULT_ADMIN_LOGS = [
     targetLabel: "Võ Mỹ Linh",
     outcome: "success",
     ipAddress: "10.24.6.18",
-    description: "Gửi email onboarding và tạo account hỗ trợ vận hành mới.",
+    description: "Gửi email onboarding và tạo account nhân viên mới.",
   },
   {
     id: "LOG-20260313-007",
@@ -383,11 +402,11 @@ const DEFAULT_ADMIN_LOGS = [
     actorName: "Trần Thảo Vy",
     actorUserName: "thaovy.owner",
     actorUserId: "USR-1002",
-    targetId: "Support",
-    targetLabel: "Role Hỗ trợ vận hành",
+    targetId: "Team Leader",
+    targetLabel: "Role Tổ trưởng",
     outcome: "warning",
     ipAddress: "10.24.2.9",
-    description: "Đề xuất mở thêm quyền export log cho role Support, đang chờ Admin phê duyệt.",
+    description: "Đề xuất mở thêm quyền export dữ liệu nhân sự cho role Tổ trưởng, đang chờ Admin phê duyệt.",
   },
   {
     id: "LOG-20260313-006",
@@ -429,7 +448,29 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
+function ensureMockSeedVersion() {
+  if (!canUseStorage()) return;
+
+  try {
+    const currentVersion = window.localStorage.getItem(ADMIN_MOCK_VERSION_KEY);
+
+    if (currentVersion === ADMIN_MOCK_VERSION) {
+      return;
+    }
+
+    // Reset demo admin storage when the supported role set changes.
+    window.localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_ADMIN_USERS));
+    window.localStorage.setItem(LOGS_STORAGE_KEY, JSON.stringify(DEFAULT_ADMIN_LOGS));
+    window.localStorage.setItem(PERMISSIONS_STORAGE_KEY, JSON.stringify(DEFAULT_PERMISSION_PROFILES));
+    window.localStorage.setItem(ADMIN_MOCK_VERSION_KEY, ADMIN_MOCK_VERSION);
+  } catch {
+    // Ignore storage write errors in demo mode.
+  }
+}
+
 function readStoredValue(key, fallbackValue) {
+  ensureMockSeedVersion();
+
   if (!canUseStorage()) return clone(fallbackValue);
 
   try {
