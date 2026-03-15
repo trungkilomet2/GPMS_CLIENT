@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import WorkerService from "@/services/WorkerService";
 import "@/styles/homepage.css";
+import "@/styles/leave.css";
 
 const MOCK_PRODUCTIONS = [
   {
@@ -214,30 +215,33 @@ export default function ProductionPlan() {
 
   return (
     <OwnerLayout>
-      <div className="min-h-screen bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10 space-y-6">
+      <div className="leave-page leave-list-page">
+        <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded text-gray-400">
-                <ArrowLeft size={20} />
+            <div className="flex items-start gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+              >
+                <ArrowLeft size={18} />
               </button>
-              <div>
+              <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Tạo kế hoạch sản xuất</h1>
                 <p className="text-slate-600">Thiết lập công đoạn và theo dõi tiến độ.</p>
               </div>
             </div>
-            <button className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700">
+            <button className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700">
               Lưu kế hoạch
             </button>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
-              <div className="text-xs font-semibold text-slate-500 uppercase">Chọn production</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn production</div>
               <select
                 value={selectedProductionId}
                 onChange={(event) => setSelectedProductionId(event.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
               >
                 <option value="">Chọn production...</option>
                 {MOCK_PRODUCTIONS.map((item) => (
@@ -249,7 +253,7 @@ export default function ProductionPlan() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <button
               type="button"
               onClick={() => setShowProductionInfo((prev) => !prev)}
@@ -261,7 +265,7 @@ export default function ProductionPlan() {
                   {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
                 </div>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">
+              <span className="inline-block rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-700">
                 {selectedProduction?.status || "Chưa chọn"}
               </span>
             </button>
@@ -276,7 +280,7 @@ export default function ProductionPlan() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <button
               type="button"
               onClick={() => setShowProductInfo((prev) => !prev)}
@@ -294,7 +298,7 @@ export default function ProductionPlan() {
             </button>
             {showProductInfo && (
               <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
-                <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                   {selectedProduction?.product?.image ? (
                     <img src={selectedProduction.product.image} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -315,38 +319,38 @@ export default function ProductionPlan() {
             )}
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="leave-table-card__header">
               <div>
-                <div className="text-sm font-semibold text-slate-800">Danh sách công đoạn</div>
-                <div className="text-xs text-slate-500">Quản lý công đoạn theo tổ trưởng và giá/sp.</div>
+                <h2 className="leave-table-card__title">Danh sách công đoạn</h2>
+                <p className="leave-table-card__subtitle">Quản lý công đoạn theo tổ trưởng và giá/sp.</p>
               </div>
               <button
                 onClick={openAddModal}
                 disabled={!selectedProductionId}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
                 <Plus size={16} /> Thêm công đoạn
               </button>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-275 w-full divide-y divide-slate-200 table-fixed">
-                <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-600 tracking-wider">
+                <thead className="leave-table-head">
                   <tr>
-                    <th className="w-16 px-3 py-3 text-center">STT</th>
-                    <th className="w-56 px-3 py-3 text-left">Tên công đoạn</th>
-                    <th className="w-44 px-3 py-3 text-left">Tổ trưởng</th>
-                    <th className="w-32 px-3 py-3 text-center">Start date</th>
-                    <th className="w-32 px-3 py-3 text-center">End date</th>
-                    <th className="w-28 px-3 py-3 text-center">Giá/SP</th>
-                    <th className="w-24 px-3 py-3 text-center">Thao tác</th>
+                    <th className="leave-table-th w-16 px-3 py-3 text-center">STT</th>
+                    <th className="leave-table-th w-56 px-3 py-3 text-left">Tên công đoạn</th>
+                    <th className="leave-table-th w-44 px-3 py-3 text-left">Tổ trưởng</th>
+                    <th className="leave-table-th w-32 px-3 py-3 text-center">Ngày bắt đầu</th>
+                    <th className="leave-table-th w-32 px-3 py-3 text-center">Ngày kết thúc</th>
+                    <th className="leave-table-th w-28 px-3 py-3 text-center">Giá/SP</th>
+                    <th className="leave-table-th w-24 px-3 py-3 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white text-sm">
                   {rows.map((row, idx) => (
                     <tr
                       key={`${row.ppId}-${idx}`}
-                      className={`hover:bg-slate-50/60 ${selectedIndex === idx ? "bg-emerald-50/60" : ""}`}
+                      className={`leave-table-row hover:bg-slate-50/60 ${selectedIndex === idx ? "bg-emerald-50/60" : ""}`}
                       onClick={() => setSelectedIndex(idx)}
                     >
                       <td className="px-3 py-2 text-center">{idx + 1}</td>
@@ -401,7 +405,7 @@ export default function ProductionPlan() {
       {isModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-200">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="text-sm font-semibold text-slate-800">
                 {editingIndex === null ? "Thêm công đoạn" : "Cập nhật công đoạn"}
               </div>
@@ -416,7 +420,7 @@ export default function ProductionPlan() {
                   value={form.partName}
                   onChange={(event) => handleFormChange("partName", event.target.value)}
                   placeholder="Nhập tên công đoạn"
-                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </div>
               <div>
@@ -424,7 +428,7 @@ export default function ProductionPlan() {
                 <select
                   value={form.teamLeaderId}
                   onChange={(event) => handleFormChange("teamLeaderId", event.target.value)}
-                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm bg-white"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   disabled={loadingTeamLeaders}
                 >
                   <option value="">
@@ -447,7 +451,7 @@ export default function ProductionPlan() {
                     type="date"
                     value={form.startDate}
                     onChange={(event) => handleFormChange("startDate", event.target.value)}
-                    className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </div>
                 <div>
@@ -456,7 +460,7 @@ export default function ProductionPlan() {
                     type="date"
                     value={form.endDate}
                     onChange={(event) => handleFormChange("endDate", event.target.value)}
-                    className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </div>
               </div>
@@ -466,18 +470,18 @@ export default function ProductionPlan() {
                   value={form.cpu}
                   onChange={(event) => handleFormChange("cpu", event.target.value)}
                   placeholder="Ví dụ: 200"
-                  className="mt-1 w-full border border-slate-300 rounded px-3 py-2 text-sm text-center"
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-center outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </div>
             </div>
-            <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={closeModal} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600">
+            <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={closeModal} className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">
                 Hủy
               </button>
               <button
                 onClick={handleSaveStep}
                 disabled={!selectedProductionId}
-                className="px-4 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700"
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:bg-emerald-400"
               >
                 {editingIndex === null ? "Thêm" : "Lưu"}
               </button>
