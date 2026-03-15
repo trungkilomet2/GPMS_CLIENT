@@ -10,6 +10,7 @@ import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
+import "@/styles/leave.css";
 
 const MOCK_ORDERS = [
   {
@@ -271,254 +272,264 @@ export default function CreateProduction() {
 
   return (
     <OwnerLayout>
-      <div className="max-w-6xl mx-auto py-6 px-4 font-sans text-gray-900 space-y-6">
-        <div className="flex items-center gap-4 border-b pb-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded text-gray-400">
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold">Tạo Production cho đơn hàng #{order?.id ?? "--"}</h1>
-            <p className="text-xs text-gray-500 font-medium uppercase tracking-tighter">
-              Hệ thống quản lý sản xuất GPMS
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
-              <div className="flex items-center gap-2 text-gray-600 mb-4">
-                <UserCheck size={16} />
-                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
+      <div className="leave-page leave-list-page">
+        <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <button
+                onClick={() => navigate(-1)}
+                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div className="flex flex-col gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  Tạo Production cho đơn hàng #{order?.id ?? "--"}
+                </h1>
+                <p className="text-slate-600">Thiết lập PM quản lý và mốc thời gian sản xuất.</p>
               </div>
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Hệ thống quản lý sản xuất GPMS
+            </div>
+          </div>
 
-              {!isAccepted && order?.id && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                  Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã chấp nhận</strong>.
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-2 text-slate-600 mb-4">
+                  <UserCheck size={16} />
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
                 </div>
-              )}
 
-              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {!orderId && (
-                  <div className="md:col-span-2">
-                    <label className="text-sm font-bold text-gray-700 mb-2 block">Chọn đơn hàng</label>
-                    <select
-                      value={selectedOrderId}
-                      onChange={(e) => setSelectedOrderId(e.target.value)}
-                      className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
-                    >
-                      <option value="">Chọn đơn hàng</option>
-                      {MOCK_ORDERS.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          #{o.id} - {o.orderName}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.orderId && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
-                    )}
+                {!isAccepted && order?.id && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã chấp nhận</strong>.
                   </div>
                 )}
 
-                <div className="md:col-span-2">
-                  <label className="text-sm font-bold text-gray-700 mb-2 block">PM quản lý</label>
-                  <select
-                    name="pmId"
-                    value={form.pmId}
-                    onChange={handleChange}
-                    className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
-                    disabled={loadingPM}
-                  >
-                    <option value="">{loadingPM ? "Đang tải danh sách PM..." : "Chọn PM"}</option>
-                    {pmUsers.map((pm) => (
-                      <option key={pm.id} value={pm.id}>
-                        {pm.fullName || pm.userName || `PM #${pm.id}`}
-                      </option>
-                    ))}
-                  </select>
-                  {pmError && (
-                    <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
-                  )}
-                  {errors.pmId && (
-                    <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-bold text-gray-700 mb-2 block">Ngày bắt đầu sản xuất</label>
-                  <input
-                    type="date"
-                    name="pStartDate"
-                    value={form.pStartDate}
-                    onChange={handleChange}
-                    className={`w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none ${
-                      errors.pStartDate
-                        ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                        : "border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
-                    }`}
-                  />
-                  {errors.pStartDate && (
-                    <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pStartDate}</div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-bold text-gray-700 mb-2 block">Ngày kết thúc sản xuất</label>
-                  <input
-                    type="date"
-                    name="pEndDate"
-                    value={form.pEndDate}
-                    onChange={handleChange}
-                    className={`w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none ${
-                      errors.pEndDate
-                        ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                        : "border-gray-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
-                    }`}
-                  />
-                  {errors.pEndDate && (
-                    <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
-                  )}
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="text-sm font-bold text-gray-700 mb-2 block">Ghi chú Production</label>
-                  <textarea
-                    name="productionNote"
-                    rows={3}
-                    value={form.productionNote}
-                    onChange={handleChange}
-                    placeholder="Nhập ghi chú cho production..."
-                    className="block w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-gray-50/30 transition-all outline-none"
-                  />
-                </div>
-
-                <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className="px-6 py-2.5 text-gray-600 font-semibold border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmitting || !isAccepted}
-                    className="px-7 py-2.5 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-all disabled:bg-emerald-400"
-                  >
-                    {isSubmitting ? "Đang tạo..." : "Tạo Production"}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 text-gray-600 text-xs font-bold uppercase tracking-widest">
-                Thông tin đơn hàng
-              </div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center border-b border-gray-100">
-                <div className="w-32 h-32 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center shadow-sm">
-                  {order?.image ? (
-                    <img src={order.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[11px] text-gray-400">-</span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 leading-relaxed">
-                  Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho PM quản lý.
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-gray-100">
-                {orderSummaryRows.map(([label, value]) => (
-                  <div key={label}>
-                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/30">
-                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{label}</span>
-                      <span className="text-sm font-medium text-gray-700">{value}</span>
+                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {!orderId && (
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Chọn đơn hàng</label>
+                      <select
+                        value={selectedOrderId}
+                        onChange={(e) => setSelectedOrderId(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      >
+                        <option value="">Chọn đơn hàng</option>
+                        {MOCK_ORDERS.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            #{o.id} - {o.orderName}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.orderId && (
+                        <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2 text-gray-600">
-                <Package size={16} />
-                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <MaterialsTable
-                  materials={order?.materials ?? []}
-                  variant="detail"
-                  showImage
-                  emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5">
-              <div className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">
-                Thông tin bổ sung
-              </div>
-              <div className="space-y-2 text-sm text-gray-700">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold text-gray-400 uppercase">Khách hàng</span>
-                  <span className="font-semibold text-gray-800 text-right">
-                    {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold text-gray-400 uppercase">SĐT</span>
-                  <span className="font-semibold text-gray-800 text-right">
-                    {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || "-"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[11px] font-bold text-gray-400 uppercase">Địa chỉ</span>
-                  <span className="font-semibold text-gray-800 text-right">
-                    {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || "-"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-md shadow-sm p-5 space-y-5">
-              <div>
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
-                <div className="space-y-2">
-                  {softTemplates.length > 0 ? (
-                    softTemplates.map((file, idx) => {
-                      const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
-                      const fileUrl = file.file ?? file.url ?? "";
-                      return (
-                        <div key={idx} className="flex items-center justify-between p-3 rounded border border-gray-100 hover:border-emerald-200 transition-all">
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <FileText size={18} className="text-emerald-600 shrink-0" />
-                            <div className="overflow-hidden">
-                              <p className="text-sm font-bold text-gray-700 truncate">{fileName}</p>
-                              {file.size && <p className="text-[10px] text-gray-400 font-bold uppercase">{file.size}</p>}
-                            </div>
-                          </div>
-                          {fileUrl ? (
-                            <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-gray-400 hover:text-emerald-600">
-                              <Download size={16} />
-                            </a>
-                          ) : (
-                            <span className="text-[10px] text-gray-400">Không có link</span>
-                          )}
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-center py-4 text-gray-400 text-[11px] italic">Không có file thiết kế</p>
                   )}
+
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">PM quản lý</label>
+                    <select
+                      name="pmId"
+                      value={form.pmId}
+                      onChange={handleChange}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      disabled={loadingPM}
+                    >
+                      <option value="">{loadingPM ? "Đang tải danh sách PM..." : "Chọn PM"}</option>
+                      {pmUsers.map((pm) => (
+                        <option key={pm.id} value={pm.id}>
+                          {pm.fullName || pm.userName || `PM #${pm.id}`}
+                        </option>
+                      ))}
+                    </select>
+                    {pmError && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
+                    )}
+                    {errors.pmId && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày bắt đầu sản xuất</label>
+                    <input
+                      type="date"
+                      name="pStartDate"
+                      value={form.pStartDate}
+                      onChange={handleChange}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
+                        errors.pStartDate
+                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
+                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      }`}
+                    />
+                    {errors.pStartDate && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pStartDate}</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày kết thúc sản xuất</label>
+                    <input
+                      type="date"
+                      name="pEndDate"
+                      value={form.pEndDate}
+                      onChange={handleChange}
+                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
+                        errors.pEndDate
+                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
+                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                      }`}
+                    />
+                    {errors.pEndDate && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
+                    )}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú Production</label>
+                    <textarea
+                      name="productionNote"
+                      rows={3}
+                      value={form.productionNote}
+                      onChange={handleChange}
+                      placeholder="Nhập ghi chú cho production..."
+                      className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 flex flex-wrap justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(-1)}
+                      className="rounded-xl border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || !isAccepted}
+                      className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
+                    >
+                      {isSubmitting ? "Đang tạo..." : "Tạo Production"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 text-slate-600 text-xs font-bold uppercase tracking-widest">
+                  Thông tin đơn hàng
+                </div>
+                <div className="p-5 grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center border-b border-slate-100">
+                  <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm">
+                    {order?.image ? (
+                      <img src={order.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-[11px] text-slate-400">-</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 leading-relaxed">
+                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho PM quản lý.
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
+                  {orderSummaryRows.map(([label, value]) => (
+                    <div key={label}>
+                      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
+                        <span className="text-sm font-medium text-slate-700">{value}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="border-t pt-4">
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                <div className="text-sm font-semibold text-gray-700">
-                  Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                  <Package size={16} />
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <MaterialsTable
+                    materials={order?.materials ?? []}
+                    variant="detail"
+                    showImage
+                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">
+                  Thông tin bổ sung
+                </div>
+                <div className="space-y-2 text-sm text-slate-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">Khách hàng</span>
+                    <span className="font-semibold text-slate-800 text-right">
+                      {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">SĐT</span>
+                    <span className="font-semibold text-slate-800 text-right">
+                      {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase">Địa chỉ</span>
+                    <span className="font-semibold text-slate-800 text-right">
+                      {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || "-"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
+                <div>
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
+                  <div className="space-y-2">
+                    {softTemplates.length > 0 ? (
+                      softTemplates.map((file, idx) => {
+                        const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
+                        const fileUrl = file.file ?? file.url ?? "";
+                        return (
+                          <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-100 p-3 transition hover:border-emerald-200">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <FileText size={18} className="text-emerald-600 shrink-0" />
+                              <div className="overflow-hidden">
+                                <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
+                                {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
+                              </div>
+                            </div>
+                            {fileUrl ? (
+                              <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
+                                <Download size={16} />
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">Không có link</span>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
+                  <div className="text-sm font-semibold text-slate-700">
+                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
+                  </div>
                 </div>
               </div>
             </div>
