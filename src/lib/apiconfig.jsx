@@ -39,7 +39,11 @@ export const API_ENDPOINTS = {
 
   LEAVE_REQUEST: {
     GET_LIST: `${BASE_URL}/api/LeaveRequest/leave-request-list`,
+    GET_MY_HISTORY: `${BASE_URL}/api/LeaveRequest/my-leave-request-history`,
+    GET_MY_HISTORY_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/my-leave-request-history/${id}`,
     GET_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/leave-request-detail/${id}`,
+    CREATE: `${BASE_URL}/api/LeaveRequest/create`,
+    APPROVE: (id) => `${BASE_URL}/api/LeaveRequest/${id}/approve`,
     DENY: (id) => `${BASE_URL}/api/LeaveRequest/${id}/deny`,
   },
 

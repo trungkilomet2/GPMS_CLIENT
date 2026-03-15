@@ -4,6 +4,12 @@ export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
   { path: "/leave", label: "Đơn xin nghỉ", parent: "/home" },
+  { path: "/leave-requests", label: "Lịch sử đơn nghỉ của tôi", parent: "/home" },
+  {
+    path: "/leave-requests/:id",
+    label: ({ id }) => `Đơn nghỉ của tôi #${id}`,
+    parent: "/leave-requests",
+  },
   {
     path: "/leave/:id",
     label: ({ id }) => `Chi tiết đơn ${id}`,

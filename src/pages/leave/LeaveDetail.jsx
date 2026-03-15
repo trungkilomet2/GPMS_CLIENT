@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import LeaveService from "@/services/LeaveService";
+import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
 const STATUS_MAP = {
@@ -158,15 +158,24 @@ export default function LeaveDetail() {
   const canReview = leave?.status === "pending";
 
   const handleApprove = async () => {
-    setSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setLeave((prev) => ({
-      ...prev,
-      status: "approved",
-      dateReply: new Date().toISOString(),
-      denyContent: "",
-    }));
-    setSubmitting(false);
+    try {
+      setSubmitting(true);
+      await LeaveService.approveLeaveRequest(id);
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "approved",
+          dateReply: new Date().toISOString(),
+          denyContent: "",
+        }
+      );
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể phê duyệt đơn nghỉ. Vui lòng thử lại."));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleReject = async () => {
@@ -189,8 +198,8 @@ export default function LeaveDetail() {
       );
       setRejectOpen(false);
       setRejectReason("");
-    } catch {
-      setError("Không thể từ chối đơn nghỉ. Vui lòng thử lại.");
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể từ chối đơn nghỉ. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }

@@ -15,6 +15,7 @@ const CreateOrder = lazy(() => import("@/pages/orders/CreateOrder"));
 const CreateManualOrder = lazy(() => import("@/pages/orders/CreateManualOrder"));
 const EditOrder = lazy(() => import("@/pages/orders/EditOrder"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
+const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
 
 /* ── PROFILE ── */
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -43,6 +44,7 @@ export const routes = [
   { path: "/orders/edit/:id", element: <EditOrder /> },
   { path: "/orders/detail/:id", element: <OrderDetail /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
+  { path: "/leave-requests/:id", element: <LeaveRequestDetail /> },
 
   /* PROFILE */
   {
