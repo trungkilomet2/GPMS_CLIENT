@@ -318,7 +318,7 @@ export default function LeaveDetail() {
                       rows={4}
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
-                      placeholder="Nhập nội dung phản hồi để lưu vào denyContent..."
+                      placeholder="Nhập lý do từ chối đơn nghỉ (bắt buộc)"
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                     />
                     <div className="mt-3 flex justify-end">
