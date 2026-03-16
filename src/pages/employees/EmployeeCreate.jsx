@@ -164,7 +164,6 @@ export default function EmployeeCreate() {
                   <span className="employee-create-field__label">Vai trò hệ thống</span>
                   <ShieldCheck size={18} className="employee-create-field__icon" />
                   <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                    <option value="Owner">Chủ xưởng</option>
                     <option value="PM">Quản lý sản xuất</option>
                     <option value="Team Leader">Tổ trưởng</option>
                     <option value="Worker">Nhân viên</option>
