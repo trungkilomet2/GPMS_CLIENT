@@ -41,6 +41,7 @@ const STATUS_META = {
 function SummaryCard({ icon: Icon, label, value, meta, tone }) {
   return (
     <div className={`payroll-summary-card payroll-summary-card--${tone}`}>
+      <span className="payroll-summary-card__glow" aria-hidden="true" />
       <div className="payroll-summary-card__top">
         <div>
           <p className="payroll-summary-card__label">{label}</p>
@@ -50,7 +51,9 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
           <Icon size={22} />
         </div>
       </div>
-      <p className="payroll-summary-card__meta">{meta}</p>
+      <div className="payroll-summary-card__footer">
+        <p className="payroll-summary-card__meta">{meta}</p>
+      </div>
     </div>
   );
 }
@@ -118,6 +121,12 @@ export default function PayrollList() {
   const employeeText = summary.newEmployeeCount
     ? `${summary.newEmployeeCount} nhân viên mới trong kỳ này`
     : "Không có nhân sự mới phát sinh";
+  const activeFilterLabel =
+    statusFilter === "all"
+      ? "Tất cả trạng thái"
+      : statusFilter === "paid"
+        ? "Đã thanh toán"
+        : "Chờ xử lý";
   const rangeStart = filteredRecords.length === 0 ? 0 : pageStart + 1;
   const rangeEnd = Math.min(pageStart + PAYROLL_PAGE_SIZE, filteredRecords.length);
 
@@ -140,31 +149,62 @@ export default function PayrollList() {
 
   return (
     <DashboardLayout>
-      <div className="payroll-page">
+      <div className="payroll-page payroll-page--list">
         <div className="payroll-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-          <div className="payroll-hero">
-            <div className="payroll-hero__content">
-              <Link to="/dashboard" className="payroll-hero__back">
-                <ArrowLeft size={20} />
-                <span>Quay lại dashboard</span>
-              </Link>
-              <h1 className="payroll-hero__title">Bảng lương</h1>
-              <p className="payroll-hero__subtitle">
-                Thống kê và báo cáo công việc của xưởng theo từng kỳ lương nhân viên.
-              </p>
-            </div>
+          <div className="payroll-hero payroll-hero--list">
+            <div className="payroll-hero__panel">
+              <div className="payroll-hero__content">
+                <Link to="/dashboard" className="payroll-hero__back">
+                  <ArrowLeft size={20} />
+                  <span>Quay lại dashboard</span>
+                </Link>
+                <h1 className="payroll-hero__title">Bảng lương</h1>
+                <p className="payroll-hero__subtitle">
+                  Theo dõi chi trả, rà soát trạng thái xử lý và xuất báo cáo lương
+                  theo từng kỳ làm việc của nhân viên.
+                </p>
 
-            <label className="payroll-month-picker">
-              <CalendarRange size={18} />
-              <input
-                type="month"
-                value={selectedMonth}
-                min={monthOptions[monthOptions.length - 1]}
-                max={monthOptions[0]}
-                onChange={(event) => setSelectedMonth(event.target.value)}
-                aria-label="Chọn kỳ lương"
-              />
-            </label>
+                <div className="payroll-hero__chips">
+                  <div className="payroll-hero-chip">
+                    <span>Kỳ đang xem</span>
+                    <strong>{formatMonthLabel(selectedMonth)}</strong>
+                  </div>
+                  <div className="payroll-hero-chip">
+                    <span>Đang hiển thị</span>
+                    <strong>{filteredRecords.length} hồ sơ</strong>
+                  </div>
+                  <div className="payroll-hero-chip">
+                    <span>Cần xử lý</span>
+                    <strong>{summary.pendingCount} hồ sơ</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="payroll-hero__aside">
+                <label className="payroll-month-picker">
+                  <CalendarRange size={18} />
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    min={monthOptions[monthOptions.length - 1]}
+                    max={monthOptions[0]}
+                    onChange={(event) => setSelectedMonth(event.target.value)}
+                    aria-label="Chọn kỳ lương"
+                  />
+                </label>
+
+                <div className="payroll-hero__period-card">
+                  <span className="payroll-hero__period-label">Tổng quan kỳ lương</span>
+                  <strong className="payroll-hero__period-value">
+                    {formatMonthLabel(selectedMonth)}
+                  </strong>
+                  <p className="payroll-hero__period-meta">
+                    {summary.payrollCreated} bảng lương đã tạo, {summary.paidCount}{" "}
+                    bảng đã thanh toán và {summary.pendingCount} bảng đang chờ xử lý.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -198,18 +238,30 @@ export default function PayrollList() {
             />
           </div>
 
-          <p className="payroll-summary-note">
-            Số liệu tổng quan phía trên được tính theo kỳ lương đang chọn và không
-            thay đổi theo bộ lọc tìm kiếm hoặc trạng thái.
-          </p>
+          <div className="payroll-summary-note">
+            <strong>Kỳ lương tổng quan</strong>
+            <span>
+              Số liệu phía trên luôn bám theo tháng đang chọn và không thay đổi theo
+              bộ lọc tìm kiếm hoặc trạng thái hiển thị.
+            </span>
+          </div>
 
           <section className="payroll-card">
             <div className="payroll-table-card__header">
-              <div>
+              <div className="payroll-table-card__intro">
+                <span className="payroll-table-card__eyebrow">Danh sách chi trả</span>
                 <h2 className="payroll-table-card__title">Danh sách bảng lương</h2>
                 <p className="payroll-table-card__subtitle">
                   Theo dõi thu nhập, phụ cấp và trạng thái chi trả theo từng nhân viên.
                 </p>
+                <div className="payroll-table-card__insights">
+                  <span className="payroll-table-card__insight">
+                    {filteredRecords.length} hồ sơ phù hợp
+                  </span>
+                  <span className="payroll-table-card__insight">
+                    Bộ lọc: {activeFilterLabel}
+                  </span>
+                </div>
               </div>
 
               <div className="payroll-toolbar">
@@ -277,39 +329,132 @@ export default function PayrollList() {
                   ) : null}
                 </div>
               ) : (
-                <table className="payroll-table">
-                  <thead>
-                    <tr>
-                      <th className="payroll-table__cell payroll-table__cell--person">
-                        Nhân viên
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--count">
-                        Số công đoạn
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--money">
-                        Tổng thu nhập
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--money">
-                        Phụ cấp
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--money">
-                        Thực lĩnh
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--status">
-                        Trạng thái
-                      </th>
-                      <th className="payroll-table__cell payroll-table__cell--actions">
-                        Thao tác
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <>
+                  <div className="payroll-table-wrap">
+                    <table className="payroll-table">
+                      <thead>
+                        <tr>
+                          <th className="payroll-table__cell payroll-table__cell--person">
+                            Nhân viên
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--count">
+                            Số công đoạn
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--money">
+                            Tổng thu nhập
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--money">
+                            Phụ cấp
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--money">
+                            Thực lĩnh
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--status">
+                            Trạng thái
+                          </th>
+                          <th className="payroll-table__cell payroll-table__cell--actions">
+                            Thao tác
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedRecords.map((record) => {
+                          const statusMeta = STATUS_META[record.status] ?? STATUS_META.pending;
+
+                          return (
+                            <tr key={`${record.employeeId}-${record.month}`}>
+                              <td className="payroll-table__body payroll-table__cell--person">
+                                <div className="payroll-person">
+                                  <div className={`payroll-avatar payroll-avatar--${record.avatarTone}`}>
+                                    {getPayrollInitials(record.fullName)}
+                                  </div>
+                                  <div>
+                                    <div className="payroll-person__name">{record.fullName}</div>
+                                    <div className="payroll-person__meta">
+                                      {record.employeeCode} · {record.team}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--count">
+                                <div className="payroll-data-block">
+                                  <strong className="payroll-data-block__value">
+                                    {record.workItems.length} mục
+                                  </strong>
+                                  <span className="payroll-data-block__meta">
+                                    Công đoạn đã chốt
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--money">
+                                <div className="payroll-data-block">
+                                  <strong className="payroll-data-block__value">
+                                    {formatCurrency(record.grossIncome)}
+                                  </strong>
+                                  <span className="payroll-data-block__meta">
+                                    Thu nhập công đoạn
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--money">
+                                <div className="payroll-data-block">
+                                  <strong className="payroll-data-block__value">
+                                    {formatCurrency(record.allowance)}
+                                  </strong>
+                                  <span className="payroll-data-block__meta">
+                                    Thưởng và hỗ trợ
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--money payroll-table__body--strong">
+                                <div className="payroll-data-block payroll-data-block--strong">
+                                  <strong className="payroll-data-block__value">
+                                    {formatCurrency(record.netIncome)}
+                                  </strong>
+                                  <span className="payroll-data-block__meta">
+                                    Thực nhận cuối kỳ
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--status">
+                                <span className={statusMeta.className}>{statusMeta.label}</span>
+                              </td>
+                              <td className="payroll-table__body payroll-table__cell--actions">
+                                <div className="payroll-table__actions">
+                                  <Link
+                                    to={`/salary/${record.employeeId}?month=${selectedMonth}`}
+                                    className="payroll-action-btn"
+                                    aria-label={`Xem chi tiết bảng lương của ${record.fullName}`}
+                                  >
+                                    <Eye size={16} />
+                                  </Link>
+                                  <button
+                                    type="button"
+                                    className="payroll-action-btn payroll-action-btn--secondary"
+                                    onClick={() => handleExportRow(record)}
+                                    aria-label={`Xuất phiếu lương của ${record.fullName}`}
+                                  >
+                                    <Download size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="payroll-mobile-list">
                     {paginatedRecords.map((record) => {
                       const statusMeta = STATUS_META[record.status] ?? STATUS_META.pending;
 
                       return (
-                        <tr key={`${record.employeeId}-${record.month}`}>
-                          <td className="payroll-table__body payroll-table__cell--person">
+                        <article
+                          key={`mobile-${record.employeeId}-${record.month}`}
+                          className="payroll-mobile-card"
+                        >
+                          <div className="payroll-mobile-card__header">
                             <div className="payroll-person">
                               <div className={`payroll-avatar payroll-avatar--${record.avatarTone}`}>
                                 {getPayrollInitials(record.fullName)}
@@ -321,46 +466,50 @@ export default function PayrollList() {
                                 </div>
                               </div>
                             </div>
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--count">
-                            {record.workItems.length} mục
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--money">
-                            {formatCurrency(record.grossIncome)}
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--money">
-                            {formatCurrency(record.allowance)}
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--money payroll-table__body--strong">
-                            {formatCurrency(record.netIncome)}
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--status">
                             <span className={statusMeta.className}>{statusMeta.label}</span>
-                          </td>
-                          <td className="payroll-table__body payroll-table__cell--actions">
-                            <div className="payroll-table__actions">
-                              <Link
-                                to={`/salary/${record.employeeId}?month=${selectedMonth}`}
-                                className="payroll-action-btn"
-                                aria-label={`Xem chi tiết bảng lương của ${record.fullName}`}
-                              >
-                                <Eye size={16} />
-                              </Link>
-                              <button
-                                type="button"
-                                className="payroll-action-btn payroll-action-btn--secondary"
-                                onClick={() => handleExportRow(record)}
-                                aria-label={`Xuất phiếu lương của ${record.fullName}`}
-                              >
-                                <Download size={16} />
-                              </button>
+                          </div>
+
+                          <div className="payroll-mobile-card__grid">
+                            <div className="payroll-mobile-card__metric">
+                              <span>Số công đoạn</span>
+                              <strong>{record.workItems.length} mục</strong>
                             </div>
-                          </td>
-                        </tr>
+                            <div className="payroll-mobile-card__metric">
+                              <span>Tổng thu nhập</span>
+                              <strong>{formatCurrency(record.grossIncome)}</strong>
+                            </div>
+                            <div className="payroll-mobile-card__metric">
+                              <span>Phụ cấp</span>
+                              <strong>{formatCurrency(record.allowance)}</strong>
+                            </div>
+                            <div className="payroll-mobile-card__metric payroll-mobile-card__metric--highlight">
+                              <span>Thực lĩnh</span>
+                              <strong>{formatCurrency(record.netIncome)}</strong>
+                            </div>
+                          </div>
+
+                          <div className="payroll-mobile-card__actions">
+                            <Link
+                              to={`/salary/${record.employeeId}?month=${selectedMonth}`}
+                              className="payroll-action-btn payroll-action-btn--text"
+                            >
+                              <Eye size={16} />
+                              <span>Chi tiết</span>
+                            </Link>
+                            <button
+                              type="button"
+                              className="payroll-action-btn payroll-action-btn--secondary payroll-action-btn--text"
+                              onClick={() => handleExportRow(record)}
+                            >
+                              <Download size={16} />
+                              <span>Xuất phiếu</span>
+                            </button>
+                          </div>
+                        </article>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </div>
+                </>
               )}
             </div>
 

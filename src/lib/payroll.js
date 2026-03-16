@@ -597,7 +597,7 @@ const PAYROLL_RECORDS = [
   },
 ];
 
-export const PAYROLL_PAGE_SIZE = 4;
+export const PAYROLL_PAGE_SIZE = 10;
 
 function normalizeMonthValue(month) {
   if (!month) return "";
