@@ -20,9 +20,9 @@ vi.mock('@/services/authService', () => ({
 }));
 
 describe('RegisterPage', () => {
-  it('submits valid register form and redirects to /home', async () => {
+  it('submits valid register form and redirects to /login', async () => {
+    vi.useFakeTimers();
     authService.register.mockResolvedValue({ message: 'ok' });
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     const { container } = render(
       <MemoryRouter>
@@ -32,8 +32,6 @@ describe('RegisterPage', () => {
 
     fireEvent.change(container.querySelector('input[name="fullName"]'), { target: { value: 'Nguyen Van A' } });
     fireEvent.change(container.querySelector('input[name="userName"]'), { target: { value: 'nva123' } });
-    fireEvent.change(container.querySelector('input[name="phoneNumber"]'), { target: { value: '0912345678' } });
-    fireEvent.change(container.querySelector('input[name="email"]'), { target: { value: 'test@mail.com' } });
     fireEvent.change(container.querySelector('input[name="password"]'), { target: { value: '123456' } });
     fireEvent.change(container.querySelector('input[name="confirmPassword"]'), { target: { value: '123456' } });
     fireEvent.click(container.querySelector('input[name="agree"]'));
@@ -43,13 +41,14 @@ describe('RegisterPage', () => {
       expect(authService.register).toHaveBeenCalledWith({
         fullName: 'Nguyen Van A',
         userName: 'nva123',
-        phoneNumber: '0912345678',
-        email: 'test@mail.com',
         password: '123456',
+        rePassword: '123456',
       });
     });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/home');
+    await vi.advanceTimersByTimeAsync(1300);
+    expect(mockNavigate).toHaveBeenCalledWith('/login');
+    vi.useRealTimers();
   });
 
   it('does not call register API when terms are not accepted', async () => {

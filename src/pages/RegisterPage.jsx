@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authService } from "../services/authService";
+import SuccessModal from "@/components/SuccessModal";
 import {
   normalizeSpaces,
   validateConfirmPassword,
-  validateEmail,
   validateFullName,
   validatePassword,
-  validatePhoneNumber,
   validateUserName,
 } from "@/lib/validators";
 import "../styles/login.css";
@@ -16,8 +15,6 @@ import "../styles/register.css";
 const initialValues = {
   fullName: "",
   userName: "",
-  phoneNumber: "",
-  email: "",
   password: "",
   confirmPassword: "",
   agree: false,
@@ -31,12 +28,21 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
+  const [successOpen, setSuccessOpen] = useState(false);
+  const redirectTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const validateField = (name, value, nextForm = formData) => {
     if (name === "fullName") return validateFullName(value);
     if (name === "userName") return validateUserName(value);
-    if (name === "phoneNumber") return validatePhoneNumber(value);
-    if (name === "email") return validateEmail(value);
     if (name === "password") return validatePassword(value);
     if (name === "confirmPassword") {
       return validateConfirmPassword(nextForm.password, value);
@@ -74,42 +80,63 @@ export default function RegisterPage() {
     }));
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!validateForm()) return;
-
-  try {
-    setLoading(true);
-
-    const payload = {
-  userName: formData.userName.trim(),
-  fullName: normalizeSpaces(formData.fullName),
-  password: formData.password,
-  rePassword: formData.confirmPassword,
-};
-
-    await authService.register(payload);
-
-    alert("Đăng ký thành công");
-
+  const goLogin = () => {
+    if (redirectTimerRef.current) {
+      clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
+    setSuccessOpen(false);
     navigate("/login");
+  };
 
-  } catch (error) {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    alert(
-      error?.response?.data?.message ||
-      error?.response?.data?.title ||
-      "Đăng ký thất bại"
-    );
+    if (!validateForm()) return;
 
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+
+      const payload = {
+        userName: formData.userName.trim(),
+        fullName: normalizeSpaces(formData.fullName),
+        password: formData.password,
+        rePassword: formData.confirmPassword,
+      };
+
+      await authService.register(payload);
+
+      setSuccessOpen(true);
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = setTimeout(goLogin, 1200);
+    } catch (error) {
+      alert(
+        error?.response?.data?.message ||
+        error?.response?.data?.title ||
+        "Đăng ký thất bại"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="login-container">
+      <SuccessModal
+        isOpen={successOpen}
+        title="Đăng ký thành công"
+        description="Tài khoản đã được tạo. Bạn sẽ được chuyển sang trang đăng nhập."
+        primaryLabel="Đăng nhập ngay"
+        secondaryLabel="Để sau"
+        onPrimary={goLogin}
+        onClose={() => {
+          if (redirectTimerRef.current) {
+            clearTimeout(redirectTimerRef.current);
+            redirectTimerRef.current = null;
+          }
+          setSuccessOpen(false);
+        }}
+      />
       <div className="login-left">
         <div className="left-content">
           <div className="brand">
@@ -120,12 +147,30 @@ const handleSubmit = async (e) => {
             </div>
           </div>
 
-          <h1 className="left-heading">Quản lý sản xuất thông minh</h1>
+          <h1 className="left-heading">
+            Quản lý sản xuất <br />
+            thông minh
+          </h1>
 
           <p className="left-desc">
             Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả
           </p>
+
+          <div className="features-box">
+            {[
+              { icon:"⏱", title:"Theo dõi thời gian thực", desc:"Giám sát tiến độ sản xuất mọi lúc mọi nơi" },
+              { icon:"👔", title:"Quản lý nhân sự",         desc:"Phân công công việc và theo dõi hiệu suất" },
+              { icon:"📦", title:"Quản lý đơn hàng",        desc:"Theo dõi đơn hàng từ A đến Z" },
+              { icon:"📊", title:"Báo cáo chi tiết",        desc:"Phân tích dữ liệu và tạo báo cáo tự động" },
+            ].map(f => (
+              <div key={f.title} className="feature">
+                <div className="icon">{f.icon}</div>
+                <div><h4>{f.title}</h4><p>{f.desc}</p></div>
+              </div>
+            ))}
+          </div>
         </div>
+        <div className="tape" />
       </div>
 
       <div className="login-right">
@@ -168,36 +213,6 @@ const handleSubmit = async (e) => {
             />
           </div>
           {errors.userName && <p className="error-text">{errors.userName}</p>}
-
-          <label className="field-label">Số điện thoại *</label>
-          <div className="input-wrapper">
-            <span className="input-icon">📞</span>
-            <input
-              type="text"
-              name="phoneNumber"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              placeholder="Nhập số điện thoại"
-              className={errors.phoneNumber ? "input-error" : ""}
-            />
-          </div>
-          {errors.phoneNumber && (
-            <p className="error-text">{errors.phoneNumber}</p>
-          )}
-
-          <label className="field-label">Email *</label>
-          <div className="input-wrapper">
-            <span className="input-icon">✉️</span>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Nhập email"
-              className={errors.email ? "input-error" : ""}
-            />
-          </div>
-          {errors.email && <p className="error-text">{errors.email}</p>}
 
           <label className="field-label">Mật khẩu *</label>
           <div className="input-wrapper">

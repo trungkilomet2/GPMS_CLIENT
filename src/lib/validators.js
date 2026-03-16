@@ -4,6 +4,12 @@ const PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
+function isSwaggerPlaceholder(value) {
+  const v = String(value ?? "").trim().toLowerCase();
+  // Swagger UI often auto-fills "string" and "user@example.com" in "Try it out".
+  return v === "string" || v === "user@example.com";
+}
+
 export function normalizeSpaces(value = "") {
   return value.trim().replace(/\s+/g, " ");
 }
@@ -24,6 +30,7 @@ export function validateUserName(value) {
 export function validateFullName(value) {
   const normalized = normalizeSpaces(value);
   if (!normalized) return "Vui lòng nhập họ và tên";
+  if (isSwaggerPlaceholder(normalized)) return "Vui lòng nhập họ và tên hợp lệ";
   if (normalized.length < 2) return "Họ và tên phải có ít nhất 2 ký tự";
   if (normalized.length > 50) return "Họ và tên không được vượt quá 50 ký tự";
   return "";
@@ -32,6 +39,7 @@ export function validateFullName(value) {
 export function validateEmail(value) {
   const normalized = String(value ?? "").trim();
   if (!normalized) return "Vui lòng nhập email";
+  if (isSwaggerPlaceholder(normalized)) return "Vui lòng nhập email hợp lệ";
   if (!EMAIL_REGEX.test(normalized)) return "Email không hợp lệ";
   return "";
 }
@@ -64,6 +72,7 @@ export function validateConfirmPassword(password, confirmPassword) {
 export function validateLocation(value) {
   const normalized = normalizeSpaces(value);
   if (!normalized) return "Vui lòng nhập địa chỉ";
+  if (isSwaggerPlaceholder(normalized)) return "Vui lòng nhập địa chỉ hợp lệ";
   if (normalized.length < 5) return "Địa chỉ phải có ít nhất 5 ký tự";
   if (normalized.length > 255) return "Địa chỉ không được vượt quá 255 ký tự";
   return "";
