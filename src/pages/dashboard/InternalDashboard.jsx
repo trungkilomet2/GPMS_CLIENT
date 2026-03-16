@@ -1,10 +1,11 @@
 import { Link, Navigate } from "react-router-dom";
-import { ArrowRight, BriefcaseBusiness, ClipboardList, Shapes, Users } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, ClipboardList, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/internal-dashboard.css";
 
 const INTERNAL_ROLES = ["Owner", "PM"];
+const ADMIN_ROLES = ["Admin"];
 
 const QUICK_LINKS = [
   {
@@ -18,12 +19,6 @@ const QUICK_LINKS = [
     title: "Quản lý nghỉ phép",
     description: "Kiểm tra tình trạng nghỉ phép và xử lý đơn nhanh.",
     icon: ClipboardList,
-  },
-  {
-    to: "/worker-roles",
-    title: "Vai trò thợ",
-    description: "Quản lý danh mục chuyên môn và nhóm tay nghề.",
-    icon: Shapes,
   },
 ];
 
@@ -46,8 +41,13 @@ export default function InternalDashboard() {
   }
 
   const roles = splitRoles(user.role);
+  const isAdmin = roles.some((role) => ADMIN_ROLES.includes(role));
   const isInternalUser = roles.some((role) => INTERNAL_ROLES.includes(role));
   const isOwner = roles.includes("Owner");
+
+  if (isAdmin) {
+    return <Navigate to="/admin/users" replace />;
+  }
 
   if (!isInternalUser) {
     return <Navigate to="/home" replace />;

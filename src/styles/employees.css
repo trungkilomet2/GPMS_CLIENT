@@ -330,7 +330,7 @@
 
 .employee-table-th--action,
 .employee-table-td--action {
-  width: 10%;
+  width: 14%;
 }
 
 .employee-table-td {
@@ -347,6 +347,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   width: 2.9rem;
   height: 2.9rem;
   border-radius: 999px;
@@ -354,6 +355,12 @@
   color: #fff;
   font-weight: 800;
   box-shadow: 0 10px 20px rgba(30, 110, 67, 0.18);
+}
+
+.employee-person__avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .employee-person__name {
@@ -451,6 +458,13 @@
   text-decoration: none;
 }
 
+.employee-action-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .employee-action-btn:hover {
   background: #e6f4ec;
   transform: translateY(-1px);
@@ -460,6 +474,35 @@
   opacity: 0.72;
   cursor: not-allowed;
   transform: none;
+}
+
+.employee-action-btn--danger {
+  border-color: #f2d3cf;
+  background: #fff5f4;
+  color: #b74a3a;
+}
+
+.employee-action-btn--danger:hover {
+  background: #fdeae7;
+}
+
+.employee-inline-banner {
+  padding: 0.95rem 1.25rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.employee-inline-banner--success {
+  background: #eef8f1;
+  color: #1e6e43;
+  border-bottom: 1px solid #dbe9df;
+}
+
+.employee-inline-banner--error {
+  background: #fff4f1;
+  color: #b74a3a;
+  border-bottom: 1px solid #f0d3ce;
 }
 
 .employee-table-state {

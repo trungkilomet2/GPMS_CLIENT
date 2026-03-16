@@ -144,6 +144,8 @@ export default function LoginPage() {
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
       const roles = splitRoles(result?.user?.role);
+      const isAdmin = hasAnyRole(roles, ["admin"]);
+      const isInternalUser = hasAnyRole(roles, ["owner", "pm"]);
 
       if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
         navigate("/monitoring/assign");
@@ -155,8 +157,7 @@ export default function LoginPage() {
         return;
       }
 
-      const isInternalUser = roles.includes("Owner") || roles.includes("PM");
-      navigate(isInternalUser ? "/dashboard" : "/home");
+      navigate(isAdmin ? "/admin/users" : isInternalUser ? "/dashboard" : "/home");
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {

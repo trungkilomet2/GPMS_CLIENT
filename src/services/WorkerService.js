@@ -9,10 +9,22 @@ export const getEmployeeModuleErrorMessage = (error, fallbackMessage) => {
   return error?.response?.data?.message || error?.response?.data?.title || fallbackMessage;
 };
 
-const normalizeEmployeeStatus = (value) => {
+const parseApiPayload = (rawResponse) =>
+  typeof rawResponse === "string"
+    ? JSON.parse(rawResponse)
+    : rawResponse ?? {};
+
+const normalizeEmployeeStatus = (value, statusId) => {
+  const normalizedStatusId = Number(statusId);
+
+  if (Number.isFinite(normalizedStatusId)) {
+    if (normalizedStatusId === 1) return "active";
+    if (normalizedStatusId === 2) return "inactive";
+  }
+
   const normalized = String(value ?? "inactive").trim().toLowerCase();
 
-  if (["active", "working", "enabled"].includes(normalized)) return "active";
+  if (["1", "active", "working", "enabled"].includes(normalized)) return "active";
   return "inactive";
 };
 
@@ -43,11 +55,18 @@ const WORKER_ROLE_LABEL_MAP = {
   "Quality Control": "Kiểm tra chất lượng",
 };
 
-const splitRoles = (value = "") =>
-  String(value)
+const splitRoles = (value = "") => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+  }
+
+  return String(value)
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+};
 
 const pickPrimaryRole = (roleValue, workerRoleValue) => {
   if (workerRoleValue) return workerRoleValue;
@@ -71,7 +90,10 @@ const shouldHideFromEmployeeDirectory = (employee = {}) => {
 
 const normalizeEmployee = (item = {}) => {
   const workerRole = String(item.workerRole ?? "").trim();
-  const role = String(item.role ?? "").trim();
+  const roleSource = item.role ?? item.roles ?? item.roleName ?? "";
+  const role = Array.isArray(roleSource)
+    ? roleSource.map((entry) => String(entry).trim()).filter(Boolean).join(", ")
+    : String(roleSource ?? "").trim();
   const roles = splitRoles(role);
 
   return {
@@ -79,6 +101,8 @@ const normalizeEmployee = (item = {}) => {
     userName: item.userName ?? "",
     fullName: item.fullName ?? item.userFullName ?? "Chưa cập nhật",
     phoneNumber: item.phoneNumber ?? "",
+    avatarUrl: item.avatarUrl ?? item.avartarUrl ?? "",
+    location: item.location ?? "",
     email: item.email ?? "",
     role,
     roles,
@@ -89,23 +113,52 @@ const normalizeEmployee = (item = {}) => {
     primaryRoleLabel: workerRole
       ? getWorkerRoleLabel(workerRole)
       : getRoleLabel(pickPrimaryRole(role, workerRole)),
-    status: normalizeEmployeeStatus(item.status),
+    statusId: item.statusId ?? null,
+    status: normalizeEmployeeStatus(
+      item.status ?? item.accountStatus ?? item.userStatus,
+      item.statusId
+    ),
   };
 };
+
+const normalizeEmployeeCollection = (response = {}) => {
+  const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
+
+  if (!Array.isArray(rawItems)) {
+    return [];
+  }
+
+  return rawItems
+    .map(normalizeEmployee)
+    .filter((employee) => !shouldHideFromEmployeeDirectory(employee));
+};
+
+const normalizeEmployeeResponse = (response = {}) => {
+  if (!response?.data || Array.isArray(response.data)) {
+    return response;
+  }
+
+  return {
+    ...response,
+    data: normalizeEmployee(response.data),
+  };
+};
+
+async function fetchEmployeeByWorkerId(id) {
+  const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_BY_ID(id));
+  const response = parseApiPayload(rawResponse);
+
+  if (!response?.data) return null;
+
+  const employee = normalizeEmployee(response.data);
+  return shouldHideFromEmployeeDirectory(employee) ? null : employee;
+}
 
 const WorkerService = {
   async getAllEmployees() {
     const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES);
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
-
-    const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
-
-    const employees = Array.isArray(rawItems)
-      ? rawItems.map(normalizeEmployee).filter((employee) => !shouldHideFromEmployeeDirectory(employee))
-      : [];
+    const response = parseApiPayload(rawResponse);
+    const employees = normalizeEmployeeCollection(response);
 
     return {
       ...response,
@@ -114,36 +167,17 @@ const WorkerService = {
   },
 
   async getEmployeeById(id) {
-    const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_BY_ID(id));
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
-
-    if (!response?.data) return null;
-
-    const employee = normalizeEmployee(response.data);
-    return shouldHideFromEmployeeDirectory(employee) ? null : employee;
+    return fetchEmployeeByWorkerId(id);
   },
 
   async createEmployee(payload) {
     const rawResponse = await axiosClient.post(API_ENDPOINTS.WORKER.CREATE, payload);
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
-
-    return response;
+    return normalizeEmployeeResponse(parseApiPayload(rawResponse));
   },
 
   async updateEmployee(id, payload) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.UPDATE(id), payload);
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
-
-    return response;
+    return parseApiPayload(rawResponse);
   },
 };
 

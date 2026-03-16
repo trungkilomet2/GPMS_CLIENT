@@ -444,7 +444,17 @@ export default function EmployeeList() {
                       <tr key={employee.id} className="employee-table-row">
                         <td className="employee-table-td employee-table-td--person px-5 py-5 align-middle">
                           <div className="employee-person">
-                            <div className="employee-person__avatar">{getInitials(employee.fullName)}</div>
+                            <div className="employee-person__avatar">
+                              {employee.avatarUrl ? (
+                                <img
+                                  src={employee.avatarUrl}
+                                  alt={employee.fullName}
+                                  className="employee-person__avatar-image"
+                                />
+                              ) : (
+                                getInitials(employee.fullName)
+                              )}
+                            </div>
                             <div>
                               <div className="employee-person__name">{employee.fullName}</div>
                               <div className="employee-person__hint">Nhân viên hệ thống</div>

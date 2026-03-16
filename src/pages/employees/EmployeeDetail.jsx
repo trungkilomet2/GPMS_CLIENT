@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CircleAlert,
   LoaderCircle,
+  MapPin,
   Mail,
   Phone,
   Pencil,
@@ -145,7 +146,17 @@ export default function EmployeeDetail() {
           ) : employee ? (
             <div className="employee-detail-grid employee-detail-grid--simple">
               <section className="employee-detail-card employee-detail-profile">
-                <div className="employee-detail-profile__avatar">{getInitials(employee.fullName)}</div>
+                <div className="employee-detail-profile__avatar">
+                  {employee.avatarUrl ? (
+                    <img
+                      src={employee.avatarUrl}
+                      alt={employee.fullName}
+                      className="employee-detail-profile__avatar-image"
+                    />
+                  ) : (
+                    getInitials(employee.fullName)
+                  )}
+                </div>
                 <div className="employee-detail-profile__name">{employee.fullName}</div>
                 <div className="employee-detail-profile__meta">
                   <span className={statusConfig.className}>{statusConfig.label}</span>
@@ -176,6 +187,10 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-info-item">
                     <Mail size={17} />
                     <span>Email: {employee.email || "Chưa cập nhật"}</span>
+                  </div>
+                  <div className="employee-detail-info-item">
+                    <MapPin size={17} />
+                    <span>Địa chỉ: {employee.location || "Chưa cập nhật"}</span>
                   </div>
                   <div className="employee-detail-info-item">
                     <ShieldCheck size={17} />

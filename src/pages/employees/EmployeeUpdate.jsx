@@ -67,6 +67,7 @@ export default function EmployeeUpdate() {
 
       try {
         const employee = await WorkerService.getEmployeeById(id);
+
         if (!mounted) return;
 
         if (!employee) {

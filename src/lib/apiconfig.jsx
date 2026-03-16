@@ -36,6 +36,12 @@ export const API_ENDPOINTS = {
   USER: {
     // GET — không có ID, backend decode từ token
     VIEW_PROFILE: `${BASE_URL}/api/User/view-profile`,
+    ADMIN_USER_LIST: `${BASE_URL}/api/User/admin/user-list`,
+    ADMIN_USER_DETAIL: (id) => `${BASE_URL}/api/User/get-user-detail-for-admin/${id}`,
+    ADMIN_CREATE_USER: `${BASE_URL}/api/User/admin/create-user`,
+    ADMIN_DISABLE_USER: (id) => `${BASE_URL}/api/User/admin/disable/${id}`,
+    ADMIN_ASSIGN_ROLES: (id) => `${BASE_URL}/api/User/admin/assign-roles/${id}`,
+    ADMIN_UPDATE_USER: (id) => `${BASE_URL}/api/User/update-user-for-admin/${id}`,
     // PUT — multipart/form-data
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
   },
