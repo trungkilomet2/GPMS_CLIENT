@@ -11,7 +11,15 @@ export const getEmployeeModuleErrorMessage = (error, fallbackMessage) => {
 
 const parseApiPayload = (rawResponse) =>
   typeof rawResponse === "string"
-    ? JSON.parse(rawResponse)
+    ? (() => {
+        // Some endpoints return `text/plain` even on success.
+        // Don't throw on JSON parse failures; treat the string as a successful payload.
+        try {
+          return JSON.parse(rawResponse);
+        } catch {
+          return { data: rawResponse };
+        }
+      })()
     : rawResponse ?? {};
 
 const normalizeEmployeeStatus = (value, statusId) => {
