@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { extractRoleValue, extractUserIdValue } from "@/lib/authIdentity";
 import { clearAuthStorage, getAuthItem, getStoredUser, removeAuthItem, setStoredUser } from "@/lib/authStorage";
 
 const readAccountStatus = (source = {}) => {
@@ -184,6 +185,17 @@ export const userService = {
       avatarUrl:   String(avatarUrl || "").trim(),
       location:    String(location || "").trim(),
       address:     String(location || "").trim(),
+      id:          extractUserIdValue(d) || getUserId(),
+      userId:      extractUserIdValue(d) || getUserId(),
+      fullName:    d.fullName    || "",
+      name:        d.fullName    || "",
+      email:       d.email       || "",
+      phoneNumber: d.phoneNumber || "",
+      phone:       d.phoneNumber || "",
+      role:        extractRoleValue(d) || (getStoredUser()?.role ?? ""),
+      avatarUrl:   d.avartarUrl  || "",   // ← đọc avartarUrl (typo backend), lưu thành avatarUrl
+      location:    d.location    || "",
+      address:     d.location    || "",
       accountStatus,
     };
 
@@ -258,6 +270,7 @@ export const userService = {
       userName:    d.userName    ?? stored.userName,
       fullName:    d.fullName    ?? stored.fullName,
       name:        d.fullName    ?? stored.name,
+      role:        extractRoleValue(d) || stored.role,
       email:       d.email       ?? stored.email,
       phoneNumber: d.phoneNumber ?? stored.phoneNumber,
       phone:       d.phoneNumber ?? stored.phone,

@@ -11,12 +11,20 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { canManageLeaveRequests } from "@/lib/roleAccess";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
   { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false },
   { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false },
   { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false },
+const NAV_ITEMS = [
+  { key: "dashboard", to: "/home", label: "Dashboard", icon: ChartPie, disabled: false },
+  { key: "orders", to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
+  { key: "monitoring", to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
+  { key: "employees", to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: true },
+  { key: "leave", to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
+  { key: "salary", to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];
 
 const OPERATION_NAV_ITEMS = [
@@ -80,6 +88,13 @@ export default function Sidebar() {
 
   const user = getStoredUser();
   const navItems = resolveSidebarItems(user);
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.key === "leave") {
+      return canManageLeaveRequests(user?.role);
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     try {
@@ -120,6 +135,7 @@ export default function Sidebar() {
             return null;
           }
 
+        {visibleNavItems.map(({ to, label, icon: Icon, disabled }) => {
           if (disabled) {
             return (
               <div

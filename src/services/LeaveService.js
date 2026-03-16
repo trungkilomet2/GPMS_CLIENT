@@ -13,11 +13,22 @@ const parseApiPayload = (rawResponse) => {
   }
 };
 
-export const getLeaveErrorMessage = (error, fallbackMessage) =>
-  error?.response?.data?.message ||
-  error?.response?.data?.title ||
-  error?.message ||
-  fallbackMessage;
+export const getLeaveErrorMessage = (error, fallbackMessage) => {
+  if (error?.response?.status === 403) {
+    return (
+      error?.response?.data?.message ||
+      error?.response?.data?.title ||
+      "Bạn không có quyền thực hiện thao tác này."
+    );
+  }
+
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.title ||
+    error?.message ||
+    fallbackMessage
+  );
+};
 
 const normalizeStatus = (value) => {
   const normalized = String(value ?? "pending").trim().toLowerCase();
@@ -83,6 +94,8 @@ const LeaveService = {
         : rawResponse;
 
     return response;
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.APPROVE(id), {});
+    return parseApiPayload(rawResponse);
   },
 
   async denyLeaveRequest(id, payload) {

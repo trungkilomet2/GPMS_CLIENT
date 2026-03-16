@@ -1,5 +1,5 @@
 ﻿import { lazy } from "react";
-import AdminRouteGuard from "@/routes/AdminRouteGuard";
+import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 
 // HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -109,11 +109,11 @@ export const routes = [
   /* LEAVE */
   {
     path: "/leave",
-    element: <LeaveList />,
+    element: <LeaveRouteGuard><LeaveList /></LeaveRouteGuard>,
   },
   {
     path: "/leave/:id",
-    element: <LeaveDetail />,
+    element: <LeaveRouteGuard><LeaveDetail /></LeaveRouteGuard>,
   },
   {
     path: "/leave-history",
