@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import LeaveService from "@/services/LeaveService";
+import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
 const STATUS_MAP = {
@@ -160,7 +160,6 @@ export default function LeaveDetail() {
   const handleApprove = async () => {
     try {
       setSubmitting(true);
-      setError("");
       await LeaveService.approveLeaveRequest(id);
 
       const refreshed = await LeaveService.getLeaveRequestById(id);
@@ -172,10 +171,8 @@ export default function LeaveDetail() {
           denyContent: "",
         }
       );
-      setRejectOpen(false);
-      setRejectReason("");
-    } catch {
-      setError("Không thể phê duyệt đơn nghỉ. Vui lòng thử lại.");
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể phê duyệt đơn nghỉ. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
@@ -201,8 +198,8 @@ export default function LeaveDetail() {
       );
       setRejectOpen(false);
       setRejectReason("");
-    } catch {
-      setError("Không thể từ chối đơn nghỉ. Vui lòng thử lại.");
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể từ chối đơn nghỉ. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
@@ -321,7 +318,7 @@ export default function LeaveDetail() {
                       rows={4}
                       value={rejectReason}
                       onChange={(e) => setRejectReason(e.target.value)}
-                      placeholder="Nhập nội dung phản hồi để lưu vào denyContent..."
+                      placeholder="Nhập lý do từ chối đơn nghỉ (bắt buộc)"
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                     />
                     <div className="mt-3 flex justify-end">

@@ -17,6 +17,13 @@ export const BREADCRUMB_CONFIG = [
     parent: "/employees",
   },
   { path: "/leave", label: "Đơn xin nghỉ", parent: "/dashboard" },
+  
+  { path: "/leave-requests", label: "Lịch sử đơn nghỉ của tôi", parent: "/home" },
+  {
+    path: "/leave-requests/:id",
+    label: ({ id }) => `Đơn nghỉ của tôi #${id}`,
+    parent: "/leave-requests",
+  },
   {
     path: "/leave/:id",
     label: ({ id }) => `Chi tiết đơn ${id}`,

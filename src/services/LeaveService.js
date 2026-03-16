@@ -1,6 +1,24 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
+const parseApiPayload = (rawResponse) => {
+  if (typeof rawResponse !== "string") {
+    return rawResponse ?? {};
+  }
+
+  try {
+    return JSON.parse(rawResponse);
+  } catch {
+    return {};
+  }
+};
+
+export const getLeaveErrorMessage = (error, fallbackMessage) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.title ||
+  error?.message ||
+  fallbackMessage;
+
 const normalizeStatus = (value) => {
   const normalized = String(value ?? "pending").trim().toLowerCase();
 
@@ -26,12 +44,22 @@ const LeaveService = {
       API_ENDPOINTS.LEAVE_REQUEST.GET_LIST,
       params ? { params } : undefined
     );
+    const response = parseApiPayload(rawResponse);
 
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
+    const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
 
+    return {
+      ...response,
+      data: Array.isArray(rawItems) ? rawItems.map(normalizeLeaveItem) : [],
+    };
+  },
+
+  async getMyLeaveRequests(params) {
+    const rawResponse = await axiosClient.get(
+      API_ENDPOINTS.LEAVE_REQUEST.GET_MY_HISTORY,
+      params ? { params } : undefined
+    );
+    const response = parseApiPayload(rawResponse);
     const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
 
     return {
@@ -42,10 +70,7 @@ const LeaveService = {
 
   async getLeaveRequestById(id) {
     const rawResponse = await axiosClient.get(API_ENDPOINTS.LEAVE_REQUEST.GET_DETAIL(id));
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
+    const response = parseApiPayload(rawResponse);
 
     return response?.data ? normalizeLeaveItem(response.data) : null;
   },
@@ -62,10 +87,7 @@ const LeaveService = {
 
   async denyLeaveRequest(id, payload) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.DENY(id), payload);
-    const response =
-      typeof rawResponse === "string"
-        ? JSON.parse(rawResponse)
-        : rawResponse;
+    const response = parseApiPayload(rawResponse);
 
     return response;
   },

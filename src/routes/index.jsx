@@ -33,6 +33,7 @@ const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
 const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
+const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
 
 // PROFILE
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -80,6 +81,7 @@ export const routes = [
   { path: "/employees/:id", element: <EmployeeDetail /> },
   { path: "/salary", element: <PayrollList /> },
   { path: "/salary/:employeeId", element: <PayrollDetail /> },
+  { path: "/leave-requests/:id", element: <LeaveRequestDetail /> },
 
   // PROFILE
   { path: "/profile", element: <ViewProfile /> },
