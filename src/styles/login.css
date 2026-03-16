@@ -11,6 +11,11 @@
   font-family:'Be Vietnam Pro',sans-serif;
 }
 
+body{
+  margin:0;
+  padding:0;
+}
+
 /* ========================= */
 /* BACKGROUND FULL SCREEN */
 /* ========================= */
@@ -18,11 +23,15 @@
 .login-container{
   display:flex;
   min-height:100vh;
-  width:100vw;
+  height:100vh;
+  width:100%;
   background-image:url("/src/assets/background.png");
   background-size:cover;
   background-position:center;
   background-repeat:no-repeat;
+  background-attachment:fixed;
+  position:relative;
+  overflow:hidden;
 }
 
 /* ========================= */
@@ -158,9 +167,40 @@
 .login-right{
   flex:1;
   display:flex;
-  align-items:center;
+  align-items:flex-start;
   justify-content:center;
   padding:40px;
+  overflow-y:scroll;
+  scrollbar-gutter:stable;
+}
+
+.login-right.login-right--center{
+  align-items:center;
+}
+
+.login-right.login-right--center .login-card{
+  padding:32px 40px;
+}
+
+.login-right.login-right--center .auth-back-btn{
+  margin-bottom:14px;
+}
+
+.login-right.login-right--center .login-card h2{
+  font-size:30px;
+  margin-bottom:6px;
+}
+
+.login-right.login-right--center .login-card > p{
+  margin-bottom:14px;
+}
+
+.login-right.login-right--center .field-label{
+  margin-bottom:4px;
+}
+
+.login-right.login-right--center .input-wrapper input{
+  height:48px;
 }
 
 /* ========================= */
@@ -376,6 +416,36 @@
   font-weight:500;
   line-height:1.4;
 }
+
+.login-right.login-right--center .input-wrapper{
+  margin-bottom:4px;
+}
+
+.login-right.login-right--center .error-text--slot{
+  min-height:10px;
+  margin-top:0;
+  margin-bottom:8px;
+  font-size:10px;
+  line-height:1.15;
+}
+
+.login-right.login-right--center .error-text--empty{
+  visibility:hidden;
+}
+
+.login-right.login-right--center .options-row{
+  margin-bottom:12px;
+}
+
+.login-right.login-right--center .login-btn{
+  height:50px;
+  margin-bottom:12px;
+}
+
+.login-right.login-right--center .register-row{
+  margin-top:6px;
+}
+
 
 .input-error{
   border-color:#e53935 !important;

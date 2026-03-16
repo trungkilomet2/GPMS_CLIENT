@@ -149,7 +149,10 @@ export default function LoginPage() {
               <p>Hệ thống quản lý sản xuất may mặc</p>
             </div>
           </div>
-          <h1 className="left-heading">Quản lý sản xuất thông minh</h1>
+          <h1 className="left-heading">
+            Quản lý sản xuất <br />
+            thông minh
+          </h1>
           <p className="left-desc">Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả</p>
           <div className="features-box">
             {[
@@ -168,7 +171,7 @@ export default function LoginPage() {
         <div className="tape" />
       </div>
 
-      <div className="login-right">
+      <div className="login-right login-right--center">
         <form className="login-card" onSubmit={handleSubmit}>
           <button
             type="button"
@@ -188,7 +191,9 @@ export default function LoginPage() {
               onChange={handleChange} placeholder="Nhập tên đăng nhập"
               className={errors.userName ? "input-error" : ""} />
           </div>
-          {errors.userName && <p className="error-text">{errors.userName}</p>}
+          <p className={`error-text error-text--slot ${errors.userName ? "" : "error-text--empty"}`}>
+            {errors.userName || ""}
+          </p>
 
           <label className="field-label">Mật khẩu</label>
           <div className="input-wrapper">
@@ -200,7 +205,9 @@ export default function LoginPage() {
             <button type="button" className="eye-btn"
               onClick={() => setShowPassword(p => !p)}>👁</button>
           </div>
-          {errors.password && <p className="error-text">{errors.password}</p>}
+          <p className={`error-text error-text--slot ${errors.password ? "" : "error-text--empty"}`}>
+            {errors.password || ""}
+          </p>
 
           <div className="options-row">
             <label className="remember-label">
