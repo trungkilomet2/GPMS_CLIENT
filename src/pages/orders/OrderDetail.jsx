@@ -1,0 +1,400 @@
+﻿import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    ArrowLeft, FileText, MessageSquare, History,
+    Loader2, Edit3, Download, Package, Info
+} from 'lucide-react';
+import OrderCommentModal from '@/components/orders/OrderCommentModal';
+import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal';
+import MaterialsTable from '@/components/orders/MaterialsTable';
+import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
+import { formatOrderDate } from '@/lib/orders/formatters';
+import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
+import OrderService from '@/services/OrderService';
+import { getStoredUser } from '@/lib/authStorage';
+import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
+import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
+import OwnerLayout from '@/layouts/OwnerLayout';
+import '@/styles/homepage.css';
+import '@/styles/leave.css';
+
+export default function OrderDetail() {
+    const { id } = useParams();
+    const navigate = useNavigate();
+
+    const [order, setOrder] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+    const [zoomImageUrl, setZoomImageUrl] = useState('');
+    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+    const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState('');
+    const user = getStoredUser();
+    const roleLower = String(user?.role ?? '').toLowerCase();
+    const isOwner = roleLower === 'owner';
+    const isAdmin = roleLower === 'admin';
+    const canModerate = isOwner || isAdmin;
+
+    useEffect(() => {
+        const fetchOrderDetail = async () => {
+            try {
+                setLoading(true);
+                const response = await OrderService.getOrderDetail(id);
+                setOrder(response.data.data || response.data);
+                setError(null);
+            } catch (err) {
+                setError("KhÃ´ng thá»ƒ táº£i thÃ´ng tin Ä‘Æ¡n hÃ ng.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (id) fetchOrderDetail();
+    }, [id]);
+
+    if (loading) return (
+        <OwnerLayout>
+            <div className="flex flex-col items-center justify-center min-h-400px">
+                <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
+                <p className="text-slate-500 text-sm font-medium">Äang truy xuáº¥t dá»¯ liá»‡u...</p>
+            </div>
+        </OwnerLayout>
+    );
+    if (error) return (
+        <OwnerLayout>
+            <div className="flex flex-col items-center justify-center min-h-400px">
+                <p className="text-red-600 text-sm font-semibold">{error}</p>
+            </div>
+        </OwnerLayout>
+    );
+
+    const templates = order?.templates ?? order?.template ?? order?.files ?? [];
+    const softTemplates = templates.filter((t) => {
+        const type = (t.type ?? '').toString().toLowerCase();
+        return type.includes('soft') || !!t.file || !!t.url;
+    });
+    const hardTemplates = templates.filter((t) => {
+        const type = (t.type ?? '').toString().toLowerCase();
+        return type.includes('hard');
+    });
+    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const orderOwnerId =
+        order?.userId ??
+        order?.customerId ??
+        order?.ownerId ??
+        order?.user?.id ??
+        order?.user?.userId ??
+        null;
+    const currentUserId = user?.userId ?? user?.id ?? null;
+    const currentUserName = String(user?.userName ?? user?.name ?? user?.fullName ?? '').trim().toLowerCase();
+    const orderUserName = String(order?.userName ?? order?.fullName ?? order?.customerName ?? order?.user?.name ?? order?.user?.fullName ?? '').trim().toLowerCase();
+    const canEdit =
+        isAdmin ||
+        (orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId)) ||
+        (!!currentUserName && !!orderUserName && currentUserName === orderUserName);
+
+    const updateOrderStatus = async (nextStatus, reason) => {
+        if (!order?.id) return;
+        try {
+            setIsUpdatingStatus(true);
+            const payload = {
+                ...order,
+                status: nextStatus,
+                reason,
+                statusReason: reason,
+            };
+            await OrderService.updateOrder(order.id, payload);
+            setOrder((prev) => ({ ...prev, status: nextStatus }));
+        } catch (err) {
+            console.error('Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:', err);
+            alert('KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const openReasonModal = (status) => {
+        setPendingStatus(status);
+        setIsReasonModalOpen(true);
+    };
+
+    return (
+        <OwnerLayout>
+            <div className="leave-page leave-list-page">
+                <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+                        >
+                            <ArrowLeft size={18} />
+                        </button>
+                        <div className="flex flex-col gap-2">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                                Chi tiết đơn hàng #{order.id}
+                            </h1>
+                            <p className="text-slate-600">Theo dõi thông tin đơn hàng và trạng thái xử lý.</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status, 'detail')}`}>
+                            {order.statusName || order.status}
+                        </span>
+                        {canModerate && (
+                            <button
+                                type="button"
+                                onClick={() => navigate(`/production/create/${order.id}`)}
+                                disabled={normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
+                                className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Tạo production
+                            </button>
+                        )}
+                        {canModerate && (
+                            <>
+                                <button
+                                    type="button"
+                                    disabled={isUpdatingStatus}
+                                    onClick={() => openReasonModal('Từ chối')}
+                                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                                >
+                                    Từ chối
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isUpdatingStatus}
+                                    onClick={() => openReasonModal('Cần cập nhật')}
+                                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                                >
+                                    Yêu cầu chỉnh sửa
+                                </button>
+                            </>
+                        )}
+                        {canEdit && (
+                            <button
+                                onClick={() => navigate(`/orders/edit/${order.id}`)}
+                                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                            >
+                                <Edit3 size={16} /> Chỉnh sửa
+                            </button>
+                        )}
+                    </div>
+                </div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* KHá»I THÃ”NG TIN CHI TIáº¾T (2/3) */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                                <Info size={16} />
+                                <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin tá»•ng quÃ¡t Ä‘Æ¡n hÃ ng</h2>
+                            </div>
+
+                            <div className="px-5 py-4 border-b border-slate-100">
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">áº¢nh Ä‘Æ¡n hÃ ng</div>
+                                <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
+                                    <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
+                                        {order.image ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
+                                                className="w-full h-full cursor-zoom-in"
+                                                title="Click Ä‘á»ƒ xem & zoom áº£nh"
+                                            >
+                                                <img src={order.image} alt="" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <span className="text-[10px] text-white font-semibold">Click Ä‘á»ƒ zoom</span>
+                                                </div>
+                                            </button>
+                                        ) : (
+                                            <span className="text-[11px] text-slate-400">-</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-slate-500 leading-relaxed">
+                                        áº¢nh tham kháº£o tá»•ng quan Ä‘Æ¡n hÃ ng, dÃ¹ng Ä‘á»ƒ kiá»ƒm tra nhanh trÆ°á»›c khi sáº£n xuáº¥t.
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Layout Grid 2 cá»™t cho thÃ´ng tin chi tiáº¿t */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 font-sans">
+                                <div className="p-0">
+                                    <DetailItem label="MÃ£ Ä‘Æ¡n hÃ ng" value={`#ÄH-${order.id}`} />
+                                    <DetailItem label="TÃªn Ä‘Æ¡n hÃ ng" value={order.orderName} isBold />
+                                    <DetailItem label="Loáº¡i Ä‘Æ¡n hÃ ng" value={order.type} />
+                                    <DetailItem label="MÃ u sáº¯c" value={order.color} />
+                                    <DetailItem label="KÃ­ch thÆ°á»›c (Size)" value={order.size} />
+                                </div>
+                                <div className="p-0">
+                                    <DetailItem label="Sá»‘ lÆ°á»£ng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="ÄÆ¡n giÃ¡" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
+                                    <DetailItem label="Tá»•ng tiá»n Ä‘Æ¡n hÃ ng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
+                                    <DetailItem label="NgÃ y báº¯t Ä‘áº§u" value={formatOrderDate(order.startDate)} />
+                                    <DetailItem label="NgÃ y káº¿t thÃºc" value={formatOrderDate(order.endDate)} />
+                                </div>
+                            </div>
+
+                            {/* Ghi chÃº chiáº¿m toÃ n bá»™ chiá»u ngang phÃ­a dÆ°á»›i */}
+                            <div className="p-5 border-t border-slate-100 bg-amber-50/30">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chÃº</p>
+                                <p className="text-sm text-slate-700 leading-relaxed italic">
+                                    {order.note ? `"${order.note}"` : "KhÃ´ng cÃ³ ghi chÃº bá»• sung cho Ä‘Æ¡n hÃ ng nÃ y."}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Báº£ng váº­t liá»‡u - Thá»±c dá»¥ng vÃ  rÃµ rÃ ng */}
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                                <Package size={16} />
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sÃ¡ch váº­t liá»‡u sáº£n xuáº¥t</h2>
+                            </div>
+                            <MaterialsTable
+                                materials={order.materials ?? []}
+                                variant="detail"
+                                showImage
+                                emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
+                                onImageClick={(url) => {
+                                    if (!url) return;
+                                    setZoomImageUrl(url);
+                                    setIsImageModalOpen(true);
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Cá»˜T PHáº¢I (1/3): FILE & THáº¢O LUáº¬N */}
+                    <div className="space-y-6">
+                        {canModerate && (
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                                <div className="flex items-center gap-2 text-slate-600 mb-3">
+                                    <Info size={16} />
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin ngÆ°á»i Ä‘áº·t hÃ ng</h2>
+                                </div>
+                                <div className="space-y-2 text-sm text-slate-700">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Há» vÃ  tÃªn</span>
+                                        <span className="font-semibold text-slate-800 text-right">
+                                            {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || '-'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Sá»‘ Ä‘iá»‡n thoáº¡i</span>
+                                        <span className="font-semibold text-slate-800 text-right">
+                                            {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || '-'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start justify-between gap-3">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Äá»‹a chá»‰</span>
+                                        <span className="font-semibold text-slate-800 text-right">
+                                            {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || '-'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
+                            <div>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Máº«u thiáº¿t káº¿ báº£n má»m</h2>
+                                <div className="space-y-2">
+                                    {softTemplates.length > 0 ? (
+                                        softTemplates.map((file, idx) => {
+                                            const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
+                                            const fileUrl = file.file ?? file.url ?? '';
+                                            return (
+                                                <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <FileText size={18} className="text-emerald-600 shrink-0" />
+                                                        <div className="overflow-hidden">
+                                                            <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
+                                                            {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
+                                                        </div>
+                                                    </div>
+                                                    {fileUrl ? (
+                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
+                                                            <Download size={16} />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400">KhÃ´ng cÃ³ link</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-center py-4 text-slate-400 text-[11px] italic">KhÃ´ng cÃ³ file thiáº¿t káº¿</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="border-t pt-4">
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Báº£n cá»©ng</h2>
+                                <div className="text-sm font-semibold text-slate-700">
+                                    Sá»‘ lÆ°á»£ng báº£n cá»©ng: <span className="text-emerald-700">{hardCopyTotal}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => setIsCommentModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
+                            >
+                                <MessageSquare size={16} /> Tháº£o luáº­n Ä‘Æ¡n hÃ ng
+                            </button>
+                            <button
+                                onClick={() => setIsHistoryModalOpen(true)}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                            >
+                                <History size={16} /> Lá»‹ch sá»­ chá»‰nh sá»­a
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <OrderCommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} orderId={order?.id ?? id} />
+            <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order?.id ?? id} />
+            <OrderImageZoomModal
+                isOpen={isImageModalOpen}
+                imageUrl={zoomImageUrl}
+                onClose={() => { setIsImageModalOpen(false); setZoomImageUrl(""); }}
+            />
+            <OrderStatusReasonModal
+                isOpen={isReasonModalOpen}
+                onClose={() => setIsReasonModalOpen(false)}
+                onSubmit={async (reason) => {
+                    await updateOrderStatus(pendingStatus, reason);
+                    setIsReasonModalOpen(false);
+                }}
+                title={pendingStatus === 'Tá»« chá»‘i' ? 'Tá»« chá»‘i Ä‘Æ¡n hÃ ng' : 'YÃªu cáº§u chá»‰nh sá»­a'}
+                description={pendingStatus === 'Tá»« chá»‘i'
+                    ? 'Vui lÃ²ng nháº­p lÃ½ do tá»« chá»‘i Ä‘á»ƒ khÃ¡ch hÃ ng náº¯m rÃµ.'
+                    : 'Vui lÃ²ng nháº­p lÃ½ do yÃªu cáº§u chá»‰nh sá»­a.'}
+                confirmText={pendingStatus === 'Tá»« chá»‘i' ? 'XÃ¡c nháº­n tá»« chá»‘i' : 'Gá»­i yÃªu cáº§u'}
+                loading={isUpdatingStatus}
+                tone={pendingStatus === 'Tá»« chá»‘i' ? 'danger' : 'warning'}
+            />
+        </OwnerLayout>
+    );
+}
+
+// Sub-component hiá»ƒn thá»‹ tá»«ng dÃ²ng thÃ´ng tin
+function DetailItem({ label, value, isBold = false, isEmerald = false }) {
+    const displayValue = value === null || value === undefined || value === '' ? '-' : value;
+    return (
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
+            <span className={`text-sm ${isBold ? 'font-bold text-slate-900' : 'font-medium text-slate-700'} ${isEmerald ? 'text-emerald-700 font-bold' : ''}`}>
+                {displayValue}
+            </span>
+        </div>
+    );
+}
+
+
+
+
+
+
