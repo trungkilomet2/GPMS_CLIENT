@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/worker-roles", label: "Vai trò thợ", icon: Shapes, disabled: false },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
-  { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
+  { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, requiredRole: "Owner" },
 ];
 
 function splitRoles(value) {
