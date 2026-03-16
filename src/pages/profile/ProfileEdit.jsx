@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 import {
@@ -126,20 +126,45 @@ function getApiErrorDetails(errData) {
   return { message, fieldErrors };
 }
 
-async function buildAvatarFile(avatarFile, avatarPreview) {
+async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
   if (avatarFile) return avatarFile;
-  if (typeof avatarPreview !== "string" || !/^https?:\/\//i.test(avatarPreview)) {
-    return null;
+
+  // Try reusing current preview (can be http(s), blob:, data:...)
+  if (typeof avatarPreview === "string" && avatarPreview.trim()) {
+    try {
+      const response = await fetch(avatarPreview);
+      if (response.ok) {
+        const blob = await response.blob();
+        const type = blob.type || "image/png";
+        const extension = type.split("/")[1] || "png";
+        return new File([blob], `avatar.${extension}`, { type });
+      }
+    } catch {
+      // fall through to generated avatar
+    }
   }
 
-  const response = await fetch(avatarPreview);
-  if (!response.ok) {
-    throw new Error("Không thể tải lại ảnh đại diện hiện tại.");
-  }
+  // Backend currently validates AvartarUrl as required.
+  // Generate a small PNG avatar so user can save profile even without uploading an image.
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể tạo ảnh đại diện mặc định.");
 
-  const blob = await response.blob();
-  const extension = blob.type.split("/")[1] || "jpg";
-  return new File([blob], `avatar.${extension}`, { type: blob.type || "image/jpeg" });
+  ctx.fillStyle = "#1f4d3a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const safeInitials = String(initials || "?").trim().slice(0, 2).toUpperCase() || "?";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 96px Lexend, 'Be Vietnam Pro', system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(safeInitials, canvas.width / 2, canvas.height / 2 + 4);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
+  if (!blob) throw new Error("Không thể tạo ảnh đại diện mặc định.");
+  return new File([blob], "avatar.png", { type: "image/png" });
 }
 
 /* ─── Input ─── */
@@ -233,7 +258,9 @@ function AvatarUploader({ src, initials, uploading, onChange }) {
    MAIN COMPONENT
 ═════════════════════════════ */
 export default function ProfileEdit() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const forceProfileCompletion = Boolean(location.state?.forceProfileCompletion);
 
   const buildLocalProfile = (user) => ({
     fullName: user?.fullName ?? user?.name ?? "",
@@ -372,13 +399,6 @@ export default function ProfileEdit() {
       setMsg(null);
 
       const user = getStoredUser();
-      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview);
-
-      if (!avatarUpload) {
-        setMsg({ type: "error", text: "Vui lòng chọn ảnh đại diện." });
-        setSaving(false);
-        return;
-      }
 
       // Tạo FormData gửi đúng theo API
       const fd = new FormData();
@@ -386,9 +406,12 @@ export default function ProfileEdit() {
       fd.append("PhoneNumber", form.PhoneNumber.trim());
       fd.append("Location", normalizeSpaces(form.Location));
       fd.append("Email", form.Email.trim());
+
+      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
       fd.append("AvartarUrl", avatarUpload);
 
       await userService.updateProfile(user.userId ?? user.id, fd);
+      await userService.getProfile();
 
       const storedUser = getStoredUser() || {};
       setStoredUser({
@@ -464,6 +487,22 @@ export default function ProfileEdit() {
           </div>
         </div>
 
+        {/* ── Force-completion banner ── */}
+        {forceProfileCompletion && (
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
+            <div style={{
+              padding: ".85rem 1.1rem", borderRadius: 10,
+              background: T.redBg,
+              color: T.red,
+              border: `1px solid ${T.redBd}`,
+              fontWeight: 700, fontSize: ".88rem",
+              display: "flex", alignItems: "center", gap: ".6rem",
+            }}>
+              ⚠️&nbsp;Vui lòng cập nhật đầy đủ email, số điện thoại và địa chỉ để tiếp tục sử dụng hệ thống.
+            </div>
+          </div>
+        )}
+
         {/* ── Message banner ── */}
         {msg && (
           <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
@@ -503,7 +542,6 @@ export default function ProfileEdit() {
                 label="Số điện thoại"
                 required
                 error={touched.PhoneNumber && errs.PhoneNumber}
-                hint="Số điện thoại được cố định theo tài khoản và hiện chỉ cho phép xem."
               >
                 <Input
                   name="PhoneNumber"
@@ -512,7 +550,6 @@ export default function ProfileEdit() {
                   onBlur={handleBlur}
                   placeholder="(+84) 0xx xxx xxx"
                   hasError={!!(touched.PhoneNumber && errs.PhoneNumber)}
-                  readOnly
                 />
               </FormField>
 
@@ -598,7 +635,9 @@ export default function ProfileEdit() {
 
             {/* Bottom actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: ".75rem" }}>
-              <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+              {!forceProfileCompletion && (
+                <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+              )}
               <BtnPrimary type="submit" disabled={saving}>
                 {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
               </BtnPrimary>

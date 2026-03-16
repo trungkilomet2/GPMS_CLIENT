@@ -1,6 +1,20 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, setAuthItem, setStoredUser } from "@/lib/authStorage";
 
+const PROFILE_CACHE_PREFIX = "profile-cache:";
+
+function readProfileCache(userId) {
+  if (userId == null) return null;
+  try {
+    const raw = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function readAccountStatus(source = {}) {
   const status = String(
     source.status ??
@@ -155,6 +169,19 @@ export const authService = {
       accountStatus: profile?.accountStatus || basicUser.accountStatus,
     };
 
+    // If backend view-profile returns nulls, reuse last known values from cache.
+    const cached = readProfileCache(user.userId) || {};
+    const mergedUser = {
+      ...cached,
+      ...user,
+      email: user.email || cached.email || "",
+      phoneNumber: user.phoneNumber || cached.phoneNumber || cached.phone || "",
+      phone: user.phone || cached.phoneNumber || cached.phone || "",
+      location: user.location || cached.location || cached.address || "",
+      address: user.address || cached.location || cached.address || "",
+      avatarUrl: user.avatarUrl || cached.avatarUrl || "",
+    };
+
     if (user.accountStatus?.isDisabled) {
       clearAuthStorage();
       throw {
@@ -167,12 +194,12 @@ export const authService = {
     }
 
     setAuthItem("token", token);
-    setStoredUser(user);
+    setStoredUser(mergedUser);
     setAuthItem("userId", String(userId));
 
     window.dispatchEvent(new Event("auth-change"));
 
-    return { token, user };
+    return { token, user: mergedUser };
   },
 
   async register(payload) {

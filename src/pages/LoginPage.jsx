@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { getPostLoginPath } from "@/lib/authRouting";
+import { isProfileComplete } from "@/lib/profileCompletion";
 import { authService } from "@/services/authService";
 import { validatePassword, validateUserName } from "@/lib/validators";
 import "../styles/login.css";
@@ -130,6 +131,12 @@ export default function LoginPage() {
       });
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
+
+      if (!isProfileComplete(result?.user)) {
+        navigate("/profile/edit", { replace: true, state: { forceProfileCompletion: true } });
+        return;
+      }
+
       navigate(getPostLoginPath(result?.user?.role));
     } catch (err) {
       setErrors(mapLoginError(err));
