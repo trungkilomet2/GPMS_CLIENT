@@ -101,7 +101,11 @@ export default function AdminUserDetail() {
     setIsDisabling(true);
 
     try {
-      await AdminUserService.disableUser(user.id);
+      const response = await AdminUserService.disableUser(user.id);
+      if (response?.currentUserSignedOut) {
+        return;
+      }
+
       setUser((current) => (
         current
           ? { ...current, status: "inactive", statusId: 2 }

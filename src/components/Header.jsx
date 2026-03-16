@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
+import { getPostLoginPath } from "@/lib/authRouting";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
 import { getStoredUser, removeAuthItem } from "@/lib/authStorage";
 import "@/styles/homepage.css";
@@ -52,7 +53,7 @@ export default function Header() {
     setUser(null);
     setProfileOpen(false);
     window.dispatchEvent(new Event("auth-change"));
-    navigate("/home");
+    navigate("/");
   };
 
   // Initials fallback nếu không có avatar
@@ -80,6 +81,8 @@ export default function Header() {
     }, 120);
   };
 
+  const defaultLandingPath = user ? getPostLoginPath(user.role) : "/home";
+
   return (
     <header className="header-root">
 
@@ -88,7 +91,7 @@ export default function Header() {
         <div className="header-top-inner">
 
           {/* Logo */}
-          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate("/home")}>
+          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate(defaultLandingPath)}>
             <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
               <div style={{ width: 32, height: 32, background: C.green, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
                 🧵

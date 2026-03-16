@@ -173,7 +173,11 @@ export default function AdminUserList() {
     setNotice("");
 
     try {
-      await AdminUserService.disableUser(user.id);
+      const response = await AdminUserService.disableUser(user.id);
+      if (response?.currentUserSignedOut) {
+        return;
+      }
+
       setUsers((current) =>
         current.map((item) =>
           item.id === user.id

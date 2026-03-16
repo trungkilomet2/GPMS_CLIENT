@@ -1,25 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { getPostLoginPath } from "@/lib/authRouting";
 import { authService } from "@/services/authService";
 import { validatePassword, validateUserName } from "@/lib/validators";
 import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
 const INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác";
-
-function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
-
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function hasAnyRole(roles, targets) {
-  const normalized = roles.map((item) => String(item).toLowerCase());
-  return targets.some((role) => normalized.includes(role));
-}
 
 function mapLoginError(err) {
   const status = err?.response?.data?.status ?? err?.status;
@@ -143,21 +130,7 @@ export default function LoginPage() {
       });
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
-      const roles = splitRoles(result?.user?.role);
-      const isAdmin = hasAnyRole(roles, ["admin"]);
-      const isInternalUser = hasAnyRole(roles, ["owner", "pm"]);
-
-      if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
-        navigate("/monitoring/assign");
-        return;
-      }
-
-      if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
-        navigate("/worker/assignments");
-        return;
-      }
-
-      navigate(isAdmin ? "/admin/users" : isInternalUser ? "/dashboard" : "/home");
+      navigate(getPostLoginPath(result?.user?.role));
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {

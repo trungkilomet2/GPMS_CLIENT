@@ -1,4 +1,5 @@
 ﻿import { lazy } from "react";
+import AdminRouteGuard from "@/routes/AdminRouteGuard";
 
 // HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -94,12 +95,12 @@ export const routes = [
   { path: "/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/worker-roles", element: <WorkerRoleList /> },
   { path: "/worker-roles/create", element: <WorkerRoleCreate /> },
-  { path: "/admin/users", element: <AdminUserList /> },
-  { path: "/admin/users/create", element: <AdminUserCreate /> },
-  { path: "/admin/users/:id/edit", element: <AdminUserUpdate /> },
-  { path: "/admin/users/:id", element: <AdminUserDetail /> },
-  { path: "/admin/logs", element: <AdminSystemLog /> },
-  { path: "/admin/permissions", element: <AdminManagePermission /> },
+  { path: "/admin/users", element: <AdminRouteGuard><AdminUserList /></AdminRouteGuard> },
+  { path: "/admin/users/create", element: <AdminRouteGuard><AdminUserCreate /></AdminRouteGuard> },
+  { path: "/admin/users/:id/edit", element: <AdminRouteGuard><AdminUserUpdate /></AdminRouteGuard> },
+  { path: "/admin/users/:id", element: <AdminRouteGuard><AdminUserDetail /></AdminRouteGuard> },
+  { path: "/admin/logs", element: <AdminRouteGuard><AdminSystemLog /></AdminRouteGuard> },
+  { path: "/admin/permissions", element: <AdminRouteGuard><AdminManagePermission /></AdminRouteGuard> },
 
   // PROFILE
   { path: "/profile", element: <ViewProfile /> },
