@@ -47,6 +47,11 @@ export const API_ENDPOINTS = {
     UPDATE: (userId) => `${BASE_URL}/api/Worker/update-employee/${userId}`,
   },
 
+  WORKER_ROLE: {
+    GET_ALL: `${BASE_URL}/api/WorkerRole/get-all-worker-roles`,
+    CREATE: `${BASE_URL}/api/WorkerRole/create-worker-roles`,
+  },
+
   LEAVE_REQUEST: {
     GET_LIST: `${BASE_URL}/api/LeaveRequest/leave-request-list`,
     GET_MY_HISTORY: `${BASE_URL}/api/LeaveRequest/my-leave-request-history`,

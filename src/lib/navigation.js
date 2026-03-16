@@ -6,6 +6,8 @@ export const BREADCRUMB_CONFIG = [
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
   { path: "/employees", label: "Danh sách nhân viên", parent: "/dashboard" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
+  { path: "/worker-roles", label: "Vai trò thợ", parent: "/home" },
+  { path: "/worker-roles/create", label: "Thêm vai trò thợ", parent: "/worker-roles" },
   {
     path: "/employees/:id/edit",
     label: ({ id }) => `Cập nhật nhân viên #${id}`,
@@ -30,6 +32,13 @@ export const BREADCRUMB_CONFIG = [
     parent: "/leave",
   },
   { path: "/orders/owner", label: "Danh sách đơn hàng", parent: "/dashboard" },
+  { path: "/leave-history", label: "Lịch sử đơn nghỉ", parent: "/home" },
+  {
+    path: "/leave-history/:id",
+    label: ({ id }) => `Lịch sử đơn #${id}`,
+    parent: "/leave-history",
+  },
+  { path: "/orders/owner", label: "Danh sách đơn hàng", parent: "/orders" },
   { path: "/orders/manual-create", label: "Tạo đơn hàng thủ công", parent: "/orders" },
   {
     path: "/orders/edit/:id",

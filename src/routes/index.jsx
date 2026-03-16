@@ -34,6 +34,8 @@ const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
 const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
 const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
+const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
+const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
 
 // PROFILE
 const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
@@ -42,6 +44,8 @@ const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
 // LEAVE
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
 const LeaveDetail = lazy(() => import("@/pages/leave/LeaveDetail"));
+const LeaveRequestHistoryList = lazy(() => import("@/pages/leave-history/LeaveRequestHistoryList"));
+const LeaveRequestHistoryDetail = lazy(() => import("@/pages/leave-history/LeaveRequestHistoryDetail"));
 
 export const routes = [
   { path: "/", element: <HomePage /> },
@@ -82,14 +86,30 @@ export const routes = [
   { path: "/salary", element: <PayrollList /> },
   { path: "/salary/:employeeId", element: <PayrollDetail /> },
   { path: "/leave-requests/:id", element: <LeaveRequestDetail /> },
+  { path: "/worker-roles", element: <WorkerRoleList /> },
+  { path: "/worker-roles/create", element: <WorkerRoleCreate /> },
 
   // PROFILE
   { path: "/profile", element: <ViewProfile /> },
   { path: "/profile/edit", element: <ProfileEdit /> },
 
-  // LEAVE
-  { path: "/leave", element: <LeaveList /> },
-  { path: "/leave/:id", element: <LeaveDetail /> },
+  /* LEAVE */
+  {
+    path: "/leave",
+    element: <LeaveList />,
+  },
+  {
+    path: "/leave/:id",
+    element: <LeaveDetail />,
+  },
+  {
+    path: "/leave-history",
+    element: <LeaveRequestHistoryList />,
+  },
+  {
+    path: "/leave-history/:id",
+    element: <LeaveRequestHistoryDetail />,
+  },
 
   // 404
   {
