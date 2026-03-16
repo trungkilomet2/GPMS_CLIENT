@@ -13,6 +13,8 @@ import {
   XCircle,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { canManageLeaveRequests } from "@/lib/roleAccess";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -110,6 +112,7 @@ export default function LeaveDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const user = getStoredUser();
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -155,9 +158,15 @@ export default function LeaveDetail() {
     [leave?.status]
   );
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
-  const canReview = leave?.status === "pending";
+  const hasReviewPermission = canManageLeaveRequests(user?.role);
+  const canReview = hasReviewPermission && leave?.status === "pending";
 
   const handleApprove = async () => {
+    if (!hasReviewPermission) {
+      setError("Bạn không có quyền phê duyệt đơn nghỉ.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await LeaveService.approveLeaveRequest(id);
@@ -179,6 +188,11 @@ export default function LeaveDetail() {
   };
 
   const handleReject = async () => {
+    if (!hasReviewPermission) {
+      setError("Bạn không có quyền từ chối đơn nghỉ.");
+      return;
+    }
+
     if (!rejectReason.trim()) return;
 
     try {
