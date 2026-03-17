@@ -1,5 +1,6 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
-import { clearAuthStorage, setAuthItem, setStoredUser } from "@/lib/authStorage";
+import { extractRoleValue, extractUserIdValue } from "@/lib/authIdentity";
+import { clearAuthStorage, removeAuthItem, setAuthItem, setStoredUser } from "@/lib/authStorage";
 
 const PROFILE_CACHE_PREFIX = "profile-cache:";
 
@@ -52,11 +53,13 @@ async function loadProfileAfterLogin(token) {
     const accountStatus = readAccountStatus(d);
 
     return {
+      userId: extractUserIdValue(d),
       fullName: d.fullName || "",
       name: d.fullName || "",
       email: d.email || "",
       phoneNumber: d.phoneNumber || "",
       phone: d.phoneNumber || "",
+      role: extractRoleValue(d),
       avatarUrl: d.avartarUrl || "",
       location: d.location || "",
       address: d.location || "",
@@ -134,14 +137,8 @@ export const authService = {
       decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"] ??
       userName;
 
-    const role =
-      decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-      "";
-
-    const userId =
-      decoded[
-        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-      ] ?? "";
+    const role = extractRoleValue(decoded);
+    const userId = extractUserIdValue(decoded);
 
     const tokenAccountStatus = readAccountStatus(decoded);
 
@@ -158,11 +155,13 @@ export const authService = {
     const profile = await loadProfileAfterLogin(token);
     const user = {
       ...basicUser,
+      userId: profile?.userId || basicUser.userId,
       name: profile?.fullName || profile?.name || basicUser.name,
       fullName: profile?.fullName || basicUser.fullName,
       email: profile?.email || "",
       phoneNumber: profile?.phoneNumber || "",
       phone: profile?.phone || "",
+      role: profile?.role || basicUser.role,
       avatarUrl: profile?.avatarUrl || basicUser.avatarUrl,
       location: profile?.location || "",
       address: profile?.address || "",
@@ -195,7 +194,12 @@ export const authService = {
 
     setAuthItem("token", token);
     setStoredUser(mergedUser);
-    setAuthItem("userId", String(userId));
+
+    if (mergedUser.userId != null) {
+      setAuthItem("userId", String(mergedUser.userId));
+    } else {
+      removeAuthItem("userId");
+    }
 
     window.dispatchEvent(new Event("auth-change"));
 

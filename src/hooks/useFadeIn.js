@@ -38,7 +38,7 @@ export function useFadeIn(threshold = 0.05) {
       cancelAnimationFrame(raf);
       obs.disconnect();
     };
-  }, []);
+  }, [threshold]);
 
   return [ref, vis];
 }

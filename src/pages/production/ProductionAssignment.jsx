@@ -75,9 +75,9 @@ export default function ProductionAssignment() {
   const navigate = useNavigate();
   const [selectedProductionId, setSelectedProductionId] = useState(() => (id ? String(id) : ""));
   const [workers, setWorkers] = useState([]);
-  const [loadingWorkers, setLoadingWorkers] = useState(false);
   const [workerError, setWorkerError] = useState(null);
   const [assignments, setAssignments] = useState({});
+  const loadingWorkers = workers.length === 0 && !workerError;
 
   const selectedProduction = useMemo(() => {
     const pid = Number(selectedProductionId);

@@ -192,6 +192,9 @@ export default function CreateOrder() {
                 imageFile: null,
                 imagePreview: imageUrl,
               };
+                if (active) setProfileCheck({ checking: false, missing });
+            } catch (_error) {
+                if (active) setProfileCheck({ checking: false, missing: ["email", "so dien thoai", "dia chi"] });
             }
             return updated;
           });
@@ -289,6 +292,198 @@ export default function CreateOrder() {
               image: uploadRes?.url || '',
               imageFile: undefined,
               imagePreview: undefined,
+    const parseMaterialValue = (val) => {
+        if (val === null || val === undefined) return 0;
+        const s = String(val).replace(',', '.').trim();
+        const n = Number(s);
+        return Number.isNaN(n) ? 0 : n;
+    };
+
+    const handleSaveMaterial = async () => {
+        const pendingMaterial = {
+            materialName: materialFormData.materialName,
+            value: parseMaterialValue(materialFormData.value),
+            uom: materialFormData.uom,
+            image: materialFormData.image || '',
+            imageFile: materialFormData.imageFile || null,
+            imagePreview: materialFormData.imagePreview || materialFormData.image || '',
+            note: materialFormData.note?.trim() || '',
+        };
+
+        let targetIndex = editingIndex;
+        if (editingIndex === null) {
+            setMaterials((prev) => {
+                targetIndex = prev.length;
+                return [...prev, pendingMaterial];
+            });
+        } else {
+            setMaterials((prev) => {
+                const updated = [...prev];
+                updated[editingIndex] = pendingMaterial;
+                return updated;
+            });
+        }
+
+        if (errors.materials) {
+            setErrors(prev => ({ ...prev, materials: null }));
+        }
+        setIsModalOpen(false);
+
+        if (pendingMaterial.imageFile) {
+            try {
+                const uploadRes = await CloudinaryService.uploadImage(pendingMaterial.imageFile);
+                const imageUrl = uploadRes?.url || '';
+                if (imageUrl) {
+                    setMaterials((prev) => {
+                        const updated = [...prev];
+                        const idx = targetIndex;
+                        if (updated[idx]) {
+                            updated[idx] = {
+                                ...updated[idx],
+                                image: imageUrl,
+                                imageFile: null,
+                                imagePreview: imageUrl,
+                            };
+                        }
+                        return updated;
+                    });
+                }
+            } catch (_err) {
+                // keep preview; user can edit to retry
+            }
+        }
+    };
+
+    const totalCost = (Number(orderData.quantity) || 0) * (Number(orderData.cpu) || 0);
+
+    const handleOrderImageChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const allowedTypes = ['image/jpeg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
+            return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Ảnh quá lớn (tối đa 2MB)');
+            return;
+        }
+        const previewUrl = URL.createObjectURL(file);
+        setOrderImageFile(file);
+        setOrderImagePreview(previewUrl);
+    };
+
+    const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx'];
+    const MAX_TEMPLATE_SIZE = 10 * 1024 * 1024;
+
+    const handleTemplateFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        const valid = [];
+        const invalid = [];
+
+        files.forEach((file) => {
+            const lower = file.name.toLowerCase();
+            const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+            const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
+            if (isAllowed && isSizeOk) {
+                valid.push(file);
+            } else {
+                invalid.push(file.name);
+            }
+        });
+
+        if (invalid.length > 0) {
+            alert(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+        }
+
+        if (valid.length > 0) {
+            setTemplateFiles((prev) => [...prev, ...valid]);
+        }
+
+        e.target.value = '';
+    };
+
+    const removeTemplateFile = (index) => {
+        setTemplateFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (profileCheck.missing.length > 0) {
+            alert("Vui lòng cập nhật email, số điện thoại và địa chỉ trước khi tạo đơn hàng.");
+            return;
+        }
+
+        if (!validateForm()) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            let orderImageUrl = orderData.image;
+
+            if (orderImageFile) {
+                const uploadRes = await CloudinaryService.uploadImage(orderImageFile);
+                orderImageUrl = uploadRes?.url || orderImageUrl;
+            }
+
+            const materialsPayload = await Promise.all(
+                materials.map(async (m) => {
+                    if (m.imageFile) {
+                        const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
+                        return {
+                            ...m,
+                            image: uploadRes?.url || '',
+                            imageFile: undefined,
+                            imagePreview: undefined,
+                        };
+                    }
+                    const isRemoteUrl = typeof m.image === 'string' && /^https?:\/\//i.test(m.image);
+                    return {
+                        ...m,
+                        image: isRemoteUrl ? m.image : '',
+                        imageFile: undefined,
+                        imagePreview: undefined,
+                    };
+                })
+            );
+
+            const templatesPayload = [];
+            if (templateFiles.length > 0) {
+                const uploadResults = await Promise.all(
+                    templateFiles.map((file) => CloudinaryService.uploadTemplateFile(file))
+                );
+                uploadResults.forEach((res, idx) => {
+                    const url = res?.url || '';
+                    if (!url) return;
+                    templatesPayload.push({
+                        templateName: templateFiles[idx]?.name || 'Bản mềm',
+                        type: 'SOFT',
+                        file: url,
+                        quantity: null,
+                        note: '',
+                    });
+                });
+            }
+            if (Number(hardCopyQty) > 0) {
+                templatesPayload.push({
+                    templateName: 'Bản cứng',
+                    type: 'HARD',
+                    file: null,
+                    quantity: Number(hardCopyQty),
+                    note: '',
+                });
+            }
+
+            const payload = {
+                ...orderData,
+                image: orderImageUrl,
+                materials: materialsPayload,
+                templates: templatesPayload,
             };
           }
           const isRemoteUrl = typeof m.image === 'string' && /^https?:\/\//i.test(m.image);

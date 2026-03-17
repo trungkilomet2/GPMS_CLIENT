@@ -1,6 +1,6 @@
 import axios from 'axios';
 import BASE_URL from './apiconfig';
-import { clearAuthStorage, getAuthItem } from './authStorage';
+import { clearAuthStorage, getAuthItem, getStoredUser } from './authStorage';
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
@@ -12,7 +12,8 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     const token = getAuthItem('token');
-    const userId = getAuthItem('userId');
+    const storedUser = getStoredUser() || {};
+    const userId = storedUser.userId || storedUser.id || getAuthItem('userId');
 
     if (token) {
       config.headers = config.headers ?? {};

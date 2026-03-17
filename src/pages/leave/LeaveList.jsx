@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -102,6 +102,7 @@ function SummaryCard({ label, value, icon, active, onClick }) {
 
 export default function LeaveList() {
   const navigate = useNavigate();
+  const mountedRef = useRef(true);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,13 +111,30 @@ export default function LeaveList() {
   const [dateFilter, setDateFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setRefreshKey((prev) => prev + 1);
+    window.addEventListener("leave-change", handler);
+    return () => window.removeEventListener("leave-change", handler);
+  }, []);
 
   useEffect(() => {
     let active = true;
 
-    const fetchLeaveRequests = async () => {
+    const fetchLeaveRequests = async ({ silent = false } = {}) => {
       try {
-        setLoading(true);
+        if (!silent) {
+          setLoading(true);
+          setError("");
+        }
 
         const params = {
           PageIndex: Math.max(0, page - 1),
@@ -133,23 +151,45 @@ export default function LeaveList() {
 
         setItems(response.data ?? []);
         setTotalCount(response.recordCount ?? response.RecordCount ?? (response.data ?? []).length);
-        setError("");
+        if (!silent) setError("");
       } catch {
         if (!active) return;
-        setItems([]);
-        setTotalCount(0);
-        setError("Không thể tải danh sách đơn nghỉ. Vui lòng thử lại.");
+
+        // Silent refresh shouldn't wipe UI; keep current list and only surface error on next hard refresh.
+        if (!silent) {
+          setItems([]);
+          setTotalCount(0);
+          setError("Không thể tải danh sách đơn nghỉ. Vui lòng thử lại.");
+        }
       } finally {
-        if (active) setLoading(false);
+        if (active && !silent) setLoading(false);
       }
     };
 
-    fetchLeaveRequests();
+    fetchLeaveRequests({ silent: false });
+
+    // Auto-refresh to reflect new requests without reloading the page.
+    // This is a light polling fallback (in lieu of websocket/SSE from backend).
+    const intervalMs = 15000;
+    const onTick = () => {
+      if (!active) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      fetchLeaveRequests({ silent: true });
+    };
+
+    const intervalId = window.setInterval(onTick, intervalMs);
+    const onFocus = () => onTick();
+    const onVisibility = () => onTick();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [dateFilter, page, search, statusFilter]);
+  }, [dateFilter, page, refreshKey, search, statusFilter]);
 
   const stats = useMemo(
     () => ({

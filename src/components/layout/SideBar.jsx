@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+﻿﻿import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { canManageLeaveRequests } from "@/lib/roleAccess";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -31,7 +33,19 @@ const OPERATION_NAV_ITEMS = [
 ];
 
 function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
+  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
+  }
 
   return String(value ?? "")
     .split(",")
@@ -81,7 +95,13 @@ export default function Sidebar() {
   });
 
   const user = getStoredUser();
-  const navItems = resolveSidebarItems(user);
+  const navItems = resolveSidebarItems(user).filter((item) => {
+    if (item.to === "/leave") {
+      return canManageLeaveRequests(user?.role);
+    }
+
+    return true;
+  });
 
   useEffect(() => {
     try {
@@ -118,18 +138,16 @@ export default function Sidebar() {
 
       <nav className="dashboard-sidebar__nav">
         {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
-          if (!hasRequiredRole(user, requiredRole)) {
-            return null;
-          }
+          if (!hasRequiredRole(user, requiredRole)) return null;
 
           if (disabled) {
             return (
               <div
-                key={label}
+                key={to}
                 className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
                 title={label}
               >
-                <Icon size={22} />
+                {createElement(Icon, { size: 22 })}
                 {!collapsed && <span>{label}</span>}
               </div>
             );
@@ -144,7 +162,7 @@ export default function Sidebar() {
                 `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
               }
             >
-              <Icon size={22} />
+              {createElement(Icon, { size: 22 })}
               {!collapsed && <span>{label}</span>}
             </NavLink>
           );

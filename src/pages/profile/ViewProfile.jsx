@@ -132,7 +132,7 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
-function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
+function SectionInfo({ user, onViewOrders, onCreateOrder }) {
   const customerProfileRows = [
     ["👤", "Người đại diện", user.fullName || user.name],
     ["✉️", "Email", user.email],
@@ -553,7 +553,7 @@ export default function ViewProfile() {
 
         {/* Content */}
         <main>
-          {tab==="info"     && <SectionInfo     user={profile} onEdit={()=>navigate("/profile/edit")} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
+          {tab==="info"     && <SectionInfo     user={profile} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
           {tab==="security" && <SectionSecurity/>}
           {tab==="activity" && <SectionActivity activities={profile?.activities||[]}/>}
         </main>

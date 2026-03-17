@@ -21,12 +21,14 @@ export function splitRoles(value) {
     .filter(Boolean);
 }
 
-export function hasAnyRole(roles, targets) {
+export function hasAnyRole(roleValue, targets) {
+  const roles = Array.isArray(roleValue) ? roleValue : splitRoles(roleValue);
   const normalizedRoles = roles.map((item) => String(item).toLowerCase());
+
   return targets.some((role) => normalizedRoles.includes(String(role).toLowerCase()));
 }
 
-export function getPostLoginPath(roleValue) {
+export function getDefaultRouteForRole(roleValue) {
   const roles = Array.isArray(roleValue) ? roleValue : splitRoles(roleValue);
 
   if (hasAnyRole(roles, ["admin"])) {
@@ -38,7 +40,7 @@ export function getPostLoginPath(roleValue) {
   }
 
   if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
-    return "/production-plan/assign";
+    return "/monitoring/assign";
   }
 
   if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
@@ -46,4 +48,8 @@ export function getPostLoginPath(roleValue) {
   }
 
   return "/home";
+}
+
+export function canManageLeaveRequests(roleValue) {
+  return hasAnyRole(roleValue, ["owner", "pm"]);
 }

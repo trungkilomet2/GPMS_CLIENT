@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -97,7 +98,7 @@ export default function InternalDashboard() {
               {quickLinks.map(({ to, title, description, icon: Icon }) => (
                 <Link key={to} to={to} className="internal-dashboard-card">
                   <div className="internal-dashboard-card__icon">
-                    <Icon size={22} />
+                    {createElement(Icon, { size: 22 })}
                   </div>
                   <div className="internal-dashboard-card__content">
                     <h3 className="internal-dashboard-card__title">{title}</h3>

@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { extractRoleValue, extractUserIdValue } from "@/lib/authIdentity";
 import { clearAuthStorage, getAuthItem, getStoredUser, removeAuthItem, setStoredUser } from "@/lib/authStorage";
 
 const readAccountStatus = (source = {}) => {
@@ -174,8 +175,15 @@ export const userService = {
       normalizeServerValue(cached.address) ||
       "";
 
+    const resolvedId = extractUserIdValue(d) || getUserId();
+    const resolvedRole = extractRoleValue(d) || (stored.role ?? "");
+
+    // IMPORTANT:
+    // Backend's view-profile sometimes returns null/placeholder values.
+    // Never let those wipe locally stored/cached values.
     const profile = {
-      id:          getUserId(),
+      id:          resolvedId,
+      userId:      resolvedId,
       fullName,
       name:        fullName,
       email:       String(email || "").trim(),
@@ -184,6 +192,7 @@ export const userService = {
       avatarUrl:   String(avatarUrl || "").trim(),
       location:    String(location || "").trim(),
       address:     String(location || "").trim(),
+      role:        resolvedRole,
       accountStatus,
     };
 
@@ -196,8 +205,8 @@ export const userService = {
 
     // Keep a per-user cache so profile values can survive logout/login
     // if backend's view-profile returns nulls intermittently.
-    if (profile.id != null) {
-      setProfileCache(profile.id, {
+    if (profile.userId != null) {
+      setProfileCache(profile.userId, {
         ...cached,
         ...profile,
       });
@@ -258,6 +267,7 @@ export const userService = {
       userName:    d.userName    ?? stored.userName,
       fullName:    d.fullName    ?? stored.fullName,
       name:        d.fullName    ?? stored.name,
+      role:        extractRoleValue(d) || stored.role,
       email:       d.email       ?? stored.email,
       phoneNumber: d.phoneNumber ?? stored.phoneNumber,
       phone:       d.phoneNumber ?? stored.phone,

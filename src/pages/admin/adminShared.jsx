@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import "@/styles/admin.css";
 import {
   ADMIN_LOG_OUTCOME_META,
@@ -90,7 +91,7 @@ export function AdminStatCard({ icon: Icon, label, value, meta, tone = "primary"
           <div className="admin-stat__value">{value}</div>
         </div>
         <div className="admin-stat__icon">
-          <Icon size={20} />
+          {createElement(Icon, { size: 20 })}
         </div>
       </div>
       <p className="admin-stat__meta">{meta}</p>
