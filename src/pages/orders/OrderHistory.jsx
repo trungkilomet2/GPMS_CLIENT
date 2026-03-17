@@ -315,23 +315,23 @@ export default function Orders({
               <table className="w-full divide-y divide-slate-200 table-fixed">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('id')}>
+                    <th className="leave-table-th is-sortable w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('id')}>
                       Mã đơn <SortIcon direction={sortBy.key === 'id' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-14 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Ảnh</th>
-                    <th className="leave-table-th w-48 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('orderName')}>
+                    <th className="leave-table-th is-sortable w-48 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('orderName')}>
                       Sản phẩm <SortIcon direction={sortBy.key === 'orderName' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap" onClick={() => toggleSort('size')}>
+                    <th className="leave-table-th is-sortable w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap" onClick={() => toggleSort('size')}>
                       Kích cỡ <SortIcon direction={sortBy.key === 'size' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th w-20 px-2 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('color')}>
+                    <th className="leave-table-th is-sortable w-20 px-2 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('color')}>
                       Màu <SortIcon direction={sortBy.key === 'color' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('quantity')}>
+                    <th className="leave-table-th is-sortable w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('quantity')}>
                       Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
+                    <th className="leave-table-th is-sortable w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
                       Ngày dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-32 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>

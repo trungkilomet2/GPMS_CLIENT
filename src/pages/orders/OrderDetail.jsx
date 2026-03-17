@@ -12,6 +12,7 @@ import { formatOrderDate } from '@/lib/orders/formatters';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
+import { hasAnyRole, splitRoles } from '@/lib/authRouting';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
 import OwnerLayout from '@/layouts/OwnerLayout';
@@ -33,9 +34,9 @@ export default function OrderDetail() {
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState('');
     const user = getStoredUser();
-    const roleLower = String(user?.role ?? '').toLowerCase();
-    const isOwner = roleLower === 'owner';
-    const isAdmin = roleLower === 'admin';
+    const roles = splitRoles(user?.role);
+    const isOwner = hasAnyRole(roles, ['owner']);
+    const isAdmin = hasAnyRole(roles, ['admin']);
     const canModerate = isOwner || isAdmin;
 
     useEffect(() => {
@@ -88,12 +89,8 @@ export default function OrderDetail() {
         order?.user?.userId ??
         null;
     const currentUserId = user?.userId ?? user?.id ?? null;
-    const currentUserName = String(user?.userName ?? user?.name ?? user?.fullName ?? '').trim().toLowerCase();
-    const orderUserName = String(order?.userName ?? order?.fullName ?? order?.customerName ?? order?.user?.name ?? order?.user?.fullName ?? '').trim().toLowerCase();
     const canEdit =
-        isAdmin ||
-        (orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId)) ||
-        (!!currentUserName && !!orderUserName && currentUserName === orderUserName);
+        orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId);
 
     const updateOrderStatus = async (nextStatus, reason) => {
         if (!order?.id) return;
