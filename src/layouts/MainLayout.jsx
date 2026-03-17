@@ -5,10 +5,19 @@ import "@/styles/homepage.css";
 
 export default function MainLayout({ children }) {
   return (
-    <div style={{ fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif", overflowX: "hidden", background: "#fff" }}>
+    <div
+      style={{
+        fontFamily: "'Lexend','Be Vietnam Pro','Segoe UI',sans-serif",
+        overflowX: "hidden",
+        background: "#fff",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <Header />
       <Breadcrumbs />
-      <main>{children}</main>
+      <main style={{ flex: 1 }}>{children}</main>
       <Footer />
     </div>
   );

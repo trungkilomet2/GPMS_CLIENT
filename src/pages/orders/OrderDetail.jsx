@@ -46,7 +46,7 @@ export default function OrderDetail() {
                 setOrder(response.data.data || response.data);
                 setError(null);
             } catch (err) {
-                setError("KhÃ´ng thá»ƒ táº£i thÃ´ng tin Ä‘Æ¡n hÃ ng.");
+                setError("Không thể tải thông tin đơn hàng.");
             } finally {
                 setLoading(false);
             }
@@ -58,7 +58,7 @@ export default function OrderDetail() {
         <OwnerLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
                 <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
-                <p className="text-slate-500 text-sm font-medium">Äang truy xuáº¥t dá»¯ liá»‡u...</p>
+                <p className="text-slate-500 text-sm font-medium">Đang truy xuất dữ liệu...</p>
             </div>
         </OwnerLayout>
     );
@@ -108,8 +108,8 @@ export default function OrderDetail() {
             await OrderService.updateOrder(order.id, payload);
             setOrder((prev) => ({ ...prev, status: nextStatus }));
         } catch (err) {
-            console.error('Lá»—i cáº­p nháº­t tráº¡ng thÃ¡i:', err);
-            alert('KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i Ä‘Æ¡n hÃ ng.');
+            console.error('Lỗi cập nhật trạng thái:', err);
+            alert('Không thể cập nhật trạng thái đơn hàng.');
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -183,16 +183,16 @@ export default function OrderDetail() {
                         )}
                     </div>
                 </div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* KHá»I THÃ”NG TIN CHI TIáº¾T (2/3) */}
+                    {/* KHỐI THÔNG TIN CHI TIẾT (2/3) */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Info size={16} />
-                                <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin tá»•ng quÃ¡t Ä‘Æ¡n hÃ ng</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin tổng quát đơn hàng</h2>
                             </div>
 
                             <div className="px-5 py-4 border-b border-slate-100">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">áº¢nh Ä‘Æ¡n hÃ ng</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">Ảnh đơn hàng</div>
                                 <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
                                     <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
                                         {order.image ? (
@@ -200,11 +200,11 @@ export default function OrderDetail() {
                                                 type="button"
                                                 onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
                                                 className="w-full h-full cursor-zoom-in"
-                                                title="Click Ä‘á»ƒ xem & zoom áº£nh"
+                                                title="Click để xem & zoom ảnh"
                                             >
                                                 <img src={order.image} alt="" className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <span className="text-[10px] text-white font-semibold">Click Ä‘á»ƒ zoom</span>
+                                                    <span className="text-[10px] text-white font-semibold">Click để zoom</span>
                                                 </div>
                                             </button>
                                         ) : (
@@ -212,43 +212,43 @@ export default function OrderDetail() {
                                         )}
                                     </div>
                                     <div className="text-xs text-slate-500 leading-relaxed">
-                                        áº¢nh tham kháº£o tá»•ng quan Ä‘Æ¡n hÃ ng, dÃ¹ng Ä‘á»ƒ kiá»ƒm tra nhanh trÆ°á»›c khi sáº£n xuáº¥t.
+                                        Ảnh tham khảo tổng quan đơn hàng, dùng để kiểm tra nhanh trước khi sản xuất.
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Layout Grid 2 cá»™t cho thÃ´ng tin chi tiáº¿t */}
+                            {/* Layout Grid 2 cột cho thông tin chi tiết */}
                             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 font-sans">
                                 <div className="p-0">
-                                    <DetailItem label="MÃ£ Ä‘Æ¡n hÃ ng" value={`#ÄH-${order.id}`} />
-                                    <DetailItem label="TÃªn Ä‘Æ¡n hÃ ng" value={order.orderName} isBold />
-                                    <DetailItem label="Loáº¡i Ä‘Æ¡n hÃ ng" value={order.type} />
-                                    <DetailItem label="MÃ u sáº¯c" value={order.color} />
-                                    <DetailItem label="KÃ­ch thÆ°á»›c (Size)" value={order.size} />
+                                    <DetailItem label="Mã đơn hàng" value={`#ĐH-${order.id}`} />
+                                    <DetailItem label="Tên đơn hàng" value={order.orderName} isBold />
+                                    <DetailItem label="Loại đơn hàng" value={order.type} />
+                                    <DetailItem label="Màu sắc" value={order.color} />
+                                    <DetailItem label="Kích thước (Size)" value={order.size} />
                                 </div>
                                 <div className="p-0">
-                                    <DetailItem label="Sá»‘ lÆ°á»£ng" value={order.quantity?.toLocaleString()} isEmerald />
-                                    <DetailItem label="ÄÆ¡n giÃ¡" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
-                                    <DetailItem label="Tá»•ng tiá»n Ä‘Æ¡n hÃ ng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
-                                    <DetailItem label="NgÃ y báº¯t Ä‘áº§u" value={formatOrderDate(order.startDate)} />
-                                    <DetailItem label="NgÃ y káº¿t thÃºc" value={formatOrderDate(order.endDate)} />
+                                    <DetailItem label="Số lượng" value={order.quantity?.toLocaleString()} isEmerald />
+                                    <DetailItem label="Đơn giá" value={order.cpu ? `${order.cpu} VND/SP` : '-'} />
+                                    <DetailItem label="Tổng tiền đơn hàng" value={order.quantity && order.cpu ? `${(order.quantity * order.cpu).toLocaleString('vi-VN')} VND` : '---'} isBold />
+                                    <DetailItem label="Ngày bắt đầu" value={formatOrderDate(order.startDate)} />
+                                    <DetailItem label="Ngày kết thúc" value={formatOrderDate(order.endDate)} />
                                 </div>
                             </div>
 
-                            {/* Ghi chÃº chiáº¿m toÃ n bá»™ chiá»u ngang phÃ­a dÆ°á»›i */}
+                            {/* Ghi chú chiếm toàn bộ chiều ngang phía dưới */}
                             <div className="p-5 border-t border-slate-100 bg-amber-50/30">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chÃº</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chú</p>
                                 <p className="text-sm text-slate-700 leading-relaxed italic">
-                                    {order.note ? `"${order.note}"` : "KhÃ´ng cÃ³ ghi chÃº bá»• sung cho Ä‘Æ¡n hÃ ng nÃ y."}
+                                    {order.note ? `"${order.note}"` : "Không có ghi chú bổ sung cho đơn hàng này."}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Báº£ng váº­t liá»‡u - Thá»±c dá»¥ng vÃ  rÃµ rÃ ng */}
+                        {/* Bảng vật liệu - Thực dụng và rõ ràng */}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Package size={16} />
-                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sÃ¡ch váº­t liá»‡u sáº£n xuáº¥t</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
                             </div>
                             <MaterialsTable
                                 materials={order.materials ?? []}
@@ -264,29 +264,29 @@ export default function OrderDetail() {
                         </div>
                     </div>
 
-                    {/* Cá»˜T PHáº¢I (1/3): FILE & THáº¢O LUáº¬N */}
+                    {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                     <div className="space-y-6">
                         {canModerate && (
                             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
                                 <div className="flex items-center gap-2 text-slate-600 mb-3">
                                     <Info size={16} />
-                                    <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin ngÆ°á»i Ä‘áº·t hÃ ng</h2>
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
                                 </div>
                                 <div className="space-y-2 text-sm text-slate-700">
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Há» vÃ  tÃªn</span>
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
                                         <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || '-'}
                                         </span>
                                     </div>
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Sá»‘ Ä‘iá»‡n thoáº¡i</span>
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Số điện thoại</span>
                                         <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || '-'}
                                         </span>
                                     </div>
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Äá»‹a chá»‰</span>
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Địa chỉ</span>
                                         <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || '-'}
                                         </span>
@@ -296,7 +296,7 @@ export default function OrderDetail() {
                         )}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                             <div>
-                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Máº«u thiáº¿t káº¿ báº£n má»m</h2>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
                                 <div className="space-y-2">
                                     {softTemplates.length > 0 ? (
                                         softTemplates.map((file, idx) => {
@@ -316,21 +316,21 @@ export default function OrderDetail() {
                                                             <Download size={16} />
                                                         </a>
                                                     ) : (
-                                                        <span className="text-[10px] text-slate-400">KhÃ´ng cÃ³ link</span>
+                                                        <span className="text-[10px] text-slate-400">Không có link</span>
                                                     )}
                                                 </div>
                                             );
                                         })
                                     ) : (
-                                        <p className="text-center py-4 text-slate-400 text-[11px] italic">KhÃ´ng cÃ³ file thiáº¿t káº¿</p>
+                                        <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="border-t pt-4">
-                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Báº£n cá»©ng</h2>
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
                                 <div className="text-sm font-semibold text-slate-700">
-                                    Sá»‘ lÆ°á»£ng báº£n cá»©ng: <span className="text-emerald-700">{hardCopyTotal}</span>
+                                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
                                 </div>
                             </div>
                         </div>
@@ -340,13 +340,13 @@ export default function OrderDetail() {
                                 onClick={() => setIsCommentModalOpen(true)}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
                             >
-                                <MessageSquare size={16} /> Tháº£o luáº­n Ä‘Æ¡n hÃ ng
+                                <MessageSquare size={16} /> Thảo luận đơn hàng
                             </button>
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
                             >
-                                <History size={16} /> Lá»‹ch sá»­ chá»‰nh sá»­a
+                                <History size={16} /> Lịch sử chỉnh sửa
                             </button>
                         </div>
                     </div>
@@ -368,19 +368,19 @@ export default function OrderDetail() {
                     await updateOrderStatus(pendingStatus, reason);
                     setIsReasonModalOpen(false);
                 }}
-                title={pendingStatus === 'Tá»« chá»‘i' ? 'Tá»« chá»‘i Ä‘Æ¡n hÃ ng' : 'YÃªu cáº§u chá»‰nh sá»­a'}
-                description={pendingStatus === 'Tá»« chá»‘i'
-                    ? 'Vui lÃ²ng nháº­p lÃ½ do tá»« chá»‘i Ä‘á»ƒ khÃ¡ch hÃ ng náº¯m rÃµ.'
-                    : 'Vui lÃ²ng nháº­p lÃ½ do yÃªu cáº§u chá»‰nh sá»­a.'}
-                confirmText={pendingStatus === 'Tá»« chá»‘i' ? 'XÃ¡c nháº­n tá»« chá»‘i' : 'Gá»­i yÃªu cáº§u'}
+                title={pendingStatus === 'Từ chối' ? 'Từ chối đơn hàng' : 'Yêu cầu chỉnh sửa'}
+                description={pendingStatus === 'Từ chối'
+                    ? 'Vui lòng nhập lý do từ chối để khách hàng nắm rõ.'
+                    : 'Vui lòng nhập lý do yêu cầu chỉnh sửa.'}
+                confirmText={pendingStatus === 'Từ chối' ? 'Xác nhận từ chối' : 'Gửi yêu cầu'}
                 loading={isUpdatingStatus}
-                tone={pendingStatus === 'Tá»« chá»‘i' ? 'danger' : 'warning'}
+                tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
             />
         </OwnerLayout>
     );
 }
 
-// Sub-component hiá»ƒn thá»‹ tá»«ng dÃ²ng thÃ´ng tin
+// Sub-component hiển thị từng dòng thông tin
 function DetailItem({ label, value, isBold = false, isEmerald = false }) {
     const displayValue = value === null || value === undefined || value === '' ? '-' : value;
     return (
@@ -392,9 +392,3 @@ function DetailItem({ label, value, isBold = false, isEmerald = false }) {
         </div>
     );
 }
-
-
-
-
-
-

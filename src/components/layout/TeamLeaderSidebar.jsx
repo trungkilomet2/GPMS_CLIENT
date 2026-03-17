@@ -6,8 +6,8 @@ import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
-  { to: "/monitoring/assign", label: "Phân công công việc", icon: ClipboardCheck },
-  { to: "/monitoring", label: "Kế hoạch sản xuất", icon: ClipboardList },
+  { to: "/production-plan/assign", label: "Phân công công việc", icon: ClipboardCheck },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ClipboardList },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardList },
 ];
 

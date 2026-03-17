@@ -26,7 +26,7 @@ export function getPostLoginPath(roleValue) {
   }
 
   if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
-    return "/monitoring/assign";
+    return "/production-plan/assign";
   }
 
   if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {

@@ -342,8 +342,9 @@ export default function CreateOrder() {
 
     return (
         <OwnerLayout>
+            <div className="min-h-screen bg-slate-50">
             {profileCheck.checking && (
-                <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
+                <div className="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8 font-sans">
                     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 flex items-center gap-3">
                         <Loader2 className="animate-spin text-emerald-600" size={20} />
                         <div className="text-sm text-gray-600">Đang kiểm tra thông tin hồ sơ...</div>
@@ -352,7 +353,7 @@ export default function CreateOrder() {
             )}
 
             {!profileCheck.checking && profileCheck.missing.length > 0 && (
-                <div className="max-w-3xl mx-auto py-10 px-4 font-sans">
+                <div className="max-w-3xl mx-auto py-10 px-4 sm:px-6 lg:px-8 font-sans">
                     <div className="bg-white rounded-lg shadow-sm border border-amber-200 p-6">
                         <div className="flex items-start gap-3">
                             <AlertCircle className="text-amber-500" size={20} />
@@ -375,7 +376,7 @@ export default function CreateOrder() {
             )}
 
             {!profileCheck.checking && profileCheck.missing.length === 0 && (
-                <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
+                <div className="max-w-7xl mx-auto w-full py-8 px-4 sm:px-6 lg:px-8 font-sans">
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-6">
                         <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
@@ -573,6 +574,7 @@ export default function CreateOrder() {
                 onChange={(e) => setMaterialFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))}
                 editingIndex={editingIndex}
             />
+            </div>
         </OwnerLayout>
     );
 }
