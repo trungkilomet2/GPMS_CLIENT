@@ -37,7 +37,7 @@ function isBusinessTableRelatedToRole(tableInfo, blueprint) {
 
   const tableTokens = [
     tableInfo.table,
-    tableInfo.table.replace(/[\[\]]/g, ""),
+    String(tableInfo.table ?? "").replaceAll("[", "").replaceAll("]", ""),
     tableInfo.module,
     tableInfo.column,
     tableInfo.purpose,

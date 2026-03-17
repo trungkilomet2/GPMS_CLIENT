@@ -194,11 +194,9 @@ export const authService = {
 
     setAuthItem("token", token);
     setStoredUser(mergedUser);
-    setAuthItem("userId", String(userId));
-    setStoredUser(user);
 
-    if (user.userId) {
-      setAuthItem("userId", String(user.userId));
+    if (mergedUser.userId != null) {
+      setAuthItem("userId", String(mergedUser.userId));
     } else {
       removeAuthItem("userId");
     }

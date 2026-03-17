@@ -1,4 +1,5 @@
 ﻿import { lazy } from "react";
+import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 
 // HOMEPAGE
@@ -84,6 +85,7 @@ export const routes = [
   { path: "/monitoring/assign/:id", element: <ProductionAssignment /> },
   { path: "/worker/assignments", element: <WorkerAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/worker/leave-requests", element: <LeaveRequests /> },
   { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },

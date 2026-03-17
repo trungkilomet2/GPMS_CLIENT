@@ -125,7 +125,7 @@ export default function ProductionPlan() {
         if (!active) return;
         setTeamLeaders(candidates);
         setTeamLeaderError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setTeamLeaderError("Không thể tải danh sách thợ.");
       } finally {

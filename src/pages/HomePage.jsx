@@ -19,37 +19,31 @@ export default function HomePage() {
   const location = useLocation();
   const user = getStoredUser();
   const redirectPath = user ? getPostLoginPath(user.role) : null;
+  const shouldRedirect = Boolean(redirectPath && location.pathname !== redirectPath);
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  if (redirectPath && location.pathname !== redirectPath) {
+  useEffect(() => {
+    if (shouldRedirect) return;
+
+    const loadProducts = async () => {
+      try {
+        const data = await productService.getAll();
+        setProducts(data);
+      } catch (err) {
+        console.error("Load products error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProducts();
+  }, [shouldRedirect]);
+
+  if (shouldRedirect) {
     return <Navigate to={redirectPath} replace />;
   }
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  const loadProducts = async () => {
-
-    try {
-
-      const data = await productService.getAll();
-
-      setProducts(data);
-
-    } catch (err) {
-
-      console.error("Load products error:", err);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  };
 
   return (
     <MainLayout>

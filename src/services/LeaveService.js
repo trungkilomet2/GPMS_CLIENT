@@ -30,11 +30,28 @@ export const getLeaveErrorMessage = (error, fallbackMessage) => {
   );
 };
 
+function emitLeaveChange(detail) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent("leave-change", { detail }));
+  } catch {
+    // ignore
+  }
+}
+
 const normalizeStatus = (value) => {
+  if (typeof value === "number") {
+    // Best-effort mapping when backend returns numeric enum.
+    // 0: pending, 1: approved, 2: rejected (common pattern)
+    if (value === 1) return "approved";
+    if (value === 2) return "rejected";
+    return "pending";
+  }
+
   const normalized = String(value ?? "pending").trim().toLowerCase();
 
   if (["approved", "approve", "đã duyệt", "da duyet"].includes(normalized)) return "approved";
-  if (["rejected", "reject", "từ chối", "tu choi"].includes(normalized)) return "rejected";
+  if (["rejected", "reject", "deny", "denied", "từ chối", "tu choi"].includes(normalized)) return "rejected";
   return "pending";
 };
 
@@ -93,15 +110,29 @@ const LeaveService = {
         ? rawResponse
         : rawResponse;
 
+    emitLeaveChange({ action: "approve", id });
     return response;
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.APPROVE(id), {});
-    return parseApiPayload(rawResponse);
   },
 
   async denyLeaveRequest(id, payload) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.DENY(id), payload);
     const response = parseApiPayload(rawResponse);
 
+    emitLeaveChange({ action: "deny", id });
+    return response;
+  },
+
+  async createLeaveRequest(payload) {
+    const rawResponse = await axiosClient.post(API_ENDPOINTS.LEAVE_REQUEST.CREATE, payload);
+    const response = parseApiPayload(rawResponse);
+
+    // API usually returns { data: { ... } }
+    if (response?.data && typeof response.data === "object") {
+      emitLeaveChange({ action: "create", id: response.data?.id ?? null });
+      return normalizeLeaveItem(response.data);
+    }
+
+    emitLeaveChange({ action: "create", id: null });
     return response;
   },
 };

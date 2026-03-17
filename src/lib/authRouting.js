@@ -1,6 +1,18 @@
 export function splitRoles(value) {
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
   if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
+    return value.map(normalizeRoleItem).filter(Boolean);
+  }
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
   }
 
   return String(value ?? "")

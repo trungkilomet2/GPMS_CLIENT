@@ -175,8 +175,15 @@ export const userService = {
       normalizeServerValue(cached.address) ||
       "";
 
+    const resolvedId = extractUserIdValue(d) || getUserId();
+    const resolvedRole = extractRoleValue(d) || (stored.role ?? "");
+
+    // IMPORTANT:
+    // Backend's view-profile sometimes returns null/placeholder values.
+    // Never let those wipe locally stored/cached values.
     const profile = {
-      id:          getUserId(),
+      id:          resolvedId,
+      userId:      resolvedId,
       fullName,
       name:        fullName,
       email:       String(email || "").trim(),
@@ -185,17 +192,7 @@ export const userService = {
       avatarUrl:   String(avatarUrl || "").trim(),
       location:    String(location || "").trim(),
       address:     String(location || "").trim(),
-      id:          extractUserIdValue(d) || getUserId(),
-      userId:      extractUserIdValue(d) || getUserId(),
-      fullName:    d.fullName    || "",
-      name:        d.fullName    || "",
-      email:       d.email       || "",
-      phoneNumber: d.phoneNumber || "",
-      phone:       d.phoneNumber || "",
-      role:        extractRoleValue(d) || (getStoredUser()?.role ?? ""),
-      avatarUrl:   d.avartarUrl  || "",   // ← đọc avartarUrl (typo backend), lưu thành avatarUrl
-      location:    d.location    || "",
-      address:     d.location    || "",
+      role:        resolvedRole,
       accountStatus,
     };
 
@@ -208,8 +205,8 @@ export const userService = {
 
     // Keep a per-user cache so profile values can survive logout/login
     // if backend's view-profile returns nulls intermittently.
-    if (profile.id != null) {
-      setProfileCache(profile.id, {
+    if (profile.userId != null) {
+      setProfileCache(profile.userId, {
         ...cached,
         ...profile,
       });

@@ -107,7 +107,7 @@ export default function UpdateProduction() {
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setPmError("Không thể tải danh sách PM.");
       } finally {

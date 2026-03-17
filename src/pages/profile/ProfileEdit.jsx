@@ -340,6 +340,7 @@ export default function ProfileEdit() {
         }
       })
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Field change ── */

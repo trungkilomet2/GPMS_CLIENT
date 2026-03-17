@@ -38,7 +38,7 @@ export default function CreateOrder() {
                 if (!String(address).trim()) missing.push("dia chi");
 
                 if (active) setProfileCheck({ checking: false, missing });
-            } catch (error) {
+            } catch (_error) {
                 if (active) setProfileCheck({ checking: false, missing: ["email", "so dien thoai", "dia chi"] });
             }
         };
@@ -190,7 +190,7 @@ export default function CreateOrder() {
                         return updated;
                     });
                 }
-            } catch (err) {
+            } catch (_err) {
                 // keep preview; user can edit to retry
             }
         }

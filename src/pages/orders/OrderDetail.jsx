@@ -45,7 +45,7 @@ export default function OrderDetail() {
                 const response = await OrderService.getOrderDetail(id);
                 setOrder(response.data.data || response.data);
                 setError(null);
-            } catch (err) {
+            } catch (_err) {
                 setError("KhÃ´ng thá»ƒ táº£i thÃ´ng tin Ä‘Æ¡n hÃ ng.");
             } finally {
                 setLoading(false);
@@ -188,11 +188,11 @@ export default function OrderDetail() {
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Info size={16} />
-                                <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin tá»•ng quÃ¡t Ä‘Æ¡n hÃ ng</h2>
+                                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin tổng quát đơn hàng</h2>
                             </div>
 
                             <div className="px-5 py-4 border-b border-slate-100">
-                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">áº¢nh Ä‘Æ¡n hÃ ng</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase mb-3">Ảnh đơn hàng</div>
                                 <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
                                     <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
                                         {order.image ? (
@@ -200,11 +200,11 @@ export default function OrderDetail() {
                                                 type="button"
                                                 onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
                                                 className="w-full h-full cursor-zoom-in"
-                                                title="Click Ä‘á»ƒ xem & zoom áº£nh"
+                                                title="Click để xem và zoom ảnh"
                                             >
                                                 <img src={order.image} alt="" className="w-full h-full object-cover" />
                                                 <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <span className="text-[10px] text-white font-semibold">Click Ä‘á»ƒ zoom</span>
+                                                    <span className="text-[10px] text-white font-semibold">Click để zoom</span>
                                                 </div>
                                             </button>
                                         ) : (
@@ -212,7 +212,7 @@ export default function OrderDetail() {
                                         )}
                                     </div>
                                     <div className="text-xs text-slate-500 leading-relaxed">
-                                        áº¢nh tham kháº£o tá»•ng quan Ä‘Æ¡n hÃ ng, dÃ¹ng Ä‘á»ƒ kiá»ƒm tra nhanh trÆ°á»›c khi sáº£n xuáº¥t.
+                                        Ảnh tham khảo tổng quan đơn hàng, dùng để kiểm tra nhanh trước khi sản xuất.
                                     </div>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@ export default function OrderDetail() {
                                 </div>
                             </div>
 
-                            {/* Ghi chÃº chiáº¿m toÃ n bá»™ chiá»u ngang phÃ­a dÆ°á»›i */}
+                            {/* Ghi chú chiếm toàn bộ chiều ngang phía dưới */}
                             <div className="p-5 border-t border-slate-100 bg-amber-50/30">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chÃº</p>
                                 <p className="text-sm text-slate-700 leading-relaxed italic">
@@ -244,7 +244,7 @@ export default function OrderDetail() {
                             </div>
                         </div>
 
-                        {/* Báº£ng váº­t liá»‡u - Thá»±c dá»¥ng vÃ  rÃµ rÃ ng */}
+                        {/* Bảng vật liệu */}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
                                 <Package size={16} />
@@ -270,11 +270,11 @@ export default function OrderDetail() {
                             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
                                 <div className="flex items-center gap-2 text-slate-600 mb-3">
                                     <Info size={16} />
-                                    <h2 className="text-xs font-bold uppercase tracking-widest">ThÃ´ng tin ngÆ°á»i Ä‘áº·t hÃ ng</h2>
+                                    <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
                                 </div>
                                 <div className="space-y-2 text-sm text-slate-700">
                                     <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Há» vÃ  tÃªn</span>
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
                                         <span className="font-semibold text-slate-800 text-right">
                                             {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || '-'}
                                         </span>
@@ -340,7 +340,7 @@ export default function OrderDetail() {
                                 onClick={() => setIsCommentModalOpen(true)}
                                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
                             >
-                                <MessageSquare size={16} /> Tháº£o luáº­n Ä‘Æ¡n hÃ ng
+                                <MessageSquare size={16} /> Thảo luận đơn hàng
                             </button>
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}

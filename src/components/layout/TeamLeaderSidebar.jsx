@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { ClipboardList, ClipboardCheck, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
@@ -75,7 +75,7 @@ export default function TeamLeaderSidebar() {
             title={label}
             className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
           >
-            <Icon size={22} />
+            {createElement(Icon, { size: 22 })}
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}

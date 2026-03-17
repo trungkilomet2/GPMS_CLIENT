@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
 import CommentService from '@/services/CommentService';
 import BASE_URL from '@/lib/apiconfig';
@@ -17,11 +17,23 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
 
     const wsRef = useRef(null);
 
-    useEffect(() => {
-        if (isOpen && orderId) {
-            fetchComments();
+    const fetchComments = useCallback(async () => {
+        if (!orderId) return;
+
+        try {
+            setLoading(true);
+            const response = await CommentService.getCommentsByOrderId(orderId);
+            setComments(response.data || []);
+        } catch (error) {
+            console.error("Lỗi lấy bình luận:", error);
+        } finally {
+            setLoading(false);
         }
-    }, [isOpen, orderId]);
+    }, [orderId]);
+
+    useEffect(() => {
+        if (isOpen && orderId) fetchComments();
+    }, [fetchComments, isOpen, orderId]);
 
     useEffect(() => {
         if (!isOpen || !orderId) return;
@@ -41,7 +53,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         ws.onopen = () => {
             try {
                 ws.send(JSON.stringify({ type: 'subscribe', orderId, userId: CURRENT_USER_ID }));
-            } catch (err) {
+            } catch (_err) {
                 // ignore if server doesn't need subscribe message
             }
         };
@@ -58,7 +70,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
                         return exists ? prev : [...prev, msg];
                     });
                 });
-            } catch (err) {
+            } catch (_err) {
                 // if server sends plain text, ignore
             }
         };
@@ -81,27 +93,6 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [comments, loading]);
-
-    const fetchComments = async () => {
-        try {
-            setLoading(true);
-            const response = await CommentService.getCommentsByOrderId(orderId);
-            setComments(response.data || []);
-        } catch (error) {
-            console.error("Lỗi lấy bình luận:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // --- HÀM TẠO CHUỖI THỜI GIAN LOCAL CHÍNH XÁC ---
-    const getLocalISOString = () => {
-        const now = new Date();
-        const offset = now.getTimezoneOffset() * 60000;
-        const localTime = new Date(now.getTime() - offset);
-        // Thay thế toISOString bằng cách thủ công hoặc xử lý chuỗi để giữ nguyên giờ địa phương
-        return new Date(now.getTime() - offset).toISOString().replace('Z', '');
-    };
 
     const handleSendComment = async () => {
         if (!newComment.trim() || isSubmitting) return;

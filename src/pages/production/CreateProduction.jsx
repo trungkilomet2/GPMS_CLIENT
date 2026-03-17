@@ -122,7 +122,7 @@ export default function CreateProduction() {
           pEndDate: data?.endDate ? String(data.endDate).slice(0, 10) : prev.pEndDate,
         }));
         setOrderError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setOrderError("Không thể tải thông tin đơn hàng.");
       } finally {
@@ -146,7 +146,7 @@ export default function CreateProduction() {
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setPmError("Không thể tải danh sách PM.");
       } finally {

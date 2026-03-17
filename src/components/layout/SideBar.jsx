@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign,
@@ -18,13 +18,6 @@ const ADMIN_NAV_ITEMS = [
   { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false },
   { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false },
   { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false },
-const NAV_ITEMS = [
-  { key: "dashboard", to: "/home", label: "Dashboard", icon: ChartPie, disabled: false },
-  { key: "orders", to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
-  { key: "monitoring", to: "/monitoring", label: "Giám sát hoạt động", icon: ClipboardList, disabled: true },
-  { key: "employees", to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: true },
-  { key: "leave", to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
-  { key: "salary", to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: true },
 ];
 
 const OPERATION_NAV_ITEMS = [
@@ -37,7 +30,19 @@ const OPERATION_NAV_ITEMS = [
 ];
 
 function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
+  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
+  }
 
   return String(value ?? "")
     .split(",")
@@ -87,9 +92,8 @@ export default function Sidebar() {
   });
 
   const user = getStoredUser();
-  const navItems = resolveSidebarItems(user);
-  const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (item.key === "leave") {
+  const navItems = resolveSidebarItems(user).filter((item) => {
+    if (item.to === "/leave") {
       return canManageLeaveRequests(user?.role);
     }
 
@@ -131,19 +135,16 @@ export default function Sidebar() {
 
       <nav className="dashboard-sidebar__nav">
         {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
-          if (!hasRequiredRole(user, requiredRole)) {
-            return null;
-          }
+          if (!hasRequiredRole(user, requiredRole)) return null;
 
-        {visibleNavItems.map(({ to, label, icon: Icon, disabled }) => {
           if (disabled) {
             return (
               <div
-                key={label}
+                key={to}
                 className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
                 title={label}
               >
-                <Icon size={22} />
+                {createElement(Icon, { size: 22 })}
                 {!collapsed && <span>{label}</span>}
               </div>
             );
@@ -158,7 +159,7 @@ export default function Sidebar() {
                 `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
               }
             >
-              <Icon size={22} />
+              {createElement(Icon, { size: 22 })}
               {!collapsed && <span>{label}</span>}
             </NavLink>
           );

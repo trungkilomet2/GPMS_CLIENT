@@ -26,11 +26,41 @@ export function extractRoleValue(source = {}) {
     "RoleName",
   ]);
 
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+
+    if (typeof item === "string" || typeof item === "number") {
+      return String(item).trim();
+    }
+
+    if (typeof item === "object") {
+      const name =
+        item.name ??
+        item.role ??
+        item.roleName ??
+        item.RoleName ??
+        item.value ??
+        item.label;
+
+      return String(name ?? "").trim();
+    }
+
+    return "";
+  };
+
   if (Array.isArray(rawRole)) {
-    return rawRole.map((item) => String(item).trim()).filter(Boolean).join(",");
+    return rawRole
+      .map(normalizeRoleItem)
+      .filter((v) => v && v !== "[object Object]")
+      .join(",");
   }
 
-  return String(rawRole ?? "").trim();
+  if (rawRole && typeof rawRole === "object") {
+    return normalizeRoleItem(rawRole);
+  }
+
+  const s = String(rawRole ?? "").trim();
+  return s === "[object Object]" ? "" : s;
 }
 
 export function extractUserIdValue(source = {}) {

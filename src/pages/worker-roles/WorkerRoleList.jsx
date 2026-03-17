@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CircleAlert,
@@ -20,7 +20,7 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
       <div className="worker-role-summary__header">
         <p className="worker-role-summary__label">{label}</p>
         <div className="worker-role-summary__icon">
-          <Icon size={20} />
+          {createElement(Icon, { size: 20 })}
         </div>
       </div>
 
