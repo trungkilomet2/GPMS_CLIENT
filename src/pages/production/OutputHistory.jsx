@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ClipboardCheck, Search } from "lucide-react";
+import { ClipboardCheck, Search } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/homepage.css";
@@ -100,12 +100,6 @@ export default function OutputHistory() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button
-                onClick={() => navigate(-1)}
-                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
-              >
-                <ArrowLeft size={18} />
-              </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Lịch sử sản lượng</h1>
                 <p className="text-slate-600">Xem lịch sử submit sản lượng của toàn bộ thợ.</p>

@@ -68,6 +68,9 @@ export default function CreateManualOrder() {
     if (!orderData.color?.trim()) newErrors.color = 'Màu sắc không được để trống';
     if (orderData.quantity <= 0) newErrors.quantity = 'Số lượng sản xuất phải lớn hơn 0';
     if (orderData.cpu < 0) newErrors.cpu = 'Chi phí đơn vị không được âm';
+    if (orderData.cpu !== '' && Number(orderData.cpu) < 10) {
+      newErrors.cpu = 'Giá / sản phẩm phải từ 10 trở lên';
+    }
 
     if (!orderData.startDate) {
       newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
