@@ -498,7 +498,7 @@ export default function EditOrder() {
                                 type="button"
                                 onClick={() => {
                                     setEditingIndex(null);
-                                    setMaterialFormData({ materialName: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
+                                    setMaterialFormData({ materialName: '', color: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
                                     setIsModalOpen(true);
                                 }}
                                 className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-sm font-bold shadow-md shadow-emerald-100"
