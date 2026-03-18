@@ -10,6 +10,7 @@ export default function OrderStatusReasonModal({
   confirmText = "Xác nhận",
   loading = false,
   tone = "warning",
+  requireReason = true,
 }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -45,11 +46,11 @@ export default function OrderStatusReasonModal({
 
   const handleSubmit = () => {
     const trimmed = reason.trim();
-    if (!trimmed) {
+    if (requireReason && !trimmed) {
       setError("Vui lòng nhập lý do.");
       return;
     }
-    onSubmit?.(trimmed);
+    onSubmit?.(requireReason ? trimmed : "");
   };
 
   return (
@@ -78,22 +79,24 @@ export default function OrderStatusReasonModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-3">
-          <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-            Lý do
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              if (error) setError("");
-            }}
-            rows={4}
-            placeholder="Nhập lý do cập nhật trạng thái..."
-            className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 ${toneStyles.border}`}
-          />
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </div>
+        {requireReason && (
+          <div className="p-5 space-y-3">
+            <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+              Lý do
+            </label>
+            <textarea
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                if (error) setError("");
+              }}
+              rows={4}
+              placeholder="Nhập lý do cập nhật trạng thái..."
+              className={`w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:ring-2 ${toneStyles.border}`}
+            />
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+        )}
 
         <div className="p-4 border-t border-slate-100 bg-white flex justify-end gap-2 rounded-b-2xl">
           <button
