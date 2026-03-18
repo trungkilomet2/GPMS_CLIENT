@@ -67,60 +67,77 @@ export default function Orders({
 
   const [sortBy, setSortBy] = useState({ key: 'id', dir: 'asc' });
 
+  const shouldFetchAll = true;
+
   useEffect(() => {
+    let active = true;
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const params = {
-          PageIndex: Math.max(0, currentPage - 1),
-          PageSize: pageSize,
-          SortColumn: sortBy.key === 'orderName' ? 'Name' : sortBy.key,
-          SortOrder: sortBy.dir.toUpperCase(),
+        const buildItems = (data) =>
+          data?.items ?? data?.data ?? data?.records ?? data?.Items ?? data?.Records ?? data ?? [];
+        const buildCount = (data, items) => {
+          const meta = data?.pagination ?? data?.paging ?? data?.meta ?? data?.metadata ?? {};
+          return (
+            data?.totalCount ??
+            data?.TotalCount ??
+            data?.totalRecords ??
+            data?.TotalRecords ??
+            data?.recordCount ??
+            data?.RecordCount ??
+            data?.total ??
+            data?.Total ??
+            meta?.totalCount ??
+            meta?.TotalCount ??
+            meta?.totalRecords ??
+            meta?.TotalRecords ??
+            meta?.total ??
+            meta?.Total ??
+            (data?.totalPages && data?.pageSize ? data.totalPages * data.pageSize : null) ??
+            (meta?.totalPages && meta?.pageSize ? meta.totalPages * meta.pageSize : null) ??
+            items.length
+          );
         };
-        const response = isOwner
-          ? await OrderService.getAllOrders(params)
-          : await OrderService.getOrdersByUser(params);
-        const data =
-          response?.recordCount !== undefined ||
-            response?.pageIndex !== undefined ||
-            response?.RecordCount !== undefined ||
-            response?.PageIndex !== undefined
-            ? response
-            : (response?.data ?? response);
-        const items = data?.items ?? data?.data ?? data?.records ?? data?.Items ?? data?.Records ?? data ?? [];
-        const meta = data?.pagination ?? data?.paging ?? data?.meta ?? data?.metadata ?? {};
-        const count =
-          data?.totalCount ??
-          data?.TotalCount ??
-          data?.totalRecords ??
-          data?.TotalRecords ??
-          data?.recordCount ??
-          data?.RecordCount ??
-          data?.total ??
-          data?.Total ??
-          meta?.totalCount ??
-          meta?.TotalCount ??
-          meta?.totalRecords ??
-          meta?.TotalRecords ??
-          meta?.total ??
-          meta?.Total ??
-          (data?.totalPages && data?.pageSize ? data.totalPages * data.pageSize : null) ??
-          (meta?.totalPages && meta?.pageSize ? meta.totalPages * meta.pageSize : null) ??
-          items.length;
-        setOrders(items);
-        setTotalCount(count);
-        if (data?.pageIndex !== undefined && data?.pageIndex !== null) {
-          const serverPage = Number(data.pageIndex) + 1;
-          if (!Number.isNaN(serverPage) && serverPage !== currentPage) {
-            setCurrentPage(serverPage);
+
+        const allItems = [];
+        let pageIndex = 0;
+        let recordCount = null;
+        while (true) {
+          const params = {
+            PageIndex: pageIndex,
+            PageSize: 100,
+            SortColumn: sortBy.key === 'orderName' ? 'Name' : sortBy.key,
+            SortOrder: sortBy.dir.toUpperCase(),
+          };
+          const response = isOwner
+            ? await OrderService.getAllOrders(params)
+            : await OrderService.getOrdersByUser(params);
+          if (!active) return;
+          const data =
+            response?.recordCount !== undefined ||
+              response?.pageIndex !== undefined ||
+              response?.RecordCount !== undefined ||
+              response?.PageIndex !== undefined
+              ? response
+              : (response?.data ?? response);
+          const items = buildItems(data);
+          allItems.push(...items);
+          if (recordCount == null) {
+            const count = buildCount(data, items);
+            recordCount = Number.isFinite(Number(count)) && Number(count) > 0 ? Number(count) : null;
           }
+          if (items.length === 0) break;
+          if (recordCount != null && allItems.length >= recordCount) break;
+          pageIndex += 1;
         }
+        setOrders(allItems);
+        setTotalCount(allItems.length);
         setError(null);
       } catch (err) {
         console.error('Lỗi lấy dữ liệu:', err);
         setError('Không thể tải dữ liệu. Vui lòng thử lại!');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
     if (!isOwner && !userId) {
@@ -129,7 +146,10 @@ export default function Orders({
       return;
     }
     fetchOrders();
-  }, [userId, isOwner, currentPage, pageSize, sortBy]);
+    return () => {
+      active = false;
+    };
+  }, [userId, isOwner, sortBy]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -141,7 +161,8 @@ export default function Orders({
     });
   }, [search, statusFilter, orders]);
 
-  const totalPages = Math.max(1, Math.ceil((totalCount || filtered.length) / pageSize));
+  const totalItems = shouldFetchAll ? filtered.length : (totalCount || filtered.length);
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -152,7 +173,12 @@ export default function Orders({
   }, [totalPages, currentPage]);
 
   const pageData = useMemo(() => {
-    if (!sortBy?.key) return filtered;
+    const applyPaging = shouldFetchAll;
+    if (!sortBy?.key) {
+      if (!applyPaging) return filtered;
+      const start = (currentPage - 1) * pageSize;
+      return filtered.slice(start, start + pageSize);
+    }
     const dir = sortBy.dir === 'desc' ? -1 : 1;
     const parseDate = (value) => {
       if (!value) return null;
@@ -193,8 +219,11 @@ export default function Orders({
           return 0;
       }
     };
-    return [...filtered].sort((a, b) => dir * compare(a, b));
-  }, [filtered, sortBy]);
+    const sorted = [...filtered].sort((a, b) => dir * compare(a, b));
+    if (!applyPaging) return sorted;
+    const start = (currentPage - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [filtered, sortBy, currentPage, pageSize, shouldFetchAll]);
 
   const stats = useMemo(() => {
     const counts = filtered.reduce(
@@ -207,12 +236,12 @@ export default function Orders({
     );
 
     return {
-      total: totalCount || orders.length,
+      total: shouldFetchAll ? filtered.length : (totalCount || orders.length),
       pending: counts['Chờ xét duyệt'] || 0,
       approved: counts['Đã chấp nhận'] || 0,
       rejected: counts['Đã từ chối'] || 0,
     };
-  }, [orders, filtered, totalCount]);
+  }, [orders, filtered, totalCount, shouldFetchAll]);
 
   const toggleSort = (key) => {
     setSortBy((prev) => ({
@@ -388,12 +417,12 @@ export default function Orders({
             </div>
           </div>
 
-          {!loading && !error && (totalCount || filtered.length) > 0 && (
+          {!loading && !error && totalItems > 0 && (
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={goToPage}
-              totalCount={totalCount || filtered.length}
+              totalCount={totalItems}
               pageSize={pageSize}
             />
           )}

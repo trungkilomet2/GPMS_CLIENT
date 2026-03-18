@@ -5,6 +5,9 @@ const ProductionService = {
   createProduction(payload) {
     return axiosClient.post(API_ENDPOINTS.PRODUCTION.CREATE, payload);
   },
+  getProductionList(params) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params });
+  },
 };
 
 export default ProductionService;

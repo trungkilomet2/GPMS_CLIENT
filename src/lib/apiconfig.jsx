@@ -25,6 +25,7 @@ export const API_ENDPOINTS = {
   },
   PRODUCTION: {
     CREATE: `${BASE_URL}/api/Production/create-production`,
+    LIST: `${BASE_URL}/api/Production/production/list`,
   },
 
   CLOUDINARY: {
