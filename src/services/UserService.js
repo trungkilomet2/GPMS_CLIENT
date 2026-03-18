@@ -218,6 +218,43 @@ export const userService = {
       cooperationNotes: stored.cooperationNotes ?? [],
     };
   },
+  async getProfileById(userId) {
+    if (userId == null) return null;
+    const res = await fetch(API_ENDPOINTS.USER.ADMIN_USER_DETAIL(userId), {
+      method: "GET",
+      credentials: "omit",
+      headers: authHeadersGet(),
+    });
+
+    if (res.status === 401) {
+      removeAuthItem("token");
+      removeAuthItem("user");
+      window.location.href = "/login";
+      throw { status: 401 };
+    }
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw { response: { data: json } };
+
+    const d = json.data ?? json;
+    const fullName = normalizeServerValue(d.fullName ?? d.userFullName ?? d.name);
+    const phoneNumber = normalizeServerValue(d.phoneNumber ?? d.phone);
+    const email = normalizeServerValue(d.email);
+    const avatarUrl = normalizeServerValue(d.avatarUrl ?? d.avartarUrl);
+    const location = normalizeServerValue(d.location ?? d.address);
+
+    return {
+      id: userId,
+      fullName,
+      name: fullName,
+      phoneNumber,
+      phone: phoneNumber,
+      email,
+      avatarUrl,
+      location,
+      address: location,
+    };
+  },
 
   /**
    * PUT /api/User/update-profile

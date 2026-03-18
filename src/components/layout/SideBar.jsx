@@ -1,4 +1,4 @@
-﻿﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
@@ -85,6 +85,7 @@ function getInitials(name = "") {
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-sidebar-collapsed");
@@ -102,6 +103,7 @@ export default function Sidebar() {
 
     return true;
   });
+  const isOrdersSection = location.pathname.startsWith("/orders");
 
   useEffect(() => {
     try {
@@ -158,9 +160,11 @@ export default function Sidebar() {
               key={to}
               to={to}
               title={label}
-              className={({ isActive }) =>
-                `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
-              }
+              className={({ isActive }) => {
+                const isForcedActive = to === "/orders/owner" && isOrdersSection;
+                const active = isActive || isForcedActive;
+                return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
+              }}
             >
               {createElement(Icon, { size: 22 })}
               {!collapsed && <span>{label}</span>}

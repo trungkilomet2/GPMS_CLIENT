@@ -21,6 +21,12 @@ const OrderService = {
     updateOrder: (orderId, orderData) => {
         return axiosClient.put(API_ENDPOINTS.ORDER.UPDATE_ORDER(orderId), orderData);
     },
+    requestOrderModification: (orderId) => {
+        return axiosClient.post(API_ENDPOINTS.ORDER.REQUEST_MODIFICATION(orderId));
+    },
+    rejectOrder: (payload) => {
+        return axiosClient.post(API_ENDPOINTS.ORDER_REJECT.REJECT, payload);
+    },
 };
 
 export default OrderService;
