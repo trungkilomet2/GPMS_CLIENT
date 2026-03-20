@@ -5,6 +5,7 @@ import {
   BadgeDollarSign,
   BriefcaseBusiness,
   ChartPie,
+  ClipboardCheck,
   ClipboardList,
   ListChecks,
   LogOut,

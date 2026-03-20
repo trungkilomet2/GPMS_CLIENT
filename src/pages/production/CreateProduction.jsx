@@ -93,8 +93,6 @@ export default function CreateProduction() {
 
   const [form, setForm] = useState({
     pmId: "",
-    pStartDate: "",
-    pEndDate: "",
     productionNote: "",
   });
 
@@ -116,11 +114,6 @@ export default function CreateProduction() {
         const data = response?.data?.data ?? response?.data ?? null;
         if (!active) return;
         setOrder(data);
-        setForm((prev) => ({
-          ...prev,
-          pStartDate: data?.startDate ? String(data.startDate).slice(0, 10) : prev.pStartDate,
-          pEndDate: data?.endDate ? String(data.endDate).slice(0, 10) : prev.pEndDate,
-        }));
         setOrderError(null);
       } catch (_err) {
         if (!active) return;
@@ -161,13 +154,6 @@ export default function CreateProduction() {
     if (!selectedOrderId || orderId) return;
     const picked = MOCK_ORDERS.find((item) => String(item.id) === String(selectedOrderId));
     setOrder(picked || null);
-    if (picked) {
-      setForm((prev) => ({
-        ...prev,
-        pStartDate: picked.startDate ? String(picked.startDate).slice(0, 10) : prev.pStartDate,
-        pEndDate: picked.endDate ? String(picked.endDate).slice(0, 10) : prev.pEndDate,
-      }));
-    }
   }, [selectedOrderId, orderId]);
 
   const orderSummaryRows = useMemo(() => ([
@@ -198,11 +184,6 @@ export default function CreateProduction() {
     const nextErrors = {};
     if (!order?.id) nextErrors.orderId = "Vui lòng chọn đơn hàng.";
     if (!form.pmId) nextErrors.pmId = "Vui lòng chọn PM quản lý.";
-    if (!form.pStartDate) nextErrors.pStartDate = "Vui lòng chọn ngày bắt đầu.";
-    if (!form.pEndDate) nextErrors.pEndDate = "Vui lòng chọn ngày kết thúc.";
-    if (form.pStartDate && form.pEndDate && new Date(form.pStartDate) > new Date(form.pEndDate)) {
-      nextErrors.pEndDate = "Ngày kết thúc không được trước ngày bắt đầu.";
-    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -231,8 +212,6 @@ export default function CreateProduction() {
       productionId: null,
       pmId: Number(form.pmId),
       orderId: Number(order?.id ?? orderId),
-      pStartDate: form.pStartDate,
-      pEndDate: form.pEndDate,
       note: form.productionNote?.trim() || "",
     };
 
@@ -286,7 +265,7 @@ export default function CreateProduction() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   Tạo Production cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý và mốc thời gian sản xuất.</p>
+                <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -351,42 +330,6 @@ export default function CreateProduction() {
                     )}
                     {errors.pmId && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày bắt đầu sản xuất</label>
-                    <input
-                      type="date"
-                      name="pStartDate"
-                      value={form.pStartDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
-                        errors.pStartDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      }`}
-                    />
-                    {errors.pStartDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pStartDate}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày kết thúc sản xuất</label>
-                    <input
-                      type="date"
-                      name="pEndDate"
-                      value={form.pEndDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
-                        errors.pEndDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      }`}
-                    />
-                    {errors.pEndDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
                     )}
                   </div>
 

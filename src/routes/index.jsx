@@ -27,6 +27,8 @@ const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPla
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
 const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
+const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
+const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
@@ -85,6 +87,8 @@ export const routes = [
   { path: "/production-plan/assign/:id", element: <ProductionAssignment /> },
   { path: "/worker/assignments", element: <WorkerAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/worker/error-report", element: <WorkerErrorReport /> },
+  { path: "/worker/cutting-book", element: <WorkerCuttingBook /> },
   { path: "/worker/leave-requests", element: <LeaveRequests /> },
   { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },

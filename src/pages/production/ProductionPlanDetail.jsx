@@ -1,6 +1,6 @@
 ﻿import { useMemo, useState } from "react";
 import { ArrowLeft, Info } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -28,9 +28,27 @@ const MOCK_PLAN_DETAILS = [
       image: "",
     },
     steps: [
-      { partName: "Diễu nẹp cổ", cpu: 800, teamLeaderName: "Trần Minh Huy", startDate: "2026-04-22", endDate: "2026-04-23" },
-      { partName: "Đính mác", cpu: 200, teamLeaderName: "Lê Thị Thu", startDate: "2026-04-23", endDate: "2026-04-24" },
-      { partName: "Can dây lồng cổ", cpu: 100, teamLeaderName: "Phạm Hoàng Đức", startDate: "2026-04-24", endDate: "2026-04-25" },
+      {
+        partName: "Diễu nẹp cổ",
+        cpu: 800,
+        startDate: "2026-04-22",
+        endDate: "2026-04-23",
+        assignedWorkers: ["My", "Hoa A"],
+      },
+      {
+        partName: "Đính mác",
+        cpu: 200,
+        startDate: "2026-04-23",
+        endDate: "2026-04-24",
+        assignedWorkers: ["Mi"],
+      },
+      {
+        partName: "Can dây lồng cổ",
+        cpu: 100,
+        startDate: "2026-04-24",
+        endDate: "2026-04-25",
+        assignedWorkers: ["Hằng", "Thảo"],
+      },
     ],
   },
   {
@@ -55,8 +73,20 @@ const MOCK_PLAN_DETAILS = [
       image: "",
     },
     steps: [
-      { partName: "May thân", cpu: 1200, teamLeaderName: "Đỗ Ngọc Anh", startDate: "2026-04-19", endDate: "2026-04-20" },
-      { partName: "May tay", cpu: 900, teamLeaderName: "Nguyễn Hữu Long", startDate: "2026-04-20", endDate: "2026-04-21" },
+      {
+        partName: "May thân",
+        cpu: 1200,
+        startDate: "2026-04-19",
+        endDate: "2026-04-20",
+        assignedWorkers: ["Trang", "Nhung"],
+      },
+      {
+        partName: "May tay",
+        cpu: 900,
+        startDate: "2026-04-20",
+        endDate: "2026-04-21",
+        assignedWorkers: ["Thư"],
+      },
     ],
   },
 ];
@@ -131,6 +161,13 @@ export default function ProductionPlanDetail() {
               >
                 {plan.production.status}
               </span>
+              <Link
+                to={`/production-plan/assign/${plan.production.productionId}`}
+                state={{ production: plan.production, product: plan.product, steps: plan.steps }}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+              >
+                Phân công công đoạn
+              </Link>
               <button
                 type="button"
                 onClick={openRejectModal}
@@ -210,6 +247,13 @@ export default function ProductionPlanDetail() {
                     <h2 className="leave-table-card__title">Danh sách công đoạn</h2>
                     <p className="leave-table-card__subtitle">Công đoạn đã lập cho kế hoạch.</p>
                   </div>
+                  <Link
+                    to={`/production-plan/assign/${plan.production.productionId}`}
+                    state={{ production: plan.production, product: plan.product, steps: plan.steps }}
+                    className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                  >
+                    Xem chi tiết công đoạn
+                  </Link>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full divide-y divide-slate-200 table-fixed">
@@ -217,7 +261,7 @@ export default function ProductionPlanDetail() {
                       <tr>
                         <th className="leave-table-th w-12 px-3 py-4 text-center text-xs font-semibold uppercase tracking-wide">STT</th>
                         <th className="leave-table-th w-40 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên công đoạn</th>
-                        <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tổ trưởng</th>
+                        <th className="leave-table-th w-40 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Thợ được giao</th>
                         <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
                         <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>
                         <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Giá/SP</th>
@@ -235,7 +279,22 @@ export default function ProductionPlanDetail() {
                           <tr key={`${row.partName}-${idx}`} className="leave-table-row hover:bg-slate-50/80">
                             <td className="px-3 py-3 text-center text-sm text-slate-600">{idx + 1}</td>
                             <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{row.partName || "-"}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate">{row.teamLeaderName || "-"}</td>
+                            <td className="px-3 py-3 text-sm text-slate-700">
+                              {Array.isArray(row.assignedWorkers) && row.assignedWorkers.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {row.assignedWorkers.map((worker) => (
+                                    <span
+                                      key={`${row.partName}-${worker}`}
+                                      className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                                    >
+                                      {worker}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">-</span>
+                              )}
+                            </td>
                             <td className="px-3 py-3 text-sm text-slate-700 text-center">{row.startDate || "-"}</td>
                             <td className="px-3 py-3 text-sm text-slate-700 text-center">{row.endDate || "-"}</td>
                             <td className="px-3 py-3 text-center text-sm font-semibold text-slate-700">
@@ -245,10 +304,11 @@ export default function ProductionPlanDetail() {
                         ))
                       )}
                       <tr className="bg-slate-50">
-                        <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">Tổng chi phí</td>
+                        <td colSpan={4} className="px-3 py-3 font-semibold text-slate-700">Tổng chi phí</td>
                         <td className="px-3 py-3 text-center font-semibold text-slate-700">
                           {`${totalCpu.toLocaleString("vi-VN")} VND`}
                         </td>
+                        <td></td>
                       </tr>
                     </tbody>
                   </table>

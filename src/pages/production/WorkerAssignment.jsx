@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipboardCheck } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -55,6 +55,9 @@ export default function WorkerAssignment() {
   const displayName = user?.fullName || user?.name || "Thợ may";
 
   const assignments = useMemo(() => MOCK_ASSIGNMENTS, []);
+  const handleReportError = (item) => {
+    navigate("/worker/error-report", { state: { assignment: item } });
+  };
 
   return (
     <OwnerLayout>
@@ -64,7 +67,7 @@ export default function WorkerAssignment() {
             <div className="flex items-start gap-3">
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Công việc được phân công</h1>
-                <p className="text-slate-600">Theo dõi các công đoạn bạn cần thực hiện.</p>
+                <p className="text-slate-600">Theo dõi các công đoạn bạn cần thực hiện. Bấm vào công đoạn để báo cáo lỗi.</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -74,12 +77,8 @@ export default function WorkerAssignment() {
               >
                 Báo cáo sản lượng
               </button>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {displayName}
-              </div>
             </div>
           </div>
-
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2 text-slate-600 mb-4">
               <ClipboardCheck size={16} />
@@ -97,12 +96,13 @@ export default function WorkerAssignment() {
                     <th className="leave-table-th w-28 px-3 py-3 text-center">Đơn giá</th>
                     <th className="leave-table-th w-28 px-3 py-3 text-center">Bắt đầu</th>
                     <th className="leave-table-th w-28 px-3 py-3 text-center">Kết thúc</th>
+                    <th className="leave-table-th w-28 px-3 py-3 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {assignments.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-10 text-center text-slate-500">
+                      <td colSpan={8} className="py-10 text-center text-slate-500">
                         Chưa có công việc nào được phân công.
                       </td>
                     </tr>
@@ -118,6 +118,15 @@ export default function WorkerAssignment() {
                         </td>
                         <td className="px-3 py-2 text-center text-slate-600">{item.startDate}</td>
                         <td className="px-3 py-2 text-center text-slate-600">{item.endDate}</td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleReportError(item)}
+                            className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                          >
+                            Báo cáo lỗi
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -130,3 +139,5 @@ export default function WorkerAssignment() {
     </OwnerLayout>
   );
 }
+
+
