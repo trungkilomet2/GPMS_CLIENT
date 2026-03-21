@@ -2,6 +2,7 @@
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionPartService from "@/services/ProductionPartService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -252,6 +253,8 @@ export default function ProductionPlan() {
   const [showTemplateSection, setShowTemplateSection] = useState(false);
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [savedPlanAt, setSavedPlanAt] = useState("");
+  const [savingParts, setSavingParts] = useState(false);
+  const [savePartsMessage, setSavePartsMessage] = useState({ type: "", text: "" });
   const [form, setForm] = useState({
     partName: "",
     startDate: "",
@@ -287,6 +290,12 @@ export default function ProductionPlan() {
   const formatDateTime = (value = "") => {
     if (!value) return "-";
     return String(value).replace("T", " ");
+  };
+
+  const formatDateOnly = (value = "") => {
+    if (!value) return "";
+    const raw = String(value);
+    return raw.includes("T") ? raw.split("T")[0] : raw;
   };
 
   const selectedProduction = useMemo(() => {
@@ -425,8 +434,36 @@ export default function ProductionPlan() {
     setSavedPlanAt(new Date().toLocaleString("vi-VN"));
   };
 
-  const saveSteps = () => {
-    savePlan();
+  const saveSteps = async () => {
+    if (!selectedProductionId || !rows.length || savingParts) return;
+    try {
+      setSavingParts(true);
+      setSavePartsMessage({ type: "", text: "" });
+      const productionId = Number(selectedProductionId);
+      const payload = {
+        data: rows.map((row) => ({
+          id: row?.id ?? row?.partId ?? row?.ppId ?? 0,
+          productionId,
+          partName: row?.partName ?? "",
+          teamLeaderId: row?.teamLeaderId ?? 0,
+          teamLeader: row?.teamLeader ?? null,
+          startDate: formatDateOnly(row?.startDate),
+          endDate: formatDateOnly(row?.endDate),
+          cpu: Number(row?.cpu) || 0,
+          statusId: row?.statusId ?? 0,
+          statusName: row?.statusName ?? "",
+          assignees: row?.assignees ?? [],
+        })),
+      };
+
+      await ProductionPartService.createParts(productionId, payload);
+      setSavePartsMessage({ type: "success", text: "Đã lưu công đoạn." });
+      savePlan();
+    } catch (error) {
+      setSavePartsMessage({ type: "error", text: "Lưu công đoạn thất bại." });
+    } finally {
+      setSavingParts(false);
+    }
   };
 
   const applySavedDesign = (design) => {
@@ -823,10 +860,10 @@ export default function ProductionPlan() {
                 <button
                   type="button"
                   onClick={saveSteps}
-                  disabled={!selectedProductionId || !rows.length}
+                  disabled={!selectedProductionId || !rows.length || savingParts}
                   className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:text-emerald-300"
                 >
-                  Lưu công đoạn
+                  {savingParts ? "Đang lưu..." : "Lưu công đoạn"}
                 </button>
                 <button
                   onClick={openAddModal}
@@ -835,6 +872,15 @@ export default function ProductionPlan() {
                 >
                   <Plus size={16} /> Thêm công đoạn
                 </button>
+                {savePartsMessage.text && (
+                  <span
+                    className={`text-xs font-semibold ${
+                      savePartsMessage.type === "error" ? "text-red-600" : "text-emerald-600"
+                    }`}
+                  >
+                    {savePartsMessage.text}
+                  </span>
+                )}
               </div>
             </div>
             <div className="overflow-x-auto">

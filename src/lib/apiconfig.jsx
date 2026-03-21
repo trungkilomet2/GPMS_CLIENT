@@ -27,6 +27,14 @@ export const API_ENDPOINTS = {
   PRODUCTION: {
     CREATE: `${BASE_URL}/api/Production/production/create`,
     LIST: `${BASE_URL}/api/Production/production/list`,
+    DETAIL: (id) => `${BASE_URL}/api/Production/production/detail/${id}`,
+    UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
+  },
+  PRODUCTION_PART: {
+    LIST_BY_PRODUCTION: (productionId) =>
+      `${BASE_URL}/api/ProductionPart/production/get-list-parts/${productionId}`,
+    CREATE_PARTS: (productionId) =>
+      `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
   },
 
   CLOUDINARY: {

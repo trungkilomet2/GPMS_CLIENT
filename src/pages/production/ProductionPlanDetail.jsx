@@ -1,95 +1,11 @@
-﻿import { useMemo } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionService from "@/services/ProductionService";
+import ProductionPartService from "@/services/ProductionPartService";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const MOCK_PLAN_DETAILS = [
-  {
-    planId: 5001,
-    production: {
-      productionId: 1001,
-      orderId: 29,
-      orderName: "Đồng phục công ty ABC",
-      pStartDate: "2026-04-21",
-      pEndDate: "2026-05-05",
-      status: "Đang sản xuất",
-      pmName: "Nguyễn Văn An",
-    },
-    product: {
-      productCode: "PRD-ABC-01",
-      productName: "Áo thun đồng phục cổ tròn",
-      type: "Áo thun",
-      size: "L",
-      color: "Trắng",
-      quantity: 100,
-      cpu: 15000,
-      image: "",
-    },
-    steps: [
-      {
-        partName: "Diễu nẹp cổ",
-        cpu: 800,
-        startDate: "2026-04-22",
-        endDate: "2026-04-23",
-        assignedWorkers: ["My", "Hoa A"],
-      },
-      {
-        partName: "Đính mác",
-        cpu: 200,
-        startDate: "2026-04-23",
-        endDate: "2026-04-24",
-        assignedWorkers: ["Mi"],
-      },
-      {
-        partName: "Can dây lồng cổ",
-        cpu: 100,
-        startDate: "2026-04-24",
-        endDate: "2026-04-25",
-        assignedWorkers: ["Hằng", "Thảo"],
-      },
-    ],
-  },
-  {
-    planId: 5002,
-    production: {
-      productionId: 1002,
-      orderId: 30,
-      orderName: "Áo hoodie mùa đông",
-      pStartDate: "2026-04-18",
-      pEndDate: "2026-04-30",
-      status: "Planned",
-      pmName: "Trần Ngọc Bích",
-    },
-    product: {
-      productCode: "PRD-HOOD-02",
-      productName: "Áo hoodie",
-      type: "Hoodie",
-      size: "M",
-      color: "Đen",
-      quantity: 80,
-      cpu: 22000,
-      image: "",
-    },
-    steps: [
-      {
-        partName: "May thân",
-        cpu: 1200,
-        startDate: "2026-04-19",
-        endDate: "2026-04-20",
-        assignedWorkers: ["Trang", "Nhung"],
-      },
-      {
-        partName: "May tay",
-        cpu: 900,
-        startDate: "2026-04-20",
-        endDate: "2026-04-21",
-        assignedWorkers: ["Thư"],
-      },
-    ],
-  },
-];
 
 const STATUS_STYLES = {
   Planned: "bg-amber-50 text-amber-700 border-amber-200",
@@ -99,13 +15,113 @@ const STATUS_STYLES = {
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
+function getStatusLabel(status) {
+  if (typeof status === "number") {
+    if (status === 1) return "Planned";
+    if (status === 2) return "In Progress";
+    if (status === 3) return "Completed";
+  }
+  return status || "-";
+}
+
 export default function ProductionPlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const plan = useMemo(() => {
-    const pid = Number(id);
-    return MOCK_PLAN_DETAILS.find((item) => Number(item.planId) === pid) || null;
+  useEffect(() => {
+    let active = true;
+
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const productionId = Number(id);
+        if (!Number.isFinite(productionId)) {
+          throw new Error("INVALID_ID");
+        }
+
+        const detailPromise = ProductionService.getProductionDetail(productionId);
+        const partsPromise = ProductionPartService.getPartsByProduction(productionId, {
+          pageIndex: 0,
+          pageSize: 200,
+          sortColumn: "Name",
+          sortOrder: "ASC",
+        }).catch(() => ProductionPartService.getPartsByProduction(productionId));
+
+        const [detailRes, partsRes] = await Promise.all([detailPromise, partsPromise]);
+
+        if (!active) return;
+
+        const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
+        const order = detailPayload?.order ?? {};
+        const pm = detailPayload?.pm ?? {};
+        const statusLabel = getStatusLabel(
+          detailPayload?.statusName ?? detailPayload?.status ?? detailPayload?.statusId ?? ""
+        );
+
+        const partsPayload = partsRes?.data ?? {};
+        const partList =
+          partsPayload?.data ??
+          partsPayload?.items ??
+          partsPayload?.list ??
+          partsPayload?.results ??
+          (Array.isArray(partsPayload) ? partsPayload : []);
+
+        const steps = Array.isArray(partList)
+          ? partList.map((part) => ({
+              partName: part?.name ?? part?.partName ?? part?.title ?? "-",
+              cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
+              startDate: part?.startDate ?? part?.planStartDate ?? "-",
+              endDate: part?.endDate ?? part?.planEndDate ?? "-",
+              assignedWorkers:
+                part?.assignedWorkers ??
+                part?.workers ??
+                part?.workerNames ??
+                (Array.isArray(part?.workerList)
+                  ? part.workerList.map((worker) => worker?.name ?? worker?.fullName ?? worker?.username).filter(Boolean)
+                  : []),
+            }))
+          : [];
+
+        setPlan({
+          planId: productionId,
+          production: {
+            productionId,
+            orderId: order?.id ?? order?.orderId ?? "-",
+            orderName: order?.orderName ?? order?.name ?? "-",
+            pStartDate: detailPayload?.startDate ?? order?.startDate ?? "-",
+            pEndDate: detailPayload?.endDate ?? order?.endDate ?? "-",
+            status: statusLabel,
+            pmName: pm?.name || pm?.fullName || (pm?.id ? `PM #${pm.id}` : "-"),
+          },
+          product: {
+            productCode: order?.type ?? (order?.id ? `ORD-${order.id}` : "-"),
+            productName: order?.orderName ?? order?.name ?? "-",
+            type: order?.type ?? "-",
+            size: order?.size ?? "-",
+            color: order?.color ?? "-",
+            quantity: order?.quantity ?? 0,
+            cpu: order?.cpu ?? 0,
+            image: order?.image ?? "",
+          },
+          steps,
+        });
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải chi tiết kế hoạch.");
+        setPlan(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchDetail();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   const totalCpu = useMemo(() => {
@@ -113,16 +129,25 @@ export default function ProductionPlanDetail() {
     return plan.steps.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0);
   }, [plan]);
 
-  const progressPercent = useMemo(() => {
-    const start = new Date(plan?.production?.pStartDate ?? "");
-    const end = new Date(plan?.production?.pEndDate ?? "");
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-    const total = end.getTime() - start.getTime();
-    if (total <= 0) return 0;
-    const now = new Date().getTime();
-    const done = Math.min(Math.max(now - start.getTime(), 0), total);
-    return Math.round((done / total) * 100);
-  }, [plan]);
+  if (loading) {
+    return (
+      <OwnerLayout>
+        <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
+          Đang tải chi tiết kế hoạch...
+        </div>
+      </OwnerLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <OwnerLayout>
+        <div className="flex items-center justify-center min-h-400px text-sm text-red-600">
+          {error}
+        </div>
+      </OwnerLayout>
+    );
+  }
 
   if (!plan) {
     return (
@@ -148,7 +173,9 @@ export default function ProductionPlanDetail() {
               </button>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Chi tiết kế hoạch #{plan.planId}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    Chi tiết kế hoạch
+                  </h1>
                   <span
                     className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
                       STATUS_STYLES[plan.production.status] || STATUS_STYLES.default
@@ -177,18 +204,29 @@ export default function ProductionPlanDetail() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
+          <div className="space-y-6">
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Thông tin sản xuất</div>
                 <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 md:grid-cols-4">
-                  <InfoBadge label="Mã kế hoạch" value={`#PL-${plan.planId}`} />
                   <InfoBadge label="Mã sản xuất" value={`#PR-${plan.production.productionId}`} />
                   <InfoBadge label="Mã đơn hàng" value={`#ĐH-${plan.production.orderId}`} />
                   <InfoBadge label="Tên đơn hàng" value={plan.production.orderName} />
                   <InfoBadge label="Quản lý dự án" value={plan.production.pmName} />
                   <InfoBadge label="Thời gian" value={`${plan.production.pStartDate} - ${plan.production.pEndDate}`} />
                   <InfoBadge label="Trạng thái" value={plan.production.status} isStatus />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-emerald-700">Tổng quan kế hoạch</div>
+                <div className="mt-3 text-sm text-emerald-900">
+                  <div className="flex items-end justify-between">
+                    <span className="text-[11px] font-semibold uppercase text-emerald-700">Tổng chi phí</span>
+                    <span className="text-lg font-bold">{totalCpu.toLocaleString("vi-VN")} VND</span>
+                  </div>
+                  <div className="mt-3 space-y-2 text-xs text-emerald-700">
+                    <div>Người quản lý: {plan.production.pmName}</div>
+                  </div>
                 </div>
               </div>
 
@@ -234,7 +272,7 @@ export default function ProductionPlanDetail() {
                         <th className="px-4 py-3 text-left">Thợ được giao</th>
                         <th className="px-4 py-3 text-left">Ngày bắt đầu / kết thúc</th>
                         <th className="px-4 py-3 text-right">Giá/SP</th>
-                        <th className="px-4 py-3 text-center">Trắng thái</th>
+                        <th className="px-4 py-3 text-center">Trạng thái</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -285,53 +323,9 @@ export default function ProductionPlanDetail() {
                   </table>
                 </div>
               </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-widest text-emerald-700">Tổng quan kế hoạch</div>
-                <div className="mt-3 text-sm text-emerald-900">
-                  <div className="flex items-end justify-between">
-                    <span className="text-[11px] font-semibold uppercase text-emerald-700">Tổng chi phí</span>
-                    <span className="text-lg font-bold">{totalCpu.toLocaleString("vi-VN")} VND</span>
-                  </div>
-                  <div className="mt-3 space-y-2 text-xs text-emerald-700">
-                    <div>Tham chiếu kế hoạch: #PL-{plan.planId}</div>
-                    <div>Người quản lý: {plan.production.pmName}</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tiến độ sản xuất</div>
-                <div className="mt-4 space-y-4 text-sm text-slate-700">
-                  <ProgressItem
-                    title="Bắt đầu sản xuất"
-                    date={plan.production.pStartDate}
-                    status="Đã hoàn thành"
-                    active
-                  />
-                  <div>
-                    <ProgressItem
-                      title="Dự kiến hoàn thành"
-                      date={plan.production.pEndDate}
-                      status={`${progressPercent}%`}
-                    />
-                    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
-                      <div
-                        className="h-1.5 rounded-full bg-emerald-500 transition-all"
-                        style={{ width: `${Math.min(progressPercent, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <ProgressItem title="Kiểm định chất lượng" date="Chưa xác định" status="-" muted />
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
     </OwnerLayout>
   );
 }
@@ -346,22 +340,3 @@ function InfoBadge({ label, value, isStatus = false }) {
     </div>
   );
 }
-
-function ProgressItem({ title, date, status, active = false, muted = false }) {
-  return (
-    <div className="flex items-start gap-3">
-      <div
-        className={`mt-1 h-3 w-3 rounded-full border ${
-          active ? "border-emerald-500 bg-emerald-500" : "border-slate-300 bg-white"
-        }`}
-      />
-      <div className={`${muted ? "text-slate-400" : "text-slate-700"}`}>
-        <div className="text-xs font-semibold uppercase tracking-widest">{title}</div>
-        <div className="text-sm font-semibold">{date}</div>
-        <div className="text-[11px] text-emerald-600 font-semibold">{status}</div>
-      </div>
-    </div>
-  );
-}
-
-
