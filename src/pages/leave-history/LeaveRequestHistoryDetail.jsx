@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, CalendarClock, CheckCircle2, Clock3, FileText, Loader2, MessageSquareQuote, UserRound, XCircle } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -25,21 +26,6 @@ const STATUS_MAP = {
     panel: "border-rose-200 bg-rose-50 text-rose-800",
   },
 };
-
-function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
-
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function StatusBadge({ status }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending;
@@ -73,12 +59,12 @@ function getTimelineItems(leave) {
   return [
     {
       title: "Tạo đơn",
-      value: formatDateTime(leave?.dateCreate),
+      value: formatLeaveDateTime(leave?.dateCreate),
       tone: "done",
     },
     {
       title: isPending ? "Đang chờ xử lý" : "Đã phản hồi",
-      value: isPending ? "Đơn hiện vẫn đang ở trạng thái chờ duyệt." : formatDateTime(leave?.dateReply),
+      value: isPending ? "Đơn hiện vẫn đang ở trạng thái chờ duyệt." : formatLeaveDateTime(leave?.dateReply),
       tone: isPending ? "current" : "done",
     },
     {
@@ -180,11 +166,11 @@ export default function LeaveRequestHistoryDetail() {
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày gửi</div>
-                    <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateCreate)}</div>
+                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateCreate)}</div>
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                    <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateReply)}</div>
+                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
                 </div>
               </div>
@@ -196,7 +182,7 @@ export default function LeaveRequestHistoryDetail() {
 
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
                       <DetailItem icon={UserRound} label="Nhân viên gửi đơn" value={leave.userFullName} />
-                      <DetailItem icon={CalendarClock} label="Ngày tạo đơn" value={formatDateTime(leave.dateCreate)} />
+                      <DetailItem icon={CalendarClock} label="Ngày tạo đơn" value={formatLeaveDateTime(leave.dateCreate)} />
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">
@@ -219,7 +205,7 @@ export default function LeaveRequestHistoryDetail() {
                     </div>
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatDateTime(leave.dateReply)} />
+                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
                       <DetailItem icon={FileText} label="Mã người gửi" value={leave.userId ? `USER-${leave.userId}` : ""} />
                     </div>
 

@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -42,22 +43,6 @@ const STATUS_MAP = {
     border: "border-rose-200",
   },
 };
-
-function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
-
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }) + ` ${date.toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
 
 function StatusBadge({ status }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending;
@@ -366,8 +351,8 @@ export default function LeaveRequests() {
                             <td className="px-5 py-4 align-top">
                               <div className="max-w-xl text-sm leading-6 text-slate-700">{item.content}</div>
                             </td>
-                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatDateTime(item.dateCreate)}</td>
-                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatDateTime(item.dateReply)}</td>
+                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
+                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply)}</td>
                             <td className="px-5 py-4 align-top">
                               <StatusBadge status={item.status} />
                             </td>

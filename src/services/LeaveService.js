@@ -1,5 +1,6 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { compareLeaveDateDesc, normalizeLeaveDate } from "@/lib/leaveDateTime";
 
 const parseApiPayload = (rawResponse) => {
   if (typeof rawResponse !== "string") {
@@ -60,11 +61,32 @@ const normalizeLeaveItem = (item = {}) => ({
   userId: item.userId ?? item.employeeId ?? null,
   userFullName: item.userFullName ?? item.fullName ?? item.employeeName ?? "Chưa có tên",
   content: item.content ?? "",
-  dateCreate: item.dateCreate ?? item.createdAt ?? null,
-  dateReply: item.dateReply ?? item.repliedAt ?? null,
+  dateCreate: normalizeLeaveDate(
+    item.dateCreate ??
+    item.date_create ??
+    item.dateCreated ??
+    item.createDate ??
+    item.createdAt ??
+    item.dateCreateAt
+  ),
+  dateReply: normalizeLeaveDate(
+    item.dateReply ??
+    item.date_reply ??
+    item.replyDate ??
+    item.repliedAt ??
+    item.repliedDate ??
+    item.updatedAt
+  ),
   denyContent: item.denyContent ?? "",
   status: normalizeStatus(item.status),
 });
+
+function normalizeLeaveCollection(rawItems = []) {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems
+    .map(normalizeLeaveItem)
+    .sort((left, right) => compareLeaveDateDesc(left.dateCreate, right.dateCreate));
+}
 
 const LeaveService = {
   async getLeaveRequests(params) {
@@ -78,7 +100,7 @@ const LeaveService = {
 
     return {
       ...response,
-      data: Array.isArray(rawItems) ? rawItems.map(normalizeLeaveItem) : [],
+      data: normalizeLeaveCollection(rawItems),
     };
   },
 
@@ -92,7 +114,7 @@ const LeaveService = {
 
     return {
       ...response,
-      data: Array.isArray(rawItems) ? rawItems.map(normalizeLeaveItem) : [],
+      data: normalizeLeaveCollection(rawItems),
     };
   },
 
