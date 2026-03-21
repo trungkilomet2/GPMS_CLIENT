@@ -50,9 +50,19 @@ const SEVERITIES = [
 export default function WorkerErrorReport() {
   const location = useLocation();
   const assignment = location.state?.assignment ?? null;
+  const normalizedAssignment = assignment
+    ? {
+        id: assignment?.id ?? `plan-${assignment?.productionId ?? ""}-${assignment?.partName ?? ""}`,
+        productionId: assignment?.productionId ?? "",
+        orderName: assignment?.orderName ?? "",
+        partName: assignment?.partName ?? "",
+        startDate: assignment?.startDate ?? "",
+        endDate: assignment?.endDate ?? "",
+      }
+    : null;
   const [form, setForm] = useState({
-    productionId: assignment?.productionId ? String(assignment.productionId) : "",
-    partName: assignment?.partName || "",
+    productionId: normalizedAssignment?.productionId ? String(normalizedAssignment.productionId) : "",
+    partName: normalizedAssignment?.partName || "",
     severity: "medium",
     title: "",
     description: "",
@@ -61,6 +71,7 @@ export default function WorkerErrorReport() {
     suggestion: "",
   });
   const [notice, setNotice] = useState("");
+  const isPrefilled = Boolean(normalizedAssignment?.productionId || normalizedAssignment?.partName);
 
   const productions = useMemo(() => {
     const map = new Map();
@@ -69,28 +80,31 @@ export default function WorkerErrorReport() {
         map.set(item.productionId, item.orderName);
       }
     });
+    if (normalizedAssignment?.productionId && !map.has(normalizedAssignment.productionId)) {
+      map.set(normalizedAssignment.productionId, normalizedAssignment.orderName || "Kế hoạch từ chi tiết");
+    }
     return Array.from(map.entries()).map(([productionId, orderName]) => ({
       productionId,
       orderName,
     }));
-  }, []);
+  }, [normalizedAssignment]);
 
   const availableParts = useMemo(() => {
     const pid = Number(form.productionId);
     if (!pid) return [];
     const base = MOCK_ASSIGNMENTS.filter((item) => item.productionId === pid);
-    if (assignment && assignment.productionId === pid) {
-      const exists = base.some((item) => item.partName === assignment.partName);
-      if (!exists) return [assignment, ...base];
+    if (normalizedAssignment && Number(normalizedAssignment.productionId) === pid) {
+      const exists = base.some((item) => item.partName === normalizedAssignment.partName);
+      if (!exists) return [normalizedAssignment, ...base];
     }
     return base;
-  }, [form.productionId, assignment]);
+  }, [form.productionId, normalizedAssignment]);
 
   const selectedPart = useMemo(() => {
     if (!form.partName) return null;
-    if (assignment && assignment.partName === form.partName) return assignment;
+    if (normalizedAssignment && normalizedAssignment.partName === form.partName) return normalizedAssignment;
     return availableParts.find((item) => item.partName === form.partName) || null;
-  }, [availableParts, form.partName, assignment]);
+  }, [availableParts, form.partName, normalizedAssignment]);
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -136,6 +150,7 @@ export default function WorkerErrorReport() {
                   <select
                     value={form.productionId}
                     onChange={(event) => handleChange("productionId", event.target.value)}
+                    disabled={isPrefilled}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
                     <option value="">Chọn production...</option>
@@ -151,6 +166,7 @@ export default function WorkerErrorReport() {
                   <select
                     value={form.partName}
                     onChange={(event) => handleChange("partName", event.target.value)}
+                    disabled={isPrefilled}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
                     <option value="">Chọn công đoạn...</option>

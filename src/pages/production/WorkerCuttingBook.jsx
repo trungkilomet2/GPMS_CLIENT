@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ClipboardCheck, Eraser, Plus, Save } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import "@/styles/homepage.css";
@@ -364,6 +365,14 @@ const normalizeBooks = (data) => {
 const calcTotalLayers = (records) =>
   records.reduce((sum, item) => sum + (Number(item.layer) || 0), 0);
 
+const getTodayString = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const formatProductionOption = (production) => {
   const id = String(getProductionId(production));
   const name = getProductionName(production);
@@ -373,6 +382,16 @@ const formatProductionOption = (production) => {
 const PAGE_SIZE = 6;
 
 export default function WorkerCuttingBook() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const locationProductionId = useMemo(() => {
+    const raw =
+      location?.state?.productionId ??
+      location?.state?.production?.productionId ??
+      location?.state?.production?.id ??
+      "";
+    return String(raw || "").trim();
+  }, [location]);
   const [books, setBooks] = useState([]);
   const [selectedProductionId, setSelectedProductionId] = useState(null);
   const [meta, setMeta] = useState(DEFAULT_META);
@@ -383,6 +402,9 @@ export default function WorkerCuttingBook() {
   const [newBook, setNewBook] = useState(DEFAULT_META);
   const [collapseMeta, setCollapseMeta] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState(false);
+  const [editingRecordId, setEditingRecordId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [recordErrors, setRecordErrors] = useState({});
   const [page, setPage] = useState(1);
   const [productions, setProductions] = useState([]);
   const [productionError, setProductionError] = useState("");
@@ -403,6 +425,21 @@ export default function WorkerCuttingBook() {
       // ignore storage errors
     }
   }, []);
+
+  useEffect(() => {
+    if (!locationProductionId) return;
+    const matched = books.find((book) => String(book.productionId) === locationProductionId);
+    if (matched) {
+      setMeta(matched.meta || DEFAULT_META);
+      setSelectedProductionId(matched.productionId);
+      setIsEditing(false);
+      return;
+    }
+    setSelectedProductionId(null);
+    setMeta((prev) => ({ ...prev, productionId: locationProductionId }));
+    setShowCreate(true);
+    setNewBook((prev) => ({ ...prev, productionId: locationProductionId }));
+  }, [books, locationProductionId]);
 
   useEffect(() => {
     let active = true;
@@ -515,15 +552,57 @@ export default function WorkerCuttingBook() {
 
   const updateRecord = (key, value) => {
     setRecord((prev) => ({ ...prev, [key]: value }));
+    if (recordErrors[key]) {
+      setRecordErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   };
 
   const clearRecord = () => {
     setRecord(DEFAULT_RECORD);
+    setEditingRecordId(null);
+    setRecordErrors({});
+  };
+
+  const validateRecord = (value) => {
+    const nextErrors = {};
+    const numberFields = [
+      ["meterPerKg", "Số m/kg"],
+      ["layer", "Số lớp"],
+      ["productQty", "Sản phẩm"],
+      ["avgConsumption", "Định mức TB"],
+    ];
+
+    if (!value.color?.trim()) nextErrors.color = "Vui lòng nhập màu.";
+    numberFields.forEach(([key, label]) => {
+      const raw = String(value[key] ?? "").trim();
+      if (!raw) {
+        nextErrors[key] = `Vui lòng nhập ${label.toLowerCase()}.`;
+        return;
+      }
+      const num = Number(raw);
+      if (!Number.isFinite(num) || num <= 0) {
+        nextErrors[key] = `${label} phải là số > 0.`;
+      }
+    });
+    return nextErrors;
   };
 
   const saveRecord = () => {
+    const nextErrors = validateRecord(record);
+    if (Object.keys(nextErrors).length > 0) {
+      setRecordErrors(nextErrors);
+      return false;
+    }
     const productionKey = String(meta.productionId || "UNASSIGNED");
-    const nextRecord = { id: Date.now().toString(36), ...record };
+    const nextRecord = {
+      id: editingRecordId || Date.now().toString(36),
+      ...record,
+      dateCreate: record.dateCreate || getTodayString(),
+    };
     const nextBooks = (() => {
       const existing = books.find((book) => String(book.productionId) === productionKey);
       if (!existing) {
@@ -539,6 +618,19 @@ export default function WorkerCuttingBook() {
       }
       return books.map((book) => {
         if (String(book.productionId) !== productionKey) return book;
+        if (editingRecordId) {
+          const nextRecords = (book.records || []).map((item) =>
+            String(item.id) === String(editingRecordId)
+              ? { ...item, ...nextRecord, id: editingRecordId }
+              : item
+          );
+          return {
+            ...book,
+            meta: { ...meta },
+            records: nextRecords,
+            updatedAt: new Date().toISOString(),
+          };
+        }
         return {
           ...book,
           meta: { ...meta },
@@ -557,6 +649,7 @@ export default function WorkerCuttingBook() {
     } catch {
       // ignore storage errors
     }
+    return true;
   };
 
   const openDetail = (productionId) => {
@@ -572,7 +665,57 @@ export default function WorkerCuttingBook() {
     setSelectedProductionId(null);
     setMeta(DEFAULT_META);
     setRecord(DEFAULT_RECORD);
+    setEditingRecordId(null);
     setIsEditing(false);
+  };
+
+  const openCreateRecord = () => {
+    setEditingRecordId(null);
+    setRecord(DEFAULT_RECORD);
+    setRecordErrors({});
+    setIsEditing(true);
+    setShowEntryModal(true);
+  };
+
+  const openEditRecord = (item) => {
+    setEditingRecordId(item.id);
+    setRecord({
+      color: item.color || "",
+      meterPerKg: item.meterPerKg || "",
+      layer: item.layer || "",
+      productQty: item.productQty || "",
+      avgConsumption: item.avgConsumption || "",
+      dateCreate: item.dateCreate || "",
+      note: item.note || "",
+    });
+    setRecordErrors({});
+    setIsEditing(true);
+    setShowEntryModal(true);
+  };
+
+  const confirmDeleteRecord = (recordId) => {
+    if (!currentBook) return;
+    setConfirmDeleteId(recordId);
+  };
+
+  const deleteRecord = () => {
+    if (!currentBook || !confirmDeleteId) return;
+    const productionKey = String(currentBook.productionId);
+    const nextBooks = books.map((book) => {
+      if (String(book.productionId) !== productionKey) return book;
+      return {
+        ...book,
+        records: (book.records || []).filter((item) => String(item.id) !== String(confirmDeleteId)),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setBooks(nextBooks);
+    setConfirmDeleteId(null);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBooks));
+    } catch {
+      // ignore storage errors
+    }
   };
 
   const createBook = () => {
@@ -628,13 +771,21 @@ export default function WorkerCuttingBook() {
         <div className="leave-shell mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+                aria-label="Quay lại"
+              >
+                <ArrowLeft size={18} />
+              </button>
               {selectedProductionId && (
                 <button
                   type="button"
                   onClick={resetToList}
                   className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
                 >
-                  <ArrowLeft size={18} />
+                  <Eraser size={18} />
                 </button>
               )}
               <div>
@@ -855,7 +1006,7 @@ export default function WorkerCuttingBook() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowEntryModal(true)}
+                    onClick={openCreateRecord}
                     className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:text-emerald-300"
                   >
                     Thêm dòng
@@ -884,6 +1035,7 @@ export default function WorkerCuttingBook() {
                           <th className="leave-table-th w-28 px-3 py-3 text-center">Định mức TB</th>
                           <th className="leave-table-th w-28 px-3 py-3 text-center">Ngày ghi</th>
                           <th className="leave-table-th w-48 px-3 py-3 text-left">Ghi chú</th>
+                          <th className="leave-table-th w-32 px-3 py-3 text-center">Thao tác</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -897,6 +1049,24 @@ export default function WorkerCuttingBook() {
                             <td className="px-3 py-2 text-center text-slate-700">{item.avgConsumption || "-"}</td>
                             <td className="px-3 py-2 text-center text-slate-600">{item.dateCreate || "-"}</td>
                             <td className="px-3 py-2 text-slate-600">{item.note || "-"}</td>
+                            <td className="px-3 py-2 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEditRecord(item)}
+                                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                                >
+                                  Sửa
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => confirmDeleteRecord(item.id)}
+                                  className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -918,21 +1088,27 @@ export default function WorkerCuttingBook() {
         </div>
       </div>
       {showEntryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Nhập dòng mới</div>
-                <div className="text-base font-bold text-slate-900">Sổ cắt #{meta.productionId || "-"}</div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                    {editingRecordId ? "Chỉnh sửa dòng" : "Nhập dòng mới"}
+                  </div>
+                  <div className="text-base font-bold text-slate-900">Sổ cắt #{meta.productionId || "-"}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEntryModal(false);
+                    setEditingRecordId(null);
+                    setRecord(DEFAULT_RECORD);
+                  }}
+                  className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 hover:text-slate-700"
+                >
+                  Đóng
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowEntryModal(false)}
-                className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 hover:text-slate-700"
-              >
-                Đóng
-              </button>
-            </div>
             <div className="mt-5 space-y-4">
               {!isEditing && (
                 <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -940,12 +1116,11 @@ export default function WorkerCuttingBook() {
                 </div>
               )}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <ModalField label="Màu" value={record.color} onChange={(v) => updateRecord("color", v)} disabled={!isEditing} placeholder="Ví dụ: Đen" />
-                <ModalField label="Số m/kg" value={record.meterPerKg} onChange={(v) => updateRecord("meterPerKg", v)} disabled={!isEditing} placeholder="Ví dụ: 65" />
-                <ModalField label="Số lớp" value={record.layer} onChange={(v) => updateRecord("layer", v)} disabled={!isEditing} placeholder="Ví dụ: 10" />
-                <ModalField label="Sản lượng" value={record.productQty} onChange={(v) => updateRecord("productQty", v)} disabled={!isEditing} placeholder="Ví dụ: 400" />
-                <ModalField label="Định mức TB" value={record.avgConsumption} onChange={(v) => updateRecord("avgConsumption", v)} disabled={!isEditing} placeholder="Ví dụ: 0.95" />
-                <ModalField label="Ngày ghi" value={record.dateCreate} onChange={(v) => updateRecord("dateCreate", v)} disabled={!isEditing} placeholder="YYYY-MM-DD" />
+                <ModalField label="Màu" value={record.color} onChange={(v) => updateRecord("color", v)} disabled={!isEditing} placeholder="Ví dụ: Đen" error={recordErrors.color} />
+                <ModalField label="Số m/kg" value={record.meterPerKg} onChange={(v) => updateRecord("meterPerKg", v)} disabled={!isEditing} placeholder="Ví dụ: 65" error={recordErrors.meterPerKg} />
+                <ModalField label="Số lớp" value={record.layer} onChange={(v) => updateRecord("layer", v)} disabled={!isEditing} placeholder="Ví dụ: 10" error={recordErrors.layer} />
+                <ModalField label="Sản phẩm" value={record.productQty} onChange={(v) => updateRecord("productQty", v)} disabled={!isEditing} placeholder="Ví dụ: 400" error={recordErrors.productQty} />
+                <ModalField label="Định mức TB" value={record.avgConsumption} onChange={(v) => updateRecord("avgConsumption", v)} disabled={!isEditing} placeholder="Ví dụ: 0.95" error={recordErrors.avgConsumption} />
               </div>
               <div className="md:col-span-2 lg:col-span-3">
                 <ModalTextarea label="Ghi chú" value={record.note} onChange={(v) => updateRecord("note", v)} disabled={!isEditing} />
@@ -967,15 +1142,49 @@ export default function WorkerCuttingBook() {
                 <button
                   type="button"
                   onClick={() => {
-                    saveRecord();
-                    setShowEntryModal(false);
+                    const ok = saveRecord();
+                    if (ok) {
+                      setShowEntryModal(false);
+                      setEditingRecordId(null);
+                    }
                   }}
                   disabled={!isEditing}
                   className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95 disabled:bg-emerald-300"
                 >
-                  Lưu dòng
+                  {editingRecordId ? "Lưu chỉnh sửa" : "Lưu dòng"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <Eraser size={18} />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-slate-900">Xóa dòng ghi</div>
+                <div className="text-xs text-slate-500">Bạn có chắc muốn xóa dòng ghi này không?</div>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={deleteRecord}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+              >
+                Xóa
+              </button>
             </div>
           </div>
         </div>
@@ -1027,7 +1236,7 @@ function Info({ label, value, compact = false }) {
   );
 }
 
-function ModalField({ label, value, onChange, disabled = false, placeholder = "" }) {
+function ModalField({ label, value, onChange, disabled = false, placeholder = "", error = "" }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-bold text-slate-700">{label}</span>
@@ -1037,8 +1246,13 @@ function ModalField({ label, value, onChange, disabled = false, placeholder = ""
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm transition-all outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white disabled:bg-slate-100 disabled:text-slate-500"
+        className={`w-full rounded-xl border px-4 py-2.5 text-sm transition-all outline-none focus:ring-4 bg-white disabled:bg-slate-100 disabled:text-slate-500 ${
+          error
+            ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+            : "border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/10"
+        }`}
       />
+      {error ? <span className="text-xs text-rose-600">{error}</span> : null}
     </label>
   );
 }

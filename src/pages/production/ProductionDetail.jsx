@@ -222,6 +222,13 @@ export default function ProductionDetail() {
               >
                 Yêu cầu chỉnh sửa
               </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+              >
+                Tổng hợp lỗi
+              </button>
             </div>
           </div>
 

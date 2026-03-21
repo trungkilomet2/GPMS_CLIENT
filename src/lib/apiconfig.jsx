@@ -20,6 +20,7 @@ export const API_ENDPOINTS = {
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
     REQUEST_MODIFICATION: (orderId) => `${BASE_URL}/api/Order/request-order-modification/${orderId}`,
     DENY_ORDER: (orderId) => `${BASE_URL}/api/Order/deny-order/${orderId}`,
+    APPROVE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/approve`,
   },
   ORDER_REJECT: {
     REJECT: `${BASE_URL}/api/OrderReject/order-reject`,

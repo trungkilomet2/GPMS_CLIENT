@@ -14,70 +14,6 @@ import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const MOCK_ORDERS = [
-  {
-    id: 29,
-    orderName: "Đồng phục công ty ABC",
-    type: "Đồng phục",
-    size: "L",
-    color: "Trắng",
-    quantity: 100,
-    cpu: 15000,
-    startDate: "2026-04-15",
-    endDate: "2026-05-05",
-    status: "Đã chấp nhận",
-    image: "",
-    note: "Giao trong giờ hành chính.",
-    materials: [
-      { materialName: "Vải cotton", value: 120, uom: "m", note: "Cotton 65/35" },
-      { materialName: "Cúc áo", value: 100, uom: "cái", note: "Màu trắng" },
-    ],
-    templates: [
-      { templateName: "Mẫu áo", type: "SOFT", file: "" },
-    ],
-    customerName: "Công ty ABC",
-    customerPhone: "0901234567",
-    customerAddress: "Q.1, TP.HCM",
-  },
-  {
-    id: 30,
-    orderName: "Áo hoodie mùa đông",
-    type: "Hoodie",
-    size: "M",
-    color: "Đen",
-    quantity: 80,
-    cpu: 22000,
-    startDate: "2026-04-10",
-    endDate: "2026-04-30",
-    status: "Đã chấp nhận",
-    image: "",
-    note: "In logo trước ngực.",
-    materials: [],
-    templates: [],
-    customerName: "Shop XYZ",
-    customerPhone: "0912345678",
-    customerAddress: "Q.3, TP.HCM",
-  },
-  {
-    id: 31,
-    orderName: "Áo sơ mi nữ",
-    type: "Sơ mi",
-    size: "S",
-    color: "Xanh nhạt",
-    quantity: 60,
-    cpu: 18000,
-    startDate: "2026-04-12",
-    endDate: "2026-04-25",
-    status: "Chờ xét duyệt",
-    image: "",
-    note: "May bo viền cổ.",
-    materials: [],
-    templates: [],
-    customerName: "Shop LMN",
-    customerPhone: "0987654321",
-    customerAddress: "Q.5, TP.HCM",
-  },
-];
 
 export default function CreateProduction() {
   const { orderId } = useParams();
@@ -163,15 +99,57 @@ export default function CreateProduction() {
       try {
         setOrdersLoading(true);
         let response;
+        const paramsSerializer = {
+          serialize: (params) =>
+            Object.entries(params)
+              .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+              .join("&"),
+        };
+
+        const baseParams = {
+          PageIndex: 0,
+          PageSize: 50,
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        };
+
         try {
-          response = await OrderService.getAllOrders({ PageIndex: 0, PageSize: 10 });
+          response = await OrderService.getAllOrders(
+            {
+              ...baseParams,
+              Status: "Đã Chấp Nhận",
+            },
+            { paramsSerializer }
+          );
         } catch (err) {
           if (err?.response?.status === 400) {
             try {
-              response = await OrderService.getAllOrders({ pageIndex: 0, pageSize: 10 });
+              response = await OrderService.getAllOrders(
+                {
+                  pageIndex: baseParams.PageIndex,
+                  pageSize: baseParams.PageSize,
+                  sortColumn: baseParams.SortColumn,
+                  sortOrder: baseParams.SortOrder,
+                  status: "Đã Chấp Nhận",
+                },
+                { paramsSerializer }
+              );
             } catch (err2) {
               if (err2?.response?.status === 400) {
-                response = await OrderService.getAllOrders();
+                try {
+                  response = await OrderService.getAllOrders(
+                    {
+                      ...baseParams,
+                    },
+                    { paramsSerializer }
+                  );
+                } catch (err3) {
+                  if (err3?.response?.status === 400) {
+                    response = await OrderService.getAllOrders();
+                  } else {
+                    throw err3;
+                  }
+                }
               } else {
                 throw err2;
               }
@@ -260,10 +238,12 @@ export default function CreateProduction() {
     if (!validate()) return;
 
     const payload = {
-      productionId: null,
+      id: 0,
       pmId: Number(form.pmId),
       orderId: Number(order?.id ?? orderId),
-      note: form.productionNote?.trim() || "",
+      startDate: order?.startDate ?? "",
+      endDate: order?.endDate ?? "",
+      statusId: 0,
     };
 
     try {
@@ -369,7 +349,10 @@ export default function CreateProduction() {
                         {orders
                           .filter((o) => {
                             const statusValue = o.statusName ?? o.status ?? o.statusText ?? o.state ?? o.statusId;
-                            return getOrderStatusLabel(statusValue) === "Đã Chấp Nhận";
+                            const label = getOrderStatusLabel(statusValue);
+                            if (label === "Đã Chấp Nhận") return true;
+                            const statusId = Number(statusValue);
+                            return Number.isFinite(statusId) && statusId === 3;
                           })
                           .map((o) => (
                             <option key={o.id ?? o.orderId} value={o.id ?? o.orderId}>

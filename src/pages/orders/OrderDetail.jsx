@@ -33,6 +33,7 @@ export default function OrderDetail() {
     const [zoomImageUrl, setZoomImageUrl] = useState('');
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+    const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState('');
     const [customerProfile, setCustomerProfile] = useState(null);
     const [showDenyConfirm, setShowDenyConfirm] = useState(false);
@@ -64,7 +65,7 @@ export default function OrderDetail() {
 
     useEffect(() => {
         const loadCustomerProfile = async () => {
-            if (!canModerate) return;
+            if (!isAdmin) return;
             const customerId =
                 order?.userId ??
                 order?.customerId ??
@@ -146,6 +147,20 @@ export default function OrderDetail() {
         } catch (err) {
             console.error('Lỗi cập nhật trạng thái:', err);
             alert('Không thể cập nhật trạng thái đơn hàng.');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleApproveOrder = async () => {
+        if (!order?.id && !id) return;
+        try {
+            setIsUpdatingStatus(true);
+            await OrderService.approveOrder(order?.id ?? id);
+            setOrder((prev) => (prev ? { ...prev, status: 'Đã chấp nhận' } : prev));
+        } catch (err) {
+            console.error('Lỗi chấp nhận đơn hàng:', err);
+            alert('Không thể chấp nhận đơn hàng.');
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -236,7 +251,7 @@ export default function OrderDetail() {
                                         disabled={isUpdatingStatus || isRejected || isAccepted || !canAccept}
                                         onClick={() => {
                                             if (isRejected || isAccepted || !canAccept) return;
-                                            updateOrderStatus('Đã chấp nhận');
+                                            setIsApproveModalOpen(true);
                                         }}
                                         className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
@@ -282,11 +297,10 @@ export default function OrderDetail() {
                     </div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {(denyError || denySuccess) && (
                             <div
-                                className={`lg:col-span-3 rounded-2xl border px-4 py-3 text-sm font-semibold ${
-                                    denyError
+                                className={`lg:col-span-3 rounded-2xl border px-4 py-3 text-sm font-semibold ${denyError
                                         ? 'border-rose-200 bg-rose-50 text-rose-700'
                                         : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                }`}
+                                    }`}
                             >
                                 {denyError || denySuccess}
                             </div>
@@ -374,55 +388,55 @@ export default function OrderDetail() {
 
                         {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                         <div className="space-y-6">
-                        {canModerate && (
-                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                                <div className="flex items-center gap-2 text-slate-600 mb-3">
-                                    <Info size={16} />
-                                    <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
+                            {canModerate && (
+                                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                                    <div className="flex items-center gap-2 text-slate-600 mb-3">
+                                        <Info size={16} />
+                                        <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
+                                    </div>
+                                    <div className="space-y-2 text-sm text-slate-700">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
+                                            <span className="font-semibold text-slate-800 text-right">
+                                                {customerProfile?.fullName ||
+                                                    customerProfile?.name ||
+                                                    order?.customerName ||
+                                                    order?.userName ||
+                                                    order?.fullName ||
+                                                    order?.user?.fullName ||
+                                                    order?.user?.name ||
+                                                    '-'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <span className="text-xs font-bold text-slate-400 uppercase">Số điện thoại</span>
+                                            <span className="font-semibold text-slate-800 text-right">
+                                                {customerProfile?.phoneNumber ||
+                                                    customerProfile?.phone ||
+                                                    order?.customerPhone ||
+                                                    order?.phone ||
+                                                    order?.phoneNumber ||
+                                                    order?.user?.phoneNumber ||
+                                                    order?.user?.phone ||
+                                                    '-'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <span className="text-xs font-bold text-slate-400 uppercase">Địa chỉ</span>
+                                            <span className="font-semibold text-slate-800 text-right">
+                                                {customerProfile?.location ||
+                                                    customerProfile?.address ||
+                                                    order?.customerAddress ||
+                                                    order?.address ||
+                                                    order?.location ||
+                                                    order?.user?.address ||
+                                                    order?.user?.location ||
+                                                    '-'}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="space-y-2 text-sm text-slate-700">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
-                                        <span className="font-semibold text-slate-800 text-right">
-                                            {customerProfile?.fullName ||
-                                                customerProfile?.name ||
-                                                order?.customerName ||
-                                                order?.userName ||
-                                                order?.fullName ||
-                                                order?.user?.fullName ||
-                                                order?.user?.name ||
-                                                '-'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Số điện thoại</span>
-                                        <span className="font-semibold text-slate-800 text-right">
-                                            {customerProfile?.phoneNumber ||
-                                                customerProfile?.phone ||
-                                                order?.customerPhone ||
-                                                order?.phone ||
-                                                order?.phoneNumber ||
-                                                order?.user?.phoneNumber ||
-                                                order?.user?.phone ||
-                                                '-'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-start justify-between gap-3">
-                                        <span className="text-xs font-bold text-slate-400 uppercase">Địa chỉ</span>
-                                        <span className="font-semibold text-slate-800 text-right">
-                                            {customerProfile?.location ||
-                                                customerProfile?.address ||
-                                                order?.customerAddress ||
-                                                order?.address ||
-                                                order?.location ||
-                                                order?.user?.address ||
-                                                order?.user?.location ||
-                                                '-'}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                            )}
                             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                                 <div>
                                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
@@ -464,20 +478,20 @@ export default function OrderDetail() {
                                 </div>
                             </div>
 
-                        <div className="space-y-3">
-                            <button
-                                onClick={() => setIsCommentModalOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
-                            >
-                                <MessageSquare size={16} /> Thảo luận đơn hàng
-                            </button>
-                            <button
-                                onClick={() => setIsHistoryModalOpen(true)}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
-                            >
-                                <History size={16} /> Lịch sử chỉnh sửa
-                            </button>
-                        </div>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => setIsCommentModalOpen(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
+                                >
+                                    <MessageSquare size={16} /> Thảo luận đơn hàng
+                                </button>
+                                <button
+                                    onClick={() => setIsHistoryModalOpen(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                                >
+                                    <History size={16} /> Lịch sử chỉnh sửa
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -497,7 +511,7 @@ export default function OrderDetail() {
                     if (pendingStatus === 'Yêu cầu chỉnh sửa') {
                         try {
                             setIsUpdatingStatus(true);
-                            await OrderService.requestOrderModification(order?.id ?? id);
+                            await OrderService.requestOrderModification(order?.id ?? id, { reason });
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
                         } catch (err) {
                             console.error('Lỗi yêu cầu chỉnh sửa:', err);
@@ -514,6 +528,7 @@ export default function OrderDetail() {
                             await OrderService.rejectOrder({
                                 orderId: order?.id ?? id,
                                 reason,
+                                userId: user?.userId ?? user?.id ?? null,
                             });
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
                         } catch (err) {
@@ -536,6 +551,20 @@ export default function OrderDetail() {
                 loading={isUpdatingStatus}
                 tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
                 requireReason={pendingStatus === 'Từ chối'}
+            />
+            <OrderStatusReasonModal
+                isOpen={isApproveModalOpen}
+                onClose={() => setIsApproveModalOpen(false)}
+                onSubmit={async () => {
+                    await handleApproveOrder();
+                    setIsApproveModalOpen(false);
+                }}
+                title="Chấp nhận đơn hàng"
+                description="Bạn có chắc muốn chấp nhận đơn hàng này không?"
+                confirmText="Xác nhận"
+                loading={isUpdatingStatus}
+                tone="warning"
+                requireReason={false}
             />
 
             {showDenyConfirm && (

@@ -5,6 +5,9 @@ import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
+import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -45,6 +48,9 @@ function getPlanStatusLabel(status) {
 }
 
 export default function ProductionPlanList() {
+  const user = getStoredUser();
+  const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
+  const isWorker = hasAnyRole(roleValue, ["worker", "sewer", "tailor"]);
   const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,7 +58,7 @@ export default function ProductionPlanList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [partCounts, setPartCounts] = useState({});
-  const pageSize = 6;
+  const pageSize = 10;
 
   useEffect(() => {
     let active = true;
@@ -247,9 +253,11 @@ export default function ProductionPlanList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách kế hoạch sản xuất</h1>
               <p className="text-slate-600">Theo dõi kế hoạch sản xuất và tiến độ triển khai theo từng đơn hàng.</p>
             </div>
-            <Link className="order-create-btn" to="/production-plan/create">
-              + Tạo kế hoạch
-            </Link>
+            {!isWorker && (
+              <Link className="order-create-btn" to="/production-plan/create">
+                + Tạo kế hoạch
+              </Link>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
