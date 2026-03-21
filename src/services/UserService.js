@@ -77,6 +77,12 @@ function setProfileCache(userId, profile) {
   }
 }
 
+function isOtpPendingResponse(payload = {}) {
+  const message = String(payload?.message ?? payload?.title ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return message.includes("otp");
+}
+
 export const userService = {
 
   /**
@@ -257,6 +263,13 @@ export const userService = {
 
     if (!res.ok) throw { response: { data: json } };
 
+    if (isOtpPendingResponse(json) && !json?.data) {
+      return {
+        ...json,
+        otpRequired: true,
+      };
+    }
+
     // Sync localStorage từ response backend để tránh lệch dữ liệu hiển thị
     const d = json.data ?? {};
     const stored = getStoredUser() || {};
@@ -288,6 +301,9 @@ export const userService = {
 
     window.dispatchEvent(new Event("auth-change"));
 
-    return json;
+    return {
+      ...json,
+      otpRequired: false,
+    };
   },
 };

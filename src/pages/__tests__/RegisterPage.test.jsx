@@ -1,4 +1,5 @@
 ﻿import { fireEvent, render, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import RegisterPage from '@/pages/RegisterPage';
 import { authService } from '@/services/authService';
@@ -20,8 +21,7 @@ vi.mock('@/services/authService', () => ({
 }));
 
 describe('RegisterPage', () => {
-  it('submits valid register form and redirects to /login', async () => {
-    vi.useFakeTimers();
+  it('submits valid register form and navigates to /login when confirmed', async () => {
     authService.register.mockResolvedValue({ message: 'ok' });
 
     const { container } = render(
@@ -46,9 +46,9 @@ describe('RegisterPage', () => {
       });
     });
 
-    await vi.advanceTimersByTimeAsync(1300);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.click(screen.getByText('Đăng nhập ngay'));
     expect(mockNavigate).toHaveBeenCalledWith('/login');
-    vi.useRealTimers();
   });
 
   it('does not call register API when terms are not accepted', async () => {

@@ -246,7 +246,8 @@
 .employee-create-field__icon {
   position: absolute;
   left: 0.95rem;
-  top: calc(50% + 0.7rem);
+  /* Keep icon anchored to the input, not the whole field (which grows when showing errors). */
+  top: 3.25rem;
   transform: translateY(-50%);
   color: #7b8f84;
   pointer-events: none;

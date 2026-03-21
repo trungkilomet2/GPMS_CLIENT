@@ -75,6 +75,8 @@ export default function LeaveRequestDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
+  const backPath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -158,7 +160,7 @@ export default function LeaveRequestDetail() {
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => navigate("/leave-requests")}
+                      onClick={() => navigate(backPath)}
                       className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
                     >
                       <ArrowLeft size={16} />
@@ -166,7 +168,9 @@ export default function LeaveRequestDetail() {
                     </button>
                     <div className="hidden h-8 w-px bg-white/20 sm:block" />
                     <div>
-                      <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">My Leave Request</div>
+                      <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">
+                        {isWorkerView ? "Worker Leave Request" : "My Leave Request"}
+                      </div>
                       <h1 className="mt-1 text-2xl font-bold">Chi tiết đơn nghỉ #{leave.id}</h1>
                     </div>
                   </div>

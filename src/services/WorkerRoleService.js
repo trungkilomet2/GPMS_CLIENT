@@ -1,15 +1,7 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { getWorkerSkillLabel, isWorkerSkillName } from "@/lib/orgHierarchy";
 import WorkerService from "@/services/WorkerService";
-
-const WORKER_ROLE_LABEL_MAP = {
-  Tailor: "Thợ may",
-  "Quality Control": "Kiểm tra chất lượng",
-};
-
-function getWorkerRoleLabel(name = "") {
-  return WORKER_ROLE_LABEL_MAP[name] ?? name;
-}
 
 export function getWorkerRoleErrorMessage(error, fallbackMessage) {
   return (
@@ -23,7 +15,7 @@ export function getWorkerRoleErrorMessage(error, fallbackMessage) {
 function normalizeRole(item = {}, fallbackId = 0) {
   return {
     id: Number(item.id ?? item.wrId ?? item.workerRoleId ?? item.WR_ID ?? fallbackId),
-    name: String(item.name ?? item.NAME ?? item.workerRoleName ?? "").trim(),
+    name: String(item.name ?? item.NAME ?? item.workerRoleName ?? item.workerSkillName ?? "").trim(),
   };
 }
 
@@ -51,7 +43,7 @@ function normalizeRoleCollection(response = {}) {
 
   return rawItems
     .map((item, index) => normalizeRole(item, index + 1))
-    .filter((item) => item.id || item.name);
+    .filter((item) => (item.id || item.name) && isWorkerSkillName(item.name));
 }
 
 async function fetchWorkerRolePages(options = {}) {
@@ -100,6 +92,7 @@ function mergeRoles(baseRoles, employeeRoles) {
 
   [...baseRoles, ...employeeRoles].forEach((role, index) => {
     if (!role?.name) return;
+    if (!isWorkerSkillName(role.name)) return;
 
     const key = role.name.trim().toLowerCase();
     if (!key) return;
@@ -130,20 +123,20 @@ const WorkerRoleService = {
     }
 
     const employeeRoles = employees
-      .filter((employee) => employee.workerRole)
+      .filter((employee) => isWorkerSkillName(employee.workerSkill))
       .map((employee, index) => ({
         id: rolesFromApi.length + index + 1,
-        name: employee.workerRole,
+        name: employee.workerSkill,
       }));
 
     const roles = mergeRoles(rolesFromApi, employeeRoles);
 
     return roles.map((role) => {
-      const members = employees.filter((employee) => employee.workerRole === role.name);
+      const members = employees.filter((employee) => employee.workerSkill === role.name);
 
       return {
         ...role,
-        label: getWorkerRoleLabel(role.name),
+        label: getWorkerSkillLabel(role.name),
         assignedCount: members.length,
         members: members.map((member) => ({
           id: member.id,
@@ -159,6 +152,10 @@ const WorkerRoleService = {
 
     if (!name) {
       throw new Error("Tên vai trò thợ không được để trống.");
+    }
+
+    if (!isWorkerSkillName(name)) {
+      throw new Error("Màn này chỉ tạo chuyên môn thợ, không dùng để tạo role hệ thống.");
     }
 
     const roles = await fetchWorkerRolePages({ pageSize: 100 });
@@ -179,7 +176,7 @@ const WorkerRoleService = {
 
     return {
       ...normalizedRole,
-      label: getWorkerRoleLabel(normalizedRole.name),
+      label: getWorkerSkillLabel(normalizedRole.name),
       assignedCount: 0,
       members: [],
     };

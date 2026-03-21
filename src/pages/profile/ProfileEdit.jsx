@@ -411,7 +411,16 @@ export default function ProfileEdit() {
       const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
       fd.append("AvartarUrl", avatarUpload);
 
-      await userService.updateProfile(user.userId ?? user.id, fd);
+      const updateResult = await userService.updateProfile(user.userId ?? user.id, fd);
+
+      if (updateResult?.otpRequired) {
+        setMsg({
+          type: "success",
+          text: updateResult?.message || "Hệ thống đã gửi OTP về email. Vui lòng xác nhận để hoàn tất cập nhật hồ sơ.",
+        });
+        return;
+      }
+
       await userService.getProfile();
 
       const storedUser = getStoredUser() || {};

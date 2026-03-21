@@ -46,8 +46,8 @@ const AdminSystemLog = lazy(() => import("@/pages/admin/AdminSystemLog"));
 const AdminManagePermission = lazy(() => import("@/pages/admin/AdminManagePermission"));
 
 // PROFILE
-const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
-const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
+const ProfileViewGate = lazy(() => import("@/pages/profile/ProfileViewGate"));
+const ProfileEditGate = lazy(() => import("@/pages/profile/ProfileEditGate"));
 
 // LEAVE
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
@@ -86,6 +86,7 @@ export const routes = [
   { path: "/worker/assignments", element: <WorkerAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
   { path: "/worker/leave-requests", element: <LeaveRequests /> },
+  { path: "/worker/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
@@ -105,8 +106,8 @@ export const routes = [
   { path: "/admin/permissions", element: <AdminRouteGuard><AdminManagePermission /></AdminRouteGuard> },
 
   // PROFILE
-  { path: "/profile", element: <ViewProfile /> },
-  { path: "/profile/edit", element: <ProfileEdit /> },
+  { path: "/profile", element: <ProfileViewGate /> },
+  { path: "/profile/edit", element: <ProfileEditGate /> },
 
   /* LEAVE */
   {

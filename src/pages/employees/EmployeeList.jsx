@@ -51,9 +51,9 @@ function normalizeSearchText(value = "") {
 }
 
 function getEmployeeSpecialty(employee) {
-  if (employee.workerRole) {
+  if (employee.workerSkill) {
     return {
-      label: employee.workerRoleLabel,
+      label: employee.workerSkillLabel,
       className: "employee-status employee-status--new",
     };
   }
@@ -166,7 +166,9 @@ export default function EmployeeList() {
           employee.phoneNumber,
           employee.email,
           ...(employee.roleLabels ?? []),
-          employee.workerRoleLabel,
+          employee.workerSkillLabel,
+          employee.managerRoleHint,
+          employee.hierarchyTag,
         ]
           .filter(Boolean)
           .join(" ")
@@ -175,7 +177,7 @@ export default function EmployeeList() {
         !keyword || searchableText.includes(keyword);
       const matchRole = roleFilter === "all" || employee.roles.includes(roleFilter);
       const matchSpecialty =
-        specialtyFilter === "all" || employee.workerRole === specialtyFilter;
+        specialtyFilter === "all" || employee.workerSkill === specialtyFilter;
       const matchStatus = statusFilter === "all" || employee.status === statusFilter;
 
       return matchSearch && matchRole && matchSpecialty && matchStatus;
@@ -188,7 +190,7 @@ export default function EmployeeList() {
     const management = employees.filter((employee) =>
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
-    const skilled = employees.filter((employee) => Boolean(employee.workerRole)).length;
+    const skilled = employees.filter((employee) => Boolean(employee.workerSkill)).length;
 
     return { total, active, management, skilled };
   }, [employees]);
@@ -216,8 +218,8 @@ export default function EmployeeList() {
     const optionsMap = new Map();
 
     employees.forEach((employee) => {
-      if (employee.workerRole) {
-        optionsMap.set(employee.workerRole, employee.workerRoleLabel || employee.workerRole);
+      if (employee.workerSkill) {
+        optionsMap.set(employee.workerSkill, employee.workerSkillLabel || employee.workerSkill);
       }
     });
 
@@ -244,7 +246,7 @@ export default function EmployeeList() {
             <div>
               <h1 className="employee-hero__title">Danh sách nhân viên</h1>
               <p className="employee-hero__subtitle">
-                Theo dõi thông tin nhân sự nội bộ trong hệ thống.
+                Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Team Lead, Worker và chuyên môn thợ.
               </p>
             </div>
 
@@ -356,7 +358,7 @@ export default function EmployeeList() {
             <div className="employee-table-card__header">
               <div>
                 <h2 className="employee-table-card__title">Nhân sự trong xưởng</h2>
-                <p className="employee-table-card__subtitle">Danh sách nhân viên và thông tin liên hệ hiện có trong hệ thống.</p>
+                <p className="employee-table-card__subtitle">Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.</p>
               </div>
             </div>
 
@@ -457,7 +459,7 @@ export default function EmployeeList() {
                             </div>
                             <div>
                               <div className="employee-person__name">{employee.fullName}</div>
-                              <div className="employee-person__hint">Nhân viên hệ thống</div>
+                              <div className="employee-person__hint">{employee.hierarchyTag}</div>
                             </div>
                           </div>
                         </td>

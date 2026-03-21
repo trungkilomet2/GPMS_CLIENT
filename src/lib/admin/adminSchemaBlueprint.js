@@ -1,4 +1,4 @@
-export const ADMIN_DB_SCHEMA_VERSION = "GPMS_DATABASE_V1.1";
+export const ADMIN_DB_SCHEMA_VERSION = "GPMS_DATABASE_V2.1";
 
 export const ADMIN_DB_PERMISSION_CORE_TABLES = [
   {
@@ -16,18 +16,18 @@ export const ADMIN_DB_PERMISSION_CORE_TABLES = [
     description: "Bảng nối giữa user và role. Đây là trung tâm của quản trị quyền trong schema hiện tại.",
   },
   {
-    table: "WORKER_ROLE",
-    label: "Worker Role Catalog",
-    columns: "WR_ID, NAME",
+    table: "WORKER_SKILL",
+    label: "Worker Skill Catalog",
+    columns: "WS_ID, NAME",
     relation: "Skill catalog",
-    description: "Danh mục chuyên môn thợ, tách riêng với role hệ thống.",
+    description: "Danh mục kỹ năng/chuyên môn thợ, tách riêng với role hệ thống.",
   },
   {
-    table: "USER_WORKER_ROLE",
-    label: "User Worker Role Bridge",
-    columns: "USER_ID, WR_ID",
+    table: "USER_WORKER_SKILL",
+    label: "User Worker Skill Bridge",
+    columns: "USER_ID, WS_ID",
     relation: "Assignment bridge",
-    description: "Bảng nối user với worker role, phục vụ phân công chuyên môn và thống kê tay nghề.",
+    description: "Bảng nối user với worker skill, phục vụ phân công chuyên môn và thống kê tay nghề.",
   },
 ];
 
@@ -81,12 +81,6 @@ export const ADMIN_DB_USER_FOREIGN_TABLES = [
     purpose: "Người ghi nhật ký cắt.",
   },
   {
-    table: "P_PART",
-    column: "TEAM_LEADER_ID",
-    module: "Production Part",
-    purpose: "Tổ trưởng phụ trách công đoạn.",
-  },
-  {
     table: "P_PART_ASSIGNEE",
     column: "USER_ID",
     module: "Production Part",
@@ -97,6 +91,18 @@ export const ADMIN_DB_USER_FOREIGN_TABLES = [
     column: "USER_ID",
     module: "Production Part",
     purpose: "Worker ghi sản lượng theo công đoạn.",
+  },
+  {
+    table: "[USER]",
+    column: "MANAGER_ID",
+    module: "User Hierarchy",
+    purpose: "Phản ánh quan hệ Owner / PM / Worker theo tuyến quản lý.",
+  },
+  {
+    table: "PRODUCTION_ISSUE_LOG",
+    column: "CREATED_BY / ASSIGNED_TO",
+    module: "Issue Tracking",
+    purpose: "Người tạo lỗi và người được giao xử lý trong production.",
   },
 ];
 
@@ -193,9 +199,20 @@ export const ADMIN_DB_LOG_SOURCES = [
     tone: "success",
     actorMode: "user",
     actorLabel: "Có USER_ID",
-    timeColumn: "WORK_DATE",
+    timeColumn: "CREATE_DATE",
     flags: ["IS_READ_ONLY", "IS_PAYMENT"],
-    description: "Nhật ký sản lượng công đoạn theo worker, ngày làm và trạng thái thanh toán.",
+    description: "Nhật ký sản lượng công đoạn theo worker, thời điểm ghi nhận và trạng thái thanh toán.",
+  },
+  {
+    key: "issue-log",
+    table: "PRODUCTION_ISSUE_LOG",
+    moduleLabel: "Issue Tracking",
+    tone: "warning",
+    actorMode: "user",
+    actorLabel: "Có CREATED_BY / ASSIGNED_TO",
+    timeColumn: "CREATED_AT",
+    flags: ["TYPE_ISSUE", "PRIORITY", "IS_ID"],
+    description: "Log lỗi production có người báo, người xử lý, mức độ ưu tiên và trạng thái.",
   },
 ];
 
@@ -275,8 +292,21 @@ export const ADMIN_DB_SYSTEM_LOG_EVENTS = [
     entityLabel: "PP #55 / WL #881",
     actorLabel: "USER_ID #25",
     actorTrace: "Actor lấy trực tiếp từ USER_ID.",
-    detail: "QUANTITY 320 trên WORK_DATE 2026-03-14.",
+    detail: "QUANTITY 320 trên CREATE_DATE 2026-03-14.",
     flags: ["IS_READ_ONLY = 0", "IS_PAYMENT = 1"],
+  },
+  {
+    id: "PRODUCTION_ISSUE_LOG-145",
+    timestamp: "2026-03-15T11:05:00+07:00",
+    sourceKey: "issue-log",
+    sourceTable: "PRODUCTION_ISSUE_LOG",
+    moduleLabel: "Issue Tracking",
+    action: "Tạo issue production",
+    entityLabel: "ISSUE #145 / PRODUCTION #88",
+    actorLabel: "CREATED_BY #18",
+    actorTrace: "Người xử lý hiện tại lưu ở ASSIGNED_TO.",
+    detail: "TYPE_ISSUE Cat, PRIORITY High, trạng thái PROCESSING.",
+    flags: ["Assigned", "Priority tracked"],
   },
   {
     id: "LEAVE_REQUEST-058",
@@ -346,9 +376,9 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
       {
         scope: "Direct",
         tone: "warning",
-        table: "WORKER_ROLE / USER_WORKER_ROLE",
-        columns: "WR_ID, USER_ID",
-        relation: "Quản lý chuyên môn thợ song song với role hệ thống.",
+        table: "WORKER_SKILL / USER_WORKER_SKILL",
+        columns: "WS_ID, USER_ID",
+        relation: "Quản lý kỹ năng worker song song với role hệ thống.",
       },
     ],
     gaps: [
@@ -362,8 +392,8 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
     label: "Chủ xưởng",
     shortLabel: "Giám sát điều hành",
     tone: "warning",
-    description: "Vai trò điều hành ở tầng business flow, nhưng schema chưa có scope riêng cho owner.",
-    joinPath: "[ROLE] -> USER_ROLE -> [USER]",
+    description: "Vai trò điều hành ở đỉnh business flow, theo mô hình 1 owner quản lý nhiều PM qua role và tuyến MANAGER_ID.",
+    joinPath: "[ROLE] -> USER_ROLE -> [USER] -> MANAGER_ID",
     touchpoints: [
       {
         scope: "Direct",
@@ -373,11 +403,18 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         relation: "Owner chỉ được xác định trực tiếp qua table gán role.",
       },
       {
+        scope: "Direct",
+        tone: "info",
+        table: "[USER]",
+        columns: "USER_ID, MANAGER_ID",
+        relation: "Owner là đỉnh tuyến quản lý; mỗi owner quản lý nhiều PM trong business flow mới.",
+      },
+      {
         scope: "Inferred",
         tone: "primary",
         table: "[ORDER]",
         columns: "USER_ID, OS_ID",
-        relation: "Theo business flow owner thường giám sát order, nhưng schema không có OWNER_ID riêng.",
+        relation: "Owner thường giám sát order, nhưng vẫn chưa có OWNER_ID riêng trên order.",
       },
       {
         scope: "Inferred",
@@ -391,11 +428,11 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         tone: "primary",
         table: "PRODUCTION",
         columns: "PM_ID, ORDER_ID",
-        relation: "Owner có nhu cầu giám sát production nhưng không có cột owner trực tiếp.",
+        relation: "Owner giám sát production qua tuyến quản lý và workflow, chưa có cột owner trực tiếp.",
       },
     ],
     gaps: [
-      "Chưa có cột OWNER_ID hoặc bảng scope riêng cho owner.",
+      "Chưa có cột OWNER_ID trực tiếp ở order/production.",
       "Chưa có bảng approval audit cho các quyết định cấp owner.",
     ],
   },
@@ -404,7 +441,7 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
     label: "Quản lý sản xuất",
     shortLabel: "Điều phối production",
     tone: "primary",
-    description: "Role có dấu vết trực tiếp nhất ở bảng PRODUCTION và các bảng công đoạn.",
+    description: "Role có dấu vết trực tiếp nhất ở bảng PRODUCTION và tuyến quản lý team lead, worker qua MANAGER_ID.",
     joinPath: "[ROLE] -> USER_ROLE -> [USER] -> PRODUCTION.PM_ID",
     touchpoints: [
       {
@@ -417,9 +454,9 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
       {
         scope: "Direct",
         tone: "info",
-        table: "P_PART",
-        columns: "PRODUCTION_ID, TEAM_LEADER_ID, PPS_ID",
-        relation: "PM điều phối công đoạn thông qua production và part.",
+        table: "[USER]",
+        columns: "USER_ID, MANAGER_ID",
+        relation: "PM quản lý team lead và worker của line mình trong flow Owner -> PM -> Team Lead / Worker.",
       },
       {
         scope: "Workflow",
@@ -432,48 +469,20 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         scope: "Workflow",
         tone: "success",
         table: "PART_WORK_LOG",
-        columns: "PP_ID, USER_ID, WORK_DATE, IS_PAYMENT",
+        columns: "PP_ID, USER_ID, CREATE_DATE, IS_PAYMENT",
         relation: "Review sản lượng theo công đoạn để điều hành tiến độ.",
+      },
+      {
+        scope: "Workflow",
+        tone: "warning",
+        table: "PRODUCTION_ISSUE_LOG",
+        columns: "CREATED_BY, ASSIGNED_TO, PRIORITY, IS_ID",
+        relation: "PM theo dõi và xử lý issue phát sinh trong production.",
       },
     ],
     gaps: [
       "Chưa có bảng riêng cho PM approval history.",
       "Chưa có permission matrix để tách quyền xem và quyền phê duyệt.",
-    ],
-  },
-  {
-    key: "Team Leader",
-    label: "Tổ trưởng",
-    shortLabel: "Điều phối chuyền",
-    tone: "info",
-    description: "Role có quan hệ trực tiếp với P_PART và các bảng phân công worker.",
-    joinPath: "[ROLE] -> USER_ROLE -> [USER] -> P_PART.TEAM_LEADER_ID",
-    touchpoints: [
-      {
-        scope: "Direct",
-        tone: "info",
-        table: "P_PART",
-        columns: "TEAM_LEADER_ID, PRODUCTION_ID, PPS_ID",
-        relation: "Tổ trưởng được gắn trực tiếp qua TEAM_LEADER_ID.",
-      },
-      {
-        scope: "Direct",
-        tone: "success",
-        table: "P_PART_ASSIGNEE",
-        columns: "PP_ID, USER_ID",
-        relation: "Danh sách worker của từng công đoạn.",
-      },
-      {
-        scope: "Direct",
-        tone: "success",
-        table: "PART_WORK_LOG",
-        columns: "PP_ID, USER_ID, QUANTITY, WORK_DATE",
-        relation: "Theo dõi sản lượng công đoạn theo worker.",
-      },
-    ],
-    gaps: [
-      "Chưa có bảng audit cho việc đổi worker giữa các công đoạn.",
-      "Chưa có lớp permission tách quyền đọc và quyền điều phối.",
     ],
   },
   {
@@ -512,19 +521,61 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
     ],
   },
   {
+    key: "Team Leader",
+    label: "Tổ trưởng",
+    shortLabel: "Điều phối chuyền",
+    tone: "info",
+    description: "Role vận hành vẫn tồn tại ở tầng nghiệp vụ; mỗi team lead thuộc một PM nhưng schema V2.1 chưa có cột riêng để neo trực tiếp trên part.",
+    joinPath: "[ROLE] -> USER_ROLE -> [USER] -> MANAGER_ID / P_PART_ASSIGNEE",
+    touchpoints: [
+      {
+        scope: "Inferred",
+        tone: "info",
+        table: "[USER]",
+        columns: "USER_ID, MANAGER_ID",
+        relation: "Team lead có thể thuộc một PM qua MANAGER_ID, nhưng không có TEAM_LEADER_ID riêng trên bảng nghiệp vụ.",
+      },
+      {
+        scope: "Workflow",
+        tone: "success",
+        table: "P_PART_ASSIGNEE",
+        columns: "PP_ID, USER_ID",
+        relation: "Tổ trưởng thường theo dõi danh sách worker được phân công vào từng part.",
+      },
+      {
+        scope: "Workflow",
+        tone: "success",
+        table: "PART_WORK_LOG",
+        columns: "PP_ID, USER_ID, QUANTITY, CREATE_DATE",
+        relation: "Theo dõi sản lượng công đoạn của worker theo ngày ghi nhận.",
+      },
+    ],
+    gaps: [
+      "Chưa có TEAM_LEADER_ID trực tiếp trên P_PART như bản mô hình cũ.",
+      "Chưa có audit riêng cho việc đổi line lead hoặc điều chuyển worker.",
+    ],
+  },
+  {
     key: "Worker",
     label: "Nhân viên",
     shortLabel: "Tác nghiệp sản xuất",
     tone: "primary",
-    description: "Role worker được phản ánh mạnh nhất qua worker role và các bảng work log.",
-    joinPath: "[ROLE] -> USER_ROLE -> [USER] + USER_WORKER_ROLE",
+    description: "Role worker được phản ánh mạnh nhất qua worker skill, assignment part và work log.",
+    joinPath: "[ROLE] -> USER_ROLE -> [USER] + USER_WORKER_SKILL",
     touchpoints: [
       {
         scope: "Direct",
         tone: "primary",
-        table: "USER_WORKER_ROLE",
-        columns: "USER_ID, WR_ID",
-        relation: "Gắn user với chuyên môn thợ.",
+        table: "USER_WORKER_SKILL",
+        columns: "USER_ID, WS_ID",
+        relation: "Gắn user với kỹ năng/chuyên môn thợ.",
+      },
+      {
+        scope: "Direct",
+        tone: "info",
+        table: "[USER]",
+        columns: "USER_ID, MANAGER_ID",
+        relation: "Worker đi theo tuyến quản lý của team lead hoặc PM tùy cách tổ chức MANAGER_ID.",
       },
       {
         scope: "Direct",
@@ -544,7 +595,7 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         scope: "Direct",
         tone: "success",
         table: "PART_WORK_LOG",
-        columns: "PP_ID, USER_ID, QUANTITY, WORK_DATE, IS_PAYMENT",
+        columns: "PP_ID, USER_ID, QUANTITY, CREATE_DATE, IS_PAYMENT",
         relation: "Worker ghi nhận sản lượng hằng ngày.",
       },
     ],

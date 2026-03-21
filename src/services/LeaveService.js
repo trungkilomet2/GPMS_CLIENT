@@ -96,6 +96,13 @@ const LeaveService = {
     };
   },
 
+  async getMyLeaveRequestById(id) {
+    const rawResponse = await axiosClient.get(API_ENDPOINTS.LEAVE_REQUEST.GET_MY_HISTORY_DETAIL(id));
+    const response = parseApiPayload(rawResponse);
+
+    return response?.data ? normalizeLeaveItem(response.data) : null;
+  },
+
   async getLeaveRequestById(id) {
     const rawResponse = await axiosClient.get(API_ENDPOINTS.LEAVE_REQUEST.GET_DETAIL(id));
     const response = parseApiPayload(rawResponse);

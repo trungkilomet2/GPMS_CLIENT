@@ -491,8 +491,8 @@ export default function AdminUserUpdate() {
                       <span>{permissionProfile?.description || "Role này chưa có permission profile demo trên web."}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Worker role hiện tại</strong>
-                      <span>{user.workerRole || "Chưa gán worker role"}</span>
+                      <strong>Chuyên môn thợ hiện tại</strong>
+                      <span>{user.workerRole || "Chưa gán chuyên môn thợ"}</span>
                     </div>
                   </div>
                 </section>

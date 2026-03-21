@@ -16,6 +16,7 @@ import {
   formatDateLabel,
   formatMonthLabel,
   getLatestPayrollMonth,
+  getPayrollFlowLabel,
   getLatestPayrollRecordForEmployee,
   getPayrollInitials,
   getPayrollRecord,
@@ -93,7 +94,7 @@ export default function PayrollDetail() {
               </Link>
               <h1 className="payroll-hero__title">Chi tiết bảng lương</h1>
               <p className="payroll-hero__subtitle">
-                Theo dõi thực lĩnh, phụ cấp và từng công đoạn đã hoàn thành của nhân viên.
+                Theo dõi thực lĩnh của worker cùng chuỗi đối soát PM và xác nhận thanh toán từ owner.
               </p>
             </div>
           </div>
@@ -137,6 +138,9 @@ export default function PayrollDetail() {
                       Bảng kê sản lượng chi tiết kỳ lương {formatMonthLabel(activeMonth)} ·{" "}
                       {record.employeeCode}
                     </p>
+                    <p className="payroll-detail-panel__subtitle">
+                      Luồng nghiệp vụ: {getPayrollFlowLabel(record)}
+                    </p>
                   </div>
                 </div>
 
@@ -169,6 +173,21 @@ export default function PayrollDetail() {
                         : statusMeta.description}
                     </p>
                   </article>
+
+                  <article className="payroll-highlight-card">
+                    <div className="payroll-highlight-card__label">
+                      <ClipboardList size={17} />
+                      <span>Chuỗi duyệt</span>
+                    </div>
+                    <div className="payroll-highlight-card__status">
+                      <span className="payroll-status payroll-status--pending">
+                        PM: {record.workflow.managerName}
+                      </span>
+                    </div>
+                    <p className="payroll-highlight-card__meta">
+                      Owner xác nhận: {record.workflow.ownerName}
+                    </p>
+                  </article>
                 </div>
 
                 <div className="payroll-detail-panel__grid payroll-detail-panel__grid--secondary">
@@ -191,6 +210,9 @@ export default function PayrollDetail() {
                       <span>Ghi chú</span>
                     </div>
                     <div className="payroll-field-card__note">{record.note}</div>
+                    <p className="payroll-field-card__text">
+                      Nguồn đối soát mock: {record.workflow.sourceTables.join(", ")}.
+                    </p>
                   </article>
                 </div>
 

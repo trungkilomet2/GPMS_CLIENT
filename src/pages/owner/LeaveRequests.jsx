@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   CalendarDays,
   CheckCircle2,
@@ -88,6 +88,7 @@ function SummaryCard({ label, value, icon: Icon, borderTone }) {
 }
 
 export default function LeaveRequests() {
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -101,6 +102,8 @@ export default function LeaveRequests() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
+  const detailBasePath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
 
   useEffect(() => {
     let active = true;
@@ -370,7 +373,7 @@ export default function LeaveRequests() {
                             </td>
                             <td className="px-5 py-4 text-center align-top">
                               <Link
-                                to={`/leave-requests/${item.id}`}
+                                to={`${detailBasePath}/${item.id}`}
                                 state={{ leave: item }}
                                 className="inline-flex rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
                               >

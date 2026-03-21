@@ -83,7 +83,11 @@ export default function WorkerSidebar() {
       </nav>
 
       <div className="dashboard-sidebar__footer">
-        <div className="dashboard-sidebar__account">
+        <NavLink
+          to="/profile"
+          title="Hồ sơ cá nhân"
+          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+        >
           <div className="dashboard-sidebar__avatar">
             {getInitials(user?.fullName || user?.name || "NV")}
           </div>
@@ -93,7 +97,7 @@ export default function WorkerSidebar() {
               <div className="dashboard-sidebar__user-role">Worker</div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <button
           type="button"

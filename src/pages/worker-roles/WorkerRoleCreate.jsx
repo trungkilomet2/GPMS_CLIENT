@@ -62,7 +62,7 @@ export default function WorkerRoleCreate() {
               </Link>
               <h1 className="worker-role-hero__title">Thêm vai trò thợ</h1>
               <p className="worker-role-hero__subtitle">
-                Tạo mới một chuyên môn để gán cho nhân sự theo danh mục nội bộ của xưởng.
+                Tạo mới chuyên môn riêng cho worker, không dùng để tạo role hệ thống trong hierarchy Owner / PM / Team Lead / Worker.
               </p>
             </div>
           </div>
@@ -71,7 +71,7 @@ export default function WorkerRoleCreate() {
             <form onSubmit={handleSubmit} className="worker-role-create-card">
               <div className="worker-role-create-card__header">
                 <h2>Thông tin vai trò</h2>
-                <p>Biểu mẫu này chỉ giữ đúng phần tên chuyên môn đang có trong hệ thống.</p>
+                <p>Biểu mẫu này chỉ nhận worker skill và tự loại các role hệ thống khỏi danh mục.</p>
               </div>
 
               <label className="worker-role-create-field">
@@ -80,7 +80,7 @@ export default function WorkerRoleCreate() {
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Ví dụ: Tailor, Quality Control..."
+                  placeholder="Ví dụ: Tailor, Quality Control, Sewing Line A..."
                   className="worker-role-create-field__control"
                 />
               </label>

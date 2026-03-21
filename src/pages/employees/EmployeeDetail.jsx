@@ -97,7 +97,7 @@ export default function EmployeeDetail() {
                 <span>Quay lại danh sách</span>
               </Link>
               <h1 className="employee-detail-hero__title">Thông tin chi tiết nhân viên</h1>
-              <p className="employee-detail-hero__subtitle">Thông tin tài khoản và vai trò hiện có của nhân viên trong hệ thống.</p>
+              <p className="employee-detail-hero__subtitle">Thông tin tài khoản, vai trò hệ thống, chuyên môn và tuyến quản lý của nhân viên trong hệ thống.</p>
             </div>
 
             <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
@@ -196,6 +196,10 @@ export default function EmployeeDetail() {
                     <ShieldCheck size={17} />
                     <span>Trạng thái: {statusConfig.label}</span>
                   </div>
+                  <div className="employee-detail-info-item">
+                    <BriefcaseBusiness size={17} />
+                    <span>Tuyến quản lý: {employee.managerRoleHint || "Chưa cập nhật"}</span>
+                  </div>
                 </div>
               </section>
 
@@ -227,11 +231,18 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-role-block">
                     <div className="employee-detail-role-label">Chuyên môn</div>
                     <div className="employee-detail-role-pills">
-                      {employee.workerRole ? (
-                        <span className="employee-detail-machine-pill">{employee.workerRoleLabel}</span>
+                      {employee.workerSkill ? (
+                        <span className="employee-detail-machine-pill">{employee.workerSkillLabel}</span>
                       ) : (
                         <span className="employee-detail-role-empty">Chưa cập nhật chuyên môn</span>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="employee-detail-role-block">
+                    <div className="employee-detail-role-label">Hierarchy</div>
+                    <div className="employee-detail-role-pills">
+                      <span className="employee-detail-machine-pill">{employee.hierarchyTag || "Chưa phân loại"}</span>
                     </div>
                   </div>
                 </div>

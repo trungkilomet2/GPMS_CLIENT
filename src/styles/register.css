@@ -503,6 +503,21 @@ body{
   margin-bottom:8px;
 }
 
+.register-card .register-submit-error{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  border:1px solid #f0c8c2;
+  background:#fff4f2;
+  color:#b64a3a;
+  border-radius:14px;
+  padding:10px 12px;
+  font-size:13px;
+  font-weight:600;
+  line-height:1.4;
+  margin:4px 0 10px;
+}
+
 .register-card .register-btn{
   margin:8px 0 16px;
 }

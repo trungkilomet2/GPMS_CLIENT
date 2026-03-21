@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authService } from "../services/authService";
 import SuccessModal from "@/components/SuccessModal";
@@ -28,17 +28,47 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
-  const redirectTimerRef = useRef(null);
 
-  useEffect(() => {
-    return () => {
-      if (redirectTimerRef.current) {
-        clearTimeout(redirectTimerRef.current);
-        redirectTimerRef.current = null;
-      }
-    };
-  }, []);
+  const getApiErrorDetails = (errData) => {
+    const rawErrors =
+      errData?.errors && typeof errData.errors === "object" ? errData.errors : null;
+
+    const fieldErrors = rawErrors
+      ? Object.entries(rawErrors).reduce((acc, [field, messages]) => {
+          const firstMessage = Array.isArray(messages) ? messages[0] : messages;
+          const message = String(firstMessage ?? "").trim();
+          if (!message) return acc;
+
+          const key = String(field ?? "").trim().toLowerCase();
+          if (key.includes("username")) acc.userName = message;
+          else if (key.includes("fullname")) acc.fullName = message;
+          else if (key === "password") acc.password = message;
+          else if (key.includes("repassword") || key.includes("confirmpassword")) {
+            acc.confirmPassword = message;
+          } else {
+            acc._ = acc._ || message;
+          }
+
+          return acc;
+        }, {})
+      : {};
+
+    const message =
+      fieldErrors.userName ||
+      fieldErrors.fullName ||
+      fieldErrors.password ||
+      fieldErrors.confirmPassword ||
+      fieldErrors._ ||
+      errData?.detail ||
+      errData?.message ||
+      errData?.title ||
+      "Đăng ký thất bại";
+
+    const { _, ...mappedFieldErrors } = fieldErrors;
+    return { message, fieldErrors: mappedFieldErrors };
+  };
 
   const validateField = (name, value, nextForm = formData) => {
     if (name === "fullName") return validateFullName(value);
@@ -71,6 +101,7 @@ export default function RegisterPage() {
     };
 
     setFormData(nextForm);
+    setSubmitError("");
     setErrors((prev) => ({
       ...prev,
       [name]: validateField(name, nextValue, nextForm),
@@ -81,10 +112,6 @@ export default function RegisterPage() {
   };
 
   const goLogin = () => {
-    if (redirectTimerRef.current) {
-      clearTimeout(redirectTimerRef.current);
-      redirectTimerRef.current = null;
-    }
     setSuccessOpen(false);
     navigate("/login");
   };
@@ -106,15 +133,15 @@ export default function RegisterPage() {
 
       await authService.register(payload);
 
+      setSubmitError("");
       setSuccessOpen(true);
-      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
-      redirectTimerRef.current = setTimeout(goLogin, 1200);
     } catch (error) {
-      alert(
-        error?.response?.data?.message ||
-        error?.response?.data?.title ||
-        "Đăng ký thất bại"
-      );
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
     } finally {
       setLoading(false);
     }
@@ -125,15 +152,11 @@ export default function RegisterPage() {
       <SuccessModal
         isOpen={successOpen}
         title="Đăng ký thành công"
-        description="Tài khoản đã được tạo. Bạn sẽ được chuyển sang trang đăng nhập."
+        description="Tài khoản đã được tạo. Bạn có thể đăng nhập ngay."
         primaryLabel="Đăng nhập ngay"
         secondaryLabel="Để sau"
         onPrimary={goLogin}
         onClose={() => {
-          if (redirectTimerRef.current) {
-            clearTimeout(redirectTimerRef.current);
-            redirectTimerRef.current = null;
-          }
           setSuccessOpen(false);
         }}
       />
@@ -270,6 +293,13 @@ export default function RegisterPage() {
             </span>
           </label>
           {errors.agree && <p className="error-text">{errors.agree}</p>}
+
+          {submitError ? (
+            <div className="register-submit-error" role="alert">
+              <span aria-hidden="true">⚠</span>
+              <span>{submitError}</span>
+            </div>
+          ) : null}
 
           <button type="submit" className="register-btn" disabled={loading}>
             {loading ? "Đang đăng ký..." : "Đăng ký"}
