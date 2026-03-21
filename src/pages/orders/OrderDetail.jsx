@@ -35,10 +35,15 @@ export default function OrderDetail() {
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState('');
     const [customerProfile, setCustomerProfile] = useState(null);
+    const [showDenyConfirm, setShowDenyConfirm] = useState(false);
+    const [denyLoading, setDenyLoading] = useState(false);
+    const [denyError, setDenyError] = useState(null);
+    const [denySuccess, setDenySuccess] = useState(null);
     const user = getStoredUser();
     const roles = splitRoles(user?.role);
     const isOwner = hasAnyRole(roles, ['owner']);
     const isAdmin = hasAnyRole(roles, ['admin']);
+    const isCustomer = hasAnyRole(roles, ['customer']);
     const canModerate = isOwner || isAdmin;
 
     useEffect(() => {
@@ -117,9 +122,13 @@ export default function OrderDetail() {
         orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId);
     const normalizedStatus = normalizeOrderStatus(order?.status);
     const canRequestModification = normalizedStatus === 'Chờ xét duyệt';
+    const canEditOnlyWhenRequested = normalizedStatus === 'Yêu cầu chỉnh sửa';
     const isRejected = normalizedStatus === 'Đã từ chối';
     const isAccepted = normalizedStatus === 'Đã chấp nhận';
+    const isCanceled = normalizedStatus === 'Đã hủy';
+    const canCancelOrder = normalizedStatus === 'Chờ xét duyệt';
     const canAccept = normalizedStatus === 'Chờ xét duyệt';
+    const canCustomerDeny = isCustomer && canEdit;
 
     const updateOrderStatus = async (nextStatus, reason = '') => {
         if (!order?.id) return;
@@ -147,6 +156,33 @@ export default function OrderDetail() {
         setIsReasonModalOpen(true);
     };
 
+    const handleCustomerDenyOrder = async () => {
+        if (!order?.id && !id) {
+            setDenyError('Không tìm thấy mã đơn hàng để hủy.');
+            return;
+        }
+        const orderId = order?.id ?? id;
+        setDenyLoading(true);
+        setDenyError(null);
+        setDenySuccess(null);
+        try {
+            await OrderService.denyOrder(orderId);
+            setDenySuccess(`Đã hủy đơn hàng #ĐH-${orderId}.`);
+            setShowDenyConfirm(false);
+            setOrder((prev) => (prev ? { ...prev, status: 'Đã hủy' } : prev));
+        } catch (err) {
+            const message =
+                err?.response?.data?.message ||
+                err?.response?.data?.error ||
+                err?.response?.data ||
+                err?.message ||
+                'Hủy đơn hàng thất bại.';
+            setDenyError(message);
+        } finally {
+            setDenyLoading(false);
+        }
+    };
+
     return (
         <OwnerLayout>
             <div className="leave-page leave-list-page">
@@ -170,6 +206,16 @@ export default function OrderDetail() {
                             <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status, 'detail')}`}>
                                 {order.statusName || order.status}
                             </span>
+                            {canCustomerDeny && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDenyConfirm(true)}
+                                    disabled={isCanceled || !canCancelOrder}
+                                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    Hủy đơn hàng
+                                </button>
+                            )}
                             {canModerate && (
                                 <button
                                     type="button"
@@ -223,10 +269,10 @@ export default function OrderDetail() {
                             {canEdit && (
                                 <button
                                     onClick={() => {
-                                        if (isRejected || isAccepted) return;
+                                        if (!canEditOnlyWhenRequested) return;
                                         navigate(`/orders/edit/${order.id}`);
                                     }}
-                                    disabled={isRejected || isAccepted}
+                                    disabled={!canEditOnlyWhenRequested}
                                     className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Edit3 size={16} /> Chỉnh sửa
@@ -234,6 +280,17 @@ export default function OrderDetail() {
                             )}
                         </div>
                     </div><div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {(denyError || denySuccess) && (
+                            <div
+                                className={`lg:col-span-3 rounded-2xl border px-4 py-3 text-sm font-semibold ${
+                                    denyError
+                                        ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                }`}
+                            >
+                                {denyError || denySuccess}
+                            </div>
+                        )}
                         {/* KHỐI THÔNG TIN CHI TIẾT (2/3) */}
                         <div className="lg:col-span-2 space-y-6">
                             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -480,6 +537,38 @@ export default function OrderDetail() {
                 tone={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
                 requireReason={pendingStatus === 'Từ chối'}
             />
+
+            {showDenyConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <div className="flex items-center gap-3 text-rose-600">
+                            <Info size={18} />
+                            <h3 className="text-lg font-semibold text-slate-900">Xác nhận hủy đơn hàng</h3>
+                        </div>
+                        <p className="mt-3 text-sm text-slate-600">
+                            Bạn có chắc muốn hủy đơn hàng #{order?.id ?? id} không?
+                        </p>
+                        <div className="mt-5 flex flex-wrap justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowDenyConfirm(false)}
+                                disabled={denyLoading}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCustomerDenyOrder}
+                                disabled={denyLoading}
+                                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                            >
+                                {denyLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </OwnerLayout>
     );
 }

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Search, Users, AlertTriangle, Check } from "lucide-react";
+import { ArrowLeft, Search, Users, Check } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
@@ -58,16 +58,16 @@ const PLAN_STEPS = [
 ];
 
 const MOCK_WORKERS = [
-  { id: 1, fullName: "My", frequentSteps: ["Diễu nẹp cổ", "May cổ", "Ủi hoàn thiện"] },
-  { id: 2, fullName: "Hoa A", frequentSteps: ["Đính mác", "Kiểm hàng"] },
-  { id: 3, fullName: "Mi", frequentSteps: ["Chạy dây lồng cổ", "Bấm lỗ lồng dây"] },
-  { id: 4, fullName: "Hằng", frequentSteps: ["May sườn", "May tay"] },
-  { id: 5, fullName: "Thảo", frequentSteps: ["Lộn hàng", "Đóng gói"] },
-  { id: 6, fullName: "Hà", frequentSteps: ["Can dây lồng cổ", "Đính mác"] },
-  { id: 7, fullName: "Trang", frequentSteps: ["Kiểm hàng", "Ủi hoàn thiện"] },
-  { id: 8, fullName: "Nhung", frequentSteps: ["May cổ", "May vai"] },
-  { id: 9, fullName: "Thư", frequentSteps: ["Vắt sổ", "May lai"] },
-  { id: 10, fullName: "Hoa B", frequentSteps: ["Đóng gói", "Kiểm hàng"] },
+  { id: 1, fullName: "My", status: "ready", frequentSteps: ["Diễu nẹp cổ", "May cổ", "Ủi hoàn thiện"] },
+  { id: 2, fullName: "Hoa A", status: "leave", leaveDate: "2026-04-24", frequentSteps: ["Đính mác", "Kiểm hàng"] },
+  { id: 3, fullName: "Mi", status: "ready", frequentSteps: ["Chạy dây lồng cổ", "Bấm lỗ lồng dây"] },
+  { id: 4, fullName: "Hằng", status: "ready", frequentSteps: ["May sườn", "May tay"] },
+  { id: 5, fullName: "Thảo", status: "leave", leaveDate: "2026-04-25", frequentSteps: ["Lộn hàng", "Đóng gói"] },
+  { id: 6, fullName: "Hà", status: "ready", frequentSteps: ["Can dây lồng cổ", "Đính mác"] },
+  { id: 7, fullName: "Trang", status: "ready", frequentSteps: ["Kiểm hàng", "Ủi hoàn thiện"] },
+  { id: 8, fullName: "Nhung", status: "leave", leaveDate: "2026-04-26", frequentSteps: ["May cổ", "May vai"] },
+  { id: 9, fullName: "Thư", status: "ready", frequentSteps: ["Vắt sổ", "May lai"] },
+  { id: 10, fullName: "Hoa B", status: "ready", frequentSteps: ["Đóng gói", "Kiểm hàng"] },
 ];
 
 export default function ProductionAssignment() {
@@ -148,6 +148,8 @@ export default function ProductionAssignment() {
       workers.map((worker) => ({
         id: String(worker.id),
         label: worker.fullName || worker.userName || `#${worker.id}`,
+        status: worker.status || "ready",
+        leaveDate: worker.leaveDate || "",
         frequentSteps: Array.isArray(worker.frequentSteps) ? worker.frequentSteps : [],
       })),
     [workers]
@@ -226,6 +228,22 @@ export default function ProductionAssignment() {
       })),
     };
   }, [assignments, rows, workerColumns, productQty, overloadRatio, underloadRatio]);
+
+  const isLeaveDuringRow = (leaveDate, row) => {
+    if (!leaveDate || !row?.startDate || !row?.endDate) return false;
+    const toDate = (value) => {
+      const d = new Date(value);
+      return Number.isNaN(d.getTime()) ? null : d;
+    };
+    const leave = toDate(leaveDate);
+    const start = toDate(row.startDate);
+    const end = toDate(row.endDate);
+    if (!leave || !start || !end) return false;
+    const day = new Date(leave.getFullYear(), leave.getMonth(), leave.getDate()).getTime();
+    const from = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+    const to = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+    return day >= from && day <= to;
+  };
 
   return (
     <OwnerLayout>
@@ -382,17 +400,6 @@ export default function ProductionAssignment() {
                       <Users size={16} />
                       <h2 className="text-sm font-bold uppercase tracking-widest">Bảng công đoạn</h2>
                     </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-700">
-                        <Search size={16} className="text-slate-400" />
-                        <input
-                          value={workerQuery}
-                          onChange={(event) => setWorkerQuery(event.target.value)}
-                          placeholder="Tìm thợ..."
-                          className="w-40 bg-transparent text-base outline-none placeholder:text-slate-400 sm:w-52"
-                        />
-                      </label>
-                    </div>
                   </div>
 
                   <div className="mt-4 max-h-96 overflow-y-auto space-y-3 pr-1">
@@ -461,15 +468,26 @@ export default function ProductionAssignment() {
                     <div className="text-sm font-bold uppercase tracking-widest text-slate-600">
                       Danh sách nhân viên
                     </div>
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                      <input
-                        type="checkbox"
-                        checked={showSelectedOnly}
-                        onChange={(event) => setShowSelectedOnly(event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-sm font-semibold text-slate-600">Chỉ hiển thị đã chọn</span>
-                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-700">
+                        <Search size={16} className="text-slate-400" />
+                        <input
+                          value={workerQuery}
+                          onChange={(event) => setWorkerQuery(event.target.value)}
+                          placeholder="Tìm thợ..."
+                          className="w-40 bg-transparent text-base outline-none placeholder:text-slate-400 sm:w-52"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                        <input
+                          type="checkbox"
+                          checked={showSelectedOnly}
+                          onChange={(event) => setShowSelectedOnly(event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-sm font-semibold text-slate-600">Chỉ hiển thị đã chọn</span>
+                      </label>
+                    </div>
                   </div>
                   {!activeRow ? (
                     <div className="text-sm text-slate-600">Chọn một công đoạn để phân công.</div>
@@ -485,32 +503,6 @@ export default function ProductionAssignment() {
 
                       return (
                         <>
-                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-slate-600">
-                            <span className="uppercase tracking-wide">Hành động nhanh</span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setRowWorkers(
-                                  activeRow.ppId,
-                                  isAllVisibleSelected
-                                    ? selectedIds.filter((id) => !visibleIds.includes(id))
-                                    : Array.from(new Set([...selectedIds, ...visibleIds]))
-                                )}
-                                disabled={!selectedProductionId || visibleIds.length === 0 || !isEditing}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-emerald-200 hover:text-emerald-700 disabled:text-slate-300"
-                              >
-                                {isAllVisibleSelected ? "Bỏ chọn" : "Chọn hết"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRowWorkers(activeRow.ppId, [])}
-                                disabled={!selectedProductionId || selectedIds.length === 0 || !isEditing}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600 disabled:text-slate-300"
-                              >
-                                Xóa chọn
-                              </button>
-                            </div>
-                          </div>
                           {loadingWorkers ? (
                             <div className="text-xs text-slate-500">Đang tải thợ...</div>
                           ) : workerColumns.length === 0 ? (
@@ -524,13 +516,16 @@ export default function ProductionAssignment() {
                                 const frequentText = worker.frequentSteps.length
                                   ? worker.frequentSteps.slice(0, 3).join(" • ")
                                   : "";
+                                const isOnLeave = worker.status === "leave";
+                                const isLeaveConflict = isOnLeave && isLeaveDuringRow(worker.leaveDate, activeRow);
+                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict;
                                 return (
                                   <button
                                     type="button"
                                     aria-pressed={checked}
                                     key={`${activeRow.ppId}-${worker.id}`}
                                     onClick={() => toggleWorker(activeRow.ppId, worker.id)}
-                                    disabled={!selectedProductionId || !isEditing}
+                                    disabled={!canSelect}
                                     className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${
                                       checked
                                         ? "bg-emerald-50 text-emerald-700"
@@ -538,7 +533,23 @@ export default function ProductionAssignment() {
                                     }`}
                                   >
                                     <div className="min-w-0 text-left">
-                                      <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
+                                        {isOnLeave ? (
+                                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                            Nghỉ {worker.leaveDate || ""}
+                                          </span>
+                                        ) : (
+                                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                            Sẵn sàng
+                                          </span>
+                                        )}
+                                        {isLeaveConflict && (
+                                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                            Trùng ngày công đoạn
+                                          </span>
+                                        )}
+                                      </div>
                                       {frequentText && (
                                         <div className="mt-1 truncate text-[11px] font-medium text-slate-500">
                                           {frequentText}
@@ -572,6 +583,7 @@ export default function ProductionAssignment() {
           </div>
         </div>
       </div>
+
     </OwnerLayout>
   );
 }

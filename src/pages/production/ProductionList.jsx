@@ -4,6 +4,8 @@ import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -60,6 +62,31 @@ function getProductionStatusLabel(status) {
   return STATUS_LABELS[normalized] || raw;
 }
 
+function splitRoles(value) {
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
+  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
+  }
+
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getPmId(item) {
+  return item?.pmId ?? item?.pmID ?? item?.pm_id ?? item?.pm?.id ?? item?.pm?.userId ?? null;
+}
+
 export default function ProductionList() {
   const [productions, setProductions] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -69,6 +96,12 @@ export default function ProductionList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+  const currentUser = useMemo(() => getStoredUser() || {}, []);
+  const roleValue = extractRoleValue(currentUser) || currentUser?.role || currentUser?.roles || "";
+  const roles = useMemo(() => splitRoles(roleValue).map((role) => role.toLowerCase()), [roleValue]);
+  const isOwner = roles.includes("owner");
+  const isPm = roles.includes("pm") || roles.includes("project manager");
+  const currentUserId = currentUser?.userId ?? currentUser?.id ?? null;
 
   useEffect(() => {
     let active = true;
@@ -140,9 +173,14 @@ export default function ProductionList() {
     };
   }, []);
 
+  const baseProductions = useMemo(() => {
+    if (isOwner || !isPm || currentUserId == null) return productions;
+    return productions.filter((item) => String(getPmId(item)) === String(currentUserId));
+  }, [productions, isOwner, isPm, currentUserId]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return productions.filter((item) => {
+    return baseProductions.filter((item) => {
       const hit =
         !q ||
         String(item.productionId).includes(q) ||
@@ -153,7 +191,7 @@ export default function ProductionList() {
       const statusOk = statusFilter === "all" || statusLabel === statusFilter;
       return hit && statusOk;
     });
-  }, [productions, search, statusFilter]);
+  }, [baseProductions, search, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -166,12 +204,12 @@ export default function ProductionList() {
   }, [filtered, currentPage, pageSize]);
 
   const stats = useMemo(() => {
-    const total = totalCount;
-    const planned = productions.filter((item) => getProductionStatusLabel(item.status) === "Chờ Xét Duyệt Kế Hoạch").length;
-    const inProgress = productions.filter((item) => getProductionStatusLabel(item.status) === "Đang Sản Xuất").length;
-    const completed = productions.filter((item) => getProductionStatusLabel(item.status) === "Hoàn Thành").length;
+    const total = baseProductions.length;
+    const planned = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Chờ Xét Duyệt Kế Hoạch").length;
+    const inProgress = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Đang Sản Xuất").length;
+    const completed = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Hoàn Thành").length;
     return { total, planned, inProgress, completed };
-  }, [productions, totalCount]);
+  }, [baseProductions]);
 
   const resetFilters = () => {
     setSearch("");
@@ -187,9 +225,11 @@ export default function ProductionList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách sản xuất</h1>
               <p className="text-slate-600">Theo dõi các kế hoạch sản xuất và trạng thái triển khai.</p>
             </div>
-            <Link className="order-create-btn" to="/production/create">
-              + Tạo production
-            </Link>
+            {(!isPm || isOwner) && (
+              <Link className="order-create-btn" to="/production/create">
+                + Tạo production
+              </Link>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

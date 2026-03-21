@@ -24,6 +24,9 @@ const OrderService = {
     requestOrderModification: (orderId) => {
         return axiosClient.post(API_ENDPOINTS.ORDER.REQUEST_MODIFICATION(orderId));
     },
+    denyOrder: (orderId) => {
+        return axiosClient.post(API_ENDPOINTS.ORDER.DENY_ORDER(orderId));
+    },
     rejectOrder: (payload) => {
         return axiosClient.post(API_ENDPOINTS.ORDER_REJECT.REJECT, payload);
     },

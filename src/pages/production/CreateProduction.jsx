@@ -1,11 +1,13 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { getStoredUser } from "@/lib/authStorage";
+import { splitRoles, hasAnyRole } from "@/lib/roleAccess";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import OrderService from "@/services/OrderService";
 import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
-import { normalizeOrderStatus } from "@/lib/orders/status";
+import { normalizeOrderStatus, getOrderStatusLabel } from "@/lib/orders/status";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -85,11 +87,15 @@ export default function CreateProduction() {
   const [loadingOrder, setLoadingOrder] = useState(!!orderId);
   const [orderError, setOrderError] = useState(null);
 
+  const currentUser = getStoredUser();
   const [pmUsers, setPmUsers] = useState([]);
   const [loadingPM, setLoadingPM] = useState(true);
   const [pmError, setPmError] = useState(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState(orderId ? String(orderId) : "");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState(null);
 
   const [form, setForm] = useState({
     pmId: "",
@@ -151,10 +157,55 @@ export default function CreateProduction() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const fetchOrders = async () => {
+      if (orderId) return;
+      try {
+        setOrdersLoading(true);
+        let response;
+        try {
+          response = await OrderService.getAllOrders({ PageIndex: 0, PageSize: 10 });
+        } catch (err) {
+          if (err?.response?.status === 400) {
+            try {
+              response = await OrderService.getAllOrders({ pageIndex: 0, pageSize: 10 });
+            } catch (err2) {
+              if (err2?.response?.status === 400) {
+                response = await OrderService.getAllOrders();
+              } else {
+                throw err2;
+              }
+            }
+          } else {
+            throw err;
+          }
+        }
+        const items = Array.isArray(response)
+          ? response
+          : response?.data?.data ??
+          response?.data?.items ??
+          response?.data ??
+          response?.items ??
+          [];
+        if (!active) return;
+        setOrders(Array.isArray(items) ? items : []);
+        setOrdersError(null);
+      } catch (_err) {
+        if (!active) return;
+        setOrdersError("Không thể tải danh sách đơn hàng.");
+      } finally {
+        if (active) setOrdersLoading(false);
+      }
+    };
+    fetchOrders();
+    return () => { active = false; };
+  }, [orderId]);
+
+  useEffect(() => {
     if (!selectedOrderId || orderId) return;
-    const picked = MOCK_ORDERS.find((item) => String(item.id) === String(selectedOrderId));
+    const picked = orders.find((item) => String(item.id ?? item.orderId) === String(selectedOrderId));
     setOrder(picked || null);
-  }, [selectedOrderId, orderId]);
+  }, [selectedOrderId, orderId, orders]);
 
   const orderSummaryRows = useMemo(() => ([
     ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
@@ -178,7 +229,7 @@ export default function CreateProduction() {
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
   const normalizedStatus = normalizeOrderStatus(order?.status);
-  const isAccepted = normalizedStatus === "Đã chấp nhận";
+  const isAccepted = getOrderStatusLabel(normalizedStatus) === "Đã Chấp Nhận";
 
   const validate = () => {
     const nextErrors = {};
@@ -203,7 +254,7 @@ export default function CreateProduction() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAccepted) {
-      alert("Chỉ được tạo production cho đơn hàng đã chấp nhận.");
+      alert("Chỉ được tạo production cho đơn hàng Đã Chấp Nhận.");
       return;
     }
     if (!validate()) return;
@@ -218,7 +269,23 @@ export default function CreateProduction() {
     try {
       setIsSubmitting(true);
       await ProductionService.createProduction(payload);
-      alert("Tạo production thành công!");
+      const nextStatus = "Chờ xét duyệt";
+      const orderIdToUpdate = Number(order?.id ?? orderId);
+      if (orderIdToUpdate) {
+        try {
+          let orderDetail = order;
+          if (!orderDetail || !orderDetail.id) {
+            const detailRes = await OrderService.getOrderDetail(orderIdToUpdate);
+            orderDetail = detailRes?.data?.data ?? detailRes?.data ?? orderDetail;
+          }
+          const updatePayload = orderDetail ? { ...orderDetail, status: nextStatus } : { status: nextStatus };
+          await OrderService.updateOrder(orderIdToUpdate, updatePayload);
+          setOrder((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        } catch (err) {
+          console.error("Update order status error:", err?.response?.data ?? err);
+        }
+      }
+      alert("Tạo production thành công! Đơn hàng đã chuyển sang Chờ xét duyệt.");
       navigate(`/orders/detail/${order?.id ?? orderId}`);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
@@ -283,7 +350,7 @@ export default function CreateProduction() {
 
                 {!isAccepted && order?.id && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã chấp nhận</strong>.
+                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
                   </div>
                 )}
 
@@ -296,13 +363,23 @@ export default function CreateProduction() {
                         onChange={(e) => setSelectedOrderId(e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                       >
-                        <option value="">Chọn đơn hàng</option>
-                        {MOCK_ORDERS.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            #{o.id} - {o.orderName}
-                          </option>
-                        ))}
+                        <option value="">
+                          {ordersLoading ? "Đang tải đơn hàng..." : "Chọn đơn hàng"}
+                        </option>
+                        {orders
+                          .filter((o) => {
+                            const statusValue = o.statusName ?? o.status ?? o.statusText ?? o.state ?? o.statusId;
+                            return getOrderStatusLabel(statusValue) === "Đã Chấp Nhận";
+                          })
+                          .map((o) => (
+                            <option key={o.id ?? o.orderId} value={o.id ?? o.orderId}>
+                              #{o.id ?? o.orderId} - {o.orderName}
+                            </option>
+                          ))}
                       </select>
+                      {ordersError && (
+                        <div className="mt-2 text-xs text-red-600 font-semibold">{ordersError}</div>
+                      )}
                       {errors.orderId && (
                         <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
                       )}
@@ -324,7 +401,13 @@ export default function CreateProduction() {
                           {pm.fullName || pm.userName || `PM #${pm.id}`}
                         </option>
                       ))}
+                      {currentUser && hasAnyRole(currentUser.role, ["Owner"]) && (
+                        <option value={currentUser.userId}>
+                          Giao việc cho tôi ({currentUser.fullName || currentUser.name || currentUser.userName})
+                        </option>
+                      )}
                     </select>
+
                     {pmError && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
                     )}

@@ -25,9 +25,9 @@ const ADMIN_NAV_ITEMS = [
 
 const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
-  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
+  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, requiredRole: "Owner" },
   { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false },
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false, requiredRole: "Owner" },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, requiredRole: "Owner" },
