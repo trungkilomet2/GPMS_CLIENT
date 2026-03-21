@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -6,6 +6,7 @@ import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
+import ProductionService from "@/services/ProductionService";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -81,16 +82,85 @@ export default function ProductionDetail() {
   const navigate = useNavigate();
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState("");
-  const production = useMemo(() => {
-    const pid = Number(id);
-    return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
+  const [production, setProduction] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const normalizeDetail = (payload) => {
+      if (!payload) return null;
+      const statusMap = { 1: "Planned", 2: "In Progress", 3: "Completed" };
+      const order = payload.order || {};
+      return {
+        productionId: payload.productionId ?? payload.id ?? null,
+        status: payload.statusName || statusMap[payload.statusId] || payload.status || "Planned",
+        pStartDate: payload.startDate || payload.pStartDate || "",
+        pEndDate: payload.endDate || payload.pEndDate || "",
+        pmId: payload.pm?.id ?? payload.pmId ?? null,
+        pmName: payload.pm?.name ?? payload.pmName ?? "",
+        note: payload.note ?? payload.productionNote ?? "",
+        order: {
+          ...order,
+          size: typeof order.size === "string" ? order.size.trim() : order.size,
+          status: order.statusName ?? order.status,
+          templates: Array.isArray(order.templates)
+            ? order.templates.map((t) => ({ ...t, templateName: t.templateName ?? t.name }))
+            : order.templates,
+          materials: Array.isArray(order.materials)
+            ? order.materials.map((m) => ({ ...m, materialName: m.materialName ?? m.name }))
+            : order.materials,
+        },
+      };
+    };
+
+    const fetchProduction = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await ProductionService.getProductionDetail(id);
+        if (!active) return;
+        const payload = response?.data?.data ?? response?.data ?? null;
+        const normalized = normalizeDetail(payload);
+        if (normalized) {
+          setProduction(normalized);
+          return;
+        }
+
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+        if (!fallback) setError(`Không tìm thấy production #${id}.`);
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải chi tiết production.");
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchProduction();
+    return () => {
+      active = false;
+    };
   }, [id]);
+
+  if (loading) {
+    return (
+      <OwnerLayout>
+        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
+          Đang tải chi tiết production...
+        </div>
+      </OwnerLayout>
+    );
+  }
 
   if (!production) {
     return (
       <OwnerLayout>
         <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
-          Không tìm thấy production #{id}.
+          {error || `Không tìm thấy production #${id}.`}
         </div>
       </OwnerLayout>
     );
@@ -151,6 +221,13 @@ export default function ProductionDetail() {
                 className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
               >
                 Yêu cầu chỉnh sửa
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+              >
+                Tổng hợp lỗi
               </button>
             </div>
           </div>
@@ -330,6 +407,8 @@ function DetailRow({ label, value }) {
     </div>
   );
 }
+
+
 
 
 

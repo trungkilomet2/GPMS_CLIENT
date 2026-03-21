@@ -1,10 +1,11 @@
-﻿﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createElement } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign,
   BriefcaseBusiness,
   ChartPie,
+  ClipboardCheck,
   ClipboardList,
   ListChecks,
   LogOut,
@@ -24,9 +25,9 @@ const ADMIN_NAV_ITEMS = [
 
 const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
-  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
+  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, requiredRole: "Owner" },
   { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false },
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false, requiredRole: "Owner" },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, requiredRole: "Owner" },
@@ -85,6 +86,7 @@ function getInitials(name = "") {
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-sidebar-collapsed");
@@ -102,6 +104,7 @@ export default function Sidebar() {
 
     return true;
   });
+  const isOrdersSection = location.pathname.startsWith("/orders");
 
   useEffect(() => {
     try {
@@ -158,9 +161,11 @@ export default function Sidebar() {
               key={to}
               to={to}
               title={label}
-              className={({ isActive }) =>
-                `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
-              }
+              className={({ isActive }) => {
+                const isForcedActive = to === "/orders/owner" && isOrdersSection;
+                const active = isActive || isForcedActive;
+                return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
+              }}
             >
               {createElement(Icon, { size: 22 })}
               {!collapsed && <span>{label}</span>}

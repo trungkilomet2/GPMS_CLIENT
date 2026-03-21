@@ -3,78 +3,195 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const MOCK_PRODUCTIONS = [
-  {
-    productionId: 1001,
-    orderId: 29,
-    orderName: "Đồng phục công ty ABC",
-    pmId: 7,
-    pmName: "Nguyễn Văn An",
-    pStartDate: "2026-04-21",
-    pEndDate: "2026-05-05",
-    status: "In Progress",
-  },
-  {
-    productionId: 1002,
-    orderId: 30,
-    orderName: "Áo hoodie mùa đông",
-    pmId: 9,
-    pmName: "Trần Ngọc Bích",
-    pStartDate: "2026-04-18",
-    pEndDate: "2026-04-30",
-    status: "Planned",
-  },
-  {
-    productionId: 1003,
-    orderId: 31,
-    orderName: "Áo sơ mi nữ",
-    pmId: 5,
-    pmName: "Phạm Minh Khoa",
-    pStartDate: "2026-04-10",
-    pEndDate: "2026-04-25",
-    status: "Completed",
-  },
-  {
-    productionId: 1004,
-    orderId: 32,
-    orderName: "Váy bộ mùa hè",
-    pmId: 7,
-    pmName: "Nguyễn Văn An",
-    pStartDate: "2026-05-01",
-    pEndDate: "2026-05-16",
-    status: "Planned",
-  },
-];
-
 const STATUS_STYLES = {
-  Planned: "bg-amber-50 text-amber-700 border-amber-200",
-  "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-  Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Cần Cập Nhật": "bg-amber-50 text-amber-700 border-amber-200",
+  "Cần Chỉnh Sửa Kế Hoạch": "bg-amber-50 text-amber-700 border-amber-200",
+  "Chấp Nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Chờ Xét Duyệt": "bg-blue-50 text-blue-700 border-blue-200",
+  "Chờ Xét Duyệt Kế Hoạch": "bg-blue-50 text-blue-700 border-blue-200",
+  "Đang Sản Xuất": "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Hoàn Thành": "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Từ Chối": "bg-red-50 text-red-700 border-red-200",
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
+const STATUS_LABELS = {
+  "cần cập nhật": "Cần Cập Nhật",
+  "can cap nhat": "Cần Cập Nhật",
+  "need update": "Cần Cập Nhật",
+  "update required": "Cần Cập Nhật",
+  "cần chỉnh sửa kế hoạch": "Cần Chỉnh Sửa Kế Hoạch",
+  "can chinh sua ke hoach": "Cần Chỉnh Sửa Kế Hoạch",
+  "need plan update": "Cần Chỉnh Sửa Kế Hoạch",
+  "chấp nhận": "Chấp Nhận",
+  "chap nhan": "Chấp Nhận",
+  approved: "Chấp Nhận",
+  accepted: "Chấp Nhận",
+  "chờ xét duyệt": "Chờ Xét Duyệt",
+  "cho xet duyet": "Chờ Xét Duyệt",
+  pending: "Chờ Xét Duyệt",
+  waiting: "Chờ Xét Duyệt",
+  "chờ xét duyệt kế hoạch": "Chờ Xét Duyệt Kế Hoạch",
+  "cho xet duyet ke hoach": "Chờ Xét Duyệt Kế Hoạch",
+  planned: "Chờ Xét Duyệt Kế Hoạch",
+  "đang sản xuất": "Đang Sản Xuất",
+  "dang san xuat": "Đang Sản Xuất",
+  "in progress": "Đang Sản Xuất",
+  production: "Đang Sản Xuất",
+  "hoàn thành": "Hoàn Thành",
+  "hoan thanh": "Hoàn Thành",
+  completed: "Hoàn Thành",
+  done: "Hoàn Thành",
+  "từ chối": "Từ Chối",
+  "tu choi": "Từ Chối",
+  rejected: "Từ Chối",
+  deny: "Từ Chối",
+  denied: "Từ Chối",
+};
+
+function getProductionStatusLabel(status) {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "-";
+  const normalized = raw.toLowerCase();
+  return STATUS_LABELS[normalized] || raw;
+}
+
+function splitRoles(value) {
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
+  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
+  }
+
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getPmId(item) {
+  return item?.pmId ?? item?.pmID ?? item?.pm_id ?? item?.pm?.id ?? item?.pm?.userId ?? null;
+}
+
 export default function ProductionList() {
+  const [productions, setProductions] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
+  const pageSize = 10;
+  const currentUser = useMemo(() => getStoredUser() || {}, []);
+  const roleValue = extractRoleValue(currentUser) || currentUser?.role || currentUser?.roles || "";
+  const roles = useMemo(() => splitRoles(roleValue).map((role) => role.toLowerCase()), [roleValue]);
+  const isOwner = roles.includes("owner");
+  const isPm = roles.includes("pm") || roles.includes("project manager");
+  const currentUserId = currentUser?.userId ?? currentUser?.id ?? null;
+
+  useEffect(() => {
+    let active = true;
+    const fetchProductions = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const allItems = [];
+        const seenKeys = new Set();
+        let pageIndex = 0;
+        let recordCount = null;
+        const pageSizeFetch = 50;
+        const maxPages = 200;
+
+        while (pageIndex < maxPages) {
+          const response = await ProductionService.getProductionList({
+            PageIndex: pageIndex,
+            PageSize: pageSizeFetch,
+            SortColumn: "Name",
+            SortOrder: "ASC",
+          });
+          if (!active) return;
+          const payload = response?.data ?? response;
+          const list = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : [];
+
+          let added = 0;
+          list.forEach((item) => {
+            const key = item?.productionId ?? item?.id ?? JSON.stringify(item);
+            if (seenKeys.has(key)) return;
+            seenKeys.add(key);
+            allItems.push(item);
+            added += 1;
+          });
+
+          if (recordCount == null) {
+            const reported = Number(payload?.recordCount ?? payload?.totalCount ?? 0);
+            recordCount = Number.isFinite(reported) && reported > 0 ? reported : null;
+            if (recordCount != null && recordCount <= list.length) {
+              recordCount = null;
+            }
+          }
+
+          if (list.length === 0) break;
+          if (added === 0) break;
+          if (recordCount != null && allItems.length >= recordCount) break;
+          if (list.length < pageSizeFetch) break;
+          pageIndex += 1;
+        }
+
+        setProductions(allItems);
+        setTotalCount(allItems.length);
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải danh sách production.");
+        setProductions([]);
+        setTotalCount(0);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchProductions();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const baseProductions = useMemo(() => {
+    if (isOwner || !isPm || currentUserId == null) return productions;
+    return productions.filter((item) => String(getPmId(item)) === String(currentUserId));
+  }, [productions, isOwner, isPm, currentUserId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_PRODUCTIONS.filter((item) => {
+    return baseProductions.filter((item) => {
       const hit =
         !q ||
         String(item.productionId).includes(q) ||
         String(item.orderId).includes(q) ||
         String(item.orderName || "").toLowerCase().includes(q) ||
         String(item.pmName || "").toLowerCase().includes(q);
-      const statusOk = statusFilter === "all" || item.status === statusFilter;
+      const statusLabel = getProductionStatusLabel(item.status);
+      const statusOk = statusFilter === "all" || statusLabel === statusFilter;
       return hit && statusOk;
     });
-  }, [search, statusFilter]);
+  }, [baseProductions, search, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -84,15 +201,15 @@ export default function ProductionList() {
   const pageData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
-  }, [filtered, currentPage]);
+  }, [filtered, currentPage, pageSize]);
 
   const stats = useMemo(() => {
-    const total = MOCK_PRODUCTIONS.length;
-    const planned = MOCK_PRODUCTIONS.filter((item) => item.status === "Planned").length;
-    const inProgress = MOCK_PRODUCTIONS.filter((item) => item.status === "In Progress").length;
-    const completed = MOCK_PRODUCTIONS.filter((item) => item.status === "Completed").length;
+    const total = baseProductions.length;
+    const planned = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Chờ Xét Duyệt Kế Hoạch").length;
+    const inProgress = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Đang Sản Xuất").length;
+    const completed = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Hoàn Thành").length;
     return { total, planned, inProgress, completed };
-  }, []);
+  }, [baseProductions]);
 
   const resetFilters = () => {
     setSearch("");
@@ -108,9 +225,11 @@ export default function ProductionList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách sản xuất</h1>
               <p className="text-slate-600">Theo dõi các kế hoạch sản xuất và trạng thái triển khai.</p>
             </div>
-            <Link className="order-create-btn" to="/production/create">
-              + Tạo production
-            </Link>
+            {(!isPm || isOwner) && (
+              <Link className="order-create-btn" to="/production/create">
+                + Tạo production
+              </Link>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -130,8 +249,8 @@ export default function ProductionList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Planned")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Planned" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -146,8 +265,8 @@ export default function ProductionList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("In Progress")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "In Progress" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Đang Sản Xuất")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -162,8 +281,8 @@ export default function ProductionList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Completed")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Completed" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Hoàn Thành")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -199,9 +318,9 @@ export default function ProductionList() {
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="Planned">Planned</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
+                  <option value="Đang Sản Xuất">Đang Sản Xuất</option>
+                  <option value="Hoàn Thành">Hoàn Thành</option>
                 </select>
               </label>
               <div className="flex items-center justify-end gap-3">
@@ -240,7 +359,19 @@ export default function ProductionList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {pageData.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-slate-600">
+                        Đang tải danh sách production...
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-red-600">
+                        {error}
+                      </td>
+                    </tr>
+                  ) : pageData.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center text-slate-600">
                         Không có production phù hợp
@@ -250,15 +381,20 @@ export default function ProductionList() {
                     pageData.map((item) => (
                       <tr key={item.productionId} className="leave-table-row hover:bg-slate-50/80">
                         <td className="px-4 py-3 text-sm text-slate-600 font-medium">#PR-{item.productionId}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 font-medium">#ĐH-{item.orderId}</td>
-                        <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{item.orderName}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600 font-medium">#ĐH-{item.order.id}</td>
+                        <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{item.order.orderName}</td>
                         <td className="px-3 py-3 text-sm text-slate-700 truncate">{item.pmName || `PM #${item.pmId}`}</td>
                         <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.pStartDate}</td>
                         <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.pEndDate}</td>
                         <td className="px-3 py-3 text-center">
-                          <span className={`inline-block rounded-full border px-3.5 py-1 text-xs font-medium ${STATUS_STYLES[item.status] || STATUS_STYLES.default}`}>
-                            {item.status}
-                          </span>
+                          {(() => {
+                            const statusLabel = getProductionStatusLabel(item.statusId);
+                            return (
+                              <span className={`inline-block rounded-full border px-3.5 py-1 text-xs font-medium ${STATUS_STYLES[statusLabel] || STATUS_STYLES.default}`}>
+                                {statusLabel}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
                           <Link to={`/production/${item.productionId}`} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">

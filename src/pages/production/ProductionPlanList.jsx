@@ -3,51 +3,13 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionPartService from "@/services/ProductionPartService";
+import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
+import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const MOCK_PLAN_LIST = [
-  {
-    planId: 5001,
-    productionId: 1001,
-    orderId: 29,
-    orderName: "Đồng phục công ty ABC",
-    productName: "Áo thun đồng phục cổ tròn",
-    pStartDate: "2026-04-21",
-    pEndDate: "2026-05-05",
-    status: "In Progress",
-  },
-  {
-    planId: 5002,
-    productionId: 1002,
-    orderId: 30,
-    orderName: "Áo hoodie mùa đông",
-    productName: "Áo hoodie",
-    pStartDate: "2026-04-18",
-    pEndDate: "2026-04-30",
-    status: "Planned",
-  },
-  {
-    planId: 5003,
-    productionId: 1003,
-    orderId: 31,
-    orderName: "Áo sơ mi nữ",
-    productName: "Áo sơ mi",
-    pStartDate: "2026-04-10",
-    pEndDate: "2026-04-25",
-    status: "Completed",
-  },
-  {
-    planId: 5004,
-    productionId: 1004,
-    orderId: 32,
-    orderName: "Váy bộ mùa hè",
-    productName: "Váy bộ",
-    pStartDate: "2026-05-01",
-    pEndDate: "2026-05-16",
-    status: "Planned",
-  },
-];
 
 const STATUS_STYLES = {
   Planned: "bg-amber-50 text-amber-700 border-amber-200",
@@ -56,18 +18,142 @@ const STATUS_STYLES = {
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
+const STATUS_LABELS = {
+  "chờ xét duyệt kế hoạch": "Planned",
+  "cho xet duyet ke hoach": "Planned",
+  planned: "Planned",
+  "chờ xét duyệt": "Planned",
+  "cho xet duyet": "Planned",
+  pending: "Planned",
+  "đang sản xuất": "In Progress",
+  "dang san xuat": "In Progress",
+  "in progress": "In Progress",
+  "hoàn thành": "Completed",
+  "hoan thanh": "Completed",
+  completed: "Completed",
+  done: "Completed",
+};
+
+function getPlanStatusLabel(status) {
+  if (typeof status === "number") {
+    if (status === 1) return "Planned";
+    if (status === 2) return "In Progress";
+    if (status === 3) return "Completed";
+  }
+
+  const raw = String(status ?? "").trim();
+  if (!raw) return "-";
+  const normalized = raw.toLowerCase();
+  return STATUS_LABELS[normalized] || raw;
+}
+
 export default function ProductionPlanList() {
+  const user = getStoredUser();
+  const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
+  const isWorker = hasAnyRole(roleValue, ["worker", "sewer", "tailor"]);
+  const [productions, setProductions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 6;
+  const [partCounts, setPartCounts] = useState({});
+  const pageSize = 10;
+
+  useEffect(() => {
+    let active = true;
+    const fetchProductions = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const allItems = [];
+        const seenKeys = new Set();
+        let pageIndex = 0;
+        let recordCount = null;
+        const pageSizeFetch = 50;
+        const maxPages = 200;
+
+        while (pageIndex < maxPages) {
+          const response = await ProductionService.getProductionList({
+            PageIndex: pageIndex,
+            PageSize: pageSizeFetch,
+            SortColumn: "Name",
+            SortOrder: "ASC",
+          });
+          if (!active) return;
+          const payload = response?.data ?? response;
+          const list = Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : [];
+
+          let added = 0;
+          list.forEach((item) => {
+            const key = item?.productionId ?? item?.id ?? JSON.stringify(item);
+            if (seenKeys.has(key)) return;
+            seenKeys.add(key);
+            allItems.push(item);
+            added += 1;
+          });
+
+          if (recordCount == null) {
+            const reported = Number(payload?.recordCount ?? payload?.totalCount ?? 0);
+            recordCount = Number.isFinite(reported) && reported > 0 ? reported : null;
+            if (recordCount != null && recordCount <= list.length) {
+              recordCount = null;
+            }
+          }
+
+          if (list.length === 0) break;
+          if (added === 0) break;
+          if (recordCount != null && allItems.length >= recordCount) break;
+          if (list.length < pageSizeFetch) break;
+          pageIndex += 1;
+        }
+
+        setProductions(allItems);
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải danh sách production.");
+        setProductions([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchProductions();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const plans = useMemo(() => {
+    return productions.map((item) => {
+      const order = item?.order ?? {};
+      const orderId = order?.id ?? item?.orderId ?? item?.order?.orderId ?? "-";
+      const orderName = order?.orderName ?? item?.orderName ?? "-";
+      const productName = order?.productName ?? item?.productName ?? order?.type ?? "-";
+      const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
+      const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
+      const status = getPlanStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+      return {
+        productionId: item?.productionId ?? item?.id ?? "-",
+        orderId,
+        orderName,
+        productName,
+        pStartDate: startDate,
+        pEndDate: endDate,
+        status,
+      };
+    });
+  }, [productions]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_PLAN_LIST.filter((item) => {
+    return plans.filter((item) => {
       const hit =
         !q ||
-        String(item.planId).includes(q) ||
         String(item.productionId).includes(q) ||
         String(item.orderId).includes(q) ||
         String(item.orderName || "").toLowerCase().includes(q) ||
@@ -75,7 +161,7 @@ export default function ProductionPlanList() {
       const statusOk = statusFilter === "all" || item.status === statusFilter;
       return hit && statusOk;
     });
-  }, [search, statusFilter]);
+  }, [plans, search, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -88,17 +174,75 @@ export default function ProductionPlanList() {
   }, [filtered, currentPage]);
 
   const stats = useMemo(() => {
-    const total = MOCK_PLAN_LIST.length;
-    const planned = MOCK_PLAN_LIST.filter((item) => item.status === "Planned").length;
-    const inProgress = MOCK_PLAN_LIST.filter((item) => item.status === "In Progress").length;
-    const completed = MOCK_PLAN_LIST.filter((item) => item.status === "Completed").length;
+    const total = plans.length;
+    const planned = plans.filter((item) => item.status === "Planned").length;
+    const inProgress = plans.filter((item) => item.status === "In Progress").length;
+    const completed = plans.filter((item) => item.status === "Completed").length;
     return { total, planned, inProgress, completed };
-  }, []);
+  }, [plans]);
 
   const resetFilters = () => {
     setSearch("");
     setStatusFilter("all");
   };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchPartCounts = async () => {
+      const productionIds = [...new Set(plans.map((item) => item.productionId).filter(Boolean))];
+      const pendingIds = productionIds.filter((id) => partCounts[id] === undefined);
+
+      if (pendingIds.length === 0) {
+        return;
+      }
+
+      const results = await Promise.all(
+        pendingIds.map(async (productionId) => {
+          try {
+            const response = await ProductionPartService.getPartsByProduction(productionId, {
+              pageIndex: 0,
+              pageSize: 10,
+              sortColumn: "Name",
+              sortOrder: "ASC",
+            }).catch(() => ProductionPartService.getPartsByProduction(productionId));
+            const payload = response?.data;
+            const list =
+              payload?.data ??
+              payload?.items ??
+              payload?.list ??
+              payload?.results ??
+              (Array.isArray(payload) ? payload : []);
+            const total =
+              typeof payload?.recordCount === "number"
+                ? payload.recordCount
+                : Array.isArray(list)
+                ? list.length
+                : 0;
+            return [productionId, total];
+          } catch (error) {
+            return [productionId, 0];
+          }
+        })
+      );
+
+      if (!isMounted) return;
+
+      setPartCounts((prev) => {
+        const next = { ...prev };
+        results.forEach(([productionId, total]) => {
+          next[productionId] = total;
+        });
+        return next;
+      });
+    };
+
+    fetchPartCounts();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [partCounts, plans]);
 
   return (
     <OwnerLayout>
@@ -109,9 +253,11 @@ export default function ProductionPlanList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách kế hoạch sản xuất</h1>
               <p className="text-slate-600">Theo dõi kế hoạch sản xuất và tiến độ triển khai theo từng đơn hàng.</p>
             </div>
-            <Link className="order-create-btn" to="/production-plan/create">
-              + Tạo kế hoạch
-            </Link>
+            {!isWorker && (
+              <Link className="order-create-btn" to="/production-plan/create">
+                + Tạo kế hoạch
+              </Link>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -233,11 +379,11 @@ export default function ProductionPlanList() {
               <table className="w-full divide-y divide-slate-200 table-auto">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Kế hoạch</th>
                     <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Production</th>
                     <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Đơn hàng</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Tên đơn</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Sản phẩm</th>
+                    <th className="leave-table-th w-20 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Công đoạn</th>
                     <th className="leave-table-th w-24 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Bắt đầu</th>
                     <th className="leave-table-th w-24 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Kết thúc</th>
                     <th className="leave-table-th w-24 px-2 py-3 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Trạng thái</th>
@@ -245,7 +391,19 @@ export default function ProductionPlanList() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {pageData.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={9} className="py-16 text-center text-slate-600">
+                        Đang tải danh sách kế hoạch...
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={9} className="py-16 text-center text-red-600">
+                        {error}
+                      </td>
+                    </tr>
+                  ) : pageData.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-16 text-center text-slate-600">
                         Không có kế hoạch phù hợp
@@ -253,12 +411,14 @@ export default function ProductionPlanList() {
                     </tr>
                   ) : (
                     pageData.map((item) => (
-                      <tr key={item.planId} className="leave-table-row hover:bg-slate-50/80">
-                        <td className="px-2 py-3 text-sm text-slate-600 font-medium whitespace-nowrap">#PL-{item.planId}</td>
+                      <tr key={item.productionId} className="leave-table-row hover:bg-slate-50/80">
                         <td className="px-2 py-3 text-sm text-slate-600 font-medium whitespace-nowrap">#PR-{item.productionId}</td>
                         <td className="px-2 py-3 text-sm text-slate-600 font-medium whitespace-nowrap">#ĐH-{item.orderId}</td>
                         <td className="px-2 py-3 text-sm text-slate-900 font-medium truncate max-w-[220px]">{item.orderName}</td>
                         <td className="px-2 py-3 text-sm text-slate-700 truncate max-w-[200px]">{item.productName}</td>
+                        <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">
+                          {partCounts[item.productionId] ?? "--"}
+                        </td>
                         <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">{item.pStartDate}</td>
                         <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">{item.pEndDate}</td>
                         <td className="px-2 py-3 text-center whitespace-nowrap">
@@ -267,7 +427,7 @@ export default function ProductionPlanList() {
                           </span>
                         </td>
                         <td className="px-2 py-3 text-right whitespace-nowrap">
-                          <Link to={`/production-plan/${item.planId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                          <Link to={`/production-plan/${item.productionId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
                             Xem chi tiết
                           </Link>
                         </td>

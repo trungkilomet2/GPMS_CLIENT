@@ -1,65 +1,14 @@
-﻿import { useMemo, useState } from "react";
-import { ArrowLeft, Info } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+﻿import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionService from "@/services/ProductionService";
+import ProductionPartService from "@/services/ProductionPartService";
+import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
+import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const MOCK_PLAN_DETAILS = [
-  {
-    planId: 5001,
-    production: {
-      productionId: 1001,
-      orderId: 29,
-      orderName: "Đồng phục công ty ABC",
-      pStartDate: "2026-04-21",
-      pEndDate: "2026-05-05",
-      status: "Đang sản xuất",
-      pmName: "Nguyễn Văn An",
-    },
-    product: {
-      productCode: "PRD-ABC-01",
-      productName: "Áo thun đồng phục cổ tròn",
-      type: "Áo thun",
-      size: "L",
-      color: "Trắng",
-      quantity: 100,
-      cpu: 15000,
-      image: "",
-    },
-    steps: [
-      { partName: "Diễu nẹp cổ", cpu: 800, teamLeaderName: "Trần Minh Huy", startDate: "2026-04-22", endDate: "2026-04-23" },
-      { partName: "Đính mác", cpu: 200, teamLeaderName: "Lê Thị Thu", startDate: "2026-04-23", endDate: "2026-04-24" },
-      { partName: "Can dây lồng cổ", cpu: 100, teamLeaderName: "Phạm Hoàng Đức", startDate: "2026-04-24", endDate: "2026-04-25" },
-    ],
-  },
-  {
-    planId: 5002,
-    production: {
-      productionId: 1002,
-      orderId: 30,
-      orderName: "Áo hoodie mùa đông",
-      pStartDate: "2026-04-18",
-      pEndDate: "2026-04-30",
-      status: "Planned",
-      pmName: "Trần Ngọc Bích",
-    },
-    product: {
-      productCode: "PRD-HOOD-02",
-      productName: "Áo hoodie",
-      type: "Hoodie",
-      size: "M",
-      color: "Đen",
-      quantity: 80,
-      cpu: 22000,
-      image: "",
-    },
-    steps: [
-      { partName: "May thân", cpu: 1200, teamLeaderName: "Đỗ Ngọc Anh", startDate: "2026-04-19", endDate: "2026-04-20" },
-      { partName: "May tay", cpu: 900, teamLeaderName: "Nguyễn Hữu Long", startDate: "2026-04-20", endDate: "2026-04-21" },
-    ],
-  },
-];
 
 const STATUS_STYLES = {
   Planned: "bg-amber-50 text-amber-700 border-amber-200",
@@ -69,15 +18,153 @@ const STATUS_STYLES = {
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
+function getStatusLabel(status) {
+  if (typeof status === "number") {
+    if (status === 1) return "Planned";
+    if (status === 2) return "In Progress";
+    if (status === 3) return "Completed";
+  }
+  return status || "-";
+}
+
+function formatDateTime(value) {
+  if (!value || value === "-") return "-";
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) {
+    return String(value);
+  }
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const hh = String(parsed.getHours()).padStart(2, "0");
+  const min = String(parsed.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
 export default function ProductionPlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [isRejectOpen, setIsRejectOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [reportedErrorCount, setReportedErrorCount] = useState(0);
+  const user = getStoredUser();
+  const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
+  const isWorker = hasAnyRole(roleValue, ["worker", "sewer", "tailor"]);
 
-  const plan = useMemo(() => {
-    const pid = Number(id);
-    return MOCK_PLAN_DETAILS.find((item) => Number(item.planId) === pid) || null;
+  useEffect(() => {
+    let active = true;
+
+    const fetchDetail = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const productionId = Number(id);
+        if (!Number.isFinite(productionId)) {
+          throw new Error("INVALID_ID");
+        }
+
+        const detailPromise = ProductionService.getProductionDetail(productionId);
+        const partsPromise = ProductionPartService.getPartsByProduction(productionId, {
+          pageIndex: 0,
+          pageSize: 200,
+          sortColumn: "Name",
+          sortOrder: "ASC",
+        }).catch(() => ProductionPartService.getPartsByProduction(productionId));
+
+        const [detailRes, partsRes] = await Promise.all([detailPromise, partsPromise]);
+
+        if (!active) return;
+
+        const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
+        const order = detailPayload?.order ?? {};
+        const pm = detailPayload?.pm ?? {};
+        const statusLabel = getStatusLabel(
+          detailPayload?.statusName ?? detailPayload?.status ?? detailPayload?.statusId ?? ""
+        );
+
+        const partsPayload = partsRes?.data ?? {};
+        const partList =
+          partsPayload?.data ??
+          partsPayload?.items ??
+          partsPayload?.list ??
+          partsPayload?.results ??
+          (Array.isArray(partsPayload) ? partsPayload : []);
+
+        const steps = Array.isArray(partList)
+          ? partList.map((part) => ({
+            partName: part?.name ?? part?.partName ?? part?.title ?? "-",
+            cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
+            startDate: part?.startDate ?? part?.planStartDate ?? "-",
+            endDate: part?.endDate ?? part?.planEndDate ?? "-",
+            assignedWorkers:
+              part?.assignedWorkers ??
+              part?.workers ??
+              part?.workerNames ??
+              (Array.isArray(part?.workerList)
+                ? part.workerList.map((worker) => worker?.name ?? worker?.fullName ?? worker?.username).filter(Boolean)
+                : []),
+          }))
+          : [];
+
+        setPlan({
+          planId: productionId,
+          production: {
+            productionId,
+            orderId: order?.id ?? order?.orderId ?? "-",
+            orderName: order?.orderName ?? order?.name ?? "-",
+            pStartDate: detailPayload?.startDate ?? order?.startDate ?? "-",
+            pEndDate: detailPayload?.endDate ?? order?.endDate ?? "-",
+            status: statusLabel,
+            pmName: pm?.name || pm?.fullName || (pm?.id ? `PM #${pm.id}` : "-"),
+          },
+          product: {
+            productCode: order?.type ?? (order?.id ? `ORD-${order.id}` : "-"),
+            productName: order?.orderName ?? order?.name ?? "-",
+            type: order?.type ?? "-",
+            size: order?.size ?? "-",
+            color: order?.color ?? "-",
+            quantity: order?.quantity ?? 0,
+            cpu: order?.cpu ?? 0,
+            image: order?.image ?? "",
+          },
+          steps,
+        });
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải chi tiết kế hoạch.");
+        setPlan(null);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchDetail();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("gpms-error-reports");
+      if (!raw) {
+        setReportedErrorCount(0);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.items)
+          ? parsed.items
+          : Array.isArray(parsed?.data)
+            ? parsed.data
+            : [];
+      const count = list.filter((item) => String(item?.productionId) === String(id)).length;
+      setReportedErrorCount(count);
+    } catch {
+      setReportedErrorCount(0);
+    }
   }, [id]);
 
   const totalCpu = useMemo(() => {
@@ -85,16 +172,38 @@ export default function ProductionPlanDetail() {
     return plan.steps.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0);
   }, [plan]);
 
-  const openRejectModal = () => setIsRejectOpen(true);
-  const closeRejectModal = () => {
-    setIsRejectOpen(false);
-    setRejectReason("");
-  };
+  const progressSummary = useMemo(() => {
+    const total = plan?.steps?.length || 0;
+    const today = new Date();
+    const completed = (plan?.steps || []).filter((row) => {
+      const raw = row.endDate;
+      if (!raw || raw === "-") return false;
+      const parsed = new Date(raw);
+      return Number.isFinite(parsed.getTime()) && parsed <= today;
+    }).length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { completed, total, percent };
+  }, [plan]);
 
-  const submitReject = () => {
-    if (!rejectReason.trim()) return;
-    closeRejectModal();
-  };
+  if (loading) {
+    return (
+      <OwnerLayout>
+        <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
+          Đang tải chi tiết kế hoạch...
+        </div>
+      </OwnerLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <OwnerLayout>
+        <div className="flex items-center justify-center min-h-400px text-sm text-red-600">
+          {error}
+        </div>
+      </OwnerLayout>
+    );
+  }
 
   if (!plan) {
     return (
@@ -119,228 +228,244 @@ export default function ProductionPlanDetail() {
                 <ArrowLeft size={18} />
               </button>
               <div className="flex flex-col gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Chi tiết kế hoạch #{plan.planId}</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    Chi tiết kế hoạch
+                  </h1>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${STATUS_STYLES[plan.production.status] || STATUS_STYLES.default
+                      }`}
+                  >
+                    {plan.production.status}
+                  </span>
+                </div>
                 <p className="text-slate-600">Theo dõi thông tin kế hoạch và tiến độ thực hiện.</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${
-                  STATUS_STYLES[plan.production.status] || STATUS_STYLES.default
-                }`}
+              <Link
+                to="/worker/cutting-book"
+                state={{ productionId: plan.production.productionId, production: plan.production, product: plan.product }}
+                className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
               >
-                {plan.production.status}
-              </span>
-              <button
-                type="button"
-                onClick={openRejectModal}
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
-              >
-                Từ chối
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                Chỉnh sửa
-              </button>
+                Sổ cắt
+              </Link>
+              {isWorker ? (
+                <Link
+                  to="/worker/daily-report"
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                >
+                  Báo cáo sản lượng
+                </Link>
+              ) : (
+                <Link
+                  to={`/production-plan/assign/${plan.production.productionId}`}
+                  state={{ production: plan.production, product: plan.product, steps: plan.steps }}
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                >
+                  Phân công
+                </Link>
+              )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
-                  <Info size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin production</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 font-sans">
-                  <div className="p-0">
-                    <DetailItem label="Mã kế hoạch" value={`#PL-${plan.planId}`} isBold />
-                    <DetailItem label="Production" value={`#PR-${plan.production.productionId}`} />
-                    <DetailItem label="Đơn hàng" value={`#ĐH-${plan.production.orderId}`} />
-                    <DetailItem label="Tên đơn" value={plan.production.orderName} />
-                  </div>
-                  <div className="p-0">
-                    <DetailItem label="PM quản lý" value={plan.production.pmName} />
-                    <DetailItem label="Ngày bắt đầu" value={plan.production.pStartDate} />
-                    <DetailItem label="Ngày kết thúc" value={plan.production.pEndDate} />
-                    <DetailItem label="Trạng thái" value={plan.production.status} />
-                  </div>
-                </div>
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Thông tin sản xuất</div>
+              <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 md:grid-cols-4">
+                <InfoBadge label="Mã sản xuất" value={`#PR-${plan.production.productionId}`} />
+                <InfoBadge label="Mã đơn hàng" value={`#ĐH-${plan.production.orderId}`} />
+                <InfoBadge label="Tên đơn hàng" value={plan.production.orderName} />
+                <InfoBadge label="Quản lý dự án" value={plan.production.pmName} />
+                <InfoBadge label="Thời gian" value={`${plan.production.pStartDate} - ${plan.production.pEndDate}`} />
+                <InfoBadge label="Trạng thái" value={plan.production.status} isStatus />
               </div>
+            </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
-                  <Info size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin sản phẩm</h2>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-widest text-emerald-700">Tổng quan kế hoạch</div>
+              <div className="mt-3 text-sm text-emerald-900">
+                <div className="flex items-end justify-between">
+                  <span className="text-[11px] font-semibold uppercase text-emerald-700">Tổng chi phí</span>
+                  <span className="text-lg font-bold">{totalCpu.toLocaleString("vi-VN")} VND</span>
                 </div>
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
-                    <div className="w-32 h-32 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
-                      {plan.product.image ? (
-                        <img src={plan.product.image} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[11px] text-slate-400">Chưa có ảnh</span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">{plan.product.productName}</div>
-                      <div className="text-xs text-slate-500 uppercase mt-1">#{plan.product.productCode}</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100 font-sans">
-                  <div className="p-0">
-                    <DetailItem label="Loại sản phẩm" value={plan.product.type} />
-                    <DetailItem label="Kích thước" value={plan.product.size} />
-                    <DetailItem label="Màu sắc" value={plan.product.color} />
-                  </div>
-                  <div className="p-0">
-                    <DetailItem label="Số lượng" value={plan.product.quantity} isBold />
-                    <DetailItem label="Giá/SP" value={`${plan.product.cpu?.toLocaleString("vi-VN") ?? "-"} VND`} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="leave-table-card__header">
-                  <div>
-                    <h2 className="leave-table-card__title">Danh sách công đoạn</h2>
-                    <p className="leave-table-card__subtitle">Công đoạn đã lập cho kế hoạch.</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full divide-y divide-slate-200 table-fixed">
-                    <thead className="leave-table-head">
-                      <tr>
-                        <th className="leave-table-th w-12 px-3 py-4 text-center text-xs font-semibold uppercase tracking-wide">STT</th>
-                        <th className="leave-table-th w-40 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên công đoạn</th>
-                        <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tổ trưởng</th>
-                        <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
-                        <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>
-                        <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Giá/SP</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {plan.steps.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-16 text-center text-slate-600">
-                            Chưa có công đoạn.
-                          </td>
-                        </tr>
-                      ) : (
-                        plan.steps.map((row, idx) => (
-                          <tr key={`${row.partName}-${idx}`} className="leave-table-row hover:bg-slate-50/80">
-                            <td className="px-3 py-3 text-center text-sm text-slate-600">{idx + 1}</td>
-                            <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{row.partName || "-"}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 truncate">{row.teamLeaderName || "-"}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 text-center">{row.startDate || "-"}</td>
-                            <td className="px-3 py-3 text-sm text-slate-700 text-center">{row.endDate || "-"}</td>
-                            <td className="px-3 py-3 text-center text-sm font-semibold text-slate-700">
-                              {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                      <tr className="bg-slate-50">
-                        <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">Tổng chi phí</td>
-                        <td className="px-3 py-3 text-center font-semibold text-slate-700">
-                          {`${totalCpu.toLocaleString("vi-VN")} VND`}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="mt-3 space-y-2 text-xs text-emerald-700">
+                  <div>Người quản lý: {plan.production.pmName}</div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                <div className="flex items-center gap-2 text-slate-600 mb-3">
-                  <Info size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Tổng quan kế hoạch</h2>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
+                <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+                  {plan.product.image ? (
+                    <img src={plan.product.image} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[11px] text-slate-400">Chưa có ảnh</span>
+                  )}
                 </div>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <SideItem label="Mã kế hoạch" value={`#PL-${plan.planId}`} />
-                  <SideItem label="Production" value={`#PR-${plan.production.productionId}`} />
-                  <SideItem label="Đơn hàng" value={`#ĐH-${plan.production.orderId}`} />
-                  <SideItem label="PM" value={plan.production.pmName} />
-                  <SideItem label="Tổng chi phí" value={`${totalCpu.toLocaleString("vi-VN")} VND`} />
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Thông tin sản phẩm</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{plan.product.productName}</div>
+                  <div className="text-xs text-slate-500 uppercase mt-1">SKU: {plan.product.productCode}</div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700">
+                    <InfoBadge label="Loại" value={plan.product.type} />
+                    <InfoBadge label="Số lượng" value={`${plan.product.quantity} cái`} />
+                    <InfoBadge label="Màu sắc / Kích thước" value={`${plan.product.color} / ${plan.product.size}`} />
+                    <InfoBadge label="Giá/SP" value={`${plan.product.cpu?.toLocaleString("vi-VN") ?? "-"} VND`} />
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                <div className="flex items-center gap-2 text-slate-600 mb-3">
-                  <Info size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Mốc thời gian</h2>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
+                    <Link
+                      to={`/production/${plan.production.productionId}/errors`}
+                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                    >
+                      Xem chi tiết
+                    </Link>
+                  </div>
                 </div>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <SideItem label="Bắt đầu" value={plan.production.pStartDate} />
-                  <SideItem label="Kết thúc" value={plan.production.pEndDate} />
-                  <SideItem label="Trạng thái" value={plan.production.status} />
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
                 </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">
+                    {progressSummary.completed}/{progressSummary.total}
+                  </div>
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
+                  <div className="mt-1">
+                    <Link
+                      to="/worker/daily-report"
+                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                    >
+                      Xem chi tiết sản lượng nhân viên
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Danh sách công đoạn & nhiệm vụ</div>
+                  <div className="text-sm text-slate-500 mt-1">Công đoạn đã lập cho kế hoạch.</div>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                  Tổng cộng {plan.steps.length} công đoạn
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full divide-y divide-slate-100 text-sm">
+                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-4 py-3 text-left">STT</th>
+                      <th className="px-4 py-3 text-left">Tên công đoạn</th>
+                      <th className="px-4 py-3 text-left">Thợ được giao</th>
+                      <th className="px-4 py-3 text-left">Thời gian bắt đầu</th>
+                      <th className="px-4 py-3 text-left">Thời gian kết thúc</th>
+                      <th className="px-4 py-3 text-right">Giá/SP</th>
+                      <th className="px-4 py-3 text-center">Trạng thái</th>
+                      <th className="px-4 py-3 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {plan.steps.map((row, idx) => (
+                      <tr key={`${row.partName}-${idx}`} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3 text-slate-500">{String(idx + 1).padStart(2, "0")}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-800">{row.partName || "-"}</div>
+                          <div className="text-[11px] text-slate-400">Giai đoạn: Rập</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {Array.isArray(row.assignedWorkers) && row.assignedWorkers.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {row.assignedWorkers.map((worker) => (
+                                <span
+                                  key={`${row.partName}-${worker}`}
+                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                                >
+                                  {worker}
+                                </span>
+                              ))}
+                            </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDateTime(row.startDate)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {formatDateTime(row.endDate)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                      </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            Đang làm
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Link
+                            to="/worker/error-report"
+                            state={{
+                              assignment: {
+                                productionId: plan.production.productionId,
+                                orderName: plan.production.orderName,
+                                partName: row.partName,
+                                startDate: row.startDate,
+                                endDate: row.endDate,
+                              },
+                            }}
+                            className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+                          >
+                            Báo lỗi
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                    {plan.steps.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="py-10 text-center text-slate-500">
+                          Chưa có công đoạn.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         </div>
       </div>
-
-      {isRejectOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-200">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="text-sm font-semibold text-slate-800">Từ chối kế hoạch</div>
-              <button onClick={closeRejectModal} className="text-slate-400 hover:text-slate-600">
-                Đóng
-              </button>
-            </div>
-            <div className="p-5 space-y-3">
-              <label className="text-xs font-semibold text-slate-500 uppercase">Lý do từ chối</label>
-              <textarea
-                rows={4}
-                value={rejectReason}
-                onChange={(event) => setRejectReason(event.target.value)}
-                placeholder="Nhập lý do từ chối..."
-                className="w-full border border-slate-300 rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="px-5 py-4 border-t border-slate-200 flex justify-end gap-3">
-              <button onClick={closeRejectModal} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600">
-                Hủy
-              </button>
-              <button
-                onClick={submitReject}
-                className="px-4 py-2 rounded-lg bg-rose-600 text-white font-semibold hover:bg-rose-700"
-              >
-                Xác nhận từ chối
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </OwnerLayout>
   );
 }
 
-function DetailItem({ label, value, isBold = false }) {
-  const displayValue = value === null || value === undefined || value === "" ? "-" : value;
+function InfoBadge({ label, value, isStatus = false }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
-      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
-      <span className={`text-sm ${isBold ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
-        {displayValue}
-      </span>
-    </div>
-  );
-}
-
-function SideItem({ label, value }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-xs font-bold text-slate-400 uppercase">{label}</span>
-      <span className="font-semibold text-slate-800 text-right">{value ?? "-"}</span>
+    <div className="space-y-1">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className={`text-sm font-semibold ${isStatus ? "text-emerald-700" : "text-slate-800"}`}>
+        {value ?? "-"}
+      </div>
     </div>
   );
 }

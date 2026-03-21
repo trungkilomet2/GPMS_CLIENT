@@ -5,6 +5,15 @@ const ProductionService = {
   createProduction(payload) {
     return axiosClient.post(API_ENDPOINTS.PRODUCTION.CREATE, payload);
   },
+  getProductionList(params) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params });
+  },
+  getProductionDetail(id) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.DETAIL(id));
+  },
+  updateProductionPm(productionId, pmId) {
+    return axiosClient.put(API_ENDPOINTS.PRODUCTION.UPDATE_PM(productionId, pmId));
+  },
 };
 
 export default ProductionService;

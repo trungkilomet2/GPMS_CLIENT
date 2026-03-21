@@ -29,7 +29,7 @@ export default function OwnerLayout({ children }) {
   const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
   const roles = splitRoles(roleValue).map((role) => role.toLowerCase());
 
-  if (roles.includes("owner")) {
+  if (roles.includes("owner") || roles.includes("pm") || roles.includes("project manager")) {
     return <DashboardLayout>{children}</DashboardLayout>;
   }
 

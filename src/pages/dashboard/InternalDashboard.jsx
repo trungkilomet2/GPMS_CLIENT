@@ -1,4 +1,4 @@
-import { createElement } from "react";
+﻿import { createElement } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -10,9 +10,9 @@ const ADMIN_ROLES = ["Admin"];
 
 const QUICK_LINKS = [
   {
-    to: "/orders/owner",
-    title: "Danh sách đơn hàng",
-    description: "Theo dõi và xử lý toàn bộ đơn hàng trong xưởng.",
+    to: "/production-plan",
+    title: "Kế hoạch sản xuất",
+    description: "Theo dõi và quản lý tiến độ các kế hoạch sản xuất trong xưởng.",
     icon: BriefcaseBusiness,
   },
   {
@@ -116,3 +116,6 @@ export default function InternalDashboard() {
     </DashboardLayout>
   );
 }
+
+
+

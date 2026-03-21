@@ -24,9 +24,11 @@ const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
+const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
-const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
+const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
+const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
@@ -78,13 +80,15 @@ export const routes = [
   { path: "/production", element: <ProductionList /> },
   { path: "/production/:id", element: <ProductionDetail /> },
   { path: "/production/:id/edit", element: <UpdateProduction /> },
+  { path: "/production/:id/errors", element: <ProductionErrorSummary /> },
   { path: "/production-plan", element: <ProductionPlanList /> },
   { path: "/production-plan/create", element: <ProductionPlan /> },
   { path: "/production-plan/:id", element: <ProductionPlanDetail /> },
   { path: "/production-plan/assign", element: <ProductionAssignment /> },
   { path: "/production-plan/assign/:id", element: <ProductionAssignment /> },
-  { path: "/worker/assignments", element: <WorkerAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/worker/error-report", element: <WorkerErrorReport /> },
+  { path: "/worker/cutting-book", element: <WorkerCuttingBook /> },
   { path: "/worker/leave-requests", element: <LeaveRequests /> },
   { path: "/worker/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/output-history", element: <OutputHistory /> },
