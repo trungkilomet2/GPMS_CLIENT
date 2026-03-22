@@ -129,7 +129,7 @@ const normalizeEmployee = (item = {}) => {
   };
 };
 
-const normalizeEmployeeCollection = (response = {}) => {
+const normalizeEmployeeCollection = (response = {}, options = {}) => {
   const rawItems = response?.data ?? response?.items ?? response?.records ?? [];
 
   if (!Array.isArray(rawItems)) {
@@ -138,7 +138,7 @@ const normalizeEmployeeCollection = (response = {}) => {
 
   return rawItems
     .map(normalizeEmployee)
-    .filter((employee) => !shouldHideFromEmployeeDirectory(employee));
+    .filter((employee) => options?.includeHidden || !shouldHideFromEmployeeDirectory(employee));
 };
 
 const normalizeEmployeeResponse = (response = {}) => {
@@ -152,21 +152,22 @@ const normalizeEmployeeResponse = (response = {}) => {
   };
 };
 
-async function fetchEmployeeByWorkerId(id) {
+async function fetchEmployeeByWorkerId(id, options = {}) {
   const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_BY_ID(id));
   const response = parseApiPayload(rawResponse);
 
   if (!response?.data) return null;
 
   const employee = normalizeEmployee(response.data);
-  return shouldHideFromEmployeeDirectory(employee) ? null : employee;
+  if (!options?.includeHidden && shouldHideFromEmployeeDirectory(employee)) return null;
+  return employee;
 }
 
 const WorkerService = {
-  async getAllEmployees() {
-    const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES);
+  async getAllEmployees(params, options = {}) {
+    const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, params ? { params } : undefined);
     const response = parseApiPayload(rawResponse);
-    const employees = normalizeEmployeeCollection(response);
+    const employees = normalizeEmployeeCollection(response, options);
 
     return {
       ...response,
@@ -174,8 +175,8 @@ const WorkerService = {
     };
   },
 
-  async getEmployeeById(id) {
-    return fetchEmployeeByWorkerId(id);
+  async getEmployeeById(id, options = {}) {
+    return fetchEmployeeByWorkerId(id, options);
   },
 
   async createEmployee(payload) {

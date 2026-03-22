@@ -43,7 +43,7 @@ export function getDefaultRouteForRole(roleValue) {
     return "/monitoring/assign";
   }
 
-  if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
+  if (hasAnyRole(roles, ["worker"])) {
     return "/production-plan";
   }
 

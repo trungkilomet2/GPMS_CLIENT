@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Plus, ArrowLeft, FileText, Loader2, AlertCircle, Save } from 'lucide-react';
 import AddMaterialModal from '@/components/orders/AddMaterialModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
@@ -13,6 +13,7 @@ export default function EditOrder() {
     const userId = getAuthItem("userId");
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [materials, setMaterials] = useState([]);
     const [orderData, setOrderData] = useState({
@@ -61,44 +62,55 @@ export default function EditOrder() {
         note: material.note ?? '',
     });
 
+    const applyOrderData = (data = {}) => {
+        const formattedData = {
+            ...data,
+            startDate: data.startDate ? String(data.startDate).split('T')[0] : '',
+            endDate: data.endDate ? String(data.endDate).split('T')[0] : '',
+        };
+
+        setOrderData((prev) => ({ ...prev, ...formattedData }));
+        setMaterials((data.materials || []).map(normalizeMaterial));
+
+        const rawTemplates = data.templates ?? data.template ?? data.Templates ?? [];
+        const templatesArr = Array.isArray(rawTemplates) ? rawTemplates : [];
+        const softTemplates = templatesArr
+            .filter((t) => {
+                const type = (t.type ?? t.Type ?? '').toString().toLowerCase();
+                return type.startsWith('soft') && (t.file ?? t.File);
+            })
+            .map((t) => ({
+                templateName: t.templateName ?? t.name ?? t.TemplateName ?? 'Bản mềm',
+                type: 'SOFT',
+                file: t.file ?? t.File ?? '',
+                quantity: null,
+                note: t.note ?? t.Note ?? '',
+            }))
+            .filter((t) => t.file);
+        setExistingTemplates(softTemplates);
+
+        const hardTemplate = templatesArr.find((t) => {
+            const type = (t.type ?? t.Type ?? '').toString().toLowerCase();
+            return type.startsWith('hard');
+        });
+        const hardQty = hardTemplate?.quantity ?? hardTemplate?.Quantity ?? '';
+        setHardCopyQty(hardQty ? String(hardQty) : '');
+    };
+
+    useEffect(() => {
+        const prefill = location?.state?.order;
+        if (prefill) {
+            applyOrderData(prefill);
+        }
+    }, [location?.state?.order]);
+
     useEffect(() => {
         const fetchOrderDetails = async () => {
             try {
                 setIsFetching(true);
                 const response = await OrderService.getOrderDetail(id);
                 const data = response?.data?.data || response?.data || {};
-
-                const formattedData = {
-                    ...data,
-                    startDate: data.startDate ? data.startDate.split('T')[0] : '',
-                    endDate: data.endDate ? data.endDate.split('T')[0] : '',
-                };
-
-                setOrderData((prev) => ({ ...prev, ...formattedData }));
-                setMaterials((data.materials || []).map(normalizeMaterial));
-                const rawTemplates = data.templates ?? data.template ?? data.Templates ?? [];
-                const templatesArr = Array.isArray(rawTemplates) ? rawTemplates : [];
-                const softTemplates = templatesArr
-                    .filter((t) => {
-                        const type = (t.type ?? t.Type ?? '').toString().toLowerCase();
-                        return type.startsWith('soft') && (t.file ?? t.File);
-                    })
-                    .map((t) => ({
-                        templateName: t.templateName ?? t.name ?? t.TemplateName ?? 'Bản mềm',
-                        type: 'SOFT',
-                        file: t.file ?? t.File ?? '',
-                        quantity: null,
-                        note: t.note ?? t.Note ?? '',
-                    }))
-                    .filter((t) => t.file);
-                setExistingTemplates(softTemplates);
-
-                const hardTemplate = templatesArr.find((t) => {
-                    const type = (t.type ?? t.Type ?? '').toString().toLowerCase();
-                    return type.startsWith('hard');
-                });
-                const hardQty = hardTemplate?.quantity ?? hardTemplate?.Quantity ?? '';
-                setHardCopyQty(hardQty ? String(hardQty) : '');
+                applyOrderData(data);
             } catch (error) {
                 console.error('Lỗi khi tải chi tiết đơn hàng:', error);
                 alert('Không thể tải thông tin đơn hàng.');

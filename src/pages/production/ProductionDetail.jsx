@@ -7,6 +7,8 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -86,6 +88,9 @@ export default function ProductionDetail() {
   const [production, setProduction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const currentUser = getStoredUser();
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner"]);
 
   useEffect(() => {
     let active = true;
@@ -205,27 +210,32 @@ export default function ProductionDetail() {
               <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${STATUS_STYLES[production.status] || STATUS_STYLES.default}`}>
                 {production.status}
               </span>
-              <button
-                type="button"
-                onClick={() => setIsApproveModalOpen(true)}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
-              >
-                Chấp nhận
-              </button>
-              <button
-                type="button"
-                onClick={() => { setIsReasonModalOpen(true); }}
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
-              >
-                Từ chối
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(`/production/${production.productionId}/errors`)}
-                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
-              >
-                Tổng hợp lỗi
-              </button>
+              {isOwner ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  Chỉnh sửa
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsApproveModalOpen(true)}
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  >
+                    Chấp nhận
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsReasonModalOpen(true); }}
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                  >
+                    Từ chối
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -235,11 +245,11 @@ export default function ProductionDetail() {
               <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
-            <DetailRow label="Production ID" value={`#PR-${production.productionId}`} />
-            <DetailRow label="Trạng thái" value={production.status} />
-            <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
-            <DetailRow label="Ngày bắt đầu (Production)" value={production.pStartDate} />
-            <DetailRow label="Ngày kết thúc (Production)" value={production.pEndDate} />
+              <DetailRow label="Production ID" value={`#PR-${production.productionId}`} />
+              <DetailRow label="Trạng thái" value={production.status} />
+              <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
+              <DetailRow label="Ngày bắt đầu (Production)" value={production.pStartDate} />
+              <DetailRow label="Ngày kết thúc (Production)" value={production.pEndDate} />
             </div>
             <div className="p-5 border-t border-slate-100 bg-amber-50/30">
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chú Production</p>
@@ -373,36 +383,56 @@ export default function ProductionDetail() {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-3">
+                  Tổng hợp lỗi
+                </div>
+                <p className="text-sm text-rose-800 mb-4">
+                  Xem nhanh các lỗi đã báo cáo liên quan đến production này.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                  className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                >
+                  Xem tổng hợp lỗi
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <OrderStatusReasonModal
-        isOpen={isReasonModalOpen}
-        onClose={() => setIsReasonModalOpen(false)}
-        onSubmit={(reason) => {
-          alert(`Từ chối production với lý do: ${reason}`);
-          setIsReasonModalOpen(false);
-        }}
-        title="Từ chối production"
-        description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
-        confirmText="Xác nhận từ chối"
-        tone="danger"
-        requireReason
-      />
-      <OrderStatusReasonModal
-        isOpen={isApproveModalOpen}
-        onClose={() => setIsApproveModalOpen(false)}
-        onSubmit={() => {
-          handleApproveProduction();
-          setIsApproveModalOpen(false);
-        }}
-        title="Chấp nhận production"
-        description="Bạn có chắc muốn chấp nhận production này không?"
-        confirmText="Xác nhận"
-        tone="warning"
-        requireReason={false}
-      />
+      {!isOwner && (
+        <>
+          <OrderStatusReasonModal
+            isOpen={isReasonModalOpen}
+            onClose={() => setIsReasonModalOpen(false)}
+            onSubmit={(reason) => {
+              alert(`Từ chối production với lý do: ${reason}`);
+              setIsReasonModalOpen(false);
+            }}
+            title="Từ chối production"
+            description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
+            confirmText="Xác nhận từ chối"
+            tone="danger"
+            requireReason
+          />
+          <OrderStatusReasonModal
+            isOpen={isApproveModalOpen}
+            onClose={() => setIsApproveModalOpen(false)}
+            onSubmit={() => {
+              handleApproveProduction();
+              setIsApproveModalOpen(false);
+            }}
+            title="Chấp nhận production"
+            description="Bạn có chắc muốn chấp nhận production này không?"
+            confirmText="Xác nhận"
+            tone="warning"
+            requireReason={false}
+          />
+        </>
+      )}
     </OwnerLayout>
   );
 }

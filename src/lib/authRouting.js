@@ -41,7 +41,7 @@ export function getPostLoginPath(roleValue) {
     return "/production-plan/assign";
   }
 
-  if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
+  if (hasAnyRole(roles, ["worker"])) {
     return "/production-plan";
   }
 
