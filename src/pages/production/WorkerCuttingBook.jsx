@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ClipboardCheck, Eraser, Plus, Save } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import "@/styles/homepage.css";
@@ -999,11 +999,25 @@ export default function WorkerCuttingBook() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <ClipboardCheck size={16} />
-                    <h2 className="text-xs font-bold uppercase tracking-widest">Nhập dòng mới</h2>
-                  </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <ClipboardCheck size={16} />
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Nhập dòng mới</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/worker/error-report"
+                    state={{
+                      assignment: {
+                        productionId: meta.productionId || selectedProductionId,
+                        partName: "Công đoạn cắt",
+                        errorType: "cutting",
+                      },
+                    }}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Báo lỗi
+                  </Link>
                   <button
                     type="button"
                     onClick={openCreateRecord}
@@ -1012,6 +1026,7 @@ export default function WorkerCuttingBook() {
                     Thêm dòng
                   </button>
                 </div>
+              </div>
                 <div className="mt-2 text-xs text-slate-500">
                   Nhấn “Thêm dòng” để nhập thông tin mới.
                 </div>

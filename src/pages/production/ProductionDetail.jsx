@@ -74,6 +74,7 @@ const STATUS_STYLES = {
   Planned: "bg-amber-50 text-amber-700 border-amber-200",
   "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
   Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Chấp Nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
@@ -81,7 +82,7 @@ export default function ProductionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState("");
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [production, setProduction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -177,6 +178,9 @@ export default function ProductionDetail() {
     return type.includes("hard");
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+  const handleApproveProduction = () => {
+    setProduction((prev) => (prev ? { ...prev, status: "Chấp Nhận" } : prev));
+  };
 
   return (
     <OwnerLayout>
@@ -203,24 +207,17 @@ export default function ProductionDetail() {
               </span>
               <button
                 type="button"
-                onClick={() => navigate(`/production/${production.productionId}/edit`)}
+                onClick={() => setIsApproveModalOpen(true)}
                 className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
               >
-                Chỉnh sửa
+                Chấp nhận
               </button>
               <button
                 type="button"
-                onClick={() => { setPendingAction("reject"); setIsReasonModalOpen(true); }}
+                onClick={() => { setIsReasonModalOpen(true); }}
                 className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
               >
                 Từ chối
-              </button>
-              <button
-                type="button"
-                onClick={() => { setPendingAction("revise"); setIsReasonModalOpen(true); }}
-                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
-              >
-                Yêu cầu chỉnh sửa
               </button>
               <button
                 type="button"
@@ -384,16 +381,27 @@ export default function ProductionDetail() {
         isOpen={isReasonModalOpen}
         onClose={() => setIsReasonModalOpen(false)}
         onSubmit={(reason) => {
-          const actionLabel = pendingAction === "reject" ? "Từ chối" : "Yêu cầu chỉnh sửa";
-          alert(`${actionLabel} production với lý do: ${reason}`);
+          alert(`Từ chối production với lý do: ${reason}`);
           setIsReasonModalOpen(false);
         }}
-        title={pendingAction === "reject" ? "Từ chối production" : "Yêu cầu chỉnh sửa production"}
-        description={pendingAction === "reject"
-          ? "Vui lòng nhập lý do từ chối để lưu vào hệ thống."
-          : "Vui lòng nhập lý do yêu cầu chỉnh sửa."}
-        confirmText={pendingAction === "reject" ? "Xác nhận từ chối" : "Gửi yêu cầu"}
-        tone={pendingAction === "reject" ? "danger" : "warning"}
+        title="Từ chối production"
+        description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
+        confirmText="Xác nhận từ chối"
+        tone="danger"
+        requireReason
+      />
+      <OrderStatusReasonModal
+        isOpen={isApproveModalOpen}
+        onClose={() => setIsApproveModalOpen(false)}
+        onSubmit={() => {
+          handleApproveProduction();
+          setIsApproveModalOpen(false);
+        }}
+        title="Chấp nhận production"
+        description="Bạn có chắc muốn chấp nhận production này không?"
+        confirmText="Xác nhận"
+        tone="warning"
+        requireReason={false}
       />
     </OwnerLayout>
   );

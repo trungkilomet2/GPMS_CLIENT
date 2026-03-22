@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
+import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -11,39 +12,219 @@ const STORAGE_KEY = "gpms-error-reports";
 const MOCK_ERRORS = [
   {
     id: "e1",
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Diễu nẹp cổ",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Cắt thân trước",
     severity: "medium",
-    title: "Lỗi lệch đường may",
-    description: "Đường may bị lệch 2-3mm ở đoạn cổ.",
-    quantity: 12,
+    title: "Sai biên cắt",
+    description: "Biên vải lệch 3mm ở đầu thân.",
+    quantity: 14,
     happenAt: "2026-03-18T09:10",
     createdAt: "2026-03-18T09:15:00.000Z",
   },
   {
     id: "e2",
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Đính mác",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May sườn",
     severity: "low",
-    title: "Mác bị lệch",
-    description: "Vị trí mác lệch nhẹ.",
+    title: "Đường may hở",
+    description: "Lỗi hở đường may ở sườn trái.",
     quantity: 6,
     happenAt: "2026-03-18T14:20",
     createdAt: "2026-03-18T14:22:00.000Z",
   },
   {
     id: "e3",
-    productionId: 1002,
-    orderName: "Áo hoodie mùa đông",
-    partName: "May thân",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Đính mác",
     severity: "high",
-    title: "Rách vải",
-    description: "Rách vải ở thân trước, cần kiểm tra máy.",
+    title: "Sai vị trí mác",
+    description: "Mác dán lệch khỏi vị trí chuẩn 1cm.",
+    quantity: 9,
+    happenAt: "2026-03-19T08:05",
+    createdAt: "2026-03-19T08:08:00.000Z",
+  },
+  {
+    id: "e4",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Hoàn thiện",
+    severity: "critical",
+    title: "Bẩn dầu máy",
+    description: "Dính dầu máy ở 4 sản phẩm lô 2.",
+    quantity: 4,
+    happenAt: "2026-03-19T15:45",
+    createdAt: "2026-03-19T15:46:00.000Z",
+  },
+  {
+    id: "e5",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May tay",
+    severity: "medium",
+    title: "Lệch đường ráp tay",
+    description: "Ráp tay lệch nhẹ ở size M.",
+    quantity: 11,
+    happenAt: "2026-03-20T10:22",
+    createdAt: "2026-03-20T10:24:00.000Z",
+  },
+  {
+    id: "e6",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Cắt thân sau",
+    severity: "low",
+    title: "Sơ đồ cắt nhăn",
+    description: "Sơ đồ bị nhăn khi cắt, cần trải lại.",
+    quantity: 5,
+    happenAt: "2026-03-20T14:18",
+    createdAt: "2026-03-20T14:20:00.000Z",
+  },
+  {
+    id: "e7",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May cổ",
+    severity: "high",
+    title: "Sai kích thước cổ",
+    description: "Chu vi cổ nhỏ hơn tiêu chuẩn 0.7cm.",
+    quantity: 7,
+    happenAt: "2026-03-21T09:30",
+    createdAt: "2026-03-21T09:32:00.000Z",
+  },
+  {
+    id: "e8",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Là ủi",
+    severity: "medium",
+    title: "Bóng vải",
+    description: "Bóng vải ở thân trước do nhiệt cao.",
+    quantity: 8,
+    happenAt: "2026-03-21T13:05",
+    createdAt: "2026-03-21T13:08:00.000Z",
+  },
+  {
+    id: "e9",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Đóng gói",
+    severity: "low",
+    title: "Thiếu tem size",
+    description: "Tem size không được dán ở 6 sản phẩm.",
+    quantity: 6,
+    happenAt: "2026-03-21T15:10",
+    createdAt: "2026-03-21T15:12:00.000Z",
+  },
+  {
+    id: "e10",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May sườn",
+    severity: "medium",
+    title: "Đường may lệch",
+    description: "Sai độ rộng đường may 2mm.",
+    quantity: 10,
+    happenAt: "2026-03-22T08:40",
+    createdAt: "2026-03-22T08:42:00.000Z",
+  },
+  {
+    id: "e11",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Kiểm hàng",
+    severity: "high",
+    title: "Phát hiện lỗi dính bẩn",
+    description: "Bẩn mực ở 3 sản phẩm size L.",
     quantity: 3,
-    happenAt: "2026-03-17T10:05",
-    createdAt: "2026-03-17T10:06:00.000Z",
+    happenAt: "2026-03-22T11:20",
+    createdAt: "2026-03-22T11:25:00.000Z",
+  },
+  {
+    id: "e12",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Cắt tay áo",
+    severity: "medium",
+    title: "Sai kích thước tay",
+    description: "Tay áo dài hơn tiêu chuẩn 0.5cm.",
+    quantity: 9,
+    happenAt: "2026-03-22T14:55",
+    createdAt: "2026-03-22T14:58:00.000Z",
+  },
+  {
+    id: "e13",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Hoàn thiện",
+    severity: "low",
+    title: "Chỉ thừa",
+    description: "Chỉ thừa ở 5 sản phẩm size S.",
+    quantity: 5,
+    happenAt: "2026-03-23T09:12",
+    createdAt: "2026-03-23T09:15:00.000Z",
+  },
+  {
+    id: "e14",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Cắt thân trước",
+    severity: "high",
+    title: "Sai sơ đồ",
+    description: "Sơ đồ cắt không đúng phiên bản.",
+    quantity: 4,
+    happenAt: "2026-03-23T13:25",
+    createdAt: "2026-03-23T13:28:00.000Z",
+  },
+  {
+    id: "e15",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May tay",
+    severity: "medium",
+    title: "Bong đường may",
+    description: "Đường may bong sau khi kéo thử.",
+    quantity: 8,
+    happenAt: "2026-03-24T08:05",
+    createdAt: "2026-03-24T08:08:00.000Z",
+  },
+  {
+    id: "e16",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Là ủi",
+    severity: "low",
+    title: "Nếp gấp không đều",
+    description: "Nếp gấp sau khi là bị lệch nhẹ.",
+    quantity: 6,
+    happenAt: "2026-03-24T10:40",
+    createdAt: "2026-03-24T10:42:00.000Z",
+  },
+  {
+    id: "e17",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "Đóng gói",
+    severity: "medium",
+    title: "Sai màu bao bì",
+    description: "Bao bì màu xanh thay vì trắng.",
+    quantity: 5,
+    happenAt: "2026-03-24T15:30",
+    createdAt: "2026-03-24T15:32:00.000Z",
+  },
+  {
+    id: "e18",
+    productionId: 2,
+    orderName: "Áo thun đồng phục",
+    partName: "May cổ",
+    severity: "critical",
+    title: "Vải rách khi ráp cổ",
+    description: "Rách vải do kéo sai lực.",
+    quantity: 2,
+    happenAt: "2026-03-25T09:18",
+    createdAt: "2026-03-25T09:20:00.000Z",
   },
 ];
 
@@ -86,6 +267,8 @@ export default function ProductionErrorSummary() {
   const [production, setProduction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     let active = true;
@@ -120,6 +303,7 @@ export default function ProductionErrorSummary() {
     const filtered = merged.filter((item) => String(item.productionId) === String(id));
     const sorted = filtered.sort((a, b) => new Date(b.createdAt || b.happenAt || 0) - new Date(a.createdAt || a.happenAt || 0));
     setErrors(sorted);
+    setCurrentPage(1);
   }, [id]);
 
   const severityCounts = useMemo(() => {
@@ -158,6 +342,12 @@ export default function ProductionErrorSummary() {
     });
     return Array.from(map.values());
   }, [errors]);
+
+  const totalPages = Math.max(1, Math.ceil(errors.length / pageSize));
+  const pagedErrors = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return errors.slice(start, start + pageSize);
+  }, [errors, currentPage, pageSize]);
 
   return (
     <OwnerLayout>
@@ -211,35 +401,44 @@ export default function ProductionErrorSummary() {
                   <div className="text-sm text-slate-500 mt-1">Tổng hợp nhanh theo công đoạn.</div>
                 </div>
               </div>
+              <div className="text-xs text-slate-500">Gộp lỗi theo công đoạn</div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
                   <tr>
-                    <th className="px-4 py-3 text-left">Công đoạn</th>
-                    <th className="px-4 py-3 text-center">Số lỗi</th>
-                    <th className="px-4 py-3 text-center">Tổng SL lỗi</th>
-                    <th className="px-4 py-3 text-center">Mức độ cao nhất</th>
-                    <th className="px-4 py-3 text-center">Lỗi gần nhất</th>
+                    <th className="px-4 py-2 text-left">Công đoạn</th>
+                    <th className="px-4 py-2 text-left">Tóm tắt</th>
+                    <th className="px-4 py-2 text-center">Mức độ cao nhất</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {byPart.map((row) => (
                     <tr key={row.partName} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-semibold text-slate-800">{row.partName}</td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.count}</td>
-                      <td className="px-4 py-3 text-center text-slate-700">{row.totalQuantity}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2">
+                        <div className="font-semibold text-slate-800">{row.partName}</div>
+                        <div className="text-[10px] text-slate-400">Lỗi gần nhất: {row.latestAt || "-"}</div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex flex-wrap items-center gap-2 text-slate-700">
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold">
+                            {row.count} lỗi
+                          </span>
+                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold">
+                            {row.totalQuantity} sản phẩm lỗi
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-center">
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default}`}>
                           {SEVERITY_LABELS[row.highestSeverity] || "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-600">{row.latestAt || "-"}</td>
                     </tr>
                   ))}
                   {byPart.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                      <td colSpan={3} className="py-8 text-center text-slate-500">
                         Chưa có lỗi nào cho production này.
                       </td>
                     </tr>
@@ -271,7 +470,7 @@ export default function ProductionErrorSummary() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {errors.map((item) => (
+                  {pagedErrors.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/70">
                       <td className="px-4 py-3 font-semibold text-slate-800">{item.partName || "-"}</td>
                       <td className="px-4 py-3">
@@ -297,6 +496,17 @@ export default function ProductionErrorSummary() {
                 </tbody>
               </table>
             </div>
+            {errors.length > 0 && (
+              <div className="px-5 py-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalCount={errors.length}
+                  pageSize={pageSize}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
