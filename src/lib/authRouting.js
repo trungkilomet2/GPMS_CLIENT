@@ -42,7 +42,7 @@ export function getPostLoginPath(roleValue) {
   }
 
   if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
-    return "/worker/assignments";
+    return "/production-plan";
   }
 
   return "/home";
