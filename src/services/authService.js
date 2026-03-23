@@ -4,6 +4,18 @@ import { clearAuthStorage, removeAuthItem, setAuthItem, setStoredUser } from "@/
 
 const PROFILE_CACHE_PREFIX = "profile-cache:";
 
+function isSwaggerPlaceholder(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "string" || normalized === "user@example.com";
+}
+
+function normalizeServerValue(value) {
+  if (value == null) return "";
+  const normalized = String(value).trim();
+  if (!normalized || isSwaggerPlaceholder(normalized)) return "";
+  return normalized;
+}
+
 function readProfileCache(userId) {
   if (userId == null) return null;
   try {
@@ -51,18 +63,23 @@ async function loadProfileAfterLogin(token) {
     const json = await res.json().catch(() => ({}));
     const d = json?.data ?? {};
     const accountStatus = readAccountStatus(d);
+    const fullName = normalizeServerValue(d.fullName);
+    const email = normalizeServerValue(d.email);
+    const phoneNumber = normalizeServerValue(d.phoneNumber);
+    const avatarUrl = normalizeServerValue(d.avartarUrl);
+    const location = normalizeServerValue(d.location);
 
     return {
       userId: extractUserIdValue(d),
-      fullName: d.fullName || "",
-      name: d.fullName || "",
-      email: d.email || "",
-      phoneNumber: d.phoneNumber || "",
-      phone: d.phoneNumber || "",
+      fullName,
+      name: fullName,
+      email,
+      phoneNumber,
+      phone: phoneNumber,
       role: extractRoleValue(d),
-      avatarUrl: d.avartarUrl || "",
-      location: d.location || "",
-      address: d.location || "",
+      avatarUrl,
+      location,
+      address: location,
       accountStatus,
     };
   } catch {
@@ -173,12 +190,14 @@ export const authService = {
     const mergedUser = {
       ...cached,
       ...user,
-      email: user.email || cached.email || "",
-      phoneNumber: user.phoneNumber || cached.phoneNumber || cached.phone || "",
-      phone: user.phone || cached.phoneNumber || cached.phone || "",
-      location: user.location || cached.location || cached.address || "",
-      address: user.address || cached.location || cached.address || "",
-      avatarUrl: user.avatarUrl || cached.avatarUrl || "",
+      name: normalizeServerValue(user.name) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.name,
+      fullName: normalizeServerValue(user.fullName) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.fullName,
+      email: normalizeServerValue(user.email) || normalizeServerValue(cached.email) || "",
+      phoneNumber: normalizeServerValue(user.phoneNumber) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
+      phone: normalizeServerValue(user.phone) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
+      location: normalizeServerValue(user.location) || normalizeServerValue(cached.location) || normalizeServerValue(cached.address) || "",
+      address: normalizeServerValue(user.address) || normalizeServerValue(cached.location) || normalizeServerValue(cached.address) || "",
+      avatarUrl: normalizeServerValue(user.avatarUrl) || normalizeServerValue(cached.avatarUrl) || "",
     };
 
     if (user.accountStatus?.isDisabled) {

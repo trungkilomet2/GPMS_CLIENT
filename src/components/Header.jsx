@@ -57,8 +57,9 @@ export default function Header() {
   };
 
   // Initials fallback nếu không có avatar
-  const initials = user?.name
-    ? user.name.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase()
+  const displayName = user?.fullName || user?.name || user?.userName || "Người dùng";
+  const initials = displayName
+    ? displayName.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase()
     : "U";
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -154,7 +155,7 @@ export default function Header() {
                           Xin chào,
                         </span>
                         <span style={{ fontSize: ".82rem", color: C.green, fontWeight: 700, maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {user.name}
+                          {displayName}
                         </span>
                       </div>
                       {user.avatarUrl
@@ -172,7 +173,7 @@ export default function Header() {
                       onMouseLeave={closeProfileMenuSoon}
                     >
                       <div className="avatar-dropdown-header">
-                        <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{user.name}</div>
+                        <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{displayName}</div>
                         <div style={{ fontSize: ".75rem", color: C.textLight }}>{user.email}</div>
                       </div>
                       <Link to="/profile" className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>
