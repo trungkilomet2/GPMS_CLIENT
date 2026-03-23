@@ -1,8 +1,10 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ClipboardCheck, Eraser, Plus, Save } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
+import CuttingNotebookService from "@/services/CuttingNotebookService";
+import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -591,7 +593,9 @@ export default function WorkerCuttingBook() {
     return nextErrors;
   };
 
-  const saveRecord = () => {
+  const [isSavingRecord, setIsSavingRecord] = useState(false);
+
+  const saveRecord = async () => {
     const nextErrors = validateRecord(record);
     if (Object.keys(nextErrors).length > 0) {
       setRecordErrors(nextErrors);
@@ -640,16 +644,62 @@ export default function WorkerCuttingBook() {
       });
     })();
 
-    setBooks(nextBooks);
-    setSelectedProductionId(productionKey);
-    clearRecord();
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBooks));
-      setSavedAt(new Date().toLocaleString("vi-VN"));
-    } catch {
-      // ignore storage errors
+      setIsSavingRecord(true);
+      const productionKey = String(meta.productionId || "UNASSIGNED");
+      if (productionKey === "UNASSIGNED") {
+        setRecordErrors({ submit: "Vui lòng chọn hoặc tạo sổ cắt trước khi lưu." });
+        setIsSavingRecord(false);
+        return false;
+      }
+
+      const storedUserId = localStorage.getItem("userId");
+      const payload = {
+        userId: Number(storedUserId) || 1,
+        color: String(record.color || ""),
+        meterPerKg: Number(record.meterPerKg || 0),
+        layer: Number(record.layer || 0),
+        productQty: Number(record.productQty || 0),
+        avgConsumption: Number(record.avgConsumption || 0),
+        note: String(record.note || "")
+      };
+
+      // Gọi API create-logs với notebookId = productionId (dựa theo cấu trúc backend hiện tại)
+      await CuttingNotebookService.createLog(productionKey, payload);
+
+      setBooks(nextBooks);
+      setSelectedProductionId(productionKey);
+      clearRecord();
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBooks));
+        setSavedAt(new Date().toLocaleString("vi-VN"));
+      } catch {
+        // ignore storage errors
+      }
+      return true;
+    } catch (error) {
+      console.error("LỖI TỪ SERVER:", JSON.stringify(error?.response?.data || error.message));
+      let errMsg = "Lưu dòng thất bại.";
+      const data = error?.response?.data;
+      
+      if (data) {
+        if (data.errors) {
+          errMsg = Object.values(data.errors).flat().join(" | ");
+        } else if (data.title) {
+          errMsg = data.title;
+        } else if (data.message) {
+          errMsg = data.message;
+        } else if (typeof data === 'string') {
+          errMsg = data;
+        } else {
+          errMsg = JSON.stringify(data);
+        }
+      }
+      setRecordErrors({ submit: `Lỗi server: ${errMsg}` });
+      return false;
+    } finally {
+      setIsSavingRecord(false);
     }
-    return true;
   };
 
   const openDetail = (productionId) => {
@@ -718,7 +768,9 @@ export default function WorkerCuttingBook() {
     }
   };
 
-  const createBook = () => {
+  const [creatingBook, setCreatingBook] = useState(false);
+
+  const createBook = async () => {
     const productionKey = String(newBook.productionId || "").trim();
     if (!productionKey) {
       setCreateError("Vui lòng chọn một production có sẵn.");
@@ -729,29 +781,56 @@ export default function WorkerCuttingBook() {
       return;
     }
     const exists = books.some((book) => String(book.productionId) === productionKey);
-    if (exists) return;
-    const selectedProduction = productionMap.get(productionKey);
-    const nextBooks = [
-      {
-        productionId: productionKey,
-        meta: {
-          ...newBook,
-          productionId: productionKey,
-          productionName: getProductionName(selectedProduction) || newBook.productionName || "",
-        },
-        records: [],
-        updatedAt: new Date().toISOString(),
-      },
-      ...books,
-    ];
-    setBooks(nextBooks);
-    setPage(1);
-    setNewBook(DEFAULT_META);
-    setShowCreate(false);
+    if (exists) {
+      setCreateError("Đơn hàng này đã có sổ cắt trên hệ thống cục bộ.");
+      return;
+    }
+
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBooks));
-    } catch {
-      // ignore storage errors
+      setCreatingBook(true);
+      setCreateError("");
+      const payload = {
+        productionId: Number(productionKey),
+        markerLength: Number(newBook.markerLength || 0),
+        fabricWidth: Number(newBook.fabricWidth || 0),
+      };
+
+      await CuttingNotebookService.createNotebook(payload);
+
+      const selectedProduction = productionMap.get(productionKey);
+      const nextBooks = [
+        {
+          productionId: productionKey,
+          meta: {
+            ...newBook,
+            productionId: productionKey,
+            productionName: getProductionName(selectedProduction) || newBook.productionName || "",
+          },
+          records: [],
+          updatedAt: new Date().toISOString(),
+        },
+        ...books,
+      ];
+      setBooks(nextBooks);
+      setPage(1);
+      setNewBook(DEFAULT_META);
+      setShowCreate(false);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextBooks));
+      } catch {
+        // ignore storage errors
+      }
+      alert("Tạo sổ cắt thành công!");
+    } catch (error) {
+      console.error(error);
+      let errMsg = "Tạo sổ cắt thất bại.";
+      const data = error?.response?.data;
+      if (data?.errors) errMsg = Object.values(data.errors).flat().join(" | ");
+      else if (data?.message) errMsg = data.message;
+      else if (typeof data === 'string' && data) errMsg = data;
+      setCreateError(`Lỗi server: ${errMsg}`);
+    } finally {
+      setCreatingBook(false);
     }
   };
 
@@ -878,9 +957,10 @@ export default function WorkerCuttingBook() {
                       <button
                         type="button"
                         onClick={createBook}
-                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                        disabled={creatingBook}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
                       >
-                        <Save size={16} /> Tạo sổ cắt
+                        <Save size={16} /> {creatingBook ? "Đang tạo..." : "Tạo sổ cắt"}
                       </button>
                       <div className="text-xs text-slate-400">
                         Bắt buộc nhập Mã kế hoạch/production để tạo sổ cắt.
@@ -999,11 +1079,25 @@ export default function WorkerCuttingBook() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <ClipboardCheck size={16} />
-                    <h2 className="text-xs font-bold uppercase tracking-widest">Nhập dòng mới</h2>
-                  </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <ClipboardCheck size={16} />
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Nhập dòng mới</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    to="/worker/error-report"
+                    state={{
+                      assignment: {
+                        productionId: meta.productionId || selectedProductionId,
+                        partName: "Công đoạn cắt",
+                        errorType: "cutting",
+                      },
+                    }}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Báo lỗi
+                  </Link>
                   <button
                     type="button"
                     onClick={openCreateRecord}
@@ -1012,6 +1106,7 @@ export default function WorkerCuttingBook() {
                     Thêm dòng
                   </button>
                 </div>
+              </div>
                 <div className="mt-2 text-xs text-slate-500">
                   Nhấn “Thêm dòng” để nhập thông tin mới.
                 </div>
@@ -1115,6 +1210,11 @@ export default function WorkerCuttingBook() {
                   Bật “Chỉnh sửa” để nhập và lưu dòng mới.
                 </div>
               )}
+              {recordErrors.submit && (
+                <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+                  {recordErrors.submit}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <ModalField label="Màu" value={record.color} onChange={(v) => updateRecord("color", v)} disabled={!isEditing} placeholder="Ví dụ: Đen" error={recordErrors.color} />
                 <ModalField label="Số m/kg" value={record.meterPerKg} onChange={(v) => updateRecord("meterPerKg", v)} disabled={!isEditing} placeholder="Ví dụ: 65" error={recordErrors.meterPerKg} />
@@ -1134,24 +1234,24 @@ export default function WorkerCuttingBook() {
                 <button
                   type="button"
                   onClick={clearRecord}
-                  disabled={!isEditing}
+                  disabled={!isEditing || isSavingRecord}
                   className="px-6 py-2.5 font-bold text-slate-500 transition-colors hover:text-slate-700 disabled:text-slate-300"
                 >
                   Xóa trắng
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const ok = saveRecord();
+                  onClick={async () => {
+                    const ok = await saveRecord();
                     if (ok) {
                       setShowEntryModal(false);
                       setEditingRecordId(null);
                     }
                   }}
-                  disabled={!isEditing}
+                  disabled={!isEditing || isSavingRecord}
                   className="px-8 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all active:scale-95 disabled:bg-emerald-300"
                 >
-                  {editingRecordId ? "Lưu chỉnh sửa" : "Lưu dòng"}
+                  {isSavingRecord ? "Đang lưu..." : (editingRecordId ? "Lưu chỉnh sửa" : "Lưu dòng")}
                 </button>
               </div>
             </div>

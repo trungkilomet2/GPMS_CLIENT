@@ -1,9 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
+import MaterialsTable from "@/components/orders/MaterialsTable";
+import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
@@ -101,6 +103,11 @@ export default function ProductionPlanDetail() {
               part?.assignedWorkers ??
               part?.workers ??
               part?.workerNames ??
+              (Array.isArray(part?.assignees)
+                ? part.assignees
+                  .map((worker) => worker?.fullName ?? worker?.name ?? worker?.username ?? worker?.id)
+                  .filter(Boolean)
+                : []) ??
               (Array.isArray(part?.workerList)
                 ? part.workerList.map((worker) => worker?.name ?? worker?.fullName ?? worker?.username).filter(Boolean)
                 : []),
@@ -111,6 +118,7 @@ export default function ProductionPlanDetail() {
           planId: productionId,
           production: {
             productionId,
+            pmId: pm?.id ?? null,
             orderId: order?.id ?? order?.orderId ?? "-",
             orderName: order?.orderName ?? order?.name ?? "-",
             pStartDate: detailPayload?.startDate ?? order?.startDate ?? "-",
@@ -128,6 +136,12 @@ export default function ProductionPlanDetail() {
             cpu: order?.cpu ?? 0,
             image: order?.image ?? "",
           },
+          materials: Array.isArray(order?.materials)
+            ? order.materials.map((m) => ({
+              ...m,
+              materialName: m?.materialName ?? m?.name,
+            }))
+            : [],
           steps,
         });
       } catch (err) {
@@ -295,9 +309,9 @@ export default function ProductionPlanDetail() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
-                <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
+              <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                   {plan.product.image ? (
                     <img src={plan.product.image} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -316,6 +330,18 @@ export default function ProductionPlanDetail() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
+                <h2 className="text-xs font-bold uppercase tracking-widest">Vật liệu cung cấp</h2>
+              </div>
+              <MaterialsTable
+                materials={plan.materials ?? []}
+                variant="detail"
+                showImage
+                emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
+              />
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

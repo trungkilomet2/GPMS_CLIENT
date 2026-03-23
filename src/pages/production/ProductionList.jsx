@@ -1,182 +1,47 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
-import { getStoredUser } from "@/lib/authStorage";
-import { extractRoleValue } from "@/lib/authIdentity";
+import WorkerService from "@/services/WorkerService";
+import { userService } from "@/services/userService";
+import { useAuth } from "@/hooks/useAuth";
+import { useProductionList } from "@/hooks/useProductionList";
+import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const STATUS_STYLES = {
-  "Cần Cập Nhật": "bg-amber-50 text-amber-700 border-amber-200",
-  "Cần Chỉnh Sửa Kế Hoạch": "bg-amber-50 text-amber-700 border-amber-200",
-  "Chấp Nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Chờ Xét Duyệt": "bg-blue-50 text-blue-700 border-blue-200",
-  "Chờ Xét Duyệt Kế Hoạch": "bg-blue-50 text-blue-700 border-blue-200",
-  "Đang Sản Xuất": "bg-indigo-50 text-indigo-700 border-indigo-200",
-  "Hoàn Thành": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Từ Chối": "bg-red-50 text-red-700 border-red-200",
-  default: "bg-gray-50 text-gray-700 border-gray-200",
-};
-
-const STATUS_LABELS = {
-  "cần cập nhật": "Cần Cập Nhật",
-  "can cap nhat": "Cần Cập Nhật",
-  "need update": "Cần Cập Nhật",
-  "update required": "Cần Cập Nhật",
-  "cần chỉnh sửa kế hoạch": "Cần Chỉnh Sửa Kế Hoạch",
-  "can chinh sua ke hoach": "Cần Chỉnh Sửa Kế Hoạch",
-  "need plan update": "Cần Chỉnh Sửa Kế Hoạch",
-  "chấp nhận": "Chấp Nhận",
-  "chap nhan": "Chấp Nhận",
-  approved: "Chấp Nhận",
-  accepted: "Chấp Nhận",
-  "chờ xét duyệt": "Chờ Xét Duyệt",
-  "cho xet duyet": "Chờ Xét Duyệt",
-  pending: "Chờ Xét Duyệt",
-  waiting: "Chờ Xét Duyệt",
-  "chờ xét duyệt kế hoạch": "Chờ Xét Duyệt Kế Hoạch",
-  "cho xet duyet ke hoach": "Chờ Xét Duyệt Kế Hoạch",
-  planned: "Chờ Xét Duyệt Kế Hoạch",
-  "đang sản xuất": "Đang Sản Xuất",
-  "dang san xuat": "Đang Sản Xuất",
-  "in progress": "Đang Sản Xuất",
-  production: "Đang Sản Xuất",
-  "hoàn thành": "Hoàn Thành",
-  "hoan thanh": "Hoàn Thành",
-  completed: "Hoàn Thành",
-  done: "Hoàn Thành",
-  "từ chối": "Từ Chối",
-  "tu choi": "Từ Chối",
-  rejected: "Từ Chối",
-  deny: "Từ Chối",
-  denied: "Từ Chối",
-};
-
-function getProductionStatusLabel(status) {
-  const raw = String(status ?? "").trim();
-  if (!raw) return "-";
-  const normalized = raw.toLowerCase();
-  return STATUS_LABELS[normalized] || raw;
-}
-
-function splitRoles(value) {
-  const normalizeRoleItem = (item) => {
-    if (item == null) return "";
-    if (typeof item === "string" || typeof item === "number") return String(item).trim();
-    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
-    return "";
-  };
-
-  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
-
-  if (value && typeof value === "object") {
-    const normalized = normalizeRoleItem(value);
-    return normalized ? [normalized] : [];
-  }
-
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 function getPmId(item) {
-  return item?.pmId ?? item?.pmID ?? item?.pm_id ?? item?.pm?.id ?? item?.pm?.userId ?? null;
+  return item?.pmInfo?.id ?? item?.pmId ?? item?.pmID ?? item?.pm_id ?? item?.pm?.id ?? item?.pm?.userId ?? null;
+}
+
+function getPmName(item) {
+  const pmId = getPmId(item);
+  return (
+    item?.pmInfo?.fullName ??
+    item?.pmName ??
+    item?.pm?.name ??
+    item?.pm?.fullName ??
+    (pmId ? `PM #${pmId}` : "-")
+  );
 }
 
 export default function ProductionList() {
-  const [productions, setProductions] = useState([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { isOwner, isPm, currentUserId } = useAuth();
+  const { productions, loading, error, totalCount } = useProductionList();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
-  const currentUser = useMemo(() => getStoredUser() || {}, []);
-  const roleValue = extractRoleValue(currentUser) || currentUser?.role || currentUser?.roles || "";
-  const roles = useMemo(() => splitRoles(roleValue).map((role) => role.toLowerCase()), [roleValue]);
-  const isOwner = roles.includes("owner");
-  const isPm = roles.includes("pm") || roles.includes("project manager");
-  const currentUserId = currentUser?.userId ?? currentUser?.id ?? null;
 
-  useEffect(() => {
-    let active = true;
-    const fetchProductions = async () => {
-      try {
-        setLoading(true);
-        setError("");
-        const allItems = [];
-        const seenKeys = new Set();
-        let pageIndex = 0;
-        let recordCount = null;
-        const pageSizeFetch = 50;
-        const maxPages = 200;
 
-        while (pageIndex < maxPages) {
-          const response = await ProductionService.getProductionList({
-            PageIndex: pageIndex,
-            PageSize: pageSizeFetch,
-            SortColumn: "Name",
-            SortOrder: "ASC",
-          });
-          if (!active) return;
-          const payload = response?.data ?? response;
-          const list = Array.isArray(payload?.data)
-            ? payload.data
-            : Array.isArray(payload)
-              ? payload
-              : [];
-
-          let added = 0;
-          list.forEach((item) => {
-            const key = item?.productionId ?? item?.id ?? JSON.stringify(item);
-            if (seenKeys.has(key)) return;
-            seenKeys.add(key);
-            allItems.push(item);
-            added += 1;
-          });
-
-          if (recordCount == null) {
-            const reported = Number(payload?.recordCount ?? payload?.totalCount ?? 0);
-            recordCount = Number.isFinite(reported) && reported > 0 ? reported : null;
-            if (recordCount != null && recordCount <= list.length) {
-              recordCount = null;
-            }
-          }
-
-          if (list.length === 0) break;
-          if (added === 0) break;
-          if (recordCount != null && allItems.length >= recordCount) break;
-          if (list.length < pageSizeFetch) break;
-          pageIndex += 1;
-        }
-
-        setProductions(allItems);
-        setTotalCount(allItems.length);
-      } catch (err) {
-        if (!active) return;
-        setError("Không thể tải danh sách production.");
-        setProductions([]);
-        setTotalCount(0);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-
-    fetchProductions();
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const baseProductions = useMemo(() => {
     if (isOwner || !isPm || currentUserId == null) return productions;
     return productions.filter((item) => String(getPmId(item)) === String(currentUserId));
   }, [productions, isOwner, isPm, currentUserId]);
+
+
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -184,10 +49,10 @@ export default function ProductionList() {
       const hit =
         !q ||
         String(item.productionId).includes(q) ||
-        String(item.orderId).includes(q) ||
-        String(item.orderName || "").toLowerCase().includes(q) ||
-        String(item.pmName || "").toLowerCase().includes(q);
-      const statusLabel = getProductionStatusLabel(item.status);
+        String(item.order?.id ?? item.orderId ?? "").includes(q) ||
+        String(item.order?.orderName ?? item.orderName ?? "").toLowerCase().includes(q) ||
+        String(getPmName(item) || "").toLowerCase().includes(q);
+      const statusLabel = getProductionStatusLabel(item.statusName ?? item.status ?? item.statusId);
       const statusOk = statusFilter === "all" || statusLabel === statusFilter;
       return hit && statusOk;
     });
@@ -381,14 +246,19 @@ export default function ProductionList() {
                     pageData.map((item) => (
                       <tr key={item.productionId} className="leave-table-row hover:bg-slate-50/80">
                         <td className="px-4 py-3 text-sm text-slate-600 font-medium">#PR-{item.productionId}</td>
-                        <td className="px-4 py-3 text-sm text-slate-600 font-medium">#ĐH-{item.order.id}</td>
-                        <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{item.order.orderName}</td>
-                        <td className="px-3 py-3 text-sm text-slate-700 truncate">{item.pmName || `PM #${item.pmId}`}</td>
-                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.pStartDate}</td>
-                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.pEndDate}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600 font-medium">#ĐH-{item.order?.id ?? item.orderId ?? "-"}</td>
+                        <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{item.order?.orderName ?? item.orderName ?? "-"}</td>
+                        <td
+                          className="px-3 py-3 text-sm text-slate-700 truncate"
+                          title={getPmName(item)}
+                        >
+                          {getPmName(item)}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.startDate ?? item.pStartDate ?? "-"}</td>
+                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.endDate ?? item.pEndDate ?? "-"}</td>
                         <td className="px-3 py-3 text-center">
                           {(() => {
-                            const statusLabel = getProductionStatusLabel(item.statusId);
+                            const statusLabel = getProductionStatusLabel(item.statusName ?? item.status ?? item.statusId);
                             return (
                               <span className={`inline-block rounded-full border px-3.5 py-1 text-xs font-medium ${STATUS_STYLES[statusLabel] || STATUS_STYLES.default}`}>
                                 {statusLabel}

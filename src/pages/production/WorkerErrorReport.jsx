@@ -1,6 +1,6 @@
-﻿import { useMemo, useState } from "react";
-import { AlertTriangle, ImagePlus, Send, Wrench } from "lucide-react";
-import { useLocation } from "react-router-dom";
+﻿import { useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -47,8 +47,17 @@ const SEVERITIES = [
   { value: "critical", label: "Nghiêm trọng" },
 ];
 
+const ERROR_TYPES = [
+  { value: "process", label: "Lỗi công đoạn" },
+  { value: "cutting", label: "Lỗi cắt" },
+  { value: "sewing", label: "Lỗi may" },
+  { value: "other", label: "Lỗi khác" },
+];
+
 export default function WorkerErrorReport() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const fileInputRef = useRef(null);
   const assignment = location.state?.assignment ?? null;
   const normalizedAssignment = assignment
     ? {
@@ -63,6 +72,8 @@ export default function WorkerErrorReport() {
   const [form, setForm] = useState({
     productionId: normalizedAssignment?.productionId ? String(normalizedAssignment.productionId) : "",
     partName: normalizedAssignment?.partName || "",
+    errorType: normalizedAssignment?.errorType || "process",
+    otherErrorDetail: normalizedAssignment?.otherErrorDetail || "",
     severity: "medium",
     title: "",
     description: "",
@@ -71,6 +82,7 @@ export default function WorkerErrorReport() {
     suggestion: "",
   });
   const [notice, setNotice] = useState("");
+  const [attachments, setAttachments] = useState([]);
   const isPrefilled = Boolean(normalizedAssignment?.productionId || normalizedAssignment?.partName);
 
   const productions = useMemo(() => {
@@ -110,6 +122,31 @@ export default function WorkerErrorReport() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleFiles = (fileList) => {
+    const next = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
+    if (next.length === 0) return;
+    const mapped = next.map((file) => ({
+      id: `${file.name}-${file.size}-${file.lastModified}`,
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setAttachments((prev) => [...prev, ...mapped]);
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    handleFiles(event.dataTransfer.files);
+  };
+
+  const removeAttachment = (id) => {
+    setAttachments((prev) => {
+      const item = prev.find((entry) => entry.id === id);
+      if (item?.preview) URL.revokeObjectURL(item.preview);
+      return prev.filter((entry) => entry.id !== id);
+    });
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
     setNotice("Báo cáo đã được ghi nhận. Tổ trưởng sẽ xử lý trong hôm nay.");
@@ -121,6 +158,14 @@ export default function WorkerErrorReport() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+                aria-label="Quay lại"
+              >
+                <ArrowLeft size={18} />
+              </button>
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
                 <AlertTriangle size={22} />
               </div>
@@ -162,20 +207,6 @@ export default function WorkerErrorReport() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
-                  <select
-                    value={form.partName}
-                    onChange={(event) => handleChange("partName", event.target.value)}
-                    disabled={isPrefilled}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    <option value="">Chọn công đoạn...</option>
-                    {availableParts.map((item) => (
-                      <option key={item.id} value={item.partName}>{item.partName}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Mức độ</label>
                   <select
                     value={form.severity}
@@ -187,12 +218,60 @@ export default function WorkerErrorReport() {
                     ))}
                   </select>
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase text-slate-500">Loại lỗi</label>
+                  <select
+                    value={form.errorType}
+                    onChange={(event) => handleChange("errorType", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    {ERROR_TYPES.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                  {form.errorType === "other" && (
+                    <div className="mt-3">
+                      <label className="text-xs font-semibold uppercase text-slate-500">Thông tin lỗi khác</label>
+                      <input
+                        value={form.otherErrorDetail}
+                        onChange={(event) => handleChange("otherErrorDetail", event.target.value)}
+                        placeholder="Nhập thông tin lỗi khác..."
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                      />
+                    </div>
+                  )}
+                </div>
+                {form.errorType === "process" && (
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
+                    <select
+                      value={form.partName}
+                      onChange={(event) => handleChange("partName", event.target.value)}
+                      disabled={isPrefilled}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    >
+                      <option value="">Chọn công đoạn...</option>
+                      {availableParts.map((item) => (
+                        <option key={item.id} value={item.partName}>{item.partName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
                   <input
                     value={form.quantity}
                     onChange={(event) => handleChange("quantity", event.target.value)}
                     placeholder="Ví dụ: 12"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thời gian phát sinh</label>
+                  <input
+                    type="datetime-local"
+                    value={form.happenAt}
+                    onChange={(event) => handleChange("happenAt", event.target.value)}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   />
                 </div>
@@ -221,15 +300,6 @@ export default function WorkerErrorReport() {
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Thời gian phát sinh</label>
-                  <input
-                    type="datetime-local"
-                    value={form.happenAt}
-                    onChange={(event) => handleChange("happenAt", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  />
-                </div>
-                <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Gợi ý xử lý</label>
                   <input
                     value={form.suggestion}
@@ -242,10 +312,50 @@ export default function WorkerErrorReport() {
 
               <div className="mt-4">
                 <label className="text-xs font-semibold uppercase text-slate-500">Ảnh minh chứng</label>
-                <div className="mt-2 flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <div
+                  className="mt-2 flex items-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 transition hover:border-rose-200 hover:bg-rose-50/40"
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onDrop={handleDrop}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      fileInputRef.current?.click();
+                    }
+                  }}
+                >
                   <ImagePlus size={18} className="text-slate-400" />
-                  Kéo thả ảnh hoặc bấm để tải lên (demo)
+                  Kéo thả ảnh hoặc bấm để tải lên
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => handleFiles(event.target.files)}
+                />
+                {attachments.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {attachments.map((item) => (
+                      <div key={item.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <img src={item.preview} alt={item.file.name} className="h-28 w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(item.id)}
+                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-600 shadow hover:text-rose-600"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {notice && (

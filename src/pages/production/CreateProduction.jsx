@@ -40,6 +40,37 @@ export default function CreateProduction() {
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const normalizeOrderDetail = (payload) => {
+    if (!payload) return null;
+    const templates = Array.isArray(payload.templates)
+      ? payload.templates
+      : Array.isArray(payload.template)
+        ? payload.template
+        : Array.isArray(payload.files)
+          ? payload.files
+          : [];
+    const materials = Array.isArray(payload.materials)
+      ? payload.materials
+      : Array.isArray(payload.materialList)
+        ? payload.materialList
+        : Array.isArray(payload.materialItems)
+          ? payload.materialItems
+          : [];
+
+    return {
+      ...payload,
+      templates: templates.map((t) => ({
+        ...t,
+        templateName: t?.templateName ?? t?.name,
+      })),
+      materials: materials.map((m) => ({
+        ...m,
+        materialName: m?.materialName ?? m?.name,
+      })),
+    };
+  };
 
   useEffect(() => {
     let active = true;
@@ -53,7 +84,8 @@ export default function CreateProduction() {
       try {
         setLoadingOrder(true);
         const response = await OrderService.getOrderDetail(orderId);
-        const data = response?.data?.data ?? response?.data ?? null;
+        const raw = response?.data?.data ?? response?.data ?? null;
+        const data = normalizeOrderDetail(raw);
         if (!active) return;
         setOrder(data);
         setOrderError(null);
@@ -73,11 +105,28 @@ export default function CreateProduction() {
     const fetchPMs = async () => {
       try {
         setLoadingPM(true);
-        const response = await WorkerService.getAllEmployees();
+        let response;
+        try {
+          response = await WorkerService.getAllEmployees({
+            PageIndex: 0,
+            PageSize: 10,
+            SortColumn: "Name",
+            SortOrder: "ASC",
+            FilterQuery: "PM",
+          });
+        } catch (_err) {
+          response = await WorkerService.getAllEmployees();
+        }
         const items = response?.data ?? [];
-        const pms = items.filter((item) =>
-          item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM"))
-        );
+        const pmRoles = ["PM", "Owner", "Admin"];
+        const pms = items.filter((item) => {
+          if (pmRoles.includes(item?.primaryRole)) return true;
+          if (Array.isArray(item?.roles)) {
+            return item.roles.some((role) => pmRoles.includes(role));
+          }
+          const rawRole = String(item?.role ?? "").split(",").map((r) => r.trim());
+          return rawRole.some((role) => pmRoles.includes(role));
+        });
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
@@ -98,6 +147,38 @@ export default function CreateProduction() {
       if (orderId) return;
       try {
         setOrdersLoading(true);
+        const getAssignedOrderIds = async () => {
+          const assigned = new Set();
+          let pageIndex = 0;
+          const pageSizeFetch = 50;
+          const maxPages = 200;
+
+          while (pageIndex < maxPages) {
+            const response = await ProductionService.getProductionList({
+              PageIndex: pageIndex,
+              PageSize: pageSizeFetch,
+              SortColumn: "Name",
+              SortOrder: "ASC",
+            });
+            const payload = response?.data ?? response;
+            const list = Array.isArray(payload?.data)
+              ? payload.data
+              : Array.isArray(payload)
+                ? payload
+                : [];
+
+            list.forEach((item) => {
+              const oid = item?.order?.id ?? item?.orderId ?? item?.orderID ?? item?.order_id;
+              if (oid != null) assigned.add(String(oid));
+            });
+
+            if (list.length < pageSizeFetch) break;
+            pageIndex += 1;
+          }
+
+          return assigned;
+        };
+
         let response;
         const paramsSerializer = {
           serialize: (params) =>
@@ -166,7 +247,18 @@ export default function CreateProduction() {
           response?.items ??
           [];
         if (!active) return;
-        setOrders(Array.isArray(items) ? items : []);
+        let filteredItems = Array.isArray(items) ? items : [];
+        try {
+          const assignedOrderIds = await getAssignedOrderIds();
+          filteredItems = filteredItems.filter((o) => {
+            const oid = o?.id ?? o?.orderId ?? o?.orderID ?? o?.order_id;
+            if (oid == null) return true;
+            return !assignedOrderIds.has(String(oid));
+          });
+        } catch (_err) {
+          // If fetching productions fails, fall back to showing all orders.
+        }
+        setOrders(filteredItems);
         setOrdersError(null);
       } catch (_err) {
         if (!active) return;
@@ -181,8 +273,28 @@ export default function CreateProduction() {
 
   useEffect(() => {
     if (!selectedOrderId || orderId) return;
-    const picked = orders.find((item) => String(item.id ?? item.orderId) === String(selectedOrderId));
-    setOrder(picked || null);
+    let active = true;
+    const picked = orders.find((item) => String(item.id ?? item.orderId) === String(selectedOrderId)) || null;
+    setOrder(picked);
+    const fetchDetail = async () => {
+      try {
+        setLoadingOrder(true);
+        const response = await OrderService.getOrderDetail(selectedOrderId);
+        const raw = response?.data?.data ?? response?.data ?? null;
+        if (!active) return;
+        setOrder(normalizeOrderDetail(raw));
+        setOrderError(null);
+      } catch (_err) {
+        if (!active) return;
+        setOrderError("Không thể tải thông tin đơn hàng.");
+      } finally {
+        if (active) setLoadingOrder(false);
+      }
+    };
+    fetchDetail();
+    return () => {
+      active = false;
+    };
   }, [selectedOrderId, orderId, orders]);
 
   const orderSummaryRows = useMemo(() => ([
@@ -265,8 +377,7 @@ export default function CreateProduction() {
           console.error("Update order status error:", err?.response?.data ?? err);
         }
       }
-      alert("Tạo production thành công! Đơn hàng đã chuyển sang Chờ xét duyệt.");
-      navigate(`/orders/detail/${order?.id ?? orderId}`);
+      setShowSuccess(true);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
       alert("Không thể tạo production. Vui lòng thử lại.");
@@ -299,6 +410,25 @@ export default function CreateProduction() {
   return (
     <OwnerLayout>
       <div className="leave-page leave-list-page">
+        {showSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-900">Tạo production thành công</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Production đã được tạo thành công. Bạn có muốn chuyển về danh sách sản xuất không?
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  onClick={() => navigate("/production")}
+                >
+                  Về danh sách sản xuất
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">

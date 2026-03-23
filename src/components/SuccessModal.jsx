@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import "@/styles/SuccessModal.css";
 
 export default function SuccessModal({
   isOpen,
@@ -6,6 +7,7 @@ export default function SuccessModal({
   description = "",
   primaryLabel = "OK",
   secondaryLabel = "Đóng",
+  hideSecondary = false,
   onPrimary,
   onClose,
 }) {
@@ -42,9 +44,11 @@ export default function SuccessModal({
         {description ? <p className="gpms-modal__desc">{description}</p> : null}
 
         <div className="gpms-modal__actions">
-          <button type="button" className="gpms-modal__btn gpms-modal__btn--ghost" onClick={onClose}>
-            {secondaryLabel}
-          </button>
+          {!hideSecondary && (
+            <button type="button" className="gpms-modal__btn gpms-modal__btn--ghost" onClick={onClose}>
+              {secondaryLabel}
+            </button>
+          )}
           <button type="button" className="gpms-modal__btn gpms-modal__btn--primary" onClick={onPrimary}>
             {primaryLabel}
           </button>

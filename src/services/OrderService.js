@@ -44,8 +44,16 @@ const OrderService = {
             throw err;
         }
     },
-    denyOrder: (orderId) => {
-        return axiosClient.post(API_ENDPOINTS.ORDER.DENY_ORDER(orderId));
+    denyOrder: async (orderId) => {
+        try {
+            return await axiosClient.put(API_ENDPOINTS.ORDER.DENY_ORDER(orderId));
+        } catch (err) {
+            const status = err?.response?.status;
+            if (status === 405 || status === 404) {
+                return axiosClient.post(API_ENDPOINTS.ORDER.DENY_ORDER(orderId));
+            }
+            throw err;
+        }
     },
     rejectOrder: async (payload) => {
         try {

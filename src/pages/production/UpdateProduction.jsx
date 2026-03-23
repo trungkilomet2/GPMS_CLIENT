@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, UserCheck, FileText, Download, Package } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
@@ -75,6 +75,7 @@ const MOCK_PRODUCTIONS = [
 export default function UpdateProduction() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [production, setProduction] = useState(null);
   const [loadingProduction, setLoadingProduction] = useState(false);
@@ -118,35 +119,45 @@ export default function UpdateProduction() {
     return () => { active = false; };
   }, []);
 
+  const normalizeDetail = (payload) => {
+    if (!payload) return null;
+    const order = payload.order || {};
+    return {
+      productionId: payload.productionId ?? payload.id ?? null,
+      status: payload.statusName || payload.status || "",
+      pStartDate: payload.startDate || payload.pStartDate || "",
+      pEndDate: payload.endDate || payload.pEndDate || "",
+      pmId: payload.pm?.id ?? payload.pmId ?? null,
+      note: payload.note ?? payload.productionNote ?? "",
+      order: {
+        ...order,
+        size: typeof order.size === "string" ? order.size.trim() : order.size,
+        status: order.statusName ?? order.status,
+        templates: Array.isArray(order.templates)
+          ? order.templates.map((t) => ({ ...t, templateName: t.templateName ?? t.name }))
+          : order.templates,
+        materials: Array.isArray(order.materials)
+          ? order.materials.map((m) => ({ ...m, materialName: m.materialName ?? m.name }))
+          : order.materials,
+      },
+    };
+  };
+
+  useEffect(() => {
+    const fromState = location?.state?.production;
+    if (fromState) {
+      const normalized = normalizeDetail(fromState);
+      if (normalized) setProduction(normalized);
+    }
+  }, [location?.state?.production]);
+
   useEffect(() => {
     let active = true;
-    const normalizeDetail = (payload) => {
-      if (!payload) return null;
-      const order = payload.order || {};
-      return {
-        productionId: payload.productionId ?? payload.id ?? null,
-        status: payload.statusName || payload.status || "",
-        pStartDate: payload.startDate || payload.pStartDate || "",
-        pEndDate: payload.endDate || payload.pEndDate || "",
-        pmId: payload.pm?.id ?? payload.pmId ?? null,
-        note: payload.note ?? payload.productionNote ?? "",
-        order: {
-          ...order,
-          size: typeof order.size === "string" ? order.size.trim() : order.size,
-          status: order.statusName ?? order.status,
-          templates: Array.isArray(order.templates)
-            ? order.templates.map((t) => ({ ...t, templateName: t.templateName ?? t.name }))
-            : order.templates,
-          materials: Array.isArray(order.materials)
-            ? order.materials.map((m) => ({ ...m, materialName: m.materialName ?? m.name }))
-            : order.materials,
-        },
-      };
-    };
 
     const fetchProduction = async () => {
       try {
-        setLoadingProduction(true);
+        const hasPrefill = !!location?.state?.production;
+        if (!hasPrefill) setLoadingProduction(true);
         setProductionError("");
         const response = await ProductionService.getProductionDetail(id);
         if (!active) return;
@@ -171,7 +182,7 @@ export default function UpdateProduction() {
 
     fetchProduction();
     return () => { active = false; };
-  }, [id]);
+  }, [id, location?.state?.production]);
 
   useEffect(() => {
     if (!production) return;
@@ -198,8 +209,9 @@ export default function UpdateProduction() {
   if (loadingProduction) {
     return (
       <OwnerLayout>
-        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
-          Đang tải thông tin production...
+        <div className="flex flex-col items-center justify-center min-h-400px">
+          <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
+          <p className="text-gray-500 text-sm font-medium">Đang tải thông tin production...</p>
         </div>
       </OwnerLayout>
     );
@@ -274,7 +286,7 @@ export default function UpdateProduction() {
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Cập nhật Production #PR-{production.productionId}
+                  Cập nhật Production cho đơn hàng #{order?.id ?? "--"}
                 </h1>
                 <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
               </div>
@@ -325,12 +337,8 @@ export default function UpdateProduction() {
                       value={form.productionNote}
                       onChange={handleChange}
                       placeholder="Nhập ghi chú cho production..."
-                      disabled
                       className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                     />
-                    <div className="mt-2 text-[11px] text-slate-400">
-                      Ghi chú chỉ hiển thị, không cập nhật ở màn này.
-                    </div>
                   </div>
 
                   <div className="md:col-span-2 flex flex-wrap justify-end gap-3 pt-2">
@@ -346,7 +354,7 @@ export default function UpdateProduction() {
                       disabled={isSubmitting}
                       className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
                     >
-                      {isSubmitting ? "Đang cập nhật..." : "Cập nhật PM"}
+                      {isSubmitting ? "Đang cập nhật..." : "Cập nhật Production"}
                     </button>
                   </div>
                 </form>

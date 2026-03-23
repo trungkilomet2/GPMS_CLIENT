@@ -285,7 +285,7 @@ export default function OrderDetail() {
                                 <button
                                     onClick={() => {
                                         if (!canEditOnlyWhenRequested) return;
-                                        navigate(`/orders/edit/${order.id}`);
+                                        navigate(`/orders/edit/${order.id}`, { state: { order } });
                                     }}
                                     disabled={!canEditOnlyWhenRequested}
                                     className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
