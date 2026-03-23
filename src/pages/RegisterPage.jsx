@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { authService } from "../services/authService";
 import SuccessModal from "@/components/SuccessModal";
 import {
+  validateEmail,
   normalizeSpaces,
   validateConfirmPassword,
   validateFullName,
@@ -14,9 +15,11 @@ import "../styles/register.css";
 
 const initialValues = {
   fullName: "",
+  email: "",
   userName: "",
   password: "",
   confirmPassword: "",
+  otp: "",
   agree: false,
 };
 
@@ -30,6 +33,7 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
 
   const getApiErrorDetails = (errData) => {
     const rawErrors =
@@ -44,6 +48,8 @@ export default function RegisterPage() {
           const key = String(field ?? "").trim().toLowerCase();
           if (key.includes("username")) acc.userName = message;
           else if (key.includes("fullname")) acc.fullName = message;
+          else if (key.includes("email")) acc.email = message;
+          else if (key.includes("otp")) acc.otp = message;
           else if (key === "password") acc.password = message;
           else if (key.includes("repassword") || key.includes("confirmpassword")) {
             acc.confirmPassword = message;
@@ -58,6 +64,8 @@ export default function RegisterPage() {
     const message =
       fieldErrors.userName ||
       fieldErrors.fullName ||
+      fieldErrors.email ||
+      fieldErrors.otp ||
       fieldErrors.password ||
       fieldErrors.confirmPassword ||
       fieldErrors._ ||
@@ -72,21 +80,25 @@ export default function RegisterPage() {
 
   const validateField = (name, value, nextForm = formData) => {
     if (name === "fullName") return validateFullName(value);
+    if (name === "email") return validateEmail(value);
     if (name === "userName") return validateUserName(value);
     if (name === "password") return validatePassword(value);
     if (name === "confirmPassword") {
       return validateConfirmPassword(nextForm.password, value);
     }
+    if (name === "otp") return otpSent && !String(value ?? "").trim() ? "Vui lòng nhập mã OTP" : "";
     if (name === "agree") return value ? "" : "Bạn phải đồng ý với điều khoản";
     return "";
   };
 
-  const validateForm = () => {
+  const validateForm = ({ includeOtp = otpSent } = {}) => {
     const newErrors = {};
-    Object.keys(formData).forEach((key) => {
+    Object.keys(formData)
+      .filter((key) => includeOtp || key !== "otp")
+      .forEach((key) => {
       const message = validateField(key, formData[key], formData);
       if (message) newErrors[key] = message;
-    });
+      });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -102,6 +114,9 @@ export default function RegisterPage() {
 
     setFormData(nextForm);
     setSubmitError("");
+    if (name === "email" && otpSent) {
+      setOtpSent(false);
+    }
     setErrors((prev) => ({
       ...prev,
       [name]: validateField(name, nextValue, nextForm),
@@ -116,22 +131,52 @@ export default function RegisterPage() {
     navigate("/login");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const buildRegisterPayload = () => ({
+    userName: formData.userName.trim(),
+    fullName: normalizeSpaces(formData.fullName),
+    email: formData.email.trim(),
+    password: formData.password,
+    rePassword: formData.confirmPassword,
+  });
 
-    if (!validateForm()) return;
+  const handleSendOtp = async () => {
+    if (!validateForm({ includeOtp: false })) return;
 
     try {
       setLoading(true);
 
-      const payload = {
-        userName: formData.userName.trim(),
-        fullName: normalizeSpaces(formData.fullName),
-        password: formData.password,
-        rePassword: formData.confirmPassword,
-      };
+      await authService.sendRegisterOtp({
+        email: formData.email.trim(),
+      });
 
-      await authService.register(payload);
+      setOtpSent(true);
+      setSubmitError("");
+      setFormData((prev) => ({ ...prev, otp: "" }));
+      setErrors((prev) => ({ ...prev, otp: "" }));
+    } catch (error) {
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAndRegister = async () => {
+    if (!validateForm({ includeOtp: true })) return;
+
+    try {
+      setLoading(true);
+
+      await authService.verifyRegisterOtp({
+        email: formData.email.trim(),
+        otp: formData.otp.trim(),
+      });
+
+      await authService.register(buildRegisterPayload());
 
       setSubmitError("");
       setSuccessOpen(true);
@@ -145,6 +190,17 @@ export default function RegisterPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (otpSent) {
+      await handleVerifyAndRegister();
+      return;
+    }
+
+    await handleSendOtp();
   };
 
   return (
@@ -223,6 +279,20 @@ export default function RegisterPage() {
           </div>
           {errors.fullName && <p className="error-text">{errors.fullName}</p>}
 
+          <label className="field-label">Email *</label>
+          <div className="input-wrapper">
+            <span className="input-icon">✉️</span>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Nhập email để nhận mã xác thực"
+              className={errors.email ? "input-error" : ""}
+            />
+          </div>
+          {errors.email && <p className="error-text">{errors.email}</p>}
+
           <label className="field-label">Tên đăng nhập *</label>
           <div className="input-wrapper">
             <span className="input-icon">🆔</span>
@@ -281,6 +351,24 @@ export default function RegisterPage() {
             <p className="error-text">{errors.confirmPassword}</p>
           )}
 
+          {otpSent ? (
+            <>
+              <label className="field-label">Mã OTP *</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🔢</span>
+                <input
+                  type="text"
+                  name="otp"
+                  value={formData.otp}
+                  onChange={handleChange}
+                  placeholder="Nhập mã OTP gửi về email"
+                  className={errors.otp ? "input-error" : ""}
+                />
+              </div>
+              {errors.otp && <p className="error-text">{errors.otp}</p>}
+            </>
+          ) : null}
+
           <label className="terms">
             <input
               type="checkbox"
@@ -302,7 +390,13 @@ export default function RegisterPage() {
           ) : null}
 
           <button type="submit" className="register-btn" disabled={loading}>
-            {loading ? "Đang đăng ký..." : "Đăng ký"}
+            {loading
+              ? otpSent
+                ? "Đang xác thực..."
+                : "Đang gửi mã..."
+              : otpSent
+                ? "Xác thực email và đăng ký"
+                : "Gửi mã xác thực"}
           </button>
 
           <div className="register-row">

@@ -11,6 +11,11 @@ export const API_ENDPOINTS = {
     REGISTER: `${BASE_URL}/api/Account/register`,
   },
 
+  EMAIL: {
+    SEND_OTP: `${BASE_URL}/api/Email/sent-otp-email`,
+    VERIFY_EMAIL: `${BASE_URL}/api/Email/verify-email`,
+  },
+
   ORDER: {
     GET_ALL: `${BASE_URL}/api/Order/order-list`,
     GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
