@@ -95,6 +95,7 @@ export default function ProductionPlanDetail() {
 
         const steps = Array.isArray(partList)
           ? partList.map((part) => ({
+            partId: part?.id ?? part?.partId ?? null,
             partName: part?.name ?? part?.partName ?? part?.title ?? "-",
             cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
             startDate: part?.startDate ?? part?.planStartDate ?? "-",
@@ -267,6 +268,7 @@ export default function ProductionPlanDetail() {
               {isWorker ? (
                 <Link
                   to="/worker/daily-report"
+                  state={{ plan: { production: plan.production, steps: plan.steps } }}
                   className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
                 >
                   Báo cáo sản lượng
@@ -377,6 +379,7 @@ export default function ProductionPlanDetail() {
                   <div className="mt-1">
                     <Link
                       to="/worker/daily-report"
+                      state={{ plan: { production: plan.production, steps: plan.steps } }}
                       className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
                     >
                       Xem chi tiết sản lượng nhân viên

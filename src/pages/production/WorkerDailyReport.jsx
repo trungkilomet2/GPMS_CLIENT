@@ -1,9 +1,10 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
+import ProductionPartService from "@/services/ProductionPartService";
 
 const MOCK_TASKS = [
   {
@@ -40,14 +41,43 @@ export default function WorkerDailyReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const assignment = location.state?.assignment || null;
+  const plan = location.state?.plan || null;
+  const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
   const today = useMemo(() => formatDateInput(), []);
   const [reportDate, setReportDate] = useState(today);
+  const [isSavingAll, setIsSavingAll] = useState(false);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [rows, setRows] = useState(() => {
-    const base = assignment ? [assignment] : MOCK_TASKS;
+    const base = planSteps.length > 0
+      ? planSteps.map((step, index) => ({
+        id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
+        partId: step?.partId ?? step?.id ?? null,
+        productionId: plan?.production?.productionId ?? step?.productionId ?? "",
+        orderName: plan?.production?.orderName ?? "",
+        partName: step?.partName ?? step?.name ?? "-",
+        cpu: step?.cpu ?? step?.unitPrice ?? 0,
+        workLogId: step?.workLogId ?? null,
+        logReadOnly: false,
+      }))
+      : (assignment ? [assignment] : MOCK_TASKS);
     return base.map((task) => ({ ...task, quantity: "" }));
   });
-  const [isEditing, setIsEditing] = useState(Boolean(assignment));
-  const [draftRows, setDraftRows] = useState(() => (assignment ? [{ ...assignment, quantity: "" }] : null));
+  const [isEditing, setIsEditing] = useState(Boolean(assignment) || planSteps.length > 0);
+  const [draftRows, setDraftRows] = useState(() =>
+    planSteps.length > 0
+      ? planSteps.map((step, index) => ({
+        id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
+        partId: step?.partId ?? step?.id ?? null,
+        productionId: plan?.production?.productionId ?? step?.productionId ?? "",
+        orderName: plan?.production?.orderName ?? "",
+        partName: step?.partName ?? step?.name ?? "-",
+        cpu: step?.cpu ?? step?.unitPrice ?? 0,
+        workLogId: step?.workLogId ?? null,
+        logReadOnly: false,
+        quantity: "",
+      }))
+      : (assignment ? [{ ...assignment, quantity: "" }] : null)
+  );
 
   const totalAmount = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.cpu) || 0), 0),
@@ -62,6 +92,116 @@ export default function WorkerDailyReport() {
 
   const isToday = reportDate === today;
   const canEdit = isToday && isEditing;
+
+  const normalizeDateString = (target) => {
+    if (!target) return "";
+    const raw = String(target).trim();
+    if (raw.includes("/")) {
+      const [mm, dd, yyyy] = raw.split("/").map((v) => v.trim());
+      if (yyyy && mm && dd) return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+    }
+    return raw;
+  };
+
+  const sameDate = (value, target) => {
+    if (!value || !target) return false;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return false;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const normalizedTarget = normalizeDateString(target);
+    return `${yyyy}-${mm}-${dd}` === normalizedTarget;
+  };
+
+  const normalizeName = (value) => String(value || "").trim().toLowerCase();
+  const unwrapArrayPayload = (response) => {
+    const root = response?.data ?? response;
+    if (Array.isArray(root)) return root;
+    if (Array.isArray(root?.data)) return root.data;
+    return [];
+  };
+
+  const unwrapObjectId = (response) => {
+    const root = response?.data ?? response;
+    return root?.id ?? root?.data?.id ?? null;
+  };
+
+  useEffect(() => {
+    let active = true;
+    const loadLogs = async () => {
+      if (!Array.isArray(rows) || rows.length === 0) return;
+      let rowsToUse = rows;
+      const missingPart = rows.filter((row) => !row.partId && row.partName);
+      const productionId =
+        plan?.production?.productionId || rows.find((row) => row.productionId)?.productionId;
+      if (missingPart.length > 0 && productionId) {
+        try {
+          const res = await ProductionPartService.getPartsByProduction(productionId);
+          const payload = res?.data?.data ?? res?.data ?? [];
+          const partList = Array.isArray(payload) ? payload : [];
+          const nameToId = new Map(
+            partList
+              .map((p) => [normalizeName(p?.partName ?? p?.name), p?.id ?? p?.partId])
+              .filter(([name, id]) => name && id != null)
+          );
+          rowsToUse = rows.map((row) => {
+            if (row.partId) return row;
+            const mappedId = nameToId.get(normalizeName(row.partName));
+            return mappedId ? { ...row, partId: mappedId } : row;
+          });
+          setRows(rowsToUse);
+          setDraftRows((prev) => (prev ? rowsToUse.map((row) => ({ ...row })) : prev));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      const partIds = rowsToUse.map((row) => row.partId).filter(Boolean);
+      const partIdKeys = partIds.map((id) => String(id));
+      if (partIds.length === 0) return;
+      setIsLoadingLogs(true);
+      try {
+        const responses = await Promise.all(
+          partIds.map((partId) => ProductionPartService.getWorkLogs(partId))
+        );
+        if (!active) return;
+        const byPart = new Map();
+        responses.forEach((res, idx) => {
+          const partId = partIdKeys[idx];
+          const effectiveList = unwrapArrayPayload(res);
+          if (effectiveList.length === 0) return;
+          const latest = effectiveList.sort((a, b) => new Date(b.workDate) - new Date(a.workDate))[0];
+          if (latest) byPart.set(partId, latest);
+        });
+
+        const applyLogs = (list) =>
+          list.map((row) => {
+            const log = row.partId ? byPart.get(String(row.partId)) : null;
+            if (!log) return row;
+            const nextQty = log.quantity ?? "";
+            return {
+              ...row,
+              workLogId: log.id ?? row.workLogId ?? null,
+              logReadOnly: Boolean(log.isReadOnly),
+              quantity: nextQty,
+            };
+          });
+
+        const applied = applyLogs(rowsToUse);
+        setRows(applied);
+        setDraftRows((prev) => (prev ? applied : prev));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (active) setIsLoadingLogs(false);
+      }
+    };
+    loadLogs();
+    return () => {
+      active = false;
+    };
+  }, [reportDate, rows.length]);
 
   const beginEdit = () => {
     setDraftRows(rows.map((row) => ({ ...row })));
@@ -78,6 +218,65 @@ export default function WorkerDailyReport() {
     setRows(draftRows);
     setDraftRows(null);
     setIsEditing(false);
+  };
+
+  const buildPayload = (row) => {
+    const storedUserId = localStorage.getItem("userId");
+    const workDate = reportDate
+      ? new Date(reportDate).toISOString()
+      : new Date().toISOString();
+    return {
+      userId: Number(storedUserId) || 1,
+      quantity: Number(row.quantity || 0),
+      workDate,
+    };
+  };
+
+  const saveAll = async () => {
+    if (!canEdit || isSavingAll) return;
+    const currentRows = isEditing ? draftRows : rows;
+    if (!Array.isArray(currentRows) || currentRows.length === 0) return;
+    setIsSavingAll(true);
+    try {
+      const results = await Promise.allSettled(
+        currentRows.map(async (row) => {
+          if (!row?.partId) return { row, skipped: true };
+          if (row.logReadOnly) return { row, skipped: true };
+          const payload = buildPayload(row);
+          let createdId = row.workLogId ?? null;
+          if (row.workLogId) {
+            await ProductionPartService.updateWorkLog(row.partId, row.workLogId, payload);
+          } else {
+            const response = await ProductionPartService.createWorkLog(row.partId, payload);
+            createdId = unwrapObjectId(response);
+          }
+          return { row, createdId };
+        })
+      );
+
+      const failed = results
+        .map((res, idx) => ({ res, row: currentRows[idx] }))
+        .filter((item) => item.res.status === "rejected");
+
+      const updatedRows = currentRows.map((row, idx) => {
+        const res = results[idx];
+        if (res.status !== "fulfilled") return row;
+        const createdId = res.value?.createdId ?? row.workLogId ?? null;
+        return { ...row, workLogId: createdId };
+      });
+
+      setRows(updatedRows.map((row) => ({ ...row })));
+      setDraftRows(updatedRows.map((row) => ({ ...row })));
+
+      if (failed.length === 0) {
+        setIsEditing(false);
+        setDraftRows(null);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingAll(false);
+    }
   };
 
   return (
@@ -123,10 +322,11 @@ export default function WorkerDailyReport() {
                     Hủy
                   </button>
                   <button
-                    onClick={saveEdit}
-                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                    onClick={saveAll}
+                    disabled={!canEdit || isSavingAll}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
                   >
-                    Lưu
+                    {isSavingAll ? "Đang lưu..." : "Lưu"}
                   </button>
                 </>
               )}
@@ -154,7 +354,7 @@ export default function WorkerDailyReport() {
           <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="leave-table-card__header">
               <div>
-                <h2 className="leave-table-card__title">Danh sách công đoạn</h2>
+                <h2 className="leave-table-card__title">Danh sách Công đoạn</h2>
                 <p className="leave-table-card__subtitle">Điền số lượng hoàn thành và ghi chú nếu cần.</p>
               </div>
             </div>
@@ -181,7 +381,7 @@ export default function WorkerDailyReport() {
                         {row.cpu ? `${row.cpu.toLocaleString("vi-VN")} VND` : "-"}
                       </td>
                       <td className="px-3 py-2">
-                        {canEdit ? (
+                        {canEdit && !row.logReadOnly ? (
                           <input
                             type="number"
                             min="0"
@@ -212,3 +412,17 @@ export default function WorkerDailyReport() {
     </OwnerLayout>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
