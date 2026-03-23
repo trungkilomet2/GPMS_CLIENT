@@ -1,16 +1,20 @@
-import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+﻿import { useEffect, useState } from "react";
+import { createElement } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   BadgeDollarSign,
   BriefcaseBusiness,
   ChartPie,
+  ClipboardCheck,
   ClipboardList,
+  ListChecks,
   LogOut,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { canManageLeaveRequests } from "@/lib/roleAccess";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -21,15 +25,28 @@ const ADMIN_NAV_ITEMS = [
 
 const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
-  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false },
-  { to: "/production", label: "Giám sát hoạt động", icon: ClipboardList, disabled: false },
+  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, requiredRole: "Owner" },
+  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, requiredRole: "Owner" },
 ];
 
 function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  const normalizeRoleItem = (item) => {
+    if (item == null) return "";
+    if (typeof item === "string" || typeof item === "number") return String(item).trim();
+    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
+    return "";
+  };
+
+  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
+
+  if (value && typeof value === "object") {
+    const normalized = normalizeRoleItem(value);
+    return normalized ? [normalized] : [];
+  }
 
   return String(value ?? "")
     .split(",")
@@ -69,6 +86,7 @@ function getInitials(name = "") {
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-sidebar-collapsed");
@@ -79,7 +97,14 @@ export default function Sidebar() {
   });
 
   const user = getStoredUser();
-  const navItems = resolveSidebarItems(user);
+  const navItems = resolveSidebarItems(user).filter((item) => {
+    if (item.to === "/leave") {
+      return canManageLeaveRequests(user?.role);
+    }
+
+    return true;
+  });
+  const isOrdersSection = location.pathname.startsWith("/orders");
 
   useEffect(() => {
     try {
@@ -116,18 +141,16 @@ export default function Sidebar() {
 
       <nav className="dashboard-sidebar__nav">
         {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
-          if (!hasRequiredRole(user, requiredRole)) {
-            return null;
-          }
+          if (!hasRequiredRole(user, requiredRole)) return null;
 
           if (disabled) {
             return (
               <div
-                key={label}
+                key={to}
                 className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
                 title={label}
               >
-                <Icon size={22} />
+                {createElement(Icon, { size: 22 })}
                 {!collapsed && <span>{label}</span>}
               </div>
             );
@@ -138,11 +161,13 @@ export default function Sidebar() {
               key={to}
               to={to}
               title={label}
-              className={({ isActive }) =>
-                `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${isActive ? "is-active" : ""}`
-              }
+              className={({ isActive }) => {
+                const isForcedActive = to === "/orders/owner" && isOrdersSection;
+                const active = isActive || isForcedActive;
+                return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
+              }}
             >
-              <Icon size={22} />
+              {createElement(Icon, { size: 22 })}
               {!collapsed && <span>{label}</span>}
             </NavLink>
           );
@@ -150,7 +175,11 @@ export default function Sidebar() {
       </nav>
 
       <div className="dashboard-sidebar__footer">
-        <div className="dashboard-sidebar__account">
+        <NavLink
+          to="/profile"
+          title="Hồ sơ cá nhân"
+          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+        >
           <div className="dashboard-sidebar__avatar">
             {getInitials(user?.fullName || user?.name || "GP")}
           </div>
@@ -160,7 +189,7 @@ export default function Sidebar() {
               <div className="dashboard-sidebar__user-role">{user?.role || "Owner / PM"}</div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <button
           type="button"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 import {
@@ -126,20 +127,56 @@ function getApiErrorDetails(errData) {
   return { message, fieldErrors };
 }
 
-async function buildAvatarFile(avatarFile, avatarPreview) {
+function isEmailVerificationRequiredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email chưa được xác thực") ||
+    message.includes("xác thực email trước khi cập nhật") ||
+    message.includes("verify email") ||
+    message.includes("email not verified")
+  );
+}
+
+async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
   if (avatarFile) return avatarFile;
-  if (typeof avatarPreview !== "string" || !/^https?:\/\//i.test(avatarPreview)) {
-    return null;
+
+  // Try reusing current preview (can be http(s), blob:, data:...)
+  if (typeof avatarPreview === "string" && avatarPreview.trim()) {
+    try {
+      const response = await fetch(avatarPreview);
+      if (response.ok) {
+        const blob = await response.blob();
+        const type = blob.type || "image/png";
+        const extension = type.split("/")[1] || "png";
+        return new File([blob], `avatar.${extension}`, { type });
+      }
+    } catch {
+      // fall through to generated avatar
+    }
   }
 
-  const response = await fetch(avatarPreview);
-  if (!response.ok) {
-    throw new Error("Không thể tải lại ảnh đại diện hiện tại.");
-  }
+  // Backend currently validates AvartarUrl as required.
+  // Generate a small PNG avatar so user can save profile even without uploading an image.
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Không thể tạo ảnh đại diện mặc định.");
 
-  const blob = await response.blob();
-  const extension = blob.type.split("/")[1] || "jpg";
-  return new File([blob], `avatar.${extension}`, { type: blob.type || "image/jpeg" });
+  ctx.fillStyle = "#1f4d3a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const safeInitials = String(initials || "?").trim().slice(0, 2).toUpperCase() || "?";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 96px Lexend, 'Be Vietnam Pro', system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(safeInitials, canvas.width / 2, canvas.height / 2 + 4);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
+  if (!blob) throw new Error("Không thể tạo ảnh đại diện mặc định.");
+  return new File([blob], "avatar.png", { type: "image/png" });
 }
 
 /* ─── Input ─── */
@@ -233,7 +270,9 @@ function AvatarUploader({ src, initials, uploading, onChange }) {
    MAIN COMPONENT
 ═════════════════════════════ */
 export default function ProfileEdit() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const forceProfileCompletion = Boolean(location.state?.forceProfileCompletion);
 
   const buildLocalProfile = (user) => ({
     fullName: user?.fullName ?? user?.name ?? "",
@@ -265,6 +304,11 @@ export default function ProfileEdit() {
   const [saving,    setSaving]    = useState(false);
   const [msg,       setMsg]       = useState(null);   // {type, text}
   const [touched,   setTouched]   = useState({});
+  const [otpCode, setOtpCode] = useState("");
+  const [otpStage, setOtpStage] = useState("idle");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
 
   const validateField = (name, value) => {
     if (name === "FullName") return validateFullName(value);
@@ -313,6 +357,7 @@ export default function ProfileEdit() {
         }
       })
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Field change ── */
@@ -321,6 +366,13 @@ export default function ProfileEdit() {
     setForm(f => ({ ...f, [name]: value }));
     if (name !== "Avatar") {
       setMsg(null);
+    }
+    if (name === "Email") {
+      const normalizedEmail = String(value || "").trim().toLowerCase();
+      if (normalizedEmail !== String(verifiedEmail || "").trim().toLowerCase()) {
+        setOtpStage("idle");
+        setOtpCode("");
+      }
     }
   };
 
@@ -344,6 +396,72 @@ export default function ProfileEdit() {
     setAvatarPreview(URL.createObjectURL(file));
     setTouched((prev) => ({ ...prev, Avatar: true }));
     setMsg(null);
+  };
+
+  const handleSendOtp = async () => {
+    const emailError = validateField("Email", form.Email);
+    setTouched((prev) => ({ ...prev, Email: true }));
+
+    if (emailError) {
+      setMsg({ type: "error", text: emailError });
+      return;
+    }
+
+    try {
+      setSendingOtp(true);
+      setMsg(null);
+      await authService.sendRegisterOtp({ email: String(form.Email || "").trim() });
+      setOtpStage("sent");
+      setVerifiedEmail("");
+      setMsg({
+        type: "success",
+        text: "Mã xác thực đã được gửi tới email. Nhập OTP rồi bấm Xác minh email.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMsg({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Không thể gửi mã xác thực. Vui lòng thử lại.",
+      });
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!String(otpCode || "").trim()) {
+      setMsg({ type: "error", text: "Vui lòng nhập mã OTP đã nhận trong email." });
+      return;
+    }
+
+    try {
+      setVerifyingOtp(true);
+      setMsg(null);
+      await authService.verifyRegisterOtp({
+        email: String(form.Email || "").trim(),
+        otp: String(otpCode || "").trim(),
+      });
+      setOtpStage("verified");
+      setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
+      setMsg({
+        type: "success",
+        text: "Email đã được xác thực. Bạn có thể lưu thay đổi hồ sơ.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMsg({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Xác minh email không thành công. Vui lòng kiểm tra lại OTP.",
+      });
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   /* ── Validation ── */
@@ -372,13 +490,6 @@ export default function ProfileEdit() {
       setMsg(null);
 
       const user = getStoredUser();
-      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview);
-
-      if (!avatarUpload) {
-        setMsg({ type: "error", text: "Vui lòng chọn ảnh đại diện." });
-        setSaving(false);
-        return;
-      }
 
       // Tạo FormData gửi đúng theo API
       const fd = new FormData();
@@ -386,9 +497,21 @@ export default function ProfileEdit() {
       fd.append("PhoneNumber", form.PhoneNumber.trim());
       fd.append("Location", normalizeSpaces(form.Location));
       fd.append("Email", form.Email.trim());
+
+      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
       fd.append("AvartarUrl", avatarUpload);
 
-      await userService.updateProfile(user.userId ?? user.id, fd);
+      const updateResult = await userService.updateProfile(user.userId ?? user.id, fd);
+
+      if (updateResult?.otpRequired) {
+        setMsg({
+          type: "success",
+          text: updateResult?.message || "Hệ thống đã gửi OTP về email. Vui lòng xác nhận để hoàn tất cập nhật hồ sơ.",
+        });
+        return;
+      }
+
+      await userService.getProfile();
 
       const storedUser = getStoredUser() || {};
       setStoredUser({
@@ -406,6 +529,9 @@ export default function ProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data;
       const { message, fieldErrors } = getApiErrorDetails(errData);
+      const shouldPromptVerify =
+        isEmailVerificationRequiredMessage(message) ||
+        isEmailVerificationRequiredMessage(errData?.detail);
 
       if (fieldErrors.length > 0) {
         const mappedTouched = { FullName: true, Email: true, PhoneNumber: true, Location: true };
@@ -413,7 +539,15 @@ export default function ProfileEdit() {
       }
 
       console.error("update-profile error:", errData);
-      setMsg({ type: "error", text: message });
+      if (shouldPromptVerify) {
+        setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
+        setMsg({
+          type: "error",
+          text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
+        });
+      } else {
+        setMsg({ type: "error", text: message });
+      }
     } finally {
       setSaving(false);
     }
@@ -464,6 +598,22 @@ export default function ProfileEdit() {
           </div>
         </div>
 
+        {/* ── Force-completion banner ── */}
+        {forceProfileCompletion && (
+          <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
+            <div style={{
+              padding: ".85rem 1.1rem", borderRadius: 10,
+              background: T.redBg,
+              color: T.red,
+              border: `1px solid ${T.redBd}`,
+              fontWeight: 700, fontSize: ".88rem",
+              display: "flex", alignItems: "center", gap: ".6rem",
+            }}>
+              ⚠️&nbsp;Vui lòng cập nhật đầy đủ email, số điện thoại và địa chỉ để tiếp tục sử dụng hệ thống.
+            </div>
+          </div>
+        )}
+
         {/* ── Message banner ── */}
         {msg && (
           <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 2rem .5rem", animation: "slideDown .25s ease" }}>
@@ -499,11 +649,115 @@ export default function ProfileEdit() {
                   placeholder="email@example.com" hasError={!!(touched.Email && errs.Email)} />
               </FormField>
 
+              <div style={{
+                marginTop: "-.2rem",
+                marginBottom: "1rem",
+                padding: ".9rem 1rem",
+                borderRadius: 10,
+                border: `1px solid ${T.border}`,
+                background: T.light,
+                display: "flex",
+                flexDirection: "column",
+                gap: ".8rem",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: ".75rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: ".5rem", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: ".82rem", fontWeight: 800, color: T.text }}>
+                        Xác minh email để lưu hồ sơ
+                        </div>
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                        padding: ".24rem .65rem",
+                        borderRadius: 999,
+                        background: otpStage === "verified" ? "#cfead8" : T.white,
+                        color: otpStage === "verified" ? T.mid : T.textMid,
+                          border: `1px solid ${otpStage === "verified" ? "#b6ddc3" : T.border}`,
+                          fontSize: ".72rem",
+                          fontWeight: 800,
+                        }}>
+                        {otpStage === "verified" ? "Đã xác minh" : "Chưa xác minh"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
+                      Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp || verifyingOtp}
+                    className="pf-btn-secondary"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      whiteSpace: "nowrap",
+                      background: "transparent",
+                      color: T.mid,
+                      border: `2px solid ${T.base}`,
+                      padding: ".61rem 1rem",
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      fontSize: ".84rem",
+                      cursor: sendingOtp || verifyingOtp ? "not-allowed" : "pointer",
+                      transition: ".15s",
+                      opacity: sendingOtp || verifyingOtp ? .7 : 1,
+                    }}
+                  >
+                    {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                  </button>
+                </div>
+
+                {otpStage !== "idle" && (
+                  <div style={{ display: "flex", gap: ".6rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      <Input
+                        name="EmailOtp"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="Nhập mã OTP"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      disabled={verifyingOtp || !String(otpCode || "").trim()}
+                      className="pf-btn-primary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        whiteSpace: "nowrap",
+                        background: verifyingOtp || !String(otpCode || "").trim() ? "#a0c8b0" : T.base,
+                        color: "#fff",
+                        border: "none",
+                        padding: ".63rem 1rem",
+                        borderRadius: 8,
+                        fontWeight: 700,
+                        fontSize: ".84rem",
+                        cursor: verifyingOtp || !String(otpCode || "").trim() ? "not-allowed" : "pointer",
+                        boxShadow: verifyingOtp || !String(otpCode || "").trim() ? "none" : `0 3px 12px rgba(30,138,71,.28)`,
+                        transition: ".15s",
+                      }}
+                    >
+                      {verifyingOtp ? "Đang xác minh..." : "Xác minh"}
+                    </button>
+                  </div>
+                )}
+
+                {otpStage === "verified" && (
+                  <div style={{ fontSize: ".74rem", fontWeight: 700, color: T.mid }}>
+                    Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
+                  </div>
+                )}
+              </div>
+
               <FormField
                 label="Số điện thoại"
                 required
                 error={touched.PhoneNumber && errs.PhoneNumber}
-                hint="Số điện thoại được cố định theo tài khoản và hiện chỉ cho phép xem."
               >
                 <Input
                   name="PhoneNumber"
@@ -512,7 +766,6 @@ export default function ProfileEdit() {
                   onBlur={handleBlur}
                   placeholder="(+84) 0xx xxx xxx"
                   hasError={!!(touched.PhoneNumber && errs.PhoneNumber)}
-                  readOnly
                 />
               </FormField>
 
@@ -598,7 +851,9 @@ export default function ProfileEdit() {
 
             {/* Bottom actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: ".75rem" }}>
-              <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+              {!forceProfileCompletion && (
+                <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+              )}
               <BtnPrimary type="submit" disabled={saving}>
                 {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
               </BtnPrimary>

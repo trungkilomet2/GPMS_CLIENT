@@ -114,6 +114,20 @@
   align-items: center;
   gap: 1rem;
   width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 1.4rem;
+  text-decoration: none;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.dashboard-sidebar__account:hover {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateX(2px);
+}
+
+.dashboard-sidebar__account.is-active {
+  background: linear-gradient(135deg, #f2b15f 0%, #f6c679 100%);
+  box-shadow: 0 10px 24px rgba(242, 177, 95, 0.26);
 }
 
 .dashboard-sidebar__avatar {

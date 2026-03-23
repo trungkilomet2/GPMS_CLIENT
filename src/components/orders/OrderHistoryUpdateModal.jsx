@@ -27,6 +27,36 @@ const fieldLabels = {
     image: 'Ảnh đơn hàng',
 };
 
+const isImageField = (fieldName = "") => {
+    const normalized = String(fieldName).replace(/[_\s]+/g, "").toLowerCase();
+    return normalized === "image" || normalized === "orderimage" || normalized === "orderimg" || normalized === "img";
+};
+
+const isImageUrl = (value) => {
+    if (!value) return false;
+    return /^https?:\/\/.+/i.test(String(value));
+};
+
+const renderValue = (value, fieldName, variant) => {
+    if (isImageField(fieldName) && isImageUrl(value)) {
+        return (
+            <div className="flex justify-center">
+                <img
+                    src={String(value)}
+                    alt={variant === "old" ? "Ảnh cũ" : "Ảnh mới"}
+                    className="h-16 w-16 rounded-lg border border-gray-200 object-cover bg-white"
+                />
+            </div>
+        );
+    }
+
+    if (!value) {
+        return 'Trống';
+    }
+
+    return value;
+};
+
 export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
     const currentUser = getStoredUser();
     const currentUserName =
@@ -133,7 +163,7 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
                                     <div className="col-span-4 bg-red-50 p-2 rounded-lg text-center">
                                         <p className="text-[10px] text-red-400 uppercase font-semibold">Giá trị cũ</p>
                                         <p className="text-red-600 text-sm line-through wrap-break-word whitespace-pre-wrap">
-                                            {item.oldValue || 'Trống'}
+                                            {renderValue(item.oldValue, item.fieldName, "old")}
                                         </p>
                                     </div>
 
@@ -144,7 +174,7 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
                                     <div className="col-span-4 bg-emerald-50 p-2 rounded-lg text-center border border-emerald-100">
                                         <p className="text-[10px] text-emerald-400 uppercase font-semibold">Giá trị mới</p>
                                         <p className="text-emerald-700 text-sm font-bold wrap-break-word whitespace-pre-wrap">
-                                            {item.newValue || 'Trống'}
+                                            {renderValue(item.newValue, item.fieldName, "new")}
                                         </p>
                                     </div>
                                 </div>

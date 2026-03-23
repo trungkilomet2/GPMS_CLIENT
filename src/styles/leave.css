@@ -88,6 +88,10 @@
   letter-spacing: 0.08em;
 }
 
+.leave-table-th.is-sortable {
+  cursor: pointer;
+}
+
 .leave-table-row {
   transition: background-color 150ms ease, transform 150ms ease;
 }

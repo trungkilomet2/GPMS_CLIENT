@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -31,21 +32,6 @@ const STATUS_MAP = {
     badge: "bg-rose-50 text-rose-700 border-rose-200",
   },
 };
-
-function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
-
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function StatusBadge({ status }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending;
@@ -75,6 +61,8 @@ export default function LeaveRequestDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
+  const backPath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -119,11 +107,11 @@ export default function LeaveRequestDetail() {
     return [
       {
         title: "Đơn đã được gửi",
-        value: formatDateTime(leave?.dateCreate),
+        value: formatLeaveDateTime(leave?.dateCreate),
       },
       {
         title: leave?.status === "pending" ? "Đang chờ xét duyệt" : "Đã có phản hồi",
-        value: leave?.status === "pending" ? "Đơn đang chờ xử lý." : formatDateTime(leave?.dateReply),
+        value: leave?.status === "pending" ? "Đơn đang chờ xử lý." : formatLeaveDateTime(leave?.dateReply),
       },
       {
         title: isApproved ? "Đã duyệt" : isRejected ? "Bị từ chối" : "Kết quả xử lý",
@@ -158,7 +146,7 @@ export default function LeaveRequestDetail() {
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => navigate("/leave-requests")}
+                      onClick={() => navigate(backPath)}
                       className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
                     >
                       <ArrowLeft size={16} />
@@ -166,7 +154,9 @@ export default function LeaveRequestDetail() {
                     </button>
                     <div className="hidden h-8 w-px bg-white/20 sm:block" />
                     <div>
-                      <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">My Leave Request</div>
+                      <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">
+                        {isWorkerView ? "Worker Leave Request" : "My Leave Request"}
+                      </div>
                       <h1 className="mt-1 text-2xl font-bold">Chi tiết đơn nghỉ #{leave.id}</h1>
                     </div>
                   </div>
@@ -181,11 +171,11 @@ export default function LeaveRequestDetail() {
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
-                    <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateCreate)}</div>
+                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateCreate)}</div>
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                    <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateReply)}</div>
+                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
                 </div>
               </div>
@@ -217,8 +207,8 @@ export default function LeaveRequestDetail() {
                     <div className="mt-5 grid gap-3">
                       <DetailItem icon={UserRound} label="Người gửi" value={leave.userFullName} />
                       <DetailItem icon={FileText} label="Trạng thái" value={STATUS_MAP[leave.status]?.label || "Chưa cập nhật"} />
-                      <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatDateTime(leave.dateCreate)} />
-                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatDateTime(leave.dateReply)} />
+                      <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatLeaveDateTime(leave.dateCreate)} />
+                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
                     </div>
                   </div>
 

@@ -1,5 +1,32 @@
 import { API_ENDPOINTS } from "@/lib/apiconfig";
-import { clearAuthStorage, setAuthItem, setStoredUser } from "@/lib/authStorage";
+import { extractRoleValue, extractUserIdValue } from "@/lib/authIdentity";
+import { clearAuthStorage, removeAuthItem, setAuthItem, setStoredUser } from "@/lib/authStorage";
+
+const PROFILE_CACHE_PREFIX = "profile-cache:";
+
+function isSwaggerPlaceholder(value) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "string" || normalized === "user@example.com";
+}
+
+function normalizeServerValue(value) {
+  if (value == null) return "";
+  const normalized = String(value).trim();
+  if (!normalized || isSwaggerPlaceholder(normalized)) return "";
+  return normalized;
+}
+
+function readProfileCache(userId) {
+  if (userId == null) return null;
+  try {
+    const raw = localStorage.getItem(`${PROFILE_CACHE_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 function readAccountStatus(source = {}) {
   const status = String(
@@ -23,6 +50,23 @@ function readAccountStatus(source = {}) {
   };
 }
 
+async function parseResponsePayload(res) {
+  const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/json")) {
+    return res.json().catch(() => ({}));
+  }
+
+  const raw = await res.text().catch(() => "");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { message: raw };
+  }
+}
+
 async function loadProfileAfterLogin(token) {
   try {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
@@ -36,16 +80,23 @@ async function loadProfileAfterLogin(token) {
     const json = await res.json().catch(() => ({}));
     const d = json?.data ?? {};
     const accountStatus = readAccountStatus(d);
+    const fullName = normalizeServerValue(d.fullName);
+    const email = normalizeServerValue(d.email);
+    const phoneNumber = normalizeServerValue(d.phoneNumber);
+    const avatarUrl = normalizeServerValue(d.avartarUrl);
+    const location = normalizeServerValue(d.location);
 
     return {
-      fullName: d.fullName || "",
-      name: d.fullName || "",
-      email: d.email || "",
-      phoneNumber: d.phoneNumber || "",
-      phone: d.phoneNumber || "",
-      avatarUrl: d.avartarUrl || "",
-      location: d.location || "",
-      address: d.location || "",
+      userId: extractUserIdValue(d),
+      fullName,
+      name: fullName,
+      email,
+      phoneNumber,
+      phone: phoneNumber,
+      role: extractRoleValue(d),
+      avatarUrl,
+      location,
+      address: location,
       accountStatus,
     };
   } catch {
@@ -120,14 +171,8 @@ export const authService = {
       decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"] ??
       userName;
 
-    const role =
-      decoded["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-      "";
-
-    const userId =
-      decoded[
-        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-      ] ?? "";
+    const role = extractRoleValue(decoded);
+    const userId = extractUserIdValue(decoded);
 
     const tokenAccountStatus = readAccountStatus(decoded);
 
@@ -144,15 +189,32 @@ export const authService = {
     const profile = await loadProfileAfterLogin(token);
     const user = {
       ...basicUser,
+      userId: profile?.userId || basicUser.userId,
       name: profile?.fullName || profile?.name || basicUser.name,
       fullName: profile?.fullName || basicUser.fullName,
       email: profile?.email || "",
       phoneNumber: profile?.phoneNumber || "",
       phone: profile?.phone || "",
+      role: profile?.role || basicUser.role,
       avatarUrl: profile?.avatarUrl || basicUser.avatarUrl,
       location: profile?.location || "",
       address: profile?.address || "",
       accountStatus: profile?.accountStatus || basicUser.accountStatus,
+    };
+
+    // If backend view-profile returns nulls, reuse last known values from cache.
+    const cached = readProfileCache(user.userId) || {};
+    const mergedUser = {
+      ...cached,
+      ...user,
+      name: normalizeServerValue(user.name) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.name,
+      fullName: normalizeServerValue(user.fullName) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.fullName,
+      email: normalizeServerValue(user.email) || normalizeServerValue(cached.email) || "",
+      phoneNumber: normalizeServerValue(user.phoneNumber) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
+      phone: normalizeServerValue(user.phone) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
+      location: normalizeServerValue(user.location) || normalizeServerValue(cached.location) || normalizeServerValue(cached.address) || "",
+      address: normalizeServerValue(user.address) || normalizeServerValue(cached.location) || normalizeServerValue(cached.address) || "",
+      avatarUrl: normalizeServerValue(user.avatarUrl) || normalizeServerValue(cached.avatarUrl) || "",
     };
 
     if (user.accountStatus?.isDisabled) {
@@ -167,12 +229,17 @@ export const authService = {
     }
 
     setAuthItem("token", token);
-    setStoredUser(user);
-    setAuthItem("userId", String(userId));
+    setStoredUser(mergedUser);
+
+    if (mergedUser.userId != null) {
+      setAuthItem("userId", String(mergedUser.userId));
+    } else {
+      removeAuthItem("userId");
+    }
 
     window.dispatchEvent(new Event("auth-change"));
 
-    return { token, user };
+    return { token, user: mergedUser };
   },
 
   async register(payload) {
@@ -185,10 +252,42 @@ export const authService = {
         fullName: payload.fullName,
         password: payload.password,
         rePassword: payload.rePassword,
+        email: payload.email,
       }),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
+  async sendRegisterOtp(payload) {
+    const res = await fetch(API_ENDPOINTS.EMAIL.SEND_OTP, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
+  async verifyRegisterOtp(payload) {
+    const res = await fetch(API_ENDPOINTS.EMAIL.VERIFY_EMAIL, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+        otp: payload.otp,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
     if (!res.ok) throw { response: { data } };
     return data;
   },

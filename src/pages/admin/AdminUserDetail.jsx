@@ -101,7 +101,11 @@ export default function AdminUserDetail() {
     setIsDisabling(true);
 
     try {
-      await AdminUserService.disableUser(user.id);
+      const response = await AdminUserService.disableUser(user.id);
+      if (response?.currentUserSignedOut) {
+        return;
+      }
+
       setUser((current) => (
         current
           ? { ...current, status: "inactive", statusId: 2 }
@@ -169,9 +173,9 @@ export default function AdminUserDetail() {
           ) : null}
 
           {!loading && !error && user ? (
-            <AdminBanner
+          <AdminBanner
               title="Hồ sơ user đang đọc từ endpoint admin detail."
-              description="Thông tin liên hệ, avatar, status, role và worker role hiện được lấy trực tiếp từ backend; riêng log hệ thống vẫn đang là dữ liệu demo."
+              description="Thông tin liên hệ, avatar, status, role và chuyên môn thợ hiện được lấy trực tiếp từ backend; riêng log hệ thống vẫn đang là dữ liệu demo."
               tone="info"
             />
           ) : null}
@@ -243,9 +247,9 @@ export default function AdminUserDetail() {
                       <span className="admin-profile__list-value">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</span>
                     </div>
                     <div className="admin-profile__list-item">
-                      <span className="admin-profile__list-label">Worker role</span>
+                      <span className="admin-profile__list-label">Chuyên môn thợ</span>
                       <span className="admin-profile__list-value">
-                        {user.workerRole || "Chưa gán worker role"}
+                        {user.workerRole || "Chưa gán chuyên môn thợ"}
                       </span>
                     </div>
                   </div>
@@ -326,7 +330,7 @@ export default function AdminUserDetail() {
                     <div className="admin-info-list__item">
                       <div className="admin-info-list__label">Ghi chú</div>
                       <div className="admin-info-list__value">
-                        Worker role đang phản ánh theo endpoint detail. MFA và audit trail vẫn sẽ cần endpoint riêng nếu muốn hiển thị chuẩn hoàn toàn.
+                        Chuyên môn thợ hiện đang phản ánh theo endpoint detail. MFA và audit trail vẫn sẽ cần endpoint riêng nếu muốn hiển thị chuẩn hoàn toàn.
                       </div>
                     </div>
                   </div>

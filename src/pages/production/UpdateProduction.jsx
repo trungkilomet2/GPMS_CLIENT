@@ -1,7 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, UserCheck, FileText, Download, Package } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import WorkerService from "@/services/WorkerService";
+import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
@@ -74,21 +75,21 @@ const MOCK_PRODUCTIONS = [
 export default function UpdateProduction() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const production = useMemo(() => {
-    const pid = Number(id);
-    return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
-  }, [id]);
+  const [production, setProduction] = useState(null);
+  const [loadingProduction, setLoadingProduction] = useState(false);
+  const [productionError, setProductionError] = useState("");
 
   const [pmUsers, setPmUsers] = useState([]);
   const [loadingPM, setLoadingPM] = useState(true);
   const [pmError, setPmError] = useState(null);
 
   const [form, setForm] = useState({
-    pmId: production?.pmId ? String(production.pmId) : "",
-    pStartDate: production?.pStartDate ?? "",
-    pEndDate: production?.pEndDate ?? "",
-    productionNote: production?.note ?? "",
+    pmId: "",
+    pStartDate: "",
+    pEndDate: "",
+    productionNote: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -107,7 +108,7 @@ export default function UpdateProduction() {
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setPmError("Không thể tải danh sách PM.");
       } finally {
@@ -118,17 +119,114 @@ export default function UpdateProduction() {
     return () => { active = false; };
   }, []);
 
-  if (!production) {
+  const normalizeDetail = (payload) => {
+    if (!payload) return null;
+    const order = payload.order || {};
+    return {
+      productionId: payload.productionId ?? payload.id ?? null,
+      status: payload.statusName || payload.status || "",
+      pStartDate: payload.startDate || payload.pStartDate || "",
+      pEndDate: payload.endDate || payload.pEndDate || "",
+      pmId: payload.pm?.id ?? payload.pmId ?? null,
+      note: payload.note ?? payload.productionNote ?? "",
+      order: {
+        ...order,
+        size: typeof order.size === "string" ? order.size.trim() : order.size,
+        status: order.statusName ?? order.status,
+        templates: Array.isArray(order.templates)
+          ? order.templates.map((t) => ({ ...t, templateName: t.templateName ?? t.name }))
+          : order.templates,
+        materials: Array.isArray(order.materials)
+          ? order.materials.map((m) => ({ ...m, materialName: m.materialName ?? m.name }))
+          : order.materials,
+      },
+    };
+  };
+
+  useEffect(() => {
+    const fromState = location?.state?.production;
+    if (fromState) {
+      const normalized = normalizeDetail(fromState);
+      if (normalized) setProduction(normalized);
+    }
+  }, [location?.state?.production]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchProduction = async () => {
+      try {
+        const hasPrefill = !!location?.state?.production;
+        if (!hasPrefill) setLoadingProduction(true);
+        setProductionError("");
+        const response = await ProductionService.getProductionDetail(id);
+        if (!active) return;
+        const payload = response?.data?.data ?? response?.data ?? null;
+        const normalized = normalizeDetail(payload);
+        if (normalized) {
+          setProduction(normalized);
+          return;
+        }
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+        if (!fallback) setProductionError(`Không tìm thấy production #${id}.`);
+      } catch (_err) {
+        if (!active) return;
+        setProductionError("Không thể tải thông tin production.");
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+      } finally {
+        if (active) setLoadingProduction(false);
+      }
+    };
+
+    fetchProduction();
+    return () => { active = false; };
+  }, [id, location?.state?.production]);
+
+  useEffect(() => {
+    if (!production) return;
+    setForm({
+      pmId: production?.pmId ? String(production.pmId) : "",
+      pStartDate: production?.pStartDate ?? "",
+      pEndDate: production?.pEndDate ?? "",
+      productionNote: production?.note ?? "",
+    });
+  }, [production]);
+
+  const order = production?.order || {};
+  const orderSummaryRows = useMemo(() => ([
+    ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
+    ["Tên đơn hàng", order?.orderName ?? "-"],
+    ["Loại đơn hàng", order?.type ?? "-"],
+    ["Kích thước", order?.size ?? "-"],
+    ["Màu sắc", order?.color ?? "-"],
+    ["Số lượng", order?.quantity ? `${order.quantity}` : "-"],
+    ["Ngày bắt đầu", formatOrderDate(order?.startDate)],
+    ["Ngày kết thúc", formatOrderDate(order?.endDate)],
+  ]), [order]);
+
+  if (loadingProduction) {
     return (
       <OwnerLayout>
-        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
-          Không tìm thấy production #{id}.
+        <div className="flex flex-col items-center justify-center min-h-400px">
+          <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
+          <p className="text-gray-500 text-sm font-medium">Đang tải thông tin production...</p>
         </div>
       </OwnerLayout>
     );
   }
 
-  const order = production.order || {};
+  if (!production) {
+    return (
+      <OwnerLayout>
+        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
+          {productionError || `Không tìm thấy production #${id}.`}
+        </div>
+      </OwnerLayout>
+    );
+  }
+
   const templates = order.templates ?? order.template ?? order.files ?? [];
   const softTemplates = templates.filter((t) => {
     const type = (t.type ?? "").toString().toLowerCase();
@@ -143,11 +241,6 @@ export default function UpdateProduction() {
   const validate = () => {
     const nextErrors = {};
     if (!form.pmId) nextErrors.pmId = "Vui lòng chọn PM quản lý.";
-    if (!form.pStartDate) nextErrors.pStartDate = "Vui lòng chọn ngày bắt đầu.";
-    if (!form.pEndDate) nextErrors.pEndDate = "Vui lòng chọn ngày kết thúc.";
-    if (form.pStartDate && form.pEndDate && new Date(form.pStartDate) > new Date(form.pEndDate)) {
-      nextErrors.pEndDate = "Ngày kết thúc không được trước ngày bắt đầu.";
-    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -169,8 +262,11 @@ export default function UpdateProduction() {
     if (!validate()) return;
     try {
       setIsSubmitting(true);
-      alert("Cập nhật production thành công!");
+      await ProductionService.updateProductionPm(production.productionId, form.pmId);
+      alert("Cập nhật PM quản lý thành công!");
       navigate(`/production/${production.productionId}`);
+    } catch (_err) {
+      alert("Không thể cập nhật PM quản lý.");
     } finally {
       setIsSubmitting(false);
     }
@@ -190,9 +286,9 @@ export default function UpdateProduction() {
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Cập nhật Production #PR-{production.productionId}
+                  Cập nhật Production cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Điều chỉnh PM quản lý và mốc thời gian sản xuất.</p>
+                <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -230,40 +326,6 @@ export default function UpdateProduction() {
                     )}
                     {errors.pmId && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày bắt đầu sản xuất</label>
-                    <input
-                      type="date"
-                      name="pStartDate"
-                      value={form.pStartDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${errors.pStartDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                        }`}
-                    />
-                    {errors.pStartDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pStartDate}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày kết thúc sản xuất</label>
-                    <input
-                      type="date"
-                      name="pEndDate"
-                      value={form.pEndDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${errors.pEndDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                        }`}
-                    />
-                    {errors.pEndDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
                     )}
                   </div>
 
@@ -315,16 +377,7 @@ export default function UpdateProduction() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
-                  {[
-                    ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
-                    ["Tên đơn hàng", order?.orderName ?? "-"],
-                    ["Loại đơn hàng", order?.type ?? "-"],
-                    ["Kích thước", order?.size ?? "-"],
-                    ["Màu sắc", order?.color ?? "-"],
-                    ["Số lượng", order?.quantity ? `${order.quantity}` : "-"],
-                    ["Ngày bắt đầu", formatOrderDate(order?.startDate)],
-                    ["Ngày kết thúc", formatOrderDate(order?.endDate)],
-                  ].map(([label, value]) => (
+                  {orderSummaryRows.map(([label, value]) => (
                     <div key={label}>
                       <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
                         <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
@@ -425,3 +478,11 @@ export default function UpdateProduction() {
     </OwnerLayout>
   );
 }
+
+
+
+
+
+
+
+

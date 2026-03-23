@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
+import { getPostLoginPath } from "@/lib/authRouting";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
 import { getStoredUser, removeAuthItem } from "@/lib/authStorage";
 import "@/styles/homepage.css";
@@ -52,12 +53,13 @@ export default function Header() {
     setUser(null);
     setProfileOpen(false);
     window.dispatchEvent(new Event("auth-change"));
-    navigate("/home");
+    navigate("/");
   };
 
   // Initials fallback nếu không có avatar
-  const initials = user?.name
-    ? user.name.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase()
+  const displayName = user?.fullName || user?.name || user?.userName || "Người dùng";
+  const initials = displayName
+    ? displayName.split(" ").map(w => w[0]).slice(-2).join("").toUpperCase()
     : "U";
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -80,6 +82,8 @@ export default function Header() {
     }, 120);
   };
 
+  const defaultLandingPath = user ? getPostLoginPath(user.role) : "/home";
+
   return (
     <header className="header-root">
 
@@ -88,7 +92,7 @@ export default function Header() {
         <div className="header-top-inner">
 
           {/* Logo */}
-          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate("/home")}>
+          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate(defaultLandingPath)}>
             <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
               <div style={{ width: 32, height: 32, background: C.green, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
                 🧵
@@ -151,7 +155,7 @@ export default function Header() {
                           Xin chào,
                         </span>
                         <span style={{ fontSize: ".82rem", color: C.green, fontWeight: 700, maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {user.name}
+                          {displayName}
                         </span>
                       </div>
                       {user.avatarUrl
@@ -169,7 +173,7 @@ export default function Header() {
                       onMouseLeave={closeProfileMenuSoon}
                     >
                       <div className="avatar-dropdown-header">
-                        <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{user.name}</div>
+                        <div style={{ fontWeight: 700, color: C.text, fontSize: ".88rem" }}>{displayName}</div>
                         <div style={{ fontSize: ".75rem", color: C.textLight }}>{user.email}</div>
                       </div>
                       <Link to="/profile" className="avatar-dropdown-item" onClick={() => setProfileOpen(false)}>

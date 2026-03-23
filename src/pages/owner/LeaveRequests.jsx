@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   CalendarDays,
   CheckCircle2,
@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -42,22 +43,6 @@ const STATUS_MAP = {
     border: "border-rose-200",
   },
 };
-
-function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
-
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }) + ` ${date.toLocaleTimeString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
 
 function StatusBadge({ status }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending;
@@ -88,6 +73,7 @@ function SummaryCard({ label, value, icon: Icon, borderTone }) {
 }
 
 export default function LeaveRequests() {
+  const location = useLocation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -101,6 +87,8 @@ export default function LeaveRequests() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
+  const detailBasePath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
 
   useEffect(() => {
     let active = true;
@@ -363,14 +351,14 @@ export default function LeaveRequests() {
                             <td className="px-5 py-4 align-top">
                               <div className="max-w-xl text-sm leading-6 text-slate-700">{item.content}</div>
                             </td>
-                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatDateTime(item.dateCreate)}</td>
-                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatDateTime(item.dateReply)}</td>
+                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
+                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply)}</td>
                             <td className="px-5 py-4 align-top">
                               <StatusBadge status={item.status} />
                             </td>
                             <td className="px-5 py-4 text-center align-top">
                               <Link
-                                to={`/leave-requests/${item.id}`}
+                                to={`${detailBasePath}/${item.id}`}
                                 state={{ leave: item }}
                                 className="inline-flex rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
                               >

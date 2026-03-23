@@ -13,6 +13,9 @@ import {
   XCircle,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
+import { canManageLeaveRequests } from "@/lib/roleAccess";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -36,21 +39,6 @@ const STATUS_MAP = {
     panel: "border-rose-200 bg-rose-50 text-rose-800",
   },
 };
-
-function formatDateTime(value) {
-  if (!value) return "Chưa cập nhật";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Không hợp lệ";
-
-  return date.toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 function StatusBadge({ status }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending;
@@ -86,12 +74,12 @@ function getTimelineItems(leave) {
   return [
     {
       title: "Đơn được gửi",
-      value: formatDateTime(leave?.dateCreate),
+      value: formatLeaveDateTime(leave?.dateCreate),
       tone: "done",
     },
     {
       title: isPending ? "Đang chờ phản hồi" : "Đã phản hồi",
-      value: isPending ? "Đơn đang chờ duyệt" : formatDateTime(leave?.dateReply),
+      value: isPending ? "Đơn đang chờ duyệt" : formatLeaveDateTime(leave?.dateReply),
       tone: isPending ? "current" : "done",
     },
     {
@@ -110,6 +98,7 @@ export default function LeaveDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
+  const user = getStoredUser();
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -155,9 +144,15 @@ export default function LeaveDetail() {
     [leave?.status]
   );
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
-  const canReview = leave?.status === "pending";
+  const hasReviewPermission = canManageLeaveRequests(user?.role);
+  const canReview = hasReviewPermission && leave?.status === "pending";
 
   const handleApprove = async () => {
+    if (!hasReviewPermission) {
+      setError("Bạn không có quyền phê duyệt đơn nghỉ.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       await LeaveService.approveLeaveRequest(id);
@@ -179,6 +174,11 @@ export default function LeaveDetail() {
   };
 
   const handleReject = async () => {
+    if (!hasReviewPermission) {
+      setError("Bạn không có quyền từ chối đơn nghỉ.");
+      return;
+    }
+
     if (!rejectReason.trim()) return;
 
     try {
@@ -251,11 +251,11 @@ export default function LeaveDetail() {
               </div>
               <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                 <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
-                <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateCreate)}</div>
+                <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateCreate)}</div>
               </div>
               <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                 <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                <div className="mt-2 text-lg font-semibold">{formatDateTime(leave.dateReply)}</div>
+                <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
               </div>
             </div>
           </div>

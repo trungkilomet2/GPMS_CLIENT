@@ -11,6 +11,11 @@ export const API_ENDPOINTS = {
     REGISTER: `${BASE_URL}/api/Account/register`,
   },
 
+  EMAIL: {
+    SEND_OTP: `${BASE_URL}/api/Email/sent-otp-email`,
+    VERIFY_EMAIL: `${BASE_URL}/api/Email/verify-email`,
+  },
+
   ORDER: {
     GET_ALL: `${BASE_URL}/api/Order/order-list`,
     GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
@@ -18,9 +23,45 @@ export const API_ENDPOINTS = {
     CREATE_ORDER: `${BASE_URL}/api/Order/create-order`,
     UPDATE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/update`,
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
+    REQUEST_MODIFICATION: (orderId) => `${BASE_URL}/api/Order/request-order-modification/${orderId}`,
+    DENY_ORDER: (orderId) => `${BASE_URL}/api/Order/deny-order/${orderId}`,
+    APPROVE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/approve`,
+  },
+  ORDER_REJECT: {
+    REJECT: `${BASE_URL}/api/OrderReject/order-reject`,
   },
   PRODUCTION: {
-    CREATE: `${BASE_URL}/api/Production/create-production`,
+    CREATE: `${BASE_URL}/api/Production/production/create`,
+    LIST: `${BASE_URL}/api/Production/production/list`,
+    DETAIL: (id) => `${BASE_URL}/api/Production/production/detail/${id}`,
+    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
+    UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
+    APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
+    REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
+  },
+  PRODUCTION_PART: {
+    LIST_BY_PRODUCTION: (productionId) =>
+      `${BASE_URL}/api/ProductionPart/production/get-list-parts/${productionId}`,
+    CREATE_PARTS: (productionId) =>
+      `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
+    LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
+    UPDATE_ASSIGN_WORKERS: (id) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
+    CREATE_WORK_LOGS: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
+    UPDATE_WORK_LOGS: (partId, logId) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
+    GET_WORK_LOGS: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
+    CREATE_ISSUE: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
+  },
+  
+  CUTTING_NOTEBOOK: {
+    CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
+    CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
+    GET_BY_PRODUCTION: (productionId) => `${BASE_URL}/api/CuttingNotebook/notebook/production/${productionId}`,
+    GET_LIST_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
   },
 
   CLOUDINARY: {

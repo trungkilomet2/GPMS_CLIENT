@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -6,6 +6,10 @@ import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
+import SuccessModal from "@/components/SuccessModal";
+import ProductionService from "@/services/ProductionService";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -73,6 +77,7 @@ const STATUS_STYLES = {
   Planned: "bg-amber-50 text-amber-700 border-amber-200",
   "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
   Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Chấp Nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
@@ -80,17 +85,91 @@ export default function ProductionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState("");
-  const production = useMemo(() => {
-    const pid = Number(id);
-    return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
+  const [production, setProduction] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const currentUser = getStoredUser();
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner"]);
+
+  useEffect(() => {
+    let active = true;
+    const normalizeDetail = (payload) => {
+      if (!payload) return null;
+      const statusMap = { 1: "Planned", 2: "In Progress", 3: "Completed" };
+      const order = payload.order || {};
+      return {
+        productionId: payload.productionId ?? payload.id ?? null,
+        status: payload.statusName || statusMap[payload.statusId] || payload.status || "Planned",
+        pStartDate: payload.startDate || payload.pStartDate || "",
+        pEndDate: payload.endDate || payload.pEndDate || "",
+        pmId: payload.pm?.id ?? payload.pmId ?? null,
+        pmName: payload.pm?.name ?? payload.pmName ?? "",
+        note: payload.note ?? payload.productionNote ?? "",
+        order: {
+          ...order,
+          size: typeof order.size === "string" ? order.size.trim() : order.size,
+          status: order.statusName ?? order.status,
+          templates: Array.isArray(order.templates)
+            ? order.templates.map((t) => ({ ...t, templateName: t.templateName ?? t.name }))
+            : order.templates,
+          materials: Array.isArray(order.materials)
+            ? order.materials.map((m) => ({ ...m, materialName: m.materialName ?? m.name }))
+            : order.materials,
+        },
+      };
+    };
+
+    const fetchProduction = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await ProductionService.getProductionDetail(id);
+        if (!active) return;
+        const payload = response?.data?.data ?? response?.data ?? null;
+        const normalized = normalizeDetail(payload);
+        if (normalized) {
+          setProduction(normalized);
+          return;
+        }
+
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+        if (!fallback) setError(`Không tìm thấy production #${id}.`);
+      } catch (err) {
+        if (!active) return;
+        setError("Không thể tải chi tiết production.");
+        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
+        setProduction(fallback);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchProduction();
+    return () => {
+      active = false;
+    };
   }, [id]);
+
+  if (loading) {
+    return (
+      <OwnerLayout>
+        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
+          Đang tải chi tiết production...
+        </div>
+      </OwnerLayout>
+    );
+  }
 
   if (!production) {
     return (
       <OwnerLayout>
         <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
-          Không tìm thấy production #{id}.
+          {error || `Không tìm thấy production #${id}.`}
         </div>
       </OwnerLayout>
     );
@@ -107,6 +186,41 @@ export default function ProductionDetail() {
     return type.includes("hard");
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+
+  const handleApproveProduction = async () => {
+    try {
+      const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      if (!userId) {
+        alert("Không tìm thấy thông tin người dùng.");
+        return;
+      }
+      await ProductionService.approveProduction(production.productionId, { userId });
+      setProduction((prev) => (prev ? { ...prev, status: "Chấp Nhận" } : prev));
+      setIsSuccessModalOpen(true);
+    } catch (err) {
+      console.error("Lỗi khi chấp nhận production:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi chấp nhận production.";
+      alert(errorMsg);
+    }
+  };
+
+  const handleRejectProduction = async (reason) => {
+    try {
+      const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      if (!userId) {
+        alert("Không tìm thấy thông tin người dùng.");
+        return;
+      }
+      await ProductionService.rejectProduction(production.productionId, { userId, reason });
+      setProduction((prev) => (prev ? { ...prev, status: "Từ Chối" } : prev));
+      setIsReasonModalOpen(false);
+      setIsRejectSuccessModalOpen(true);
+    } catch (err) {
+      console.error("Lỗi khi từ chối production:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi từ chối production.";
+      alert(errorMsg);
+    }
+  };
 
   return (
     <OwnerLayout>
@@ -131,27 +245,32 @@ export default function ProductionDetail() {
               <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${STATUS_STYLES[production.status] || STATUS_STYLES.default}`}>
                 {production.status}
               </span>
-              <button
-                type="button"
-                onClick={() => navigate(`/production/${production.productionId}/edit`)}
-                className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
-              >
-                Chỉnh sửa
-              </button>
-              <button
-                type="button"
-                onClick={() => { setPendingAction("reject"); setIsReasonModalOpen(true); }}
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
-              >
-                Từ chối
-              </button>
-              <button
-                type="button"
-                onClick={() => { setPendingAction("revise"); setIsReasonModalOpen(true); }}
-                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
-              >
-                Yêu cầu chỉnh sửa
-              </button>
+              {isOwner ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
+                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  Chỉnh sửa
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsApproveModalOpen(true)}
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  >
+                    Chấp nhận
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsReasonModalOpen(true); }}
+                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                  >
+                    Từ chối
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -161,11 +280,11 @@ export default function ProductionDetail() {
               <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
-            <DetailRow label="Production ID" value={`#PR-${production.productionId}`} />
-            <DetailRow label="Trạng thái" value={production.status} />
-            <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
-            <DetailRow label="Ngày bắt đầu (Production)" value={production.pStartDate} />
-            <DetailRow label="Ngày kết thúc (Production)" value={production.pEndDate} />
+              <DetailRow label="Production ID" value={`#PR-${production.productionId}`} />
+              <DetailRow label="Trạng thái" value={production.status} />
+              <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
+              <DetailRow label="Ngày bắt đầu (Production)" value={production.pStartDate} />
+              <DetailRow label="Ngày kết thúc (Production)" value={production.pEndDate} />
             </div>
             <div className="p-5 border-t border-slate-100 bg-amber-50/30">
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chú Production</p>
@@ -299,25 +418,71 @@ export default function ProductionDetail() {
                   </div>
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-3">
+                  Tổng hợp lỗi
+                </div>
+                <p className="text-sm text-rose-800 mb-4">
+                  Xem nhanh các lỗi đã báo cáo liên quan đến production này.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                  className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                >
+                  Xem tổng hợp lỗi
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <OrderStatusReasonModal
-        isOpen={isReasonModalOpen}
-        onClose={() => setIsReasonModalOpen(false)}
-        onSubmit={(reason) => {
-          const actionLabel = pendingAction === "reject" ? "Từ chối" : "Yêu cầu chỉnh sửa";
-          alert(`${actionLabel} production với lý do: ${reason}`);
-          setIsReasonModalOpen(false);
-        }}
-        title={pendingAction === "reject" ? "Từ chối production" : "Yêu cầu chỉnh sửa production"}
-        description={pendingAction === "reject"
-          ? "Vui lòng nhập lý do từ chối để lưu vào hệ thống."
-          : "Vui lòng nhập lý do yêu cầu chỉnh sửa."}
-        confirmText={pendingAction === "reject" ? "Xác nhận từ chối" : "Gửi yêu cầu"}
-        tone={pendingAction === "reject" ? "danger" : "warning"}
-      />
+      {!isOwner && (
+        <>
+          <OrderStatusReasonModal
+            isOpen={isReasonModalOpen}
+            onClose={() => setIsReasonModalOpen(false)}
+            onSubmit={handleRejectProduction}
+            title="Từ chối production"
+            description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
+            confirmText="Xác nhận từ chối"
+            tone="danger"
+            requireReason
+          />
+          <OrderStatusReasonModal
+            isOpen={isApproveModalOpen}
+            onClose={() => setIsApproveModalOpen(false)}
+            onSubmit={() => {
+              handleApproveProduction();
+              setIsApproveModalOpen(false);
+            }}
+            title="Chấp nhận production"
+            description="Bạn có chắc muốn chấp nhận production này không?"
+            confirmText="Xác nhận"
+            tone="warning"
+            requireReason={false}
+          />
+          <SuccessModal
+            isOpen={isSuccessModalOpen}
+            onClose={() => setIsSuccessModalOpen(false)}
+            onPrimary={() => navigate("/production")}
+            title="Duyệt thành công"
+            description={`Đơn sản xuất #PR-${production?.productionId} đã được chấp nhận.`}
+            primaryLabel="Về danh sách"
+            hideSecondary={true}
+          />
+          <SuccessModal
+            isOpen={isRejectSuccessModalOpen}
+            onClose={() => setIsRejectSuccessModalOpen(false)}
+            onPrimary={() => navigate("/production")}
+            title="Từ chối thành công"
+            description={`Đơn sản xuất #PR-${production?.productionId} đã bị từ chối.`}
+            primaryLabel="Về danh sách"
+            hideSecondary={true}
+          />
+        </>
+      )}
     </OwnerLayout>
   );
 }
@@ -330,6 +495,8 @@ function DetailRow({ label, value }) {
     </div>
   );
 }
+
+
 
 
 

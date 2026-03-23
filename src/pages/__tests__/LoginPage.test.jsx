@@ -28,7 +28,7 @@ describe('LoginPage', () => {
   it('submits login form and navigates to /home', async () => {
     authService.login.mockResolvedValue({
       token: 'token-1',
-      user: { id: 1, name: 'Tester' },
+      user: { id: 1, name: 'Tester', email: 't@mail.com', phoneNumber: '0912345678', location: 'HCM' },
     });
 
     const { container } = render(

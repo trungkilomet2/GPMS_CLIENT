@@ -37,7 +37,7 @@ function isBusinessTableRelatedToRole(tableInfo, blueprint) {
 
   const tableTokens = [
     tableInfo.table,
-    tableInfo.table.replace(/[\[\]]/g, ""),
+    String(tableInfo.table ?? "").replaceAll("[", "").replaceAll("]", ""),
     tableInfo.module,
     tableInfo.column,
     tableInfo.purpose,
@@ -74,7 +74,7 @@ export default function AdminManagePermission() {
               <h1 className="admin-hero__title">Manage Permission Screen</h1>
               <p className="admin-hero__subtitle">
                 Màn phân quyền cho Admin được thiết kế lại theo schema {ADMIN_DB_SCHEMA_VERSION}. Database hiện mới có
-                tầng gán role và worker role, nên màn này tập trung vào blueprint dữ liệu thay vì ma trận permission
+                tầng gán role và worker skill, nên màn này tập trung vào blueprint dữ liệu thay vì ma trận permission
                 chi tiết theo module/action.
               </p>
             </div>
@@ -107,14 +107,14 @@ export default function AdminManagePermission() {
               icon={Table2}
               label="Bảng lõi phân quyền"
               value={ADMIN_DB_PERMISSION_CORE_TABLES.length}
-              meta="ROLE, USER_ROLE, WORKER_ROLE, USER_WORKER_ROLE"
+              meta="ROLE, USER_ROLE, WORKER_SKILL, USER_WORKER_SKILL"
               tone="success"
             />
             <AdminStatCard
               icon={Users}
               label="Bảng business liên quan"
               value={ADMIN_DB_USER_FOREIGN_TABLES.length}
-              meta="Các bảng đang có USER_ID, PM_ID hoặc TEAM_LEADER_ID"
+              meta="Các bảng đang có USER_ID, PM_ID, MANAGER_ID hoặc assignee"
               tone="info"
             />
             <AdminStatCard

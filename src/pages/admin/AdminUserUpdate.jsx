@@ -47,6 +47,8 @@ export default function AdminUserUpdate() {
   const [avatarPreview, setAvatarPreview] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [submitNotice, setSubmitNotice] = useState("");
+  const [submitNoticeTone, setSubmitNoticeTone] = useState("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -126,6 +128,7 @@ export default function AdminUserUpdate() {
       [field]: "",
     }));
     setSubmitError("");
+    setSubmitNotice("");
   };
 
   const handleAvatarChange = (event) => {
@@ -148,6 +151,7 @@ export default function AdminUserUpdate() {
       avatarFile: "",
     }));
     setSubmitError("");
+    setSubmitNotice("");
   };
 
   const handleSubmit = async (event) => {
@@ -173,11 +177,13 @@ export default function AdminUserUpdate() {
     setFieldErrors(errors);
 
     if (Object.values(errors).some(Boolean)) {
+      setSubmitNotice("");
       setSubmitError("Vui lòng kiểm tra lại thông tin trước khi lưu.");
       return;
     }
 
     setIsSubmitting(true);
+    setSubmitNotice("");
     setSubmitError("");
 
     try {
@@ -190,7 +196,34 @@ export default function AdminUserUpdate() {
       });
 
       if (normalizedValues.roleKey !== user?.roleKey) {
-        await AdminUserService.assignRoles(id, [normalizedValues.roleKey]);
+        try {
+          await AdminUserService.assignRoles(id, [normalizedValues.roleKey]);
+        } catch (roleError) {
+          setUser((current) => (
+            current
+              ? {
+                  ...current,
+                  fullName: updatedUser.fullName ?? current.fullName,
+                  userName: updatedUser.userName ?? current.userName,
+                  email: updatedUser.email ?? current.email,
+                  phoneNumber: updatedUser.phoneNumber ?? current.phoneNumber,
+                  location: updatedUser.location ?? current.location,
+                  avatarUrl: updatedUser.avatarUrl ?? current.avatarUrl,
+                }
+              : updatedUser
+          ));
+          setAvatarFile(null);
+          setAvatarPreview(updatedUser.avatarUrl || avatarPreview);
+          setSubmitNotice("Hồ sơ cơ bản đã được lưu, nhưng chưa gán được role mới.");
+          setSubmitNoticeTone("warning");
+          setSubmitError(
+            getAdminUserErrorMessage(
+              roleError,
+              "Role hiện tại vẫn được giữ nguyên. Vui lòng thử gán role lại."
+            )
+          );
+          return;
+        }
       }
 
       navigate(`/admin/users/${id}`, {
@@ -227,7 +260,11 @@ export default function AdminUserUpdate() {
     setIsDisabling(true);
 
     try {
-      await AdminUserService.disableUser(user.id);
+      const response = await AdminUserService.disableUser(user.id);
+      if (response?.currentUserSignedOut) {
+        return;
+      }
+
       navigate(`/admin/users/${id}`, {
         state: {
           notice: `Đã vô hiệu hóa user ${user.fullName || user.userName}.`,
@@ -414,9 +451,19 @@ export default function AdminUserUpdate() {
                     />
                   </div>
 
-                  {submitError ? (
+                  {submitNotice ? (
                     <div className="mt-4">
-                      <AdminBanner title="Chưa thể lưu thay đổi" description={submitError} tone="warning" />
+                      <AdminBanner title={submitNotice} description={submitError} tone={submitNoticeTone} />
+                    </div>
+                  ) : null}
+
+                  {!submitNotice && submitError ? (
+                    <div className="mt-4">
+                      <AdminBanner
+                        title="Chưa thể lưu thay đổi"
+                        description={submitError}
+                        tone="warning"
+                      />
                     </div>
                   ) : null}
                 </section>
@@ -444,8 +491,8 @@ export default function AdminUserUpdate() {
                       <span>{permissionProfile?.description || "Role này chưa có permission profile demo trên web."}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Worker role hiện tại</strong>
-                      <span>{user.workerRole || "Chưa gán worker role"}</span>
+                      <strong>Chuyên môn thợ hiện tại</strong>
+                      <span>{user.workerRole || "Chưa gán chuyên môn thợ"}</span>
                     </div>
                   </div>
                 </section>

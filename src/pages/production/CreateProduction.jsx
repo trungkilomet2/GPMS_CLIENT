@@ -1,81 +1,19 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { getStoredUser } from "@/lib/authStorage";
+import { splitRoles, hasAnyRole } from "@/lib/roleAccess";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import OrderService from "@/services/OrderService";
 import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
-import { normalizeOrderStatus } from "@/lib/orders/status";
+import { normalizeOrderStatus, getOrderStatusLabel } from "@/lib/orders/status";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const MOCK_ORDERS = [
-  {
-    id: 29,
-    orderName: "Đồng phục công ty ABC",
-    type: "Đồng phục",
-    size: "L",
-    color: "Trắng",
-    quantity: 100,
-    cpu: 15000,
-    startDate: "2026-04-15",
-    endDate: "2026-05-05",
-    status: "Đã chấp nhận",
-    image: "",
-    note: "Giao trong giờ hành chính.",
-    materials: [
-      { materialName: "Vải cotton", value: 120, uom: "m", note: "Cotton 65/35" },
-      { materialName: "Cúc áo", value: 100, uom: "cái", note: "Màu trắng" },
-    ],
-    templates: [
-      { templateName: "Mẫu áo", type: "SOFT", file: "" },
-    ],
-    customerName: "Công ty ABC",
-    customerPhone: "0901234567",
-    customerAddress: "Q.1, TP.HCM",
-  },
-  {
-    id: 30,
-    orderName: "Áo hoodie mùa đông",
-    type: "Hoodie",
-    size: "M",
-    color: "Đen",
-    quantity: 80,
-    cpu: 22000,
-    startDate: "2026-04-10",
-    endDate: "2026-04-30",
-    status: "Đã chấp nhận",
-    image: "",
-    note: "In logo trước ngực.",
-    materials: [],
-    templates: [],
-    customerName: "Shop XYZ",
-    customerPhone: "0912345678",
-    customerAddress: "Q.3, TP.HCM",
-  },
-  {
-    id: 31,
-    orderName: "Áo sơ mi nữ",
-    type: "Sơ mi",
-    size: "S",
-    color: "Xanh nhạt",
-    quantity: 60,
-    cpu: 18000,
-    startDate: "2026-04-12",
-    endDate: "2026-04-25",
-    status: "Chờ xét duyệt",
-    image: "",
-    note: "May bo viền cổ.",
-    materials: [],
-    templates: [],
-    customerName: "Shop LMN",
-    customerPhone: "0987654321",
-    customerAddress: "Q.5, TP.HCM",
-  },
-];
 
 export default function CreateProduction() {
   const { orderId } = useParams();
@@ -85,21 +23,54 @@ export default function CreateProduction() {
   const [loadingOrder, setLoadingOrder] = useState(!!orderId);
   const [orderError, setOrderError] = useState(null);
 
+  const currentUser = getStoredUser();
   const [pmUsers, setPmUsers] = useState([]);
   const [loadingPM, setLoadingPM] = useState(true);
   const [pmError, setPmError] = useState(null);
 
   const [selectedOrderId, setSelectedOrderId] = useState(orderId ? String(orderId) : "");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState(null);
 
   const [form, setForm] = useState({
     pmId: "",
-    pStartDate: "",
-    pEndDate: "",
     productionNote: "",
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const normalizeOrderDetail = (payload) => {
+    if (!payload) return null;
+    const templates = Array.isArray(payload.templates)
+      ? payload.templates
+      : Array.isArray(payload.template)
+        ? payload.template
+        : Array.isArray(payload.files)
+          ? payload.files
+          : [];
+    const materials = Array.isArray(payload.materials)
+      ? payload.materials
+      : Array.isArray(payload.materialList)
+        ? payload.materialList
+        : Array.isArray(payload.materialItems)
+          ? payload.materialItems
+          : [];
+
+    return {
+      ...payload,
+      templates: templates.map((t) => ({
+        ...t,
+        templateName: t?.templateName ?? t?.name,
+      })),
+      materials: materials.map((m) => ({
+        ...m,
+        materialName: m?.materialName ?? m?.name,
+      })),
+    };
+  };
 
   useEffect(() => {
     let active = true;
@@ -113,16 +84,12 @@ export default function CreateProduction() {
       try {
         setLoadingOrder(true);
         const response = await OrderService.getOrderDetail(orderId);
-        const data = response?.data?.data ?? response?.data ?? null;
+        const raw = response?.data?.data ?? response?.data ?? null;
+        const data = normalizeOrderDetail(raw);
         if (!active) return;
         setOrder(data);
-        setForm((prev) => ({
-          ...prev,
-          pStartDate: data?.startDate ? String(data.startDate).slice(0, 10) : prev.pStartDate,
-          pEndDate: data?.endDate ? String(data.endDate).slice(0, 10) : prev.pEndDate,
-        }));
         setOrderError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setOrderError("Không thể tải thông tin đơn hàng.");
       } finally {
@@ -138,15 +105,32 @@ export default function CreateProduction() {
     const fetchPMs = async () => {
       try {
         setLoadingPM(true);
-        const response = await WorkerService.getAllEmployees();
+        let response;
+        try {
+          response = await WorkerService.getAllEmployees({
+            PageIndex: 0,
+            PageSize: 10,
+            SortColumn: "Name",
+            SortOrder: "ASC",
+            FilterQuery: "PM",
+          });
+        } catch (_err) {
+          response = await WorkerService.getAllEmployees();
+        }
         const items = response?.data ?? [];
-        const pms = items.filter((item) =>
-          item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM"))
-        );
+        const pmRoles = ["PM", "Owner", "Admin"];
+        const pms = items.filter((item) => {
+          if (pmRoles.includes(item?.primaryRole)) return true;
+          if (Array.isArray(item?.roles)) {
+            return item.roles.some((role) => pmRoles.includes(role));
+          }
+          const rawRole = String(item?.role ?? "").split(",").map((r) => r.trim());
+          return rawRole.some((role) => pmRoles.includes(role));
+        });
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setPmError("Không thể tải danh sách PM.");
       } finally {
@@ -158,17 +142,160 @@ export default function CreateProduction() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const fetchOrders = async () => {
+      if (orderId) return;
+      try {
+        setOrdersLoading(true);
+        const getAssignedOrderIds = async () => {
+          const assigned = new Set();
+          let pageIndex = 0;
+          const pageSizeFetch = 50;
+          const maxPages = 200;
+
+          while (pageIndex < maxPages) {
+            const response = await ProductionService.getProductionList({
+              PageIndex: pageIndex,
+              PageSize: pageSizeFetch,
+              SortColumn: "Name",
+              SortOrder: "ASC",
+            });
+            const payload = response?.data ?? response;
+            const list = Array.isArray(payload?.data)
+              ? payload.data
+              : Array.isArray(payload)
+                ? payload
+                : [];
+
+            list.forEach((item) => {
+              const oid = item?.order?.id ?? item?.orderId ?? item?.orderID ?? item?.order_id;
+              if (oid != null) assigned.add(String(oid));
+            });
+
+            if (list.length < pageSizeFetch) break;
+            pageIndex += 1;
+          }
+
+          return assigned;
+        };
+
+        let response;
+        const paramsSerializer = {
+          serialize: (params) =>
+            Object.entries(params)
+              .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+              .join("&"),
+        };
+
+        const baseParams = {
+          PageIndex: 0,
+          PageSize: 50,
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        };
+
+        try {
+          response = await OrderService.getAllOrders(
+            {
+              ...baseParams,
+              Status: "Đã Chấp Nhận",
+            },
+            { paramsSerializer }
+          );
+        } catch (err) {
+          if (err?.response?.status === 400) {
+            try {
+              response = await OrderService.getAllOrders(
+                {
+                  pageIndex: baseParams.PageIndex,
+                  pageSize: baseParams.PageSize,
+                  sortColumn: baseParams.SortColumn,
+                  sortOrder: baseParams.SortOrder,
+                  status: "Đã Chấp Nhận",
+                },
+                { paramsSerializer }
+              );
+            } catch (err2) {
+              if (err2?.response?.status === 400) {
+                try {
+                  response = await OrderService.getAllOrders(
+                    {
+                      ...baseParams,
+                    },
+                    { paramsSerializer }
+                  );
+                } catch (err3) {
+                  if (err3?.response?.status === 400) {
+                    response = await OrderService.getAllOrders();
+                  } else {
+                    throw err3;
+                  }
+                }
+              } else {
+                throw err2;
+              }
+            }
+          } else {
+            throw err;
+          }
+        }
+        const items = Array.isArray(response)
+          ? response
+          : response?.data?.data ??
+          response?.data?.items ??
+          response?.data ??
+          response?.items ??
+          [];
+        if (!active) return;
+        let filteredItems = Array.isArray(items) ? items : [];
+        try {
+          const assignedOrderIds = await getAssignedOrderIds();
+          filteredItems = filteredItems.filter((o) => {
+            const oid = o?.id ?? o?.orderId ?? o?.orderID ?? o?.order_id;
+            if (oid == null) return true;
+            return !assignedOrderIds.has(String(oid));
+          });
+        } catch (_err) {
+          // If fetching productions fails, fall back to showing all orders.
+        }
+        setOrders(filteredItems);
+        setOrdersError(null);
+      } catch (_err) {
+        if (!active) return;
+        setOrdersError("Không thể tải danh sách đơn hàng.");
+      } finally {
+        if (active) setOrdersLoading(false);
+      }
+    };
+    fetchOrders();
+    return () => { active = false; };
+  }, [orderId]);
+
+  useEffect(() => {
     if (!selectedOrderId || orderId) return;
-    const picked = MOCK_ORDERS.find((item) => String(item.id) === String(selectedOrderId));
-    setOrder(picked || null);
-    if (picked) {
-      setForm((prev) => ({
-        ...prev,
-        pStartDate: picked.startDate ? String(picked.startDate).slice(0, 10) : prev.pStartDate,
-        pEndDate: picked.endDate ? String(picked.endDate).slice(0, 10) : prev.pEndDate,
-      }));
-    }
-  }, [selectedOrderId, orderId]);
+    let active = true;
+    const picked = orders.find((item) => String(item.id ?? item.orderId) === String(selectedOrderId)) || null;
+    setOrder(picked);
+    const fetchDetail = async () => {
+      try {
+        setLoadingOrder(true);
+        const response = await OrderService.getOrderDetail(selectedOrderId);
+        const raw = response?.data?.data ?? response?.data ?? null;
+        if (!active) return;
+        setOrder(normalizeOrderDetail(raw));
+        setOrderError(null);
+      } catch (_err) {
+        if (!active) return;
+        setOrderError("Không thể tải thông tin đơn hàng.");
+      } finally {
+        if (active) setLoadingOrder(false);
+      }
+    };
+    fetchDetail();
+    return () => {
+      active = false;
+    };
+  }, [selectedOrderId, orderId, orders]);
 
   const orderSummaryRows = useMemo(() => ([
     ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
@@ -192,17 +319,12 @@ export default function CreateProduction() {
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
   const normalizedStatus = normalizeOrderStatus(order?.status);
-  const isAccepted = normalizedStatus === "Đã chấp nhận";
+  const isAccepted = getOrderStatusLabel(normalizedStatus) === "Đã Chấp Nhận";
 
   const validate = () => {
     const nextErrors = {};
     if (!order?.id) nextErrors.orderId = "Vui lòng chọn đơn hàng.";
     if (!form.pmId) nextErrors.pmId = "Vui lòng chọn PM quản lý.";
-    if (!form.pStartDate) nextErrors.pStartDate = "Vui lòng chọn ngày bắt đầu.";
-    if (!form.pEndDate) nextErrors.pEndDate = "Vui lòng chọn ngày kết thúc.";
-    if (form.pStartDate && form.pEndDate && new Date(form.pStartDate) > new Date(form.pEndDate)) {
-      nextErrors.pEndDate = "Ngày kết thúc không được trước ngày bắt đầu.";
-    }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -222,25 +344,40 @@ export default function CreateProduction() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAccepted) {
-      alert("Chỉ được tạo production cho đơn hàng đã chấp nhận.");
+      alert("Chỉ được tạo production cho đơn hàng Đã Chấp Nhận.");
       return;
     }
     if (!validate()) return;
 
     const payload = {
-      productionId: null,
+      id: 0,
       pmId: Number(form.pmId),
       orderId: Number(order?.id ?? orderId),
-      pStartDate: form.pStartDate,
-      pEndDate: form.pEndDate,
-      note: form.productionNote?.trim() || "",
+      startDate: order?.startDate ?? "",
+      endDate: order?.endDate ?? "",
+      statusId: 0,
     };
 
     try {
       setIsSubmitting(true);
       await ProductionService.createProduction(payload);
-      alert("Tạo production thành công!");
-      navigate(`/orders/detail/${order?.id ?? orderId}`);
+      const nextStatus = "Chờ xét duyệt";
+      const orderIdToUpdate = Number(order?.id ?? orderId);
+      if (orderIdToUpdate) {
+        try {
+          let orderDetail = order;
+          if (!orderDetail || !orderDetail.id) {
+            const detailRes = await OrderService.getOrderDetail(orderIdToUpdate);
+            orderDetail = detailRes?.data?.data ?? detailRes?.data ?? orderDetail;
+          }
+          const updatePayload = orderDetail ? { ...orderDetail, status: nextStatus } : { status: nextStatus };
+          await OrderService.updateOrder(orderIdToUpdate, updatePayload);
+          setOrder((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+        } catch (err) {
+          console.error("Update order status error:", err?.response?.data ?? err);
+        }
+      }
+      setShowSuccess(true);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
       alert("Không thể tạo production. Vui lòng thử lại.");
@@ -273,6 +410,25 @@ export default function CreateProduction() {
   return (
     <OwnerLayout>
       <div className="leave-page leave-list-page">
+        {showSuccess && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+              <h3 className="text-lg font-bold text-slate-900">Tạo production thành công</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Production đã được tạo thành công. Bạn có muốn chuyển về danh sách sản xuất không?
+              </p>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                  onClick={() => navigate("/production")}
+                >
+                  Về danh sách sản xuất
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
@@ -286,7 +442,7 @@ export default function CreateProduction() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   Tạo Production cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý và mốc thời gian sản xuất.</p>
+                <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -304,7 +460,7 @@ export default function CreateProduction() {
 
                 {!isAccepted && order?.id && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã chấp nhận</strong>.
+                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
                   </div>
                 )}
 
@@ -317,13 +473,26 @@ export default function CreateProduction() {
                         onChange={(e) => setSelectedOrderId(e.target.value)}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                       >
-                        <option value="">Chọn đơn hàng</option>
-                        {MOCK_ORDERS.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            #{o.id} - {o.orderName}
-                          </option>
-                        ))}
+                        <option value="">
+                          {ordersLoading ? "Đang tải đơn hàng..." : "Chọn đơn hàng"}
+                        </option>
+                        {orders
+                          .filter((o) => {
+                            const statusValue = o.statusName ?? o.status ?? o.statusText ?? o.state ?? o.statusId;
+                            const label = getOrderStatusLabel(statusValue);
+                            if (label === "Đã Chấp Nhận") return true;
+                            const statusId = Number(statusValue);
+                            return Number.isFinite(statusId) && statusId === 3;
+                          })
+                          .map((o) => (
+                            <option key={o.id ?? o.orderId} value={o.id ?? o.orderId}>
+                              #{o.id ?? o.orderId} - {o.orderName}
+                            </option>
+                          ))}
                       </select>
+                      {ordersError && (
+                        <div className="mt-2 text-xs text-red-600 font-semibold">{ordersError}</div>
+                      )}
                       {errors.orderId && (
                         <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
                       )}
@@ -345,48 +514,18 @@ export default function CreateProduction() {
                           {pm.fullName || pm.userName || `PM #${pm.id}`}
                         </option>
                       ))}
+                      {currentUser && hasAnyRole(currentUser.role, ["Owner"]) && (
+                        <option value={currentUser.userId}>
+                          Giao việc cho tôi ({currentUser.fullName || currentUser.name || currentUser.userName})
+                        </option>
+                      )}
                     </select>
+
                     {pmError && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
                     )}
                     {errors.pmId && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày bắt đầu sản xuất</label>
-                    <input
-                      type="date"
-                      name="pStartDate"
-                      value={form.pStartDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
-                        errors.pStartDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      }`}
-                    />
-                    {errors.pStartDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pStartDate}</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ngày kết thúc sản xuất</label>
-                    <input
-                      type="date"
-                      name="pEndDate"
-                      value={form.pEndDate}
-                      onChange={handleChange}
-                      className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition ${
-                        errors.pEndDate
-                          ? "border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100"
-                          : "border-slate-200 bg-slate-50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      }`}
-                    />
-                    {errors.pEndDate && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pEndDate}</div>
                     )}
                   </div>
 

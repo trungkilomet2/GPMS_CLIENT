@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+﻿import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { ClipboardCheck, LogOut } from "lucide-react";
+import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
-  { to: "/worker/assignments", label: "Công việc được phân công", icon: ClipboardCheck },
-  { to: "/worker/daily-report", label: "Báo cáo sản lượng", icon: ClipboardCheck },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
+  { to: "/worker/error-report", label: "Báo lỗi", icon: AlertTriangle },
+  { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
 
 function getInitials(name = "") {
@@ -75,14 +76,18 @@ export default function WorkerSidebar() {
             title={label}
             className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
           >
-            <Icon size={22} />
+            {createElement(Icon, { size: 22 })}
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="dashboard-sidebar__footer">
-        <div className="dashboard-sidebar__account">
+        <NavLink
+          to="/profile"
+          title="Hồ sơ cá nhân"
+          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+        >
           <div className="dashboard-sidebar__avatar">
             {getInitials(user?.fullName || user?.name || "NV")}
           </div>
@@ -92,7 +97,7 @@ export default function WorkerSidebar() {
               <div className="dashboard-sidebar__user-role">Worker</div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <button
           type="button"

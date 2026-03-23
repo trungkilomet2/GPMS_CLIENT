@@ -7,14 +7,16 @@ const VARIANT_STYLES = {
         thead: 'bg-gray-50 text-[11px] uppercase font-bold text-gray-500 tracking-wider',
         tbody: 'divide-y divide-gray-100 text-sm bg-white',
         row: 'hover:bg-gray-50 transition-colors',
-        nameHeader: 'px-4 py-3 text-left',
-        name: 'px-4 py-3 font-semibold text-gray-700 align-middle',
-        value: 'px-4 py-3 text-gray-600 align-middle',
-        uom: 'px-4 py-3 text-gray-500 align-middle',
+        nameHeader: 'px-4 py-3 text-center',
+        name: 'px-4 py-3 font-semibold text-gray-700 align-middle text-center',
+        colorHeader: 'px-4 py-3 text-center w-28',
+        color: 'px-4 py-3 text-gray-600 align-middle text-center',
+        value: 'px-4 py-3 text-gray-600 align-middle text-center',
+        uom: 'px-4 py-3 text-gray-500 align-middle text-center',
         empty: 'px-4 py-10 text-center text-gray-400 italic',
         imageHeader: 'px-4 py-3 text-center w-24',
-        valueHeader: 'px-4 py-3 text-left w-32',
-        uomHeader: 'px-4 py-3 text-left w-32',
+        valueHeader: 'px-4 py-3 text-center w-32',
+        uomHeader: 'px-4 py-3 text-center w-32',
         actionsHeader: 'px-4 py-3 w-24',
     },
     detail: {
@@ -22,14 +24,16 @@ const VARIANT_STYLES = {
         thead: 'bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100',
         tbody: 'divide-y divide-gray-50 text-sm',
         row: 'hover:bg-gray-50/80 transition-colors',
-        nameHeader: 'px-6 py-3',
-        name: 'px-6 py-4 font-semibold text-gray-700',
+        nameHeader: 'px-6 py-3 text-center',
+        name: 'px-6 py-4 font-semibold text-gray-700 text-center',
+        colorHeader: 'px-6 py-3 text-center',
+        color: 'px-6 py-4 text-gray-600 text-center',
         value: 'px-6 py-4 text-center text-emerald-700 font-bold',
-        uom: 'px-6 py-4 text-right text-gray-500 font-medium uppercase',
+        uom: 'px-6 py-4 text-center text-gray-500 font-medium uppercase',
         empty: 'px-6 py-10 text-center text-gray-400 text-xs italic',
         imageHeader: 'px-6 py-3 text-center w-24',
         valueHeader: 'px-6 py-3 text-center',
-        uomHeader: 'px-6 py-3 text-right',
+        uomHeader: 'px-6 py-3 text-center',
         actionsHeader: 'px-6 py-3 w-24',
     },
 };
@@ -37,6 +41,7 @@ const VARIANT_STYLES = {
 function normalizeMaterial(material = {}) {
     return {
         materialName: material.materialName ?? material.name ?? '',
+        color: material.color ?? '',
         value: material.value ?? material.quantity ?? '',
         uom: material.uom ?? '',
         image: material.image ?? '',
@@ -68,6 +73,7 @@ export default function MaterialsTable({
                 <tr>
                     {showImage && <th className={styles.imageHeader}>{finalLabels.image}</th>}
                     <th className={styles.nameHeader}>{finalLabels.name}</th>
+                    <th className={styles.colorHeader}>{finalLabels.color}</th>
                     <th className={styles.valueHeader}>{finalLabels.value}</th>
                     <th className={styles.uomHeader}>{finalLabels.uom}</th>
                     {showNote && <th className={styles.uomHeader}>{finalLabels.note}</th>}
@@ -100,6 +106,7 @@ export default function MaterialsTable({
                             </td>
                         )}
                         <td className={styles.name}>{m.materialName}</td>
+                        <td className={styles.color}>{m.color || '-'}</td>
                         <td className={styles.value}>{m.value}</td>
                         <td className={styles.uom}>{m.uom}</td>
                         {showNote && (
@@ -132,7 +139,7 @@ export default function MaterialsTable({
 
                 {normalized.length === 0 && (
                     <tr>
-                        <td colSpan={(showImage ? 1 : 0) + 3 + (showNote ? 1 : 0) + (showActions ? 1 : 0)} className={styles.empty}>
+                        <td colSpan={(showImage ? 1 : 0) + 4 + (showNote ? 1 : 0) + (showActions ? 1 : 0)} className={styles.empty}>
                             {emptyText}
                         </td>
                     </tr>

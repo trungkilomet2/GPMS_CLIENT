@@ -1,4 +1,6 @@
-﻿import { lazy } from "react";
+import { lazy } from "react";
+import AdminRouteGuard from "@/routes/AdminRouteGuard";
+import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 
 // HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
@@ -22,9 +24,12 @@ const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
+const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
-const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
+const WorkerDailyReportEdit = lazy(() => import("@/pages/production/WorkerDailyReportEdit"));
+const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
+const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
@@ -44,8 +49,8 @@ const AdminSystemLog = lazy(() => import("@/pages/admin/AdminSystemLog"));
 const AdminManagePermission = lazy(() => import("@/pages/admin/AdminManagePermission"));
 
 // PROFILE
-const ViewProfile = lazy(() => import("@/pages/profile/ViewProfile"));
-const ProfileEdit = lazy(() => import("@/pages/profile/ProfileEdit"));
+const ProfileViewGate = lazy(() => import("@/pages/profile/ProfileViewGate"));
+const ProfileEditGate = lazy(() => import("@/pages/profile/ProfileEditGate"));
 
 // LEAVE
 const LeaveList = lazy(() => import("@/pages/leave/LeaveList"));
@@ -76,13 +81,18 @@ export const routes = [
   { path: "/production", element: <ProductionList /> },
   { path: "/production/:id", element: <ProductionDetail /> },
   { path: "/production/:id/edit", element: <UpdateProduction /> },
-  { path: "/monitoring", element: <ProductionPlanList /> },
-  { path: "/monitoring/create", element: <ProductionPlan /> },
-  { path: "/monitoring/:id", element: <ProductionPlanDetail /> },
-  { path: "/monitoring/assign", element: <ProductionAssignment /> },
-  { path: "/monitoring/assign/:id", element: <ProductionAssignment /> },
-  { path: "/worker/assignments", element: <WorkerAssignment /> },
+  { path: "/production/:id/errors", element: <ProductionErrorSummary /> },
+  { path: "/production-plan", element: <ProductionPlanList /> },
+  { path: "/production-plan/create", element: <ProductionPlan /> },
+  { path: "/production-plan/:id", element: <ProductionPlanDetail /> },
+  { path: "/production-plan/assign", element: <ProductionAssignment /> },
+  { path: "/production-plan/assign/:id", element: <ProductionAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/worker/daily-report/edit", element: <WorkerDailyReportEdit /> },
+  { path: "/worker/error-report", element: <WorkerErrorReport /> },
+  { path: "/worker/cutting-book", element: <WorkerCuttingBook /> },
+  { path: "/worker/leave-requests", element: <LeaveRequests /> },
+  { path: "/worker/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
   { path: "/employees", element: <EmployeeList /> },
@@ -94,25 +104,25 @@ export const routes = [
   { path: "/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/worker-roles", element: <WorkerRoleList /> },
   { path: "/worker-roles/create", element: <WorkerRoleCreate /> },
-  { path: "/admin/users", element: <AdminUserList /> },
-  { path: "/admin/users/create", element: <AdminUserCreate /> },
-  { path: "/admin/users/:id/edit", element: <AdminUserUpdate /> },
-  { path: "/admin/users/:id", element: <AdminUserDetail /> },
-  { path: "/admin/logs", element: <AdminSystemLog /> },
-  { path: "/admin/permissions", element: <AdminManagePermission /> },
+  { path: "/admin/users", element: <AdminRouteGuard><AdminUserList /></AdminRouteGuard> },
+  { path: "/admin/users/create", element: <AdminRouteGuard><AdminUserCreate /></AdminRouteGuard> },
+  { path: "/admin/users/:id/edit", element: <AdminRouteGuard><AdminUserUpdate /></AdminRouteGuard> },
+  { path: "/admin/users/:id", element: <AdminRouteGuard><AdminUserDetail /></AdminRouteGuard> },
+  { path: "/admin/logs", element: <AdminRouteGuard><AdminSystemLog /></AdminRouteGuard> },
+  { path: "/admin/permissions", element: <AdminRouteGuard><AdminManagePermission /></AdminRouteGuard> },
 
   // PROFILE
-  { path: "/profile", element: <ViewProfile /> },
-  { path: "/profile/edit", element: <ProfileEdit /> },
+  { path: "/profile", element: <ProfileViewGate /> },
+  { path: "/profile/edit", element: <ProfileEditGate /> },
 
   /* LEAVE */
   {
     path: "/leave",
-    element: <LeaveList />,
+    element: <LeaveRouteGuard><LeaveList /></LeaveRouteGuard>,
   },
   {
     path: "/leave/:id",
-    element: <LeaveDetail />,
+    element: <LeaveRouteGuard><LeaveDetail /></LeaveRouteGuard>,
   },
   {
     path: "/leave-history",

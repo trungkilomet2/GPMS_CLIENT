@@ -132,11 +132,10 @@ function NavItem({ icon, label, active, onClick }) {
   );
 }
 
-function SectionInfo({ user, onEdit, onViewOrders, onCreateOrder }) {
+function SectionInfo({ user, onViewOrders, onCreateOrder }) {
   const customerProfileRows = [
     ["👤", "Người đại diện", user.fullName || user.name],
     ["✉️", "Email", user.email],
-    ["📞", "Số điện thoại", user.phone],
     ["📍", "Địa chỉ", user.address],
     ["🏢", "Doanh nghiệp", user.companyName || user.department || "Đối tác ngành may mặc"],
     ["🎭", "Vai trò", user.role || "Khách hàng doanh nghiệp"],
@@ -340,7 +339,7 @@ const NAV_ITEMS = [
   {key:"security", icon:"🔒",label:"Bảo mật"},
   {key:"activity", icon:"📋",label:"Lịch sử hoạt động"},
 ];
-const IN_PROGRESS_STATUSES = ["Ch? x�t duy?t", "C?n c?p nh?t"];
+const IN_PROGRESS_STATUSES = ["Ch? x�t duy?t", "C?n c?p nh?t"];
 const DONE_STATUSES = ["Ch?p nh?n", "T? ch?i"];
 
 function formatDisplayDate(value) {
@@ -539,13 +538,13 @@ export default function ViewProfile() {
           {/* Quick contact */}
           <CardSection title="Liên hệ nhanh" mb="0">
             <div style={{display:"flex",flexDirection:"column",gap:".55rem"}}>
-              {[["✉️",profile?.email],["📞",profile?.phone]].map(([ic,val])=>val&&(
+              {[["✉️",profile?.email]].map(([ic,val])=>val&&(
                 <div key={val} style={{display:"flex",gap:".6rem",alignItems:"center",fontSize:".82rem",color:T.textMid}}>
                   <span style={{width:28,height:28,borderRadius:7,background:T.light,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ic}</span>
                   <span style={{wordBreak:"break-all"}}>{val}</span>
                 </div>
               ))}
-              {!profile?.email&&!profile?.phone&&(
+              {!profile?.email&&(
                 <p style={{fontSize:".82rem",color:T.textLt,fontStyle:"italic"}}>Chưa có thông tin.</p>
               )}
             </div>
@@ -554,7 +553,7 @@ export default function ViewProfile() {
 
         {/* Content */}
         <main>
-          {tab==="info"     && <SectionInfo     user={profile} onEdit={()=>navigate("/profile/edit")} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
+          {tab==="info"     && <SectionInfo     user={profile} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
           {tab==="security" && <SectionSecurity/>}
           {tab==="activity" && <SectionActivity activities={profile?.activities||[]}/>}
         </main>

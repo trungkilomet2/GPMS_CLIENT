@@ -1,4 +1,4 @@
-const PAYROLL_RECORDS = [
+const RAW_PAYROLL_RECORDS = [
   {
     employeeId: "nv001",
     employeeCode: "NV001",
@@ -597,6 +597,122 @@ const PAYROLL_RECORDS = [
   },
 ];
 
+const PAYROLL_OWNER = {
+  id: "owner-001",
+  fullName: "Thao Vy",
+  role: "Owner",
+};
+
+const PAYROLL_PM_DIRECTORY = {
+  "To may 1": {
+    id: "pm-001",
+    fullName: "Quoc Bao",
+    role: "PM",
+  },
+  "To may 2": {
+    id: "pm-001",
+    fullName: "Quoc Bao",
+    role: "PM",
+  },
+  "To may 3": {
+    id: "pm-002",
+    fullName: "Gia Han",
+    role: "PM",
+  },
+  "To cat": {
+    id: "pm-002",
+    fullName: "Gia Han",
+    role: "PM",
+  },
+  "To dong goi": {
+    id: "pm-003",
+    fullName: "Thanh Binh",
+    role: "PM",
+  },
+  "To hoan thien": {
+    id: "pm-003",
+    fullName: "Thanh Binh",
+    role: "PM",
+  },
+};
+
+const PAYROLL_TEAM_LEAD_DIRECTORY = {
+  "To may 1": {
+    id: "tl-001",
+    fullName: "Gia Han",
+    role: "Team Lead",
+  },
+  "To may 2": {
+    id: "tl-002",
+    fullName: "Minh Chau",
+    role: "Team Lead",
+  },
+  "To may 3": {
+    id: "tl-003",
+    fullName: "Bao Ngan",
+    role: "Team Lead",
+  },
+  "To cat": {
+    id: "tl-004",
+    fullName: "Thanh Tung",
+    role: "Team Lead",
+  },
+  "To dong goi": {
+    id: "tl-005",
+    fullName: "Hong Nhung",
+    role: "Team Lead",
+  },
+  "To hoan thien": {
+    id: "tl-006",
+    fullName: "Duc Manh",
+    role: "Team Lead",
+  },
+};
+
+function buildWorkflow(record) {
+  const pm = PAYROLL_PM_DIRECTORY[record.team] ?? {
+    id: "pm-000",
+    fullName: "Chua phan cong",
+    role: "PM",
+  };
+  const teamLead = PAYROLL_TEAM_LEAD_DIRECTORY[record.team] ?? {
+    id: "tl-000",
+    fullName: "Chua phan cong",
+    role: "Team Lead",
+  };
+  const isPaid = record.status === "paid";
+  const reviewedAt = record.createdAt
+    ? `${record.createdAt}T09:00:00+07:00`
+    : null;
+  const approvedAt = isPaid && record.paidAt
+    ? `${record.paidAt}T16:00:00+07:00`
+    : null;
+
+  return {
+    managerId: teamLead.id,
+    managerName: teamLead.fullName,
+    managerRole: teamLead.role,
+    teamLeadId: teamLead.id,
+    teamLeadName: teamLead.fullName,
+    teamLeadRole: teamLead.role,
+    pmId: pm.id,
+    pmName: pm.fullName,
+    pmRole: pm.role,
+    ownerId: PAYROLL_OWNER.id,
+    ownerName: PAYROLL_OWNER.fullName,
+    ownerRole: PAYROLL_OWNER.role,
+    reviewedByPmAt: reviewedAt,
+    approvedByOwnerAt: approvedAt,
+    sourceTables: ["PART_WORK_LOG", "CUTTING_NOTEBOOK_LOG", "USER.MANAGER_ID"],
+  };
+}
+
+const PAYROLL_RECORDS = RAW_PAYROLL_RECORDS.map((record) => ({
+  ...record,
+  employeeRole: "Worker",
+  workflow: buildWorkflow(record),
+}));
+
 export const PAYROLL_PAGE_SIZE = 10;
 
 function normalizeMonthValue(month) {
@@ -626,6 +742,12 @@ export function formatDateLabel(value) {
   if (Number.isNaN(date.getTime())) return "Chưa cập nhật";
 
   return date.toLocaleDateString("vi-VN");
+}
+
+export function getPayrollFlowLabel(record) {
+  if (!record?.workflow) return "Worker";
+
+  return `${record.employeeRole} -> ${record.workflow.teamLeadRole} -> ${record.workflow.pmRole} -> ${record.workflow.ownerRole}`;
 }
 
 export function getPayrollInitials(name = "") {

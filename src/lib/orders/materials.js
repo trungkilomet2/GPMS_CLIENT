@@ -3,6 +3,7 @@ export const MATERIALS_TABLE_LABELS = {
   create: {
     image: "Ảnh",
     name: "Tên vật liệu",
+    color: "Màu sắc",
     value: "Số lượng",
     uom: "Đơn vị",
     note: "Ghi chú",
@@ -10,6 +11,7 @@ export const MATERIALS_TABLE_LABELS = {
   detail: {
     image: "Ảnh",
     name: "Tên vật liệu",
+    color: "Màu sắc",
     value: "Định mức/Số lượng",
     uom: "Đơn vị (UoM)",
     note: "Ghi chú",

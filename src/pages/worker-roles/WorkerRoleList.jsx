@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   CircleAlert,
@@ -20,7 +20,7 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
       <div className="worker-role-summary__header">
         <p className="worker-role-summary__label">{label}</p>
         <div className="worker-role-summary__icon">
-          <Icon size={20} />
+          {createElement(Icon, { size: 20 })}
         </div>
       </div>
 
@@ -118,7 +118,7 @@ export default function WorkerRoleList() {
             <div>
               <h1 className="worker-role-hero__title">Danh sách vai trò thợ</h1>
               <p className="worker-role-hero__subtitle">
-                Theo dõi các chuyên môn đang được gán cho nhân sự trong xưởng.
+                Chỉ hiển thị chuyên môn dành cho worker, tách biệt với role hệ thống và hierarchy Owner / PM / Team Lead / Worker.
               </p>
             </div>
 
@@ -169,7 +169,7 @@ export default function WorkerRoleList() {
               <div>
                 <h2 className="worker-role-table-card__title">Danh mục chuyên môn thợ</h2>
                 <p className="worker-role-table-card__subtitle">
-                  Dữ liệu bám theo cấu trúc vai trò thợ và quan hệ gán nhân sự hiện có.
+                  Dữ liệu chỉ lấy các worker skill hợp lệ và bỏ qua role vận hành của hệ thống.
                 </p>
               </div>
             </div>

@@ -1,25 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { getPostLoginPath } from "@/lib/authRouting";
+import { isProfileComplete } from "@/lib/profileCompletion";
 import { authService } from "@/services/authService";
 import { validatePassword, validateUserName } from "@/lib/validators";
 import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
 const INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác";
-
-function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
-
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function hasAnyRole(roles, targets) {
-  const normalized = roles.map((item) => String(item).toLowerCase());
-  return targets.some((role) => normalized.includes(role));
-}
 
 function mapLoginError(err) {
   const status = err?.response?.data?.status ?? err?.status;
@@ -143,21 +131,13 @@ export default function LoginPage() {
       });
       if (remember) localStorage.setItem("rememberUserName", formData.userName.trim());
       else          localStorage.removeItem("rememberUserName");
-      const roles = splitRoles(result?.user?.role);
-      const isAdmin = hasAnyRole(roles, ["admin"]);
-      const isInternalUser = hasAnyRole(roles, ["owner", "pm"]);
 
-      if (hasAnyRole(roles, ["team leader", "teamleader", "tl"])) {
-        navigate("/monitoring/assign");
+      if (!isProfileComplete(result?.user)) {
+        navigate("/profile/edit", { replace: true, state: { forceProfileCompletion: true } });
         return;
       }
 
-      if (hasAnyRole(roles, ["worker", "sewer", "tailor"])) {
-        navigate("/worker/assignments");
-        return;
-      }
-
-      navigate(isAdmin ? "/admin/users" : isInternalUser ? "/dashboard" : "/home");
+      navigate(getPostLoginPath(result?.user?.role));
     } catch (err) {
       setErrors(mapLoginError(err));
     } finally {
@@ -176,7 +156,10 @@ export default function LoginPage() {
               <p>Hệ thống quản lý sản xuất may mặc</p>
             </div>
           </div>
-          <h1 className="left-heading">Quản lý sản xuất thông minh</h1>
+          <h1 className="left-heading">
+            Quản lý sản xuất <br />
+            thông minh
+          </h1>
           <p className="left-desc">Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả</p>
           <div className="features-box">
             {[
@@ -195,7 +178,7 @@ export default function LoginPage() {
         <div className="tape" />
       </div>
 
-      <div className="login-right">
+      <div className="login-right login-right--center">
         <form className="login-card" onSubmit={handleSubmit}>
           <button
             type="button"
@@ -215,7 +198,9 @@ export default function LoginPage() {
               onChange={handleChange} placeholder="Nhập tên đăng nhập"
               className={errors.userName ? "input-error" : ""} />
           </div>
-          {errors.userName && <p className="error-text">{errors.userName}</p>}
+          <p className={`error-text error-text--slot ${errors.userName ? "" : "error-text--empty"}`}>
+            {errors.userName || ""}
+          </p>
 
           <label className="field-label">Mật khẩu</label>
           <div className="input-wrapper">
@@ -227,7 +212,9 @@ export default function LoginPage() {
             <button type="button" className="eye-btn"
               onClick={() => setShowPassword(p => !p)}>👁</button>
           </div>
-          {errors.password && <p className="error-text">{errors.password}</p>}
+          <p className={`error-text error-text--slot ${errors.password ? "" : "error-text--empty"}`}>
+            {errors.password || ""}
+          </p>
 
           <div className="options-row">
             <label className="remember-label">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { ClipboardList, ClipboardCheck, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
@@ -6,8 +6,7 @@ import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
-  { to: "/monitoring/assign", label: "Phân công công việc", icon: ClipboardCheck },
-  { to: "/monitoring", label: "Kế hoạch sản xuất", icon: ClipboardList },
+  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ClipboardList },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardList },
 ];
 
@@ -75,14 +74,18 @@ export default function TeamLeaderSidebar() {
             title={label}
             className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
           >
-            <Icon size={22} />
+            {createElement(Icon, { size: 22 })}
             {!collapsed && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
 
       <div className="dashboard-sidebar__footer">
-        <div className="dashboard-sidebar__account">
+        <NavLink
+          to="/profile"
+          title="Hồ sơ cá nhân"
+          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+        >
           <div className="dashboard-sidebar__avatar">
             {getInitials(user?.fullName || user?.name || "TL")}
           </div>
@@ -92,7 +95,7 @@ export default function TeamLeaderSidebar() {
               <div className="dashboard-sidebar__user-role">Team Leader</div>
             </div>
           )}
-        </div>
+        </NavLink>
 
         <button
           type="button"

@@ -111,6 +111,14 @@ const extractNamesFromCollection = (collection = []) => {
   );
 };
 
+const normalizeManagerId = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return null;
+  }
+  return numericValue;
+};
+
 const canUseStorage = () =>
   typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
@@ -138,6 +146,11 @@ const writeRoleCache = (value) => {
   }
 };
 
+const getCurrentUserId = () => {
+  const currentUser = getStoredUser();
+  return String(currentUser?.userId ?? currentUser?.id ?? "");
+};
+
 const rememberUserRoles = (id, roleKeys = []) => {
   if (id == null) return;
 
@@ -152,9 +165,26 @@ const rememberUserRoles = (id, roleKeys = []) => {
   writeRoleCache(cache);
 };
 
+const syncCurrentUserRoles = (id, roleKeys = []) => {
+  const currentUser = getStoredUser();
+  const currentId = getCurrentUserId();
+
+  if (!currentId || String(id) !== currentId) {
+    return false;
+  }
+
+  setStoredUser({
+    ...currentUser,
+    role: unique(roleKeys).join(", ") || currentUser?.role,
+  });
+
+  window.dispatchEvent(new Event("auth-change"));
+  return true;
+};
+
 const getCurrentUserRoles = (id) => {
   const currentUser = getStoredUser();
-  const currentId = String(currentUser?.userId ?? currentUser?.id ?? "");
+  const currentId = getCurrentUserId();
 
   if (!currentId || String(id) !== currentId) {
     return [];
@@ -295,7 +325,10 @@ const normalizeAdminStatus = (statusId, rawStatus) => {
       : rawStatus;
   const normalized = String(normalizedStatus ?? "").trim().toLowerCase();
   if (["1", "active", "enabled", "working"].includes(normalized)) return "active";
-  if (["2", "inactive", "disabled", "locked", "suspended", "blocked"].includes(normalized)) return "inactive";
+  if (["invited", "invite", "pending activation"].includes(normalized)) return "invited";
+  if (["locked", "lock"].includes(normalized)) return "locked";
+  if (["suspended", "blocked", "banned"].includes(normalized)) return "suspended";
+  if (["2", "inactive", "disabled"].includes(normalized)) return "inactive";
   return "inactive";
 };
 
@@ -313,7 +346,9 @@ const normalizeAdminUser = (item = {}) => {
   ]);
   const workerRoleNames = unique([
     ...extractNamesFromCollection(item.workerRoles),
+    ...extractNamesFromCollection(item.workerSkills),
     ...splitRoles(item.workerRole),
+    ...splitRoles(item.workerSkill),
   ]);
   const roleKeys = extractRoleKeys(item);
   const primaryRole = pickPrimaryRole(roleKeys);
@@ -332,6 +367,7 @@ const normalizeAdminUser = (item = {}) => {
     avatarUrl: item.avatarUrl ?? item.avartarUrl ?? "",
     location: item.location ?? "",
     email: item.email ?? "",
+    managerId: normalizeManagerId(item.managerId),
     statusId: item.statusId ?? item.status?.id ?? (status === "active" ? 1 : 2),
     status,
     roleNames,
@@ -345,6 +381,7 @@ const normalizeAdminUser = (item = {}) => {
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
     workerRoleLabel: workerRoleNames[0] || "",
+    workerSkillNames: workerRoleNames,
     ...timestamps,
   };
 };
@@ -542,7 +579,23 @@ const AdminUserService = {
 
   async disableUser(id) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_DISABLE_USER(id), null);
-    return parseApiPayload(rawResponse);
+    const response = parseApiPayload(rawResponse);
+
+    if (getCurrentUserId() && String(id) === getCurrentUserId()) {
+      clearAuthStorage();
+      window.dispatchEvent(new Event("auth-change"));
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login?reason=disabled";
+      }
+
+      return {
+        ...(response && typeof response === "object" ? response : { data: response }),
+        currentUserSignedOut: true,
+      };
+    }
+
+    return response;
   },
 
   async updateUser(id, payload = {}) {
@@ -605,6 +658,7 @@ const AdminUserService = {
     });
 
     rememberUserRoles(id, roleKeys);
+    syncCurrentUserRoles(id, roleKeys);
     return parseApiPayload(rawResponse);
   },
 };

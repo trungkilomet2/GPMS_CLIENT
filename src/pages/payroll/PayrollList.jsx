@@ -160,8 +160,8 @@ export default function PayrollList() {
                 </Link>
                 <h1 className="payroll-hero__title">Bảng lương</h1>
                 <p className="payroll-hero__subtitle">
-                  Theo dõi chi trả, rà soát trạng thái xử lý và xuất báo cáo lương
-                  theo từng kỳ làm việc của nhân viên.
+                  Theo dõi bảng lương worker theo cây quản lý 1 owner, nhiều PM,
+                  mỗi PM phụ trách team lead và worker của line mình.
                 </p>
 
                 <div className="payroll-hero__chips">
@@ -199,8 +199,8 @@ export default function PayrollList() {
                     {formatMonthLabel(selectedMonth)}
                   </strong>
                   <p className="payroll-hero__period-meta">
-                    {summary.payrollCreated} bảng lương đã tạo, {summary.paidCount}{" "}
-                    bảng đã thanh toán và {summary.pendingCount} bảng đang chờ xử lý.
+                    {summary.payrollCreated} bảng lương worker đã tạo, {summary.paidCount}{" "}
+                    bảng đã owner xác nhận và {summary.pendingCount} bảng đang chờ đối soát.
                   </p>
                 </div>
               </div>
@@ -240,10 +240,7 @@ export default function PayrollList() {
 
           <div className="payroll-summary-note">
             <strong>Kỳ lương tổng quan</strong>
-            <span>
-              Số liệu phía trên luôn bám theo tháng đang chọn và không thay đổi theo
-              bộ lọc tìm kiếm hoặc trạng thái hiển thị.
-            </span>
+            <span>Dữ liệu đang bám cây quản lý Owner / PM / Team Lead / Worker theo schema USER, USER_ROLE, MANAGER_ID, PART_WORK_LOG.</span>
           </div>
 
           <section className="payroll-card">
@@ -252,7 +249,7 @@ export default function PayrollList() {
                 <span className="payroll-table-card__eyebrow">Danh sách chi trả</span>
                 <h2 className="payroll-table-card__title">Danh sách bảng lương</h2>
                 <p className="payroll-table-card__subtitle">
-                  Theo dõi thu nhập, phụ cấp và trạng thái chi trả theo từng nhân viên.
+                  Theo dõi thu nhập, phụ cấp và trạng thái đối soát theo từng worker.
                 </p>
                 <div className="payroll-table-card__insights">
                   <span className="payroll-table-card__insight">
@@ -335,7 +332,7 @@ export default function PayrollList() {
                       <thead>
                         <tr>
                           <th className="payroll-table__cell payroll-table__cell--person">
-                            Nhân viên
+                            Worker
                           </th>
                           <th className="payroll-table__cell payroll-table__cell--count">
                             Số công đoạn
@@ -373,6 +370,9 @@ export default function PayrollList() {
                                     <div className="payroll-person__meta">
                                       {record.employeeCode} · {record.team}
                                     </div>
+                                    <div className="payroll-person__meta">
+                                      TL: {record.workflow.teamLeadName} · PM: {record.workflow.pmName}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -382,7 +382,7 @@ export default function PayrollList() {
                                     {record.workItems.length} mục
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Công đoạn đã chốt
+                                    Log đã chốt từ worker
                                   </span>
                                 </div>
                               </td>
@@ -412,7 +412,7 @@ export default function PayrollList() {
                                     {formatCurrency(record.netIncome)}
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Thực nhận cuối kỳ
+                                    Owner xác nhận cuối kỳ
                                   </span>
                                 </div>
                               </td>
@@ -463,6 +463,9 @@ export default function PayrollList() {
                                 <div className="payroll-person__name">{record.fullName}</div>
                                 <div className="payroll-person__meta">
                                   {record.employeeCode} · {record.team}
+                                </div>
+                                <div className="payroll-person__meta">
+                                  TL: {record.workflow.teamLeadName} · PM: {record.workflow.pmName}
                                 </div>
                               </div>
                             </div>

@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authService } from "../services/authService";
+import SuccessModal from "@/components/SuccessModal";
 import {
+  validateEmail,
   normalizeSpaces,
   validateConfirmPassword,
-  validateEmail,
   validateFullName,
   validatePassword,
-  validatePhoneNumber,
   validateUserName,
 } from "@/lib/validators";
 import "../styles/login.css";
@@ -15,11 +15,11 @@ import "../styles/register.css";
 
 const initialValues = {
   fullName: "",
-  userName: "",
-  phoneNumber: "",
   email: "",
+  userName: "",
   password: "",
   confirmPassword: "",
+  otp: "",
   agree: false,
 };
 
@@ -31,26 +31,74 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  const getApiErrorDetails = (errData) => {
+    const rawErrors =
+      errData?.errors && typeof errData.errors === "object" ? errData.errors : null;
+
+    const fieldErrors = rawErrors
+      ? Object.entries(rawErrors).reduce((acc, [field, messages]) => {
+          const firstMessage = Array.isArray(messages) ? messages[0] : messages;
+          const message = String(firstMessage ?? "").trim();
+          if (!message) return acc;
+
+          const key = String(field ?? "").trim().toLowerCase();
+          if (key.includes("username")) acc.userName = message;
+          else if (key.includes("fullname")) acc.fullName = message;
+          else if (key.includes("email")) acc.email = message;
+          else if (key.includes("otp")) acc.otp = message;
+          else if (key === "password") acc.password = message;
+          else if (key.includes("repassword") || key.includes("confirmpassword")) {
+            acc.confirmPassword = message;
+          } else {
+            acc._ = acc._ || message;
+          }
+
+          return acc;
+        }, {})
+      : {};
+
+    const message =
+      fieldErrors.userName ||
+      fieldErrors.fullName ||
+      fieldErrors.email ||
+      fieldErrors.otp ||
+      fieldErrors.password ||
+      fieldErrors.confirmPassword ||
+      fieldErrors._ ||
+      errData?.detail ||
+      errData?.message ||
+      errData?.title ||
+      "Đăng ký thất bại";
+
+    const { _, ...mappedFieldErrors } = fieldErrors;
+    return { message, fieldErrors: mappedFieldErrors };
+  };
 
   const validateField = (name, value, nextForm = formData) => {
     if (name === "fullName") return validateFullName(value);
-    if (name === "userName") return validateUserName(value);
-    if (name === "phoneNumber") return validatePhoneNumber(value);
     if (name === "email") return validateEmail(value);
+    if (name === "userName") return validateUserName(value);
     if (name === "password") return validatePassword(value);
     if (name === "confirmPassword") {
       return validateConfirmPassword(nextForm.password, value);
     }
+    if (name === "otp") return otpSent && !String(value ?? "").trim() ? "Vui lòng nhập mã OTP" : "";
     if (name === "agree") return value ? "" : "Bạn phải đồng ý với điều khoản";
     return "";
   };
 
-  const validateForm = () => {
+  const validateForm = ({ includeOtp = otpSent } = {}) => {
     const newErrors = {};
-    Object.keys(formData).forEach((key) => {
+    Object.keys(formData)
+      .filter((key) => includeOtp || key !== "otp")
+      .forEach((key) => {
       const message = validateField(key, formData[key], formData);
       if (message) newErrors[key] = message;
-    });
+      });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -65,6 +113,10 @@ export default function RegisterPage() {
     };
 
     setFormData(nextForm);
+    setSubmitError("");
+    if (name === "email" && otpSent) {
+      setOtpSent(false);
+    }
     setErrors((prev) => ({
       ...prev,
       [name]: validateField(name, nextValue, nextForm),
@@ -74,42 +126,96 @@ export default function RegisterPage() {
     }));
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!validateForm()) return;
-
-  try {
-    setLoading(true);
-
-    const payload = {
-  userName: formData.userName.trim(),
-  fullName: normalizeSpaces(formData.fullName),
-  password: formData.password,
-  rePassword: formData.confirmPassword,
-};
-
-    await authService.register(payload);
-
-    alert("Đăng ký thành công");
-
+  const goLogin = () => {
+    setSuccessOpen(false);
     navigate("/login");
+  };
 
-  } catch (error) {
+  const buildRegisterPayload = () => ({
+    userName: formData.userName.trim(),
+    fullName: normalizeSpaces(formData.fullName),
+    email: formData.email.trim(),
+    password: formData.password,
+    rePassword: formData.confirmPassword,
+  });
 
-    alert(
-      error?.response?.data?.message ||
-      error?.response?.data?.title ||
-      "Đăng ký thất bại"
-    );
+  const handleSendOtp = async () => {
+    if (!validateForm({ includeOtp: false })) return;
 
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+
+      await authService.sendRegisterOtp({
+        email: formData.email.trim(),
+      });
+
+      setOtpSent(true);
+      setSubmitError("");
+      setFormData((prev) => ({ ...prev, otp: "" }));
+      setErrors((prev) => ({ ...prev, otp: "" }));
+    } catch (error) {
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAndRegister = async () => {
+    if (!validateForm({ includeOtp: true })) return;
+
+    try {
+      setLoading(true);
+
+      await authService.verifyRegisterOtp({
+        email: formData.email.trim(),
+        otp: formData.otp.trim(),
+      });
+
+      await authService.register(buildRegisterPayload());
+
+      setSubmitError("");
+      setSuccessOpen(true);
+    } catch (error) {
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (otpSent) {
+      await handleVerifyAndRegister();
+      return;
+    }
+
+    await handleSendOtp();
+  };
 
   return (
     <div className="login-container">
+      <SuccessModal
+        isOpen={successOpen}
+        title="Đăng ký thành công"
+        description="Tài khoản đã được tạo. Bạn có thể đăng nhập ngay."
+        primaryLabel="Đăng nhập ngay"
+        secondaryLabel="Để sau"
+        onPrimary={goLogin}
+        onClose={() => {
+          setSuccessOpen(false);
+        }}
+      />
       <div className="login-left">
         <div className="left-content">
           <div className="brand">
@@ -120,12 +226,30 @@ const handleSubmit = async (e) => {
             </div>
           </div>
 
-          <h1 className="left-heading">Quản lý sản xuất thông minh</h1>
+          <h1 className="left-heading">
+            Quản lý sản xuất <br />
+            thông minh
+          </h1>
 
           <p className="left-desc">
             Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả
           </p>
+
+          <div className="features-box">
+            {[
+              { icon:"⏱", title:"Theo dõi thời gian thực", desc:"Giám sát tiến độ sản xuất mọi lúc mọi nơi" },
+              { icon:"👔", title:"Quản lý nhân sự",         desc:"Phân công công việc và theo dõi hiệu suất" },
+              { icon:"📦", title:"Quản lý đơn hàng",        desc:"Theo dõi đơn hàng từ A đến Z" },
+              { icon:"📊", title:"Báo cáo chi tiết",        desc:"Phân tích dữ liệu và tạo báo cáo tự động" },
+            ].map(f => (
+              <div key={f.title} className="feature">
+                <div className="icon">{f.icon}</div>
+                <div><h4>{f.title}</h4><p>{f.desc}</p></div>
+              </div>
+            ))}
+          </div>
         </div>
+        <div className="tape" />
       </div>
 
       <div className="login-right">
@@ -155,6 +279,20 @@ const handleSubmit = async (e) => {
           </div>
           {errors.fullName && <p className="error-text">{errors.fullName}</p>}
 
+          <label className="field-label">Email *</label>
+          <div className="input-wrapper">
+            <span className="input-icon">✉️</span>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Nhập email để nhận mã xác thực"
+              className={errors.email ? "input-error" : ""}
+            />
+          </div>
+          {errors.email && <p className="error-text">{errors.email}</p>}
+
           <label className="field-label">Tên đăng nhập *</label>
           <div className="input-wrapper">
             <span className="input-icon">🆔</span>
@@ -168,36 +306,6 @@ const handleSubmit = async (e) => {
             />
           </div>
           {errors.userName && <p className="error-text">{errors.userName}</p>}
-
-          <label className="field-label">Số điện thoại *</label>
-          <div className="input-wrapper">
-            <span className="input-icon">📞</span>
-            <input
-              type="text"
-              name="phoneNumber"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              placeholder="Nhập số điện thoại"
-              className={errors.phoneNumber ? "input-error" : ""}
-            />
-          </div>
-          {errors.phoneNumber && (
-            <p className="error-text">{errors.phoneNumber}</p>
-          )}
-
-          <label className="field-label">Email *</label>
-          <div className="input-wrapper">
-            <span className="input-icon">✉️</span>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Nhập email"
-              className={errors.email ? "input-error" : ""}
-            />
-          </div>
-          {errors.email && <p className="error-text">{errors.email}</p>}
 
           <label className="field-label">Mật khẩu *</label>
           <div className="input-wrapper">
@@ -243,6 +351,24 @@ const handleSubmit = async (e) => {
             <p className="error-text">{errors.confirmPassword}</p>
           )}
 
+          {otpSent ? (
+            <>
+              <label className="field-label">Mã OTP *</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🔢</span>
+                <input
+                  type="text"
+                  name="otp"
+                  value={formData.otp}
+                  onChange={handleChange}
+                  placeholder="Nhập mã OTP gửi về email"
+                  className={errors.otp ? "input-error" : ""}
+                />
+              </div>
+              {errors.otp && <p className="error-text">{errors.otp}</p>}
+            </>
+          ) : null}
+
           <label className="terms">
             <input
               type="checkbox"
@@ -256,8 +382,21 @@ const handleSubmit = async (e) => {
           </label>
           {errors.agree && <p className="error-text">{errors.agree}</p>}
 
+          {submitError ? (
+            <div className="register-submit-error" role="alert">
+              <span aria-hidden="true">⚠</span>
+              <span>{submitError}</span>
+            </div>
+          ) : null}
+
           <button type="submit" className="register-btn" disabled={loading}>
-            {loading ? "Đang đăng ký..." : "Đăng ký"}
+            {loading
+              ? otpSent
+                ? "Đang xác thực..."
+                : "Đang gửi mã..."
+              : otpSent
+                ? "Xác thực email và đăng ký"
+                : "Gửi mã xác thực"}
           </button>
 
           <div className="register-row">

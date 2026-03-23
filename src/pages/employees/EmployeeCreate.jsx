@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
+  BriefcaseBusiness,
   CircleAlert,
   LoaderCircle,
   ShieldCheck,
@@ -9,37 +10,92 @@ import {
   UserRoundCog,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import {
+  EMPLOYEE_FORM_ROLE_OPTIONS,
+  SYSTEM_ROLE_IDS,
+  getAllowedManagerRoles,
+  getManagerRoleHint,
+  getSystemRoleLabel,
+  isManagerRequired,
+} from "@/lib/orgHierarchy";
 import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
-
-const ROLE_ID_MAP = {
-  Admin: 1,
-  Customer: 2,
-  Owner: 3,
-  PM: 4,
-  "Team Leader": 5,
-  Worker: 6,
-  KCS: 7,
-};
-
-const STATUS_ID_MAP = {
-  Active: 1,
-  Inactive: 2,
-};
 
 export default function EmployeeCreate() {
   const navigate = useNavigate();
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [managerOptions, setManagerOptions] = useState([]);
+  const [managerLoading, setManagerLoading] = useState(true);
+  const [managerError, setManagerError] = useState("");
   const [form, setForm] = useState({
     userName: "",
     password: "",
     fullName: "",
     role: "PM",
-    status: "Active",
+    managerId: "",
   });
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadManagers = async () => {
+      setManagerLoading(true);
+      setManagerError("");
+
+      try {
+        const response = await WorkerService.getAllEmployees();
+        if (!mounted) return;
+        setManagerOptions(response?.data ?? []);
+      } catch (error) {
+        if (!mounted) return;
+        setManagerError(
+          getEmployeeModuleErrorMessage(
+            error,
+            "Không tải được danh sách quản lý để gán tuyến báo cáo."
+          )
+        );
+      } finally {
+        if (mounted) setManagerLoading(false);
+      }
+    };
+
+    loadManagers();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const allowedManagerRoles = useMemo(
+    () => getAllowedManagerRoles(form.role),
+    [form.role]
+  );
+
+  const availableManagers = useMemo(
+    () =>
+      managerOptions.filter((employee) =>
+        employee.roles.some((role) => allowedManagerRoles.includes(role))
+      ),
+    [allowedManagerRoles, managerOptions]
+  );
+
+  useEffect(() => {
+    if (!form.managerId) return;
+
+    const isValidSelection = availableManagers.some(
+      (manager) => String(manager.id) === String(form.managerId)
+    );
+
+    if (!isValidSelection) {
+      setForm((prev) => ({
+        ...prev,
+        managerId: "",
+      }));
+    }
+  }, [availableManagers, form.managerId]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({
@@ -63,8 +119,11 @@ export default function EmployeeCreate() {
       userName: validateUserName(normalizedUserName),
       password: validatePassword(form.password),
       fullName: validateFullName(normalizedFullName),
-      role: ROLE_ID_MAP[form.role] ? "" : "Vai trò không hợp lệ",
-      status: STATUS_ID_MAP[form.status] ? "" : "Trạng thái không hợp lệ",
+      role: SYSTEM_ROLE_IDS[form.role] ? "" : "Vai trò không hợp lệ",
+      managerId:
+        isManagerRequired(form.role) && !String(form.managerId ?? "").trim()
+          ? "Vui lòng chọn quản lý trực tiếp"
+          : "",
     };
 
     setFieldErrors(nextErrors);
@@ -82,8 +141,8 @@ export default function EmployeeCreate() {
         userName: normalizedUserName,
         password: form.password,
         fullName: normalizedFullName,
-        statusId: STATUS_ID_MAP[form.status],
-        roleIds: [ROLE_ID_MAP[form.role]],
+        managerId: form.role === "Owner" ? null : Number(form.managerId),
+        roleIds: [SYSTEM_ROLE_IDS[form.role]],
       });
 
       navigate("/employees");
@@ -110,7 +169,7 @@ export default function EmployeeCreate() {
               </Link>
               <h1 className="employee-create-hero__title">Thêm nhân viên mới</h1>
               <p className="employee-create-hero__subtitle">
-                Nhập thông tin cơ bản để tạo tài khoản nhân viên trong hệ thống.
+                Tạo tài khoản nhân sự theo hierarchy 1 Owner, nhiều PM, mỗi PM quản lý team lead và worker của line mình.
               </p>
             </div>
 
@@ -164,25 +223,53 @@ export default function EmployeeCreate() {
                   <span className="employee-create-field__label">Vai trò hệ thống</span>
                   <ShieldCheck size={18} className="employee-create-field__icon" />
                   <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                    <option value="Owner">Chủ xưởng</option>
-                    <option value="PM">Quản lý sản xuất</option>
-                    <option value="Team Leader">Tổ trưởng</option>
-                    <option value="Worker">Nhân viên</option>
-                    <option value="KCS">Kiểm soát chất lượng</option>
+                    {EMPLOYEE_FORM_ROLE_OPTIONS.map((roleOption) => (
+                      <option key={roleOption.value} value={roleOption.value}>
+                        {roleOption.label}
+                      </option>
+                    ))}
                   </select>
                   {fieldErrors.role ? <span className="employee-create-field__error">{fieldErrors.role}</span> : null}
                 </label>
 
                 <label className="employee-create-field">
-                  <span className="employee-create-field__label">Trạng thái</span>
-                  <ShieldCheck size={18} className="employee-create-field__icon" />
-                  <select value={form.status} onChange={handleChange("status")} className="employee-create-field__control">
-                    <option value="Active">Đang hoạt động</option>
-                    <option value="Inactive">Ngừng hoạt động</option>
+                  <span className="employee-create-field__label">Quản lý trực tiếp</span>
+                  <BriefcaseBusiness size={18} className="employee-create-field__icon" />
+                  <select
+                    value={form.managerId}
+                    onChange={handleChange("managerId")}
+                    className="employee-create-field__control"
+                    disabled={form.role === "Owner" || managerLoading}
+                  >
+                    <option value="">
+                      {form.role === "Owner"
+                        ? "Owner không có quản lý trực tiếp"
+                        : managerLoading
+                          ? "Đang tải danh sách quản lý..."
+                          : availableManagers.length
+                            ? "Chọn quản lý trực tiếp"
+                            : "Chưa có quản lý phù hợp"}
+                    </option>
+                    {availableManagers.map((manager) => (
+                      <option key={manager.id} value={manager.id}>
+                        {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                      </option>
+                    ))}
                   </select>
-                  {fieldErrors.status ? <span className="employee-create-field__error">{fieldErrors.status}</span> : null}
+                  {fieldErrors.managerId ? <span className="employee-create-field__error">{fieldErrors.managerId}</span> : null}
                 </label>
               </div>
+
+              <div className="employee-create-banner">
+                <span>{getManagerRoleHint(form.role)}</span>
+              </div>
+
+              {managerError ? (
+                <div className="employee-create-banner employee-create-banner--error">
+                  <CircleAlert size={18} />
+                  <span>{managerError}</span>
+                </div>
+              ) : null}
 
               {submitError ? (
                 <div className="employee-create-banner employee-create-banner--error">
