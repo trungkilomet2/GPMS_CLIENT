@@ -70,10 +70,15 @@ const normalizeEmployee = (item = {}) => {
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);
   const managerIdRaw = item.managerId ?? item.manager?.id ?? item.parentId ?? null;
+  const parsedManagerId = Number(managerIdRaw);
   const managerId =
-    managerIdRaw === null || managerIdRaw === undefined || managerIdRaw === ""
+    managerIdRaw === null ||
+    managerIdRaw === undefined ||
+    managerIdRaw === "" ||
+    !Number.isFinite(parsedManagerId) ||
+    parsedManagerId <= 0
       ? null
-      : Number(managerIdRaw);
+      : parsedManagerId;
   const managerName = String(
     item.managerName ??
     item.manager?.fullName ??
@@ -107,7 +112,7 @@ const normalizeEmployee = (item = {}) => {
     primarySystemRoleLabel: primarySystemRole ? getSystemRoleLabel(primarySystemRole) : "Chưa cập nhật",
     hierarchyTag: getRoleHierarchyTag(primarySystemRole),
     managerRoleHint: getManagerRoleHint(primarySystemRole),
-    managerId: Number.isFinite(managerId) ? managerId : null,
+    managerId,
     managerName,
     allowedManagerRoles: managerRoles,
     statusId: item.statusId ?? item.status?.id ?? null,

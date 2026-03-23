@@ -111,6 +111,14 @@ const extractNamesFromCollection = (collection = []) => {
   );
 };
 
+const normalizeManagerId = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return null;
+  }
+  return numericValue;
+};
+
 const canUseStorage = () =>
   typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 
@@ -338,7 +346,9 @@ const normalizeAdminUser = (item = {}) => {
   ]);
   const workerRoleNames = unique([
     ...extractNamesFromCollection(item.workerRoles),
+    ...extractNamesFromCollection(item.workerSkills),
     ...splitRoles(item.workerRole),
+    ...splitRoles(item.workerSkill),
   ]);
   const roleKeys = extractRoleKeys(item);
   const primaryRole = pickPrimaryRole(roleKeys);
@@ -357,6 +367,7 @@ const normalizeAdminUser = (item = {}) => {
     avatarUrl: item.avatarUrl ?? item.avartarUrl ?? "",
     location: item.location ?? "",
     email: item.email ?? "",
+    managerId: normalizeManagerId(item.managerId),
     statusId: item.statusId ?? item.status?.id ?? (status === "active" ? 1 : 2),
     status,
     roleNames,
@@ -370,6 +381,7 @@ const normalizeAdminUser = (item = {}) => {
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
     workerRoleLabel: workerRoleNames[0] || "",
+    workerSkillNames: workerRoleNames,
     ...timestamps,
   };
 };

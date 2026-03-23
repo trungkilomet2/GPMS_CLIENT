@@ -199,6 +199,8 @@ export const userService = {
       location:    String(location || "").trim(),
       address:     String(location || "").trim(),
       role:        resolvedRole,
+      managerId:   stored.managerId ?? cached.managerId ?? null,
+      workerSkills: Array.isArray(stored.workerSkills) ? stored.workerSkills : (cached.workerSkills ?? []),
       accountStatus,
     };
 
@@ -324,6 +326,8 @@ export const userService = {
       avatarUrl:   d.avartarUrl  ?? stored.avatarUrl,
       location:    d.location    ?? stored.location,
       address:     d.location    ?? stored.address,
+      managerId:   d.managerId   ?? stored.managerId ?? null,
+      workerSkills: d.workerSkills ?? stored.workerSkills ?? [],
     };
 
     setStoredUser(nextStored);
