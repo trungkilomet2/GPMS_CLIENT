@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
+import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import {
@@ -92,6 +93,17 @@ function mapApiErrors(errData) {
   return { message, fieldErrors };
 }
 
+function isEmailVerificationRequiredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email chưa được xác thực") ||
+    message.includes("xác thực email trước khi cập nhật") ||
+    message.includes("verify email") ||
+    message.includes("email not verified")
+  );
+}
+
 export default function InternalProfileEdit() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -116,6 +128,11 @@ export default function InternalProfileEdit() {
   const [message, setMessage] = useState(null);
   const [touched, setTouched] = useState({});
   const [serverErrors, setServerErrors] = useState({});
+  const [otpCode, setOtpCode] = useState("");
+  const [otpStage, setOtpStage] = useState("idle");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
@@ -201,6 +218,14 @@ export default function InternalProfileEdit() {
     setTouched((prev) => ({ ...prev, [name]: true }));
     setServerErrors((prev) => ({ ...prev, [name]: "" }));
     setMessage(null);
+
+    if (name === "email") {
+      const normalizedEmail = String(value || "").trim().toLowerCase();
+      if (normalizedEmail !== String(verifiedEmail || "").trim().toLowerCase()) {
+        setOtpStage("idle");
+        setOtpCode("");
+      }
+    }
   };
 
   const onAvatarChange = (e) => {
@@ -219,6 +244,72 @@ export default function InternalProfileEdit() {
     setAvatarPreview(URL.createObjectURL(file));
     setTouched((prev) => ({ ...prev, avatar: true }));
     setMessage(null);
+  };
+
+  const handleSendOtp = async () => {
+    const emailError = validateField("email", form.email);
+    setTouched((prev) => ({ ...prev, email: true }));
+
+    if (emailError) {
+      setMessage({ type: "error", text: emailError });
+      return;
+    }
+
+    try {
+      setSendingOtp(true);
+      setMessage(null);
+      await authService.sendRegisterOtp({ email: String(form.email || "").trim() });
+      setOtpStage("sent");
+      setVerifiedEmail("");
+      setMessage({
+        type: "success",
+        text: "Mã xác thực đã được gửi tới email. Nhập OTP rồi bấm Xác minh email.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMessage({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Không thể gửi mã xác thực. Vui lòng thử lại.",
+      });
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!String(otpCode || "").trim()) {
+      setMessage({ type: "error", text: "Vui lòng nhập mã OTP đã nhận trong email." });
+      return;
+    }
+
+    try {
+      setVerifyingOtp(true);
+      setMessage(null);
+      await authService.verifyRegisterOtp({
+        email: String(form.email || "").trim(),
+        otp: String(otpCode || "").trim(),
+      });
+      setOtpStage("verified");
+      setVerifiedEmail(String(form.email || "").trim().toLowerCase());
+      setMessage({
+        type: "success",
+        text: "Email đã được xác thực. Bạn có thể lưu thay đổi hồ sơ.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMessage({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Xác minh email không thành công. Vui lòng kiểm tra lại OTP.",
+      });
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   const handleSave = async (e) => {
@@ -279,6 +370,10 @@ export default function InternalProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data ?? {};
       const mapped = mapApiErrors(errData);
+      const shouldPromptVerify =
+        isEmailVerificationRequiredMessage(mapped.message) ||
+        isEmailVerificationRequiredMessage(errData?.detail);
+
       setServerErrors(mapped.fieldErrors || {});
       setTouched((prev) => ({
         ...prev,
@@ -287,7 +382,15 @@ export default function InternalProfileEdit() {
         ...(mapped.fieldErrors.phoneNumber ? { phoneNumber: true } : {}),
         ...(mapped.fieldErrors.location ? { location: true } : {}),
       }));
-      setMessage({ type: "error", text: mapped.message });
+      if (shouldPromptVerify) {
+        setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
+        setMessage({
+          type: "error",
+          text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
+        });
+      } else {
+        setMessage({ type: "error", text: mapped.message });
+      }
     } finally {
       setSaving(false);
     }
@@ -438,6 +541,68 @@ export default function InternalProfileEdit() {
                 {effectiveErrors.phoneNumber ? (
                   <div className="mt-2 text-sm font-semibold text-rose-700">{effectiveErrors.phoneNumber}</div>
                 ) : null}
+              </div>
+
+              <div className="sm:col-span-2">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-extrabold text-emerald-900">
+                          Xác minh email để lưu hồ sơ
+                        </div>
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${
+                            otpStage === "verified"
+                              ? "bg-emerald-200 text-emerald-900"
+                              : "bg-white text-slate-500"
+                          }`}
+                        >
+                          {otpStage === "verified" ? "Đã xác minh" : "Chưa xác minh"}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs font-semibold text-slate-500">
+                        Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSendOtp}
+                        disabled={sendingOtp || verifyingOtp}
+                        className="whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-extrabold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {otpStage !== "idle" ? (
+                    <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center">
+                      <input
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                        placeholder="Nhập mã OTP"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyOtp}
+                        disabled={verifyingOtp || !String(otpCode || "").trim()}
+                        className="whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-3 text-sm font-extrabold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {verifyingOtp ? "Đang xác minh..." : "Xác minh"}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {otpStage === "verified" ? (
+                    <div className="mt-3 text-sm font-extrabold text-emerald-700">
+                      Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="sm:col-span-2">

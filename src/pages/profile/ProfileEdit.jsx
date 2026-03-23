@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 import {
@@ -124,6 +125,17 @@ function getApiErrorDetails(errData) {
     "Lưu thất bại. Vui lòng thử lại.";
 
   return { message, fieldErrors };
+}
+
+function isEmailVerificationRequiredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email chưa được xác thực") ||
+    message.includes("xác thực email trước khi cập nhật") ||
+    message.includes("verify email") ||
+    message.includes("email not verified")
+  );
 }
 
 async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
@@ -292,6 +304,11 @@ export default function ProfileEdit() {
   const [saving,    setSaving]    = useState(false);
   const [msg,       setMsg]       = useState(null);   // {type, text}
   const [touched,   setTouched]   = useState({});
+  const [otpCode, setOtpCode] = useState("");
+  const [otpStage, setOtpStage] = useState("idle");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
 
   const validateField = (name, value) => {
     if (name === "FullName") return validateFullName(value);
@@ -350,6 +367,13 @@ export default function ProfileEdit() {
     if (name !== "Avatar") {
       setMsg(null);
     }
+    if (name === "Email") {
+      const normalizedEmail = String(value || "").trim().toLowerCase();
+      if (normalizedEmail !== String(verifiedEmail || "").trim().toLowerCase()) {
+        setOtpStage("idle");
+        setOtpCode("");
+      }
+    }
   };
 
   const handleBlur = (e) => {
@@ -372,6 +396,72 @@ export default function ProfileEdit() {
     setAvatarPreview(URL.createObjectURL(file));
     setTouched((prev) => ({ ...prev, Avatar: true }));
     setMsg(null);
+  };
+
+  const handleSendOtp = async () => {
+    const emailError = validateField("Email", form.Email);
+    setTouched((prev) => ({ ...prev, Email: true }));
+
+    if (emailError) {
+      setMsg({ type: "error", text: emailError });
+      return;
+    }
+
+    try {
+      setSendingOtp(true);
+      setMsg(null);
+      await authService.sendRegisterOtp({ email: String(form.Email || "").trim() });
+      setOtpStage("sent");
+      setVerifiedEmail("");
+      setMsg({
+        type: "success",
+        text: "Mã xác thực đã được gửi tới email. Nhập OTP rồi bấm Xác minh email.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMsg({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Không thể gửi mã xác thực. Vui lòng thử lại.",
+      });
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!String(otpCode || "").trim()) {
+      setMsg({ type: "error", text: "Vui lòng nhập mã OTP đã nhận trong email." });
+      return;
+    }
+
+    try {
+      setVerifyingOtp(true);
+      setMsg(null);
+      await authService.verifyRegisterOtp({
+        email: String(form.Email || "").trim(),
+        otp: String(otpCode || "").trim(),
+      });
+      setOtpStage("verified");
+      setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
+      setMsg({
+        type: "success",
+        text: "Email đã được xác thực. Bạn có thể lưu thay đổi hồ sơ.",
+      });
+    } catch (err) {
+      const errData = err?.response?.data;
+      setMsg({
+        type: "error",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Xác minh email không thành công. Vui lòng kiểm tra lại OTP.",
+      });
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   /* ── Validation ── */
@@ -439,6 +529,9 @@ export default function ProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data;
       const { message, fieldErrors } = getApiErrorDetails(errData);
+      const shouldPromptVerify =
+        isEmailVerificationRequiredMessage(message) ||
+        isEmailVerificationRequiredMessage(errData?.detail);
 
       if (fieldErrors.length > 0) {
         const mappedTouched = { FullName: true, Email: true, PhoneNumber: true, Location: true };
@@ -446,7 +539,15 @@ export default function ProfileEdit() {
       }
 
       console.error("update-profile error:", errData);
-      setMsg({ type: "error", text: message });
+      if (shouldPromptVerify) {
+        setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
+        setMsg({
+          type: "error",
+          text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
+        });
+      } else {
+        setMsg({ type: "error", text: message });
+      }
     } finally {
       setSaving(false);
     }
@@ -547,6 +648,111 @@ export default function ProfileEdit() {
                 <Input name="Email" type="email" value={form.Email} onChange={handle} onBlur={handleBlur}
                   placeholder="email@example.com" hasError={!!(touched.Email && errs.Email)} />
               </FormField>
+
+              <div style={{
+                marginTop: "-.2rem",
+                marginBottom: "1rem",
+                padding: ".9rem 1rem",
+                borderRadius: 10,
+                border: `1px solid ${T.border}`,
+                background: T.light,
+                display: "flex",
+                flexDirection: "column",
+                gap: ".8rem",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: ".75rem", alignItems: "center", flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: ".5rem", flexWrap: "wrap" }}>
+                        <div style={{ fontSize: ".82rem", fontWeight: 800, color: T.text }}>
+                        Xác minh email để lưu hồ sơ
+                        </div>
+                        <span style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                        padding: ".24rem .65rem",
+                        borderRadius: 999,
+                        background: otpStage === "verified" ? "#cfead8" : T.white,
+                        color: otpStage === "verified" ? T.mid : T.textMid,
+                          border: `1px solid ${otpStage === "verified" ? "#b6ddc3" : T.border}`,
+                          fontSize: ".72rem",
+                          fontWeight: 800,
+                        }}>
+                        {otpStage === "verified" ? "Đã xác minh" : "Chưa xác minh"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
+                      Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={sendingOtp || verifyingOtp}
+                    className="pf-btn-secondary"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      whiteSpace: "nowrap",
+                      background: "transparent",
+                      color: T.mid,
+                      border: `2px solid ${T.base}`,
+                      padding: ".61rem 1rem",
+                      borderRadius: 8,
+                      fontWeight: 700,
+                      fontSize: ".84rem",
+                      cursor: sendingOtp || verifyingOtp ? "not-allowed" : "pointer",
+                      transition: ".15s",
+                      opacity: sendingOtp || verifyingOtp ? .7 : 1,
+                    }}
+                  >
+                    {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                  </button>
+                </div>
+
+                {otpStage !== "idle" && (
+                  <div style={{ display: "flex", gap: ".6rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={{ flex: 1, minWidth: 220 }}>
+                      <Input
+                        name="EmailOtp"
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                        placeholder="Nhập mã OTP"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVerifyOtp}
+                      disabled={verifyingOtp || !String(otpCode || "").trim()}
+                      className="pf-btn-primary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        whiteSpace: "nowrap",
+                        background: verifyingOtp || !String(otpCode || "").trim() ? "#a0c8b0" : T.base,
+                        color: "#fff",
+                        border: "none",
+                        padding: ".63rem 1rem",
+                        borderRadius: 8,
+                        fontWeight: 700,
+                        fontSize: ".84rem",
+                        cursor: verifyingOtp || !String(otpCode || "").trim() ? "not-allowed" : "pointer",
+                        boxShadow: verifyingOtp || !String(otpCode || "").trim() ? "none" : `0 3px 12px rgba(30,138,71,.28)`,
+                        transition: ".15s",
+                      }}
+                    >
+                      {verifyingOtp ? "Đang xác minh..." : "Xác minh"}
+                    </button>
+                  </div>
+                )}
+
+                {otpStage === "verified" && (
+                  <div style={{ fontSize: ".74rem", fontWeight: 700, color: T.mid }}>
+                    Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
+                  </div>
+                )}
+              </div>
 
               <FormField
                 label="Số điện thoại"
