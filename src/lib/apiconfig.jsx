@@ -41,6 +41,12 @@ export const API_ENDPOINTS = {
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
     UPDATE_ASSIGN_WORKERS: (id) =>
       `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
+    CREATE_WORK_LOGS: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
+    UPDATE_WORK_LOGS: (partId, logId) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
+    GET_WORK_LOGS: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
   },
   
   CUTTING_NOTEBOOK: {
