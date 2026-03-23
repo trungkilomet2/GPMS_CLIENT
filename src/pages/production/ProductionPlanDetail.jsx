@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
+import CuttingNotebookService from "@/services/CuttingNotebookService";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
@@ -29,6 +31,47 @@ function getStatusLabel(status) {
   return status || "-";
 }
 
+function detectHasCuttingNotebook(detailPayload) {
+  const notebook =
+    detailPayload?.cuttingNotebook ??
+    detailPayload?.notebook ??
+    detailPayload?.cuttingBook ??
+    null;
+  const notebookId =
+    notebook?.id ??
+    detailPayload?.cuttingNotebookId ??
+    detailPayload?.notebookId ??
+    detailPayload?.cuttingBookId ??
+    null;
+  const markerLength =
+    notebook?.markerLength ??
+    detailPayload?.markerLength ??
+    detailPayload?.notebookMarkerLength;
+  const fabricWidth =
+    notebook?.fabricWidth ??
+    detailPayload?.fabricWidth ??
+    detailPayload?.notebookFabricWidth;
+  const logs =
+    notebook?.logs ??
+    detailPayload?.cuttingNotebookLogs ??
+    detailPayload?.notebookLogs ??
+    [];
+  const flag =
+    detailPayload?.hasCuttingNotebook ??
+    detailPayload?.isCuttingNotebookCreated ??
+    detailPayload?.cuttingNotebookExists ??
+    detailPayload?.notebookExists ??
+    false;
+
+  return Boolean(
+    flag ||
+    notebookId ||
+    markerLength ||
+    fabricWidth ||
+    (Array.isArray(logs) && logs.length > 0)
+  );
+}
+
 function formatDateTime(value) {
   if (!value || value === "-") return "-";
   const parsed = new Date(value);
@@ -49,6 +92,7 @@ export default function ProductionPlanDetail() {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const user = getStoredUser();
   const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
@@ -84,6 +128,7 @@ export default function ProductionPlanDetail() {
         const statusLabel = getStatusLabel(
           detailPayload?.statusName ?? detailPayload?.status ?? detailPayload?.statusId ?? ""
         );
+        const hasCuttingNotebook = detectHasCuttingNotebook(detailPayload);
 
         const partsPayload = partsRes?.data ?? {};
         const partList =
@@ -119,6 +164,7 @@ export default function ProductionPlanDetail() {
           planId: productionId,
           production: {
             productionId,
+            hasCuttingNotebook,
             pmId: pm?.id ?? null,
             orderId: order?.id ?? order?.orderId ?? "-",
             orderName: order?.orderName ?? order?.name ?? "-",
@@ -145,7 +191,7 @@ export default function ProductionPlanDetail() {
             : [],
           steps,
         });
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setError("Không thể tải chi tiết kế hoạch.");
         setPlan(null);
@@ -199,6 +245,110 @@ export default function ProductionPlanDetail() {
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { completed, total, percent };
   }, [plan]);
+
+  const resolveHasCuttingNotebook = async (productionId) => {
+    if (!Number.isFinite(Number(productionId))) return false;
+    if (plan?.production?.hasCuttingNotebook) return true;
+
+    try {
+      const notebookRes = await CuttingNotebookService.getByProduction(productionId);
+      const payload = notebookRes?.data ?? notebookRes ?? {};
+      const notebookList = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      if (notebookList.length > 0) {
+        return true;
+      }
+    } catch {
+      // ignore and fallback checks
+    }
+
+    try {
+      const detailRes = await ProductionService.getProductionDetail(productionId);
+      const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
+      if (detectHasCuttingNotebook(detailPayload)) {
+        return true;
+      }
+    } catch {
+      // ignore and fallback
+    }
+
+    try {
+      const pageSize = 100;
+      const maxPages = 20;
+      let pageIndex = 0;
+
+      while (pageIndex < maxPages) {
+        const listRes = await ProductionService.getProductionList({
+          PageIndex: pageIndex,
+          PageSize: pageSize,
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        });
+        const payload = listRes?.data ?? {};
+        const rows = Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload)
+            ? payload
+            : [];
+        if (rows.length === 0) break;
+
+        const matched = rows.find(
+          (item) =>
+            String(item?.productionId ?? item?.id ?? "") === String(productionId)
+        );
+        if (matched) {
+          return detectHasCuttingNotebook(matched);
+        }
+
+        if (rows.length < pageSize) break;
+        pageIndex += 1;
+      }
+    } catch {
+      // ignore and fallback false
+    }
+
+    return false;
+  };
+
+  const handleOpenCuttingBook = async () => {
+    if (!plan?.production?.productionId || checkingCuttingBook) return;
+
+    setCheckingCuttingBook(true);
+    try {
+      const productionId = plan.production.productionId;
+      const hasNotebook = await resolveHasCuttingNotebook(productionId);
+
+      if (!hasNotebook) {
+        toast.info("Chưa có sổ cắt cho kế hoạch này. Hệ thống sẽ chuyển sang trang tạo sổ.");
+      } else {
+        setPlan((prev) =>
+          prev
+            ? {
+              ...prev,
+              production: {
+                ...prev.production,
+                hasCuttingNotebook: true,
+              },
+            }
+            : prev
+        );
+      }
+
+      navigate("/worker/cutting-book", {
+        state: {
+          productionId,
+          production: plan.production,
+          product: plan.product,
+          openCuttingBookMode: hasNotebook ? "detail" : "create",
+        },
+      });
+    } finally {
+      setCheckingCuttingBook(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -258,13 +408,14 @@ export default function ProductionPlanDetail() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link
-                to="/worker/cutting-book"
-                state={{ productionId: plan.production.productionId, production: plan.production, product: plan.product }}
+              <button
+                type="button"
+                onClick={handleOpenCuttingBook}
+                disabled={checkingCuttingBook}
                 className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
               >
-                Sổ cắt
-              </Link>
+                {checkingCuttingBook ? "Đang kiểm tra..." : "Sổ cắt"}
+              </button>
               {isWorker ? (
                 <Link
                   to="/worker/daily-report"
@@ -456,6 +607,7 @@ export default function ProductionPlanDetail() {
                             to="/worker/error-report"
                             state={{
                               assignment: {
+                                partId: row.partId,
                                 productionId: plan.production.productionId,
                                 orderName: plan.production.orderName,
                                 partName: row.partName,

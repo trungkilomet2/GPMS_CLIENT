@@ -27,6 +27,17 @@ const ProductionPartService = {
   getWorkLogs(partId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_WORK_LOGS(partId));
   },
+  createIssue(partId, formData) {
+    return axiosClient.post(
+      API_ENDPOINTS.PRODUCTION_PART.CREATE_ISSUE(partId),
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
 };
 
 export default ProductionPartService;

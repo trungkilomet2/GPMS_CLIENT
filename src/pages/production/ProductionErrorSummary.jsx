@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -6,227 +6,6 @@ import ProductionService from "@/services/ProductionService";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const STORAGE_KEY = "gpms-error-reports";
-
-const MOCK_ERRORS = [
-  {
-    id: "e1",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân trước",
-    severity: "medium",
-    title: "Sai biên cắt",
-    description: "Biên vải lệch 3mm ở đầu thân.",
-    quantity: 14,
-    happenAt: "2026-03-18T09:10",
-    createdAt: "2026-03-18T09:15:00.000Z",
-  },
-  {
-    id: "e2",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May sườn",
-    severity: "low",
-    title: "Đường may hở",
-    description: "Lỗi hở đường may ở sườn trái.",
-    quantity: 6,
-    happenAt: "2026-03-18T14:20",
-    createdAt: "2026-03-18T14:22:00.000Z",
-  },
-  {
-    id: "e3",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đính mác",
-    severity: "high",
-    title: "Sai vị trí mác",
-    description: "Mác dán lệch khỏi vị trí chuẩn 1cm.",
-    quantity: 9,
-    happenAt: "2026-03-19T08:05",
-    createdAt: "2026-03-19T08:08:00.000Z",
-  },
-  {
-    id: "e4",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Hoàn thiện",
-    severity: "critical",
-    title: "Bẩn dầu máy",
-    description: "Dính dầu máy ở 4 sản phẩm lô 2.",
-    quantity: 4,
-    happenAt: "2026-03-19T15:45",
-    createdAt: "2026-03-19T15:46:00.000Z",
-  },
-  {
-    id: "e5",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May tay",
-    severity: "medium",
-    title: "Lệch đường ráp tay",
-    description: "Ráp tay lệch nhẹ ở size M.",
-    quantity: 11,
-    happenAt: "2026-03-20T10:22",
-    createdAt: "2026-03-20T10:24:00.000Z",
-  },
-  {
-    id: "e6",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân sau",
-    severity: "low",
-    title: "Sơ đồ cắt nhăn",
-    description: "Sơ đồ bị nhăn khi cắt, cần trải lại.",
-    quantity: 5,
-    happenAt: "2026-03-20T14:18",
-    createdAt: "2026-03-20T14:20:00.000Z",
-  },
-  {
-    id: "e7",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May cổ",
-    severity: "high",
-    title: "Sai kích thước cổ",
-    description: "Chu vi cổ nhỏ hơn tiêu chuẩn 0.7cm.",
-    quantity: 7,
-    happenAt: "2026-03-21T09:30",
-    createdAt: "2026-03-21T09:32:00.000Z",
-  },
-  {
-    id: "e8",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Là ủi",
-    severity: "medium",
-    title: "Bóng vải",
-    description: "Bóng vải ở thân trước do nhiệt cao.",
-    quantity: 8,
-    happenAt: "2026-03-21T13:05",
-    createdAt: "2026-03-21T13:08:00.000Z",
-  },
-  {
-    id: "e9",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đóng gói",
-    severity: "low",
-    title: "Thiếu tem size",
-    description: "Tem size không được dán ở 6 sản phẩm.",
-    quantity: 6,
-    happenAt: "2026-03-21T15:10",
-    createdAt: "2026-03-21T15:12:00.000Z",
-  },
-  {
-    id: "e10",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May sườn",
-    severity: "medium",
-    title: "Đường may lệch",
-    description: "Sai độ rộng đường may 2mm.",
-    quantity: 10,
-    happenAt: "2026-03-22T08:40",
-    createdAt: "2026-03-22T08:42:00.000Z",
-  },
-  {
-    id: "e11",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Kiểm hàng",
-    severity: "high",
-    title: "Phát hiện lỗi dính bẩn",
-    description: "Bẩn mực ở 3 sản phẩm size L.",
-    quantity: 3,
-    happenAt: "2026-03-22T11:20",
-    createdAt: "2026-03-22T11:25:00.000Z",
-  },
-  {
-    id: "e12",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt tay áo",
-    severity: "medium",
-    title: "Sai kích thước tay",
-    description: "Tay áo dài hơn tiêu chuẩn 0.5cm.",
-    quantity: 9,
-    happenAt: "2026-03-22T14:55",
-    createdAt: "2026-03-22T14:58:00.000Z",
-  },
-  {
-    id: "e13",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Hoàn thiện",
-    severity: "low",
-    title: "Chỉ thừa",
-    description: "Chỉ thừa ở 5 sản phẩm size S.",
-    quantity: 5,
-    happenAt: "2026-03-23T09:12",
-    createdAt: "2026-03-23T09:15:00.000Z",
-  },
-  {
-    id: "e14",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân trước",
-    severity: "high",
-    title: "Sai sơ đồ",
-    description: "Sơ đồ cắt không đúng phiên bản.",
-    quantity: 4,
-    happenAt: "2026-03-23T13:25",
-    createdAt: "2026-03-23T13:28:00.000Z",
-  },
-  {
-    id: "e15",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May tay",
-    severity: "medium",
-    title: "Bong đường may",
-    description: "Đường may bong sau khi kéo thử.",
-    quantity: 8,
-    happenAt: "2026-03-24T08:05",
-    createdAt: "2026-03-24T08:08:00.000Z",
-  },
-  {
-    id: "e16",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Là ủi",
-    severity: "low",
-    title: "Nếp gấp không đều",
-    description: "Nếp gấp sau khi là bị lệch nhẹ.",
-    quantity: 6,
-    happenAt: "2026-03-24T10:40",
-    createdAt: "2026-03-24T10:42:00.000Z",
-  },
-  {
-    id: "e17",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đóng gói",
-    severity: "medium",
-    title: "Sai màu bao bì",
-    description: "Bao bì màu xanh thay vì trắng.",
-    quantity: 5,
-    happenAt: "2026-03-24T15:30",
-    createdAt: "2026-03-24T15:32:00.000Z",
-  },
-  {
-    id: "e18",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May cổ",
-    severity: "critical",
-    title: "Vải rách khi ráp cổ",
-    description: "Rách vải do kéo sai lực.",
-    quantity: 2,
-    happenAt: "2026-03-25T09:18",
-    createdAt: "2026-03-25T09:20:00.000Z",
-  },
-];
 
 const SEVERITY_LABELS = {
   low: "Thấp",
@@ -243,51 +22,117 @@ const SEVERITY_STYLES = {
   default: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
-function normalizeErrors(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.items)) return raw.items;
-  if (Array.isArray(raw.data)) return raw.data;
-  return [];
-}
+const TYPE_ISSUE_LABELS = {
+  0: "Lỗi công đoạn",
+  1: "Lỗi cắt",
+  2: "Lỗi may",
+  3: "Lỗi khác",
+};
 
-function readStoredErrors() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return normalizeErrors(JSON.parse(raw));
-  } catch {
-    return [];
+const SEVERITY_ORDER = ["low", "medium", "high", "critical"];
+
+const getSeverityFromPriority = (priority, fallbackSeverity) => {
+  if (typeof fallbackSeverity === "string" && SEVERITY_ORDER.includes(fallbackSeverity)) {
+    return fallbackSeverity;
   }
-}
+
+  const p = Number(priority);
+  if (!Number.isFinite(p)) return "low";
+  if (p >= 4) return "critical";
+  if (p === 3) return "high";
+  if (p === 2) return "medium";
+  return "low";
+};
+
+const getTypeIssueLabel = (typeIssue) => {
+  const n = Number(typeIssue);
+  if (Number.isFinite(n) && TYPE_ISSUE_LABELS[n]) return TYPE_ISSUE_LABELS[n];
+  return "Chưa phân loại";
+};
+
+const parsePayload = (payload) => {
+  if (typeof payload !== "string") return payload;
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return payload;
+  }
+};
+
+const extractList = (payload) => {
+  const parsed = parsePayload(payload);
+  if (Array.isArray(parsed?.data)) return parsed.data;
+  if (Array.isArray(parsed?.items)) return parsed.items;
+  if (Array.isArray(parsed?.list)) return parsed.list;
+  if (Array.isArray(parsed?.results)) return parsed.results;
+  if (Array.isArray(parsed)) return parsed;
+  return [];
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString("vi-VN");
+};
+
+const normalizeIssue = (item, index) => {
+  const typeLabel = getTypeIssueLabel(item?.typeIssue);
+  const partName =
+    item?.partName ??
+    item?.part?.partName ??
+    item?.stageName ??
+    item?.stepName ??
+    (item?.partId ? `Công đoạn #${item.partId}` : typeLabel);
+
+  const severity = getSeverityFromPriority(item?.priority, item?.severity);
+
+  return {
+    id: item?.issueId ?? item?.id ?? `issue-${index}`,
+    partName,
+    typeIssue: item?.typeIssue,
+    typeIssueLabel: typeLabel,
+    title: item?.title ?? "Không có tiêu đề",
+    description: item?.description ?? "",
+    severity,
+    priority: item?.priority ?? 0,
+    quantity: Number(item?.quantity) || 0,
+    imageUrl: item?.imageUrl ?? "",
+    createdAt: item?.createdAt ?? "",
+  };
+};
 
 export default function ProductionErrorSummary() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [production, setProduction] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [productionLoading, setProductionLoading] = useState(false);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issueError, setIssueError] = useState("");
   const [errors, setErrors] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
     let active = true;
+
     const fetchProduction = async () => {
       try {
-        setLoading(true);
+        setProductionLoading(true);
         const response = await ProductionService.getProductionDetail(id);
         if (!active) return;
         const payload = response?.data?.data ?? response?.data ?? {};
-        const order = payload.order ?? {};
+        const order = payload?.order ?? {};
         setProduction({
-          productionId: payload.productionId ?? payload.id ?? id,
-          orderName: order.orderName ?? order.name ?? "",
+          productionId: payload?.productionId ?? payload?.id ?? id,
+          orderName: order?.orderName ?? order?.name ?? "",
         });
       } catch {
         if (!active) return;
         setProduction({ productionId: id, orderName: "" });
       } finally {
-        if (active) setLoading(false);
+        if (active) setProductionLoading(false);
       }
     };
 
@@ -298,29 +143,61 @@ export default function ProductionErrorSummary() {
   }, [id]);
 
   useEffect(() => {
-    const stored = readStoredErrors();
-    const merged = [...stored, ...MOCK_ERRORS];
-    const filtered = merged.filter((item) => String(item.productionId) === String(id));
-    const sorted = filtered.sort((a, b) => new Date(b.createdAt || b.happenAt || 0) - new Date(a.createdAt || a.happenAt || 0));
-    setErrors(sorted);
-    setCurrentPage(1);
+    let active = true;
+
+    const fetchIssues = async () => {
+      try {
+        setIssuesLoading(true);
+        setIssueError("");
+
+        const response = await ProductionService.getProductionIssues(id);
+        if (!active) return;
+
+        const payload = response?.data ?? response;
+        const list = extractList(payload).map(normalizeIssue);
+        const sorted = list.sort((a, b) => {
+          const aTs = new Date(a.createdAt || 0).getTime();
+          const bTs = new Date(b.createdAt || 0).getTime();
+          return bTs - aTs;
+        });
+
+        setErrors(sorted);
+      } catch {
+        if (!active) return;
+        setErrors([]);
+        setIssueError("Không thể tải danh sách lỗi từ hệ thống.");
+      } finally {
+        if (active) {
+          setIssuesLoading(false);
+          setCurrentPage(1);
+        }
+      }
+    };
+
+    fetchIssues();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
-  const severityCounts = useMemo(() => {
-    return errors.reduce(
-      (acc, item) => {
-        const key = item.severity || "default";
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      },
-      { low: 0, medium: 0, high: 0, critical: 0 }
-    );
-  }, [errors]);
+  const severityCounts = useMemo(
+    () =>
+      errors.reduce(
+        (acc, item) => {
+          const key = item.severity || "low";
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        },
+        { low: 0, medium: 0, high: 0, critical: 0 }
+      ),
+    [errors]
+  );
 
   const byPart = useMemo(() => {
     const map = new Map();
+
     errors.forEach((item) => {
-      const key = item.partName || "Không rõ";
+      const key = item.partName || "Chưa xác định";
       const current = map.get(key) || {
         partName: key,
         count: 0,
@@ -328,26 +205,36 @@ export default function ProductionErrorSummary() {
         latestAt: "",
         highestSeverity: "low",
       };
+
       current.count += 1;
       current.totalQuantity += Number(item.quantity) || 0;
-      const ts = new Date(item.happenAt || item.createdAt || 0);
-      if (!current.latestAt || ts > new Date(current.latestAt)) {
-        current.latestAt = item.happenAt || item.createdAt || "";
+
+      const nextTs = new Date(item.createdAt || 0).getTime();
+      const currentTs = new Date(current.latestAt || 0).getTime();
+      if (!current.latestAt || nextTs > currentTs) {
+        current.latestAt = item.createdAt || "";
       }
-      const severityRank = ["low", "medium", "high", "critical"];
-      const currentRank = severityRank.indexOf(current.highestSeverity);
-      const nextRank = severityRank.indexOf(item.severity || "low");
-      if (nextRank > currentRank) current.highestSeverity = item.severity || "low";
+
+      const currentRank = SEVERITY_ORDER.indexOf(current.highestSeverity);
+      const nextRank = SEVERITY_ORDER.indexOf(item.severity || "low");
+      if (nextRank > currentRank) {
+        current.highestSeverity = item.severity || "low";
+      }
+
       map.set(key, current);
     });
+
     return Array.from(map.values());
   }, [errors]);
 
   const totalPages = Math.max(1, Math.ceil(errors.length / pageSize));
+
   const pagedErrors = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return errors.slice(start, start + pageSize);
-  }, [errors, currentPage, pageSize]);
+  }, [errors, currentPage]);
+
+  const loading = productionLoading || issuesLoading;
 
   return (
     <OwnerLayout>
@@ -367,7 +254,9 @@ export default function ProductionErrorSummary() {
                   Tổng hợp lỗi Production #{production?.productionId ?? id}
                 </h1>
                 <p className="text-slate-600">
-                  {production?.orderName ? `Đơn hàng: ${production.orderName}` : "Theo dõi lỗi theo từng công đoạn."}
+                  {production?.orderName
+                    ? `Đơn hàng: ${production.orderName}`
+                    : "Theo dõi lỗi theo từng công đoạn."}
                 </p>
               </div>
             </div>
@@ -377,6 +266,12 @@ export default function ProductionErrorSummary() {
               </span>
             </div>
           </div>
+
+          {issueError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {issueError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             {[
@@ -417,7 +312,9 @@ export default function ProductionErrorSummary() {
                     <tr key={row.partName} className="hover:bg-slate-50/70">
                       <td className="px-4 py-2">
                         <div className="font-semibold text-slate-800">{row.partName}</div>
-                        <div className="text-[10px] text-slate-400">Lỗi gần nhất: {row.latestAt || "-"}</div>
+                        <div className="text-[10px] text-slate-400">
+                          Lỗi gần nhất: {formatDateTime(row.latestAt)}
+                        </div>
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex flex-wrap items-center gap-2 text-slate-700">
@@ -430,7 +327,11 @@ export default function ProductionErrorSummary() {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-center">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
+                          }`}
+                        >
                           {SEVERITY_LABELS[row.highestSeverity] || "-"}
                         </span>
                       </td>
@@ -478,12 +379,16 @@ export default function ProductionErrorSummary() {
                         <div className="text-[11px] text-slate-400">{item.description || ""}</div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
+                          }`}
+                        >
                           {SEVERITY_LABELS[item.severity] || "-"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.happenAt || "-"}</td>
+                      <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
                     </tr>
                   ))}
                   {errors.length === 0 && (
@@ -510,6 +415,7 @@ export default function ProductionErrorSummary() {
           </div>
         </div>
       </div>
+
       {loading && (
         <div className="fixed bottom-6 right-6 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 shadow">
           Đang tải dữ liệu production...
