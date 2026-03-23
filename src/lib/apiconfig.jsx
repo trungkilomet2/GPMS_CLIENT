@@ -34,6 +34,7 @@ export const API_ENDPOINTS = {
     CREATE: `${BASE_URL}/api/Production/production/create`,
     LIST: `${BASE_URL}/api/Production/production/list`,
     DETAIL: (id) => `${BASE_URL}/api/Production/production/detail/${id}`,
+    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
     UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
     APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
     REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
@@ -52,11 +53,15 @@ export const API_ENDPOINTS = {
       `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
     GET_WORK_LOGS: (partId) =>
       `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
+    CREATE_ISSUE: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
   },
   
   CUTTING_NOTEBOOK: {
     CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
     CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
+    GET_BY_PRODUCTION: (productionId) => `${BASE_URL}/api/CuttingNotebook/notebook/production/${productionId}`,
+    GET_LIST_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
   },
 
   CLOUDINARY: {
