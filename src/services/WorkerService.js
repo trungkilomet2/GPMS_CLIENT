@@ -1,6 +1,7 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import {
+  getAllowedManagerRoles,
   getManagerRoleHint,
   getRoleHierarchyTag,
   getSystemRoleLabel,
@@ -60,13 +61,26 @@ const shouldHideFromEmployeeDirectory = (employee = {}) => {
 };
 
 const normalizeEmployee = (item = {}) => {
-  const workerRole = String(item.workerRole ?? item.workerSkill ?? "").trim();
-  const roleSource = item.role ?? item.roles ?? item.roleName ?? "";
-  const role = Array.isArray(roleSource)
-    ? roleSource.map((entry) => String(entry).trim()).filter(Boolean).join(", ")
-    : String(roleSource ?? "").trim();
-  const roles = splitRoles(role);
+  const roles = splitRoles(item.role ?? item.roles ?? item.roleName ?? item.roleNames ?? "");
+  const role = roles.join(", ");
+  const workerSkillCandidates = splitRoles(
+    item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
+  );
+  const workerRole = workerSkillCandidates[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
+  const managerRoles = getAllowedManagerRoles(primarySystemRole);
+  const managerIdRaw = item.managerId ?? item.manager?.id ?? item.parentId ?? null;
+  const managerId =
+    managerIdRaw === null || managerIdRaw === undefined || managerIdRaw === ""
+      ? null
+      : Number(managerIdRaw);
+  const managerName = String(
+    item.managerName ??
+    item.manager?.fullName ??
+    item.manager?.name ??
+    item.parentName ??
+    ""
+  ).trim();
 
   return {
     id: item.id ?? null,
@@ -93,10 +107,13 @@ const normalizeEmployee = (item = {}) => {
     primarySystemRoleLabel: primarySystemRole ? getSystemRoleLabel(primarySystemRole) : "Chưa cập nhật",
     hierarchyTag: getRoleHierarchyTag(primarySystemRole),
     managerRoleHint: getManagerRoleHint(primarySystemRole),
-    statusId: item.statusId ?? null,
+    managerId: Number.isFinite(managerId) ? managerId : null,
+    managerName,
+    allowedManagerRoles: managerRoles,
+    statusId: item.statusId ?? item.status?.id ?? null,
     status: normalizeEmployeeStatus(
-      item.status ?? item.accountStatus ?? item.userStatus,
-      item.statusId
+      item.status?.name ?? item.status ?? item.accountStatus ?? item.userStatus,
+      item.statusId ?? item.status?.id
     ),
   };
 };

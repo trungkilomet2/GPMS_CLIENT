@@ -167,6 +167,7 @@ export default function EmployeeList() {
           employee.email,
           ...(employee.roleLabels ?? []),
           employee.workerSkillLabel,
+          employee.managerName,
           employee.managerRoleHint,
           employee.hierarchyTag,
         ]

@@ -200,6 +200,10 @@ export default function EmployeeDetail() {
                     <BriefcaseBusiness size={17} />
                     <span>Tuyến quản lý: {employee.managerRoleHint || "Chưa cập nhật"}</span>
                   </div>
+                  <div className="employee-detail-info-item">
+                    <BriefcaseBusiness size={17} />
+                    <span>Quản lý trực tiếp: {employee.managerName || "Chưa cập nhật"}</span>
+                  </div>
                 </div>
               </section>
 

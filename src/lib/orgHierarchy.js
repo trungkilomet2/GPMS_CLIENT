@@ -119,6 +119,27 @@ export function getManagerRoleHint(role = "") {
   }
 }
 
+export function getAllowedManagerRoles(role = "") {
+  switch (role) {
+    case "Owner":
+      return [];
+    case "PM":
+      return ["Owner"];
+    case "Team Leader":
+      return ["PM"];
+    case "Worker":
+      return ["Team Leader", "PM"];
+    case "KCS":
+      return ["Owner", "PM"];
+    default:
+      return [];
+  }
+}
+
+export function isManagerRequired(role = "") {
+  return getAllowedManagerRoles(role).length > 0;
+}
+
 export function getRoleHierarchyTag(role = "") {
   switch (role) {
     case "Owner":
