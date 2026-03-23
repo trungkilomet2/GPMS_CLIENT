@@ -1,9 +1,11 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
+import ProductionService from "@/services/ProductionService";
 import { getStoredUser } from "@/lib/authStorage";
+import SuccessModal from "@/components/SuccessModal";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -235,6 +237,8 @@ export default function ProductionPlan() {
   const { id } = useParams();
   const navigate = useNavigate();
   const currentUser = useMemo(() => getStoredUser() || {}, []);
+  const [productionList, setProductionList] = useState([]);
+  const [selectedProduction, setSelectedProduction] = useState(null);
   const [selectedProductionId, setSelectedProductionId] = useState(() => (id ? String(id) : ""));
   const [rows, setRows] = useState(() =>
     DEFAULT_ROWS.map((row, index) => ({
@@ -245,6 +249,7 @@ export default function ProductionPlan() {
   );
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [showProductionInfo, setShowProductionInfo] = useState(true);
   const [showProductInfo, setShowProductInfo] = useState(true);
@@ -255,6 +260,7 @@ export default function ProductionPlan() {
   const [savedPlanAt, setSavedPlanAt] = useState("");
   const [savingParts, setSavingParts] = useState(false);
   const [savePartsMessage, setSavePartsMessage] = useState({ type: "", text: "" });
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     partName: "",
     startDate: "",
@@ -298,10 +304,67 @@ export default function ProductionPlan() {
     return raw.includes("T") ? raw.split("T")[0] : raw;
   };
 
-  const selectedProduction = useMemo(() => {
-    const pid = Number(selectedProductionId);
-    if (!pid) return null;
-    return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
+  useEffect(() => {
+    let active = true;
+    const fetchList = async () => {
+      try {
+        const response = await ProductionService.getProductionList({ PageSize: 50 });
+        if (!active) return;
+        const payload = response?.data?.data ?? response?.data ?? [];
+        setProductionList(
+          Array.isArray(payload)
+            ? payload.map((p) => ({
+              productionId: p.productionId ?? p.id,
+              orderName: p.order?.orderName ?? p.orderName ?? `Đơn hàng #${p.orderId || '?'}`,
+            }))
+            : []
+        );
+      } catch (err) {
+        console.error("Lỗi tải ds production:", err);
+      }
+    };
+    fetchList();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedProductionId) {
+      setSelectedProduction(null);
+      return;
+    }
+    const fetchDetail = async () => {
+      try {
+        const response = await ProductionService.getProductionDetail(selectedProductionId);
+        if (!active) return;
+        const payload = response?.data?.data ?? response?.data ?? null;
+        if (!payload) return;
+        const order = payload.order || {};
+        setSelectedProduction({
+          productionId: payload.productionId ?? payload.id,
+          orderId: order.id,
+          orderName: order.orderName,
+          pStartDate: payload.startDate || payload.pStartDate,
+          pEndDate: payload.endDate || payload.pEndDate,
+          status: payload.statusName || payload.status || "Planned",
+          pmName: payload.pm?.name ?? payload.pmName,
+          product: {
+            productCode: order.id ? `PRD-${order.id}` : "PRD-UNKNOWN",
+            productName: order.orderName,
+            type: order.type,
+            size: typeof order.size === "string" ? order.size.trim() : order.size,
+            color: order.color,
+            quantity: order.quantity,
+            cpu: order.cpu,
+            image: order.image || "",
+          }
+        });
+      } catch (err) {
+        console.error("Lỗi chi tiết production:", err);
+      }
+    };
+    fetchDetail();
+    return () => { active = false; };
   }, [selectedProductionId]);
 
   const suggestedCategory = useMemo(() => {
@@ -441,26 +504,30 @@ export default function ProductionPlan() {
       setSavePartsMessage({ type: "", text: "" });
       const productionId = Number(selectedProductionId);
       const payload = {
-        data: rows.map((row) => ({
-          id: row?.id ?? row?.partId ?? row?.ppId ?? 0,
-          productionId,
-          partName: row?.partName ?? "",
-          teamLeaderId: row?.teamLeaderId ?? 0,
-          teamLeader: row?.teamLeader ?? null,
-          startDate: formatDateOnly(row?.startDate),
-          endDate: formatDateOnly(row?.endDate),
-          cpu: Number(row?.cpu) || 0,
-          statusId: row?.statusId ?? 0,
-          statusName: row?.statusName ?? "",
-          assignees: row?.assignees ?? [],
+        parts: rows.map((row) => ({
+          partName: row?.partName || "",
+          startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
+          endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
+          cpu: Number(row?.cpu) || 0
         })),
       };
 
       await ProductionPartService.createParts(productionId, payload);
       setSavePartsMessage({ type: "success", text: "Đã lưu công đoạn." });
+      setIsSuccessModalOpen(true);
       savePlan();
     } catch (error) {
-      setSavePartsMessage({ type: "error", text: "Lưu công đoạn thất bại." });
+      console.error(error);
+      let errMsg = "Lưu công đoạn thất bại.";
+      const data = error?.response?.data;
+      if (data?.errors) {
+        errMsg = Object.values(data.errors).flat().join(" | ");
+      } else if (data?.message) {
+        errMsg = data.message;
+      } else if (typeof data === 'string' && data) {
+        errMsg = data;
+      }
+      setSavePartsMessage({ type: "error", text: `Chi tiết lỗi: ${errMsg}` });
     } finally {
       setSavingParts(false);
     }
@@ -497,6 +564,7 @@ export default function ProductionPlan() {
   const openAddModal = () => {
     setEditingIndex(null);
     setForm({ partName: "", startDate: "", endDate: "", cpu: "" });
+    setFormError("");
     setIsModalOpen(true);
   };
 
@@ -510,12 +578,14 @@ export default function ProductionPlan() {
       endDate: target.endDate || "",
       cpu: target.cpu || "",
     });
+    setFormError("");
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingIndex(null);
+    setFormError("");
   };
 
   const handleFormChange = (field, value) => {
@@ -524,7 +594,31 @@ export default function ProductionPlan() {
 
   const handleSaveStep = () => {
     const name = form.partName.trim();
-    if (!name || !selectedProductionId) return;
+    if (!selectedProductionId) {
+      setFormError("Vui lòng chọn production trước.");
+      return;
+    }
+    if (!name) {
+      setFormError("Tên công đoạn không được để trống.");
+      return;
+    }
+    if (!form.startDate) {
+      setFormError("Vui lòng chọn ngày bắt đầu.");
+      return;
+    }
+    if (!form.endDate) {
+      setFormError("Vui lòng chọn ngày kết thúc.");
+      return;
+    }
+    if (new Date(form.endDate) <= new Date(form.startDate)) {
+      setFormError("Ngày kết thúc phải sau ngày bắt đầu.");
+      return;
+    }
+    if (form.cpu === "" || Number(form.cpu) < 0 || isNaN(Number(form.cpu))) {
+      setFormError("Giá/SP phải là số hợp lệ lớn hơn hoặc bằng 0.");
+      return;
+    }
+    setFormError("");
     setRows((prev) => {
       if (editingIndex === null) {
         const next = [
@@ -625,7 +719,7 @@ export default function ProductionPlan() {
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
               >
                 <option value="">Chọn production...</option>
-                {MOCK_PRODUCTIONS.map((item) => (
+                {productionList.map((item) => (
                   <option key={item.productionId} value={item.productionId}>
                     {`#PR-${item.productionId} - ${item.orderName}`}
                   </option>
@@ -726,11 +820,10 @@ export default function ProductionPlan() {
                         key={`template-filter-${item}`}
                         type="button"
                         onClick={() => setTemplateCategory(item)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          active
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"
-                        }`}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${active
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"
+                          }`}
                       >
                         {label}
                       </button>
@@ -874,9 +967,8 @@ export default function ProductionPlan() {
                 </button>
                 {savePartsMessage.text && (
                   <span
-                    className={`text-xs font-semibold ${
-                      savePartsMessage.type === "error" ? "text-red-600" : "text-emerald-600"
-                    }`}
+                    className={`text-xs font-semibold ${savePartsMessage.type === "error" ? "text-red-600" : "text-emerald-600"
+                      }`}
                   >
                     {savePartsMessage.text}
                   </span>
@@ -966,7 +1058,7 @@ export default function ProductionPlan() {
               </button>
               <button
                 type="button"
-                onClick={savePlan}
+                onClick={saveSteps}
                 disabled={!selectedProductionId || !rows.length}
                 className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400"
               >
@@ -987,6 +1079,13 @@ export default function ProductionPlan() {
                 Đóng
               </button>
             </div>
+            {formError && (
+              <div className="px-5 pt-4 pb-1">
+                <p className="text-sm font-medium text-rose-500 bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                  {formError}
+                </p>
+              </div>
+            )}
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-500 uppercase">Tên công đoạn</label>
@@ -1042,6 +1141,14 @@ export default function ProductionPlan() {
           </div>
         </div>
       )}
+      <SuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        onPrimary={() => navigate("/production")}
+        title="Lưu thành công"
+        description="Kế hoạch sản xuất đã được lưu vào hệ thống."
+        primaryLabel="OK"
+      />
     </OwnerLayout>
   );
 }

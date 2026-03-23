@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -6,6 +6,7 @@ import MaterialsTable from "@/components/orders/MaterialsTable";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
+import SuccessModal from "@/components/SuccessModal";
 import ProductionService from "@/services/ProductionService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
@@ -85,6 +86,8 @@ export default function ProductionDetail() {
   const navigate = useNavigate();
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
   const [production, setProduction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -183,8 +186,40 @@ export default function ProductionDetail() {
     return type.includes("hard");
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
-  const handleApproveProduction = () => {
-    setProduction((prev) => (prev ? { ...prev, status: "Chấp Nhận" } : prev));
+
+  const handleApproveProduction = async () => {
+    try {
+      const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      if (!userId) {
+        alert("Không tìm thấy thông tin người dùng.");
+        return;
+      }
+      await ProductionService.approveProduction(production.productionId, { userId });
+      setProduction((prev) => (prev ? { ...prev, status: "Chấp Nhận" } : prev));
+      setIsSuccessModalOpen(true);
+    } catch (err) {
+      console.error("Lỗi khi chấp nhận production:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi chấp nhận production.";
+      alert(errorMsg);
+    }
+  };
+
+  const handleRejectProduction = async (reason) => {
+    try {
+      const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      if (!userId) {
+        alert("Không tìm thấy thông tin người dùng.");
+        return;
+      }
+      await ProductionService.rejectProduction(production.productionId, { userId, reason });
+      setProduction((prev) => (prev ? { ...prev, status: "Từ Chối" } : prev));
+      setIsReasonModalOpen(false);
+      setIsRejectSuccessModalOpen(true);
+    } catch (err) {
+      console.error("Lỗi khi từ chối production:", err);
+      const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi từ chối production.";
+      alert(errorMsg);
+    }
   };
 
   return (
@@ -408,10 +443,7 @@ export default function ProductionDetail() {
           <OrderStatusReasonModal
             isOpen={isReasonModalOpen}
             onClose={() => setIsReasonModalOpen(false)}
-            onSubmit={(reason) => {
-              alert(`Từ chối production với lý do: ${reason}`);
-              setIsReasonModalOpen(false);
-            }}
+            onSubmit={handleRejectProduction}
             title="Từ chối production"
             description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
             confirmText="Xác nhận từ chối"
@@ -430,6 +462,24 @@ export default function ProductionDetail() {
             confirmText="Xác nhận"
             tone="warning"
             requireReason={false}
+          />
+          <SuccessModal
+            isOpen={isSuccessModalOpen}
+            onClose={() => setIsSuccessModalOpen(false)}
+            onPrimary={() => navigate("/production")}
+            title="Duyệt thành công"
+            description={`Đơn sản xuất #PR-${production?.productionId} đã được chấp nhận.`}
+            primaryLabel="Về danh sách"
+            hideSecondary={true}
+          />
+          <SuccessModal
+            isOpen={isRejectSuccessModalOpen}
+            onClose={() => setIsRejectSuccessModalOpen(false)}
+            onPrimary={() => navigate("/production")}
+            title="Từ chối thành công"
+            description={`Đơn sản xuất #PR-${production?.productionId} đã bị từ chối.`}
+            primaryLabel="Về danh sách"
+            hideSecondary={true}
           />
         </>
       )}

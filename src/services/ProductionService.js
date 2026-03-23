@@ -14,6 +14,12 @@ const ProductionService = {
   updateProductionPm(productionId, pmId) {
     return axiosClient.put(API_ENDPOINTS.PRODUCTION.UPDATE_PM(productionId, pmId));
   },
+  approveProduction(productionId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.APPROVE(productionId), payload);
+  },
+  rejectProduction(productionId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT(productionId), payload);
+  },
 };
 
 export default ProductionService;

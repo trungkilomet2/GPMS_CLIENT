@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -103,6 +103,11 @@ export default function ProductionPlanDetail() {
               part?.assignedWorkers ??
               part?.workers ??
               part?.workerNames ??
+              (Array.isArray(part?.assignees)
+                ? part.assignees
+                  .map((worker) => worker?.fullName ?? worker?.name ?? worker?.username ?? worker?.id)
+                  .filter(Boolean)
+                : []) ??
               (Array.isArray(part?.workerList)
                 ? part.workerList.map((worker) => worker?.name ?? worker?.fullName ?? worker?.username).filter(Boolean)
                 : []),
@@ -113,6 +118,7 @@ export default function ProductionPlanDetail() {
           planId: productionId,
           production: {
             productionId,
+            pmId: pm?.id ?? null,
             orderId: order?.id ?? order?.orderId ?? "-",
             orderName: order?.orderName ?? order?.name ?? "-",
             pStartDate: detailPayload?.startDate ?? order?.startDate ?? "-",

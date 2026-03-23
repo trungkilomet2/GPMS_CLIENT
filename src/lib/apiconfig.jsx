@@ -30,12 +30,22 @@ export const API_ENDPOINTS = {
     LIST: `${BASE_URL}/api/Production/production/list`,
     DETAIL: (id) => `${BASE_URL}/api/Production/production/detail/${id}`,
     UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
+    APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
+    REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>
       `${BASE_URL}/api/ProductionPart/production/get-list-parts/${productionId}`,
     CREATE_PARTS: (productionId) =>
       `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
+    LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
+    UPDATE_ASSIGN_WORKERS: (id) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
+  },
+  
+  CUTTING_NOTEBOOK: {
+    CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
+    CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
   },
 
   CLOUDINARY: {

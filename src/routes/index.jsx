@@ -1,4 +1,4 @@
-﻿import { lazy } from "react";
+import { lazy } from "react";
 import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 

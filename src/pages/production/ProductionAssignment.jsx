@@ -1,74 +1,13 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Search, Users, Check } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const MOCK_PRODUCTIONS = [
-  {
-    productionId: 1001,
-    orderId: 29,
-    orderName: "Đồng phục công ty ABC",
-    pStartDate: "2026-04-21",
-    pEndDate: "2026-05-05",
-    status: "In Progress",
-    pmName: "Nguyễn Văn An",
-    product: {
-      productCode: "PRD-ABC-01",
-      productName: "Áo thun đồng phục cổ tròn",
-      type: "Áo thun",
-      size: "L",
-      color: "Trắng",
-      quantity: 100,
-      cpu: 15000,
-      image: "",
-    },
-  },
-  {
-    productionId: 1002,
-    orderId: 30,
-    orderName: "Áo hoodie mùa đông",
-    pStartDate: "2026-04-18",
-    pEndDate: "2026-04-30",
-    status: "Planned",
-    pmName: "Trần Ngọc Bích",
-    product: {
-      productCode: "PRD-HOOD-02",
-      productName: "Áo hoodie",
-      type: "Hoodie",
-      size: "M",
-      color: "Đen",
-      quantity: 80,
-      cpu: 22000,
-      image: "",
-    },
-  },
-];
-
-const PLAN_STEPS = [
-  { partName: "Diễu nẹp cổ", cpu: 800, teamLeaderId: "TL-01", startDate: "2026-04-22", endDate: "2026-04-23" },
-  { partName: "Đính mác", cpu: 200, teamLeaderId: "TL-02", startDate: "2026-04-23", endDate: "2026-04-24" },
-  { partName: "Can dây lồng cổ", cpu: 100, teamLeaderId: "TL-03", startDate: "2026-04-24", endDate: "2026-04-25" },
-  { partName: "Chạy dây lồng cổ", cpu: 500, teamLeaderId: "TL-04", startDate: "2026-04-25", endDate: "2026-04-26" },
-  { partName: "Bấm lỗ lồng dây", cpu: 400, teamLeaderId: "TL-05", startDate: "2026-04-26", endDate: "2026-04-27" },
-  { partName: "Lộn hàng", cpu: 200, teamLeaderId: "TL-06", startDate: "2026-04-27", endDate: "2026-04-28" },
-  { partName: "Kiểm hàng", cpu: 100, teamLeaderId: "TL-07", startDate: "2026-04-28", endDate: "2026-04-29" },
-  { partName: "Bó buộc hàng", cpu: 100, teamLeaderId: "TL-08", startDate: "2026-04-29", endDate: "2026-04-30" },
-];
-
-const MOCK_WORKERS = [
-  { id: 1, fullName: "My", status: "ready", frequentSteps: ["Diễu nẹp cổ", "May cổ", "Ủi hoàn thiện"] },
-  { id: 2, fullName: "Hoa A", status: "leave", leaveDate: "2026-04-24", frequentSteps: ["Đính mác", "Kiểm hàng"] },
-  { id: 3, fullName: "Mi", status: "ready", frequentSteps: ["Chạy dây lồng cổ", "Bấm lỗ lồng dây"] },
-  { id: 4, fullName: "Hằng", status: "ready", frequentSteps: ["May sườn", "May tay"] },
-  { id: 5, fullName: "Thảo", status: "leave", leaveDate: "2026-04-25", frequentSteps: ["Lộn hàng", "Đóng gói"] },
-  { id: 6, fullName: "Hà", status: "ready", frequentSteps: ["Can dây lồng cổ", "Đính mác"] },
-  { id: 7, fullName: "Trang", status: "ready", frequentSteps: ["Kiểm hàng", "Ủi hoàn thiện"] },
-  { id: 8, fullName: "Nhung", status: "leave", leaveDate: "2026-04-26", frequentSteps: ["May cổ", "May vai"] },
-  { id: 9, fullName: "Thư", status: "ready", frequentSteps: ["Vắt sổ", "May lai"] },
-  { id: 10, fullName: "Hoa B", status: "ready", frequentSteps: ["Đóng gói", "Kiểm hàng"] },
-];
+import ProductionPartService from "@/services/ProductionPartService";
+import ProductionService from "@/services/ProductionService";
+import { toast } from "react-toastify";
 
 export default function ProductionAssignment() {
   const { id } = useParams();
@@ -88,48 +27,213 @@ export default function ProductionAssignment() {
   const [underloadRatio, setUnderloadRatio] = useState(0.8);
   const [activeRowId, setActiveRowId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [fetchedProduction, setFetchedProduction] = useState(null);
+  const [backendParts, setBackendParts] = useState([]); // Real parts with real IDs from backend
   const loadingWorkers = workers.length === 0 && !workerError;
 
+  // Fetch production detail from API when pmId is missing (from incoming state or directly by URL)
+  useEffect(() => {
+    const incomingPmId = incoming?.production?.pmId || incoming?.production?.pm?.id;
+    const needFetch = selectedProductionId && !incomingPmId;
+    if (!needFetch) return;
+    let active = true;
+    ProductionService.getProductionDetail(selectedProductionId).then((res) => {
+      if (!active) return;
+      const payload = res?.data?.data ?? res?.data ?? null;
+      if (!payload) return;
+      const order = payload.order || {};
+      const pm = payload.pm || {};
+      setFetchedProduction({
+        productionId: payload.productionId ?? payload.id,
+        pmId: pm.id ?? null,
+        pm,
+        orderId: order.id,
+        orderName: order.orderName,
+        pStartDate: payload.startDate ?? order.startDate ?? null,
+        pEndDate: payload.endDate ?? order.endDate ?? null,
+        status: payload.statusName || payload.status,
+        pmName: pm.fullName || pm.name || (pm.id ? `PM #${pm.id}` : "-"),
+        product: {
+          productCode: order.id ? `PRD-${order.id}` : "PRD-UNKNOWN",
+          productName: order.orderName,
+          type: order.type,
+          size: order.size,
+          color: order.color,
+          quantity: order.quantity,
+          cpu: order.cpu,
+          image: order.image || "",
+          startDate: order.startDate,
+          endDate: order.endDate,
+        },
+      });
+    }).catch(() => {
+      setWorkerError("Không thể tải thông tin production.");
+    });
+    return () => { active = false; };
+  }, [selectedProductionId, incoming]);
+
   const selectedProduction = useMemo(() => {
-    if (incoming?.production) {
+    const incomingPmId = incoming?.production?.pmId || incoming?.production?.pm?.id;
+    if (incoming?.production && incomingPmId) {
       return {
         ...incoming.production,
+        pmId: incomingPmId,
         product: incoming.product ?? null,
       };
     }
+    // If incoming exists but no pmId, merge with fetchedProduction to get pmId
+    if (incoming?.production && fetchedProduction) {
+      return {
+        ...incoming.production,
+        pmId: fetchedProduction.pmId,
+        product: incoming.product ?? fetchedProduction.product ?? null,
+      };
+    }
+    if (fetchedProduction) return fetchedProduction;
     const pid = Number(selectedProductionId);
     if (!pid) return null;
     return MOCK_PRODUCTIONS.find((item) => Number(item.productionId) === pid) || null;
-  }, [selectedProductionId, incoming]);
+  }, [selectedProductionId, incoming, fetchedProduction]);
+
+  // Fetch real part IDs from backend for this production
+  useEffect(() => {
+    if (!selectedProductionId) return;
+    let active = true;
+    const fetchParts = async () => {
+      try {
+        const res = await ProductionPartService.getPartsByProduction(selectedProductionId);
+        if (!active) return;
+        const payload = res?.data?.data ?? res?.data ?? [];
+        const list = Array.isArray(payload) ? payload : [];
+        setBackendParts(list);
+      } catch {
+        // ignore - parts may not exist yet
+      }
+    };
+    fetchParts();
+    return () => { active = false; };
+  }, [selectedProductionId]);
 
   const rows = useMemo(() => {
     const sourceSteps = Array.isArray(incoming?.steps) && incoming.steps.length > 0
       ? incoming.steps
       : PLAN_STEPS;
-    return sourceSteps.map((row, index) => ({
-      ...row,
-      ppId: 2000 + index,
-      productionId: selectedProduction ? selectedProduction.productionId : null,
-    }));
-  }, [selectedProduction, incoming]);
-
-  useEffect(() => {
-    setWorkers(MOCK_WORKERS);
-    setWorkerError(null);
-  }, []);
-
-  useEffect(() => {
-    const next = {};
-    rows.forEach((row) => {
-      next[row.ppId] = {
-        workerIds: [],
+    return sourceSteps.map((row, index) => {
+      // Try to match with a real backend part by name or index
+      const realPart = backendParts[index] || backendParts.find(p => p.partName === row.partName || p.name === row.partName);
+      return {
+        ...row,
+        ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
+        realPartId: realPart?.id ?? null,
+        productionId: selectedProduction ? selectedProduction.productionId : null,
       };
     });
-    setAssignments(next);
-    if (rows.length > 0) {
+  }, [selectedProduction, incoming, backendParts]);
+
+  const extractAssignedWorkerIds = (part, workerList) => {
+    if (!part) return [];
+    const normalizeIds = (ids) =>
+      ids
+        .map((id) => (id != null ? String(id) : ""))
+        .filter((id) => id !== "");
+
+    let ids = [];
+    if (Array.isArray(part.workerIds)) ids = part.workerIds;
+    else if (Array.isArray(part.assignedWorkerIds)) ids = part.assignedWorkerIds;
+    else if (Array.isArray(part.assignedWorkers)) ids = part.assignedWorkers;
+    else if (Array.isArray(part.workers)) ids = part.workers;
+    else if (Array.isArray(part.workerList)) ids = part.workerList;
+    else if (Array.isArray(part.assignees)) ids = part.assignees;
+
+    // If array contains objects, extract ids
+    if (ids.length > 0 && typeof ids[0] === "object") {
+      ids = ids
+        .map((w) => w?.workerId ?? w?.id ?? w?.userId ?? w?.accountId ?? null)
+        .filter((id) => id != null);
+      return normalizeIds(ids);
+    }
+
+    // If array contains strings that are not numeric, treat them as names
+    const stringIds = ids.filter((id) => typeof id === "string");
+    const looksLikeName = stringIds.some((id) => Number.isNaN(Number(id)));
+    if (looksLikeName && Array.isArray(workerList)) {
+      const nameToId = new Map(
+        workerList
+          .map((w) => [w.fullName || w.userName || w.label || "", String(w.id)])
+          .filter(([name]) => name)
+      );
+      return normalizeIds(
+        stringIds.map((name) => nameToId.get(name)).filter((id) => id != null)
+      );
+    }
+
+    return normalizeIds(ids);
+  };
+
+  useEffect(() => {
+    if (!selectedProductionId) return;
+    // pmId can be at pmId (top-level), pm.id (nested), or fallback
+    const pmId = selectedProduction?.pmId || selectedProduction?.pm?.id || null;
+    const fromDate = selectedProduction?.pStartDate || selectedProduction?.startDate
+      || selectedProduction?.product?.startDate || "2026-01-01";
+    const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
+      || selectedProduction?.product?.endDate || "2026-12-31";
+    if (!pmId) {
+      setWorkerError("Không tìm thấy thông tin PM quản lý production này.");
+      return;
+    }
+    ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
+      .then((res) => {
+        const list = res?.data?.data || res?.data || res || [];
+        if (Array.isArray(list)) {
+          const mapped = list.map((w) => {
+            const info = w.workerInfo || w || {};
+            const skills = Array.isArray(w.workerSkillInfo)
+              ? w.workerSkillInfo.map(s => s.skillName)
+              : (w.frequentSteps || []);
+            const lrInfo = Array.isArray(w.workerLrInfo) ? w.workerLrInfo : [];
+            const hasLeave = lrInfo.length > 0;
+            const leaveDate = hasLeave ? (lrInfo[0]?.fromDate || lrInfo[0]?.startDate || lrInfo[0]?.leaveDate || "") : "";
+
+            return {
+              id: String(info.workerId || info.id || ""),
+              fullName: info.workerName || info.fullName || info.userName || "No name",
+              status: hasLeave ? "leave" : (w.statusId === 2 ? "leave" : "ready"),
+              frequentSteps: skills,
+              leaveDate: leaveDate || w.leaveDate || "",
+              role: w.role || "Worker",
+            };
+          }).filter(w => w.id !== ""); // Filter out empty IDs just in case
+          setWorkers(mapped);
+        }
+      })
+      .catch((err) => {
+        setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi tải danh sách thợ");
+      });
+  }, [selectedProductionId, selectedProduction]);
+
+  useEffect(() => {
+    setAssignments((prev) => {
+      const next = { ...prev };
+      rows.forEach((row, index) => {
+        const existing = next[row.ppId]?.workerIds || [];
+        if (existing.length > 0) return;
+        const realPart =
+          backendParts.find((p) => p?.id === row.realPartId) ||
+          backendParts[index] ||
+          backendParts.find((p) => p?.partName === row.partName || p?.name === row.partName);
+        const initialIds = extractAssignedWorkerIds(realPart, workers);
+        next[row.ppId] = {
+          workerIds: initialIds,
+        };
+      });
+      return next;
+    });
+    if (!activeRowId && rows.length > 0) {
       setActiveRowId(rows[0].ppId);
     }
-  }, [selectedProductionId, rows]);
+  }, [selectedProductionId, rows, backendParts, workers, activeRowId]);
 
   const assignedCount = useMemo(
     () => Object.values(assignments).filter((item) => (item.workerIds || []).length > 0).length,
@@ -245,6 +349,46 @@ export default function ProductionAssignment() {
     return day >= from && day <= to;
   };
 
+  const handleToggleEdit = async () => {
+    if (isSaving) return;
+    if (isEditing) {
+      // User clicked Save Edit
+      try {
+        const rowsWithRealId = rows.filter(row => row.realPartId != null);
+        if (rowsWithRealId.length === 0) {
+          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
+          return;
+        }
+        setIsSaving(true);
+        const results = await Promise.allSettled(
+          rowsWithRealId.map((row) => {
+            const selectedWorkerIds = (assignments[row.ppId]?.workerIds || []).map(Number);
+            return ProductionPartService.updateAssignWorker(row.realPartId, { workerIds: selectedWorkerIds });
+          })
+        );
+        const failed = results
+          .map((res, idx) => ({ res, row: rowsWithRealId[idx] }))
+          .filter((item) => item.res.status === "rejected");
+        if (failed.length > 0) {
+          const first = failed[0]?.row;
+          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
+          return;
+        }
+        toast.success("Lưu dữ liệu phân công thành công!");
+        setIsEditing(false);
+      } catch (err) {
+        console.error(err);
+        setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi khi lưu phân công thợ.");
+        toast.error(err?.response?.data?.detail || err?.response?.data?.message || "Phát sinh lỗi khi lưu phân công.");
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setIsEditing(true);
+      setWorkerError(null);
+    }
+  };
+
   return (
     <OwnerLayout>
       <div className="leave-page leave-list-page">
@@ -264,14 +408,14 @@ export default function ProductionAssignment() {
             </div>
             <button
               type="button"
-              onClick={() => setIsEditing((prev) => !prev)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                isEditing
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+              onClick={handleToggleEdit}
+              disabled={isSaving}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
+                ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
             >
-              {isEditing ? "Lưu chỉnh sửa" : "Chỉnh sửa"}
+              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : "Chỉnh sửa")}
             </button>
           </div>
 
@@ -415,25 +559,24 @@ export default function ProductionAssignment() {
                           type="button"
                           key={row.ppId}
                           onClick={() => setActiveRowId(row.ppId)}
-                          className={`w-full rounded-2xl border p-4 text-left shadow-sm transition ${
-                            isActive
-                              ? "border-emerald-200 bg-emerald-50/40"
-                              : "border-slate-200 bg-white hover:border-emerald-200"
-                          }`}
+                          className={`w-full rounded-2xl border p-4 text-left shadow-sm transition ${isActive
+                            ? "border-emerald-200 bg-emerald-50/40"
+                            : "border-slate-200 bg-white hover:border-emerald-200"
+                            }`}
                         >
-                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center justify-between gap-4">
                             <div className="flex items-start gap-4">
                               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-sm font-bold text-emerald-700">
                                 {idx + 1}
                               </div>
                               <div>
-                              <div className="text-base font-semibold text-slate-800">{row.partName}</div>
-                              <div className="mt-1 text-sm text-slate-500">
-                                Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
-                              </div>
-                              <div className="mt-1 text-sm text-slate-500">
-                                {row.startDate || "-"} → {row.endDate || "-"}
-                              </div>
+                                <div className="text-base font-semibold text-slate-800">{row.partName}</div>
+                                <div className="mt-1 text-sm text-slate-500">
+                                  Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                                </div>
+                                <div className="mt-1 text-sm text-slate-500">
+                                  {row.startDate || "-"} → {row.endDate || "-"}
+                                </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
                                     {selectedLabels.map((label) => (
@@ -526,11 +669,10 @@ export default function ProductionAssignment() {
                                     key={`${activeRow.ppId}-${worker.id}`}
                                     onClick={() => toggleWorker(activeRow.ppId, worker.id)}
                                     disabled={!canSelect}
-                                    className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${
-                                      checked
-                                        ? "bg-emerald-50 text-emerald-700"
-                                        : "bg-white text-slate-700 hover:bg-slate-50"
-                                    }`}
+                                    className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${checked
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : "bg-white text-slate-700 hover:bg-slate-50"
+                                      }`}
                                   >
                                     <div className="min-w-0 text-left">
                                       <div className="flex flex-wrap items-center gap-2">
@@ -605,3 +747,9 @@ function SummaryItem({ label, value }) {
     </div>
   );
 }
+
+
+
+
+
+
