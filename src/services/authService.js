@@ -50,6 +50,23 @@ function readAccountStatus(source = {}) {
   };
 }
 
+async function parseResponsePayload(res) {
+  const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/json")) {
+    return res.json().catch(() => ({}));
+  }
+
+  const raw = await res.text().catch(() => "");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { message: raw };
+  }
+}
+
 async function loadProfileAfterLogin(token) {
   try {
     const res = await fetch(API_ENDPOINTS.USER.VIEW_PROFILE, {
@@ -235,10 +252,42 @@ export const authService = {
         fullName: payload.fullName,
         password: payload.password,
         rePassword: payload.rePassword,
+        email: payload.email,
       }),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
+  async sendRegisterOtp(payload) {
+    const res = await fetch(API_ENDPOINTS.EMAIL.SEND_OTP, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
+  async verifyRegisterOtp(payload) {
+    const res = await fetch(API_ENDPOINTS.EMAIL.VERIFY_EMAIL, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+        otp: payload.otp,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
     if (!res.ok) throw { response: { data } };
     return data;
   },
