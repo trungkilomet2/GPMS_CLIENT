@@ -1,8 +1,11 @@
 ﻿import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ClipboardCheck, Search } from "lucide-react";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -145,19 +148,18 @@ const MOCK_OUTPUTS = [
   },
 ];
 
-function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export default function OutputHistory() {
+  const location = useLocation();
   const navigate = useNavigate();
   const user = getStoredUser();
-  const roles = splitRoles(user?.role).map((role) => role.toLowerCase());
-  const isCustomer = roles.includes("customer");
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isCustomer = primaryRole === "customer";
+  const LayoutComponent =
+    primaryRole === "worker"
+      ? WorkerLayout
+      : primaryRole === "teamLeader"
+        ? TeamLeaderLayout
+        : PmOwnerLayout;
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(() => {
@@ -204,16 +206,16 @@ export default function OutputHistory() {
 
   if (isCustomer) {
     return (
-      <OwnerLayout>
+      <LayoutComponent>
         <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
           Bạn không có quyền truy cập trang này.
         </div>
-      </OwnerLayout>
+      </LayoutComponent>
     );
   }
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -335,7 +337,7 @@ export default function OutputHistory() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }
 

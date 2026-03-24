@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "@/lib/authStorage";
 import { splitRoles, hasAnyRole } from "@/lib/roleAccess";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import OrderService from "@/services/OrderService";
@@ -118,9 +119,10 @@ export default function CreateProduction() {
           response = await WorkerService.getAllEmployees();
         }
         const items = response?.data ?? [];
-        const pmRoles = ["PM", "Owner", "Admin"];
+        const pmRoles = ["PM"];
         const pms = items.filter((item) => {
           if (pmRoles.includes(item?.primaryRole)) return true;
+          if (getPrimaryWorkspaceRole(item?.role ?? item?.roles ?? "") === "pm") return true;
           if (Array.isArray(item?.roles)) {
             return item.roles.some((role) => pmRoles.includes(role));
           }

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
 import MaterialsTable from "@/components/orders/MaterialsTable";
@@ -9,6 +11,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -44,6 +47,7 @@ function formatDateTime(value) {
 }
 
 export default function ProductionPlanDetail() {
+  const location = useLocation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
@@ -52,6 +56,11 @@ export default function ProductionPlanDetail() {
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const user = getStoredUser();
   const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
+  const primaryRole = getPrimaryWorkspaceRole(roleValue);
+  const isWorkerRoute = location.pathname.startsWith("/worker/");
+  const isWorkerView = primaryRole === "worker";
+  const isTeamLeaderView = primaryRole === "teamLeader";
+  const LayoutComponent = isWorkerView ? WorkerLayout : isTeamLeaderView ? TeamLeaderLayout : PmOwnerLayout;
   const isWorker = hasAnyRole(roleValue, ["worker", "sewer", "tailor"]);
 
   useEffect(() => {
@@ -201,36 +210,36 @@ export default function ProductionPlanDetail() {
 
   if (loading) {
     return (
-      <OwnerLayout>
+      <LayoutComponent>
         <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
           Đang tải chi tiết kế hoạch...
         </div>
-      </OwnerLayout>
+      </LayoutComponent>
     );
   }
 
   if (error) {
     return (
-      <OwnerLayout>
+      <LayoutComponent>
         <div className="flex items-center justify-center min-h-400px text-sm text-red-600">
           {error}
         </div>
-      </OwnerLayout>
+      </LayoutComponent>
     );
   }
 
   if (!plan) {
     return (
-      <OwnerLayout>
+      <LayoutComponent>
         <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
           Không tìm thấy kế hoạch #{id}.
         </div>
-      </OwnerLayout>
+      </LayoutComponent>
     );
   }
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-detail-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -481,7 +490,7 @@ export default function ProductionPlanDetail() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }
 

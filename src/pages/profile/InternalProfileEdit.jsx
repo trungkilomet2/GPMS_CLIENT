@@ -6,6 +6,7 @@ import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import {
   normalizeSpaces,
   validateAvatarFile,
@@ -109,14 +110,10 @@ export default function InternalProfileEdit() {
   const location = useLocation();
   const storedUser = useMemo(() => getStoredUser(), []);
   const Layout = useMemo(() => {
-    const roleValue = storedUser?.role;
-    const roles = String(roleValue ?? "")
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean);
+    const primaryRole = getPrimaryWorkspaceRole(storedUser?.role);
 
-    if (roles.includes("worker")) return WorkerLayout;
-    if (roles.includes("team leader") || roles.includes("teamleader") || roles.includes("tl")) {
+    if (primaryRole === "worker") return WorkerLayout;
+    if (primaryRole === "teamLeader") {
       return TeamLeaderLayout;
     }
 

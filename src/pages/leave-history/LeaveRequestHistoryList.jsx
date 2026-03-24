@@ -244,9 +244,16 @@ export default function LeaveRequestHistoryList() {
                         </td>
                         <td className="px-5 py-4 align-top">
                           <p className="line-clamp-2 max-w-xl text-sm leading-6 text-slate-700">{item.content}</p>
+                          <div className="mt-2 text-xs text-slate-500">
+                            Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
+                          </div>
+                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                         </td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
-                        <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</td>
+                        <td className="px-5 py-4 align-top text-sm text-slate-700">
+                          <div>{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</div>
+                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                        </td>
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />
                         </td>

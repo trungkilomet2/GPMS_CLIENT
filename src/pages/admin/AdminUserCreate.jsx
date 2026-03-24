@@ -194,8 +194,8 @@ export default function AdminUserCreate() {
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Permission preview</h2>
-                    <p className="admin-card__subtitle">Xem nhanh quyền mà user sẽ nhận theo role đã chọn.</p>
+                    <h2 className="admin-card__title">Quyền theo role</h2>
+                    <p className="admin-card__subtitle">Xem nhanh phần quyền web đang gắn với role đã chọn.</p>
                   </div>
                 </div>
 
@@ -208,8 +208,8 @@ export default function AdminUserCreate() {
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Phạm vi quyền</strong>
-                    <span>{permissionProfile?.shortLabel || "Chưa có preview"}</span>
-                    <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} capability bật` : "Role này chưa có permission profile demo"}</span>
+                    <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
+                    <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} quyền đang được web hiển thị` : "Role này chưa có dữ liệu quyền tương ứng trên web"}</span>
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Mô tả role</strong>

@@ -358,7 +358,7 @@ export default function AdminUserUpdate() {
                   <div className="admin-card__header">
                     <div>
                       <h2 className="admin-card__title">Thông tin user hiện tại</h2>
-                      <p className="admin-card__subtitle">Endpoint update yêu cầu đầy đủ họ tên, số điện thoại, email và địa điểm. Role vẫn được lưu qua API assign-roles.</p>
+                      <p className="admin-card__subtitle">Endpoint update yêu cầu đầy đủ họ tên, số điện thoại, email và địa điểm. Role sẽ được cập nhật riêng qua API assign-roles.</p>
                     </div>
                   </div>
 
@@ -446,7 +446,7 @@ export default function AdminUserUpdate() {
                   <div className="mt-4">
                     <AdminBanner
                       title="Màn update admin đang dùng 3 API thật."
-                      description="`get-user-detail-for-admin/{id}` để load hồ sơ, `update-user-for-admin/{id}` để lưu thông tin cơ bản, và `assign-roles/{id}` để đổi role."
+                      description="`get-user-detail-for-admin/{id}` để load hồ sơ, `update-user-for-admin/{id}` để lưu thông tin cơ bản, và `assign-roles/{id}` để đổi role trên backend."
                       tone="info"
                     />
                   </div>
@@ -473,8 +473,8 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Role impact preview</h2>
-                      <p className="admin-card__subtitle">Xem trước phạm vi quyền mới trước khi lưu thay đổi.</p>
+                      <h2 className="admin-card__title">Quyền theo role đang chọn</h2>
+                      <p className="admin-card__subtitle">Xem nhanh phần quyền web sẽ hiển thị theo role mới.</p>
                     </div>
                   </div>
 
@@ -486,9 +486,9 @@ export default function AdminUserUpdate() {
                       </div>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Permission preview</strong>
-                      <span>{permissionProfile?.shortLabel || "Chưa có preview"}</span>
-                      <span>{permissionProfile?.description || "Role này chưa có permission profile demo trên web."}</span>
+                      <strong>Thông tin quyền</strong>
+                      <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
+                      <span>{permissionProfile?.description || "Role này chưa có dữ liệu quyền tương ứng trên web."}</span>
                     </div>
                     <div className="admin-preview-list__item">
                       <strong>Chuyên môn thợ hiện tại</strong>

@@ -10,7 +10,8 @@ import {
   UserRound,
   XCircle,
 } from "lucide-react";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
@@ -63,6 +64,7 @@ export default function LeaveRequestDetail() {
   const { id } = useParams();
   const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
   const backPath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
+  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -125,7 +127,7 @@ export default function LeaveRequestDetail() {
   }, [leave]);
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-detail-page">
         <div className="leave-shell mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           {loading ? (
@@ -177,6 +179,16 @@ export default function LeaveRequestDetail() {
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
                     <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
+                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
+                    <div className="mt-2 text-lg font-semibold">{leave.approvedByName || "Chưa cập nhật"}</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4 md:col-span-3">
+                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
+                    <div className="mt-2 text-lg font-semibold">
+                      {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -209,6 +221,9 @@ export default function LeaveRequestDetail() {
                       <DetailItem icon={FileText} label="Trạng thái" value={STATUS_MAP[leave.status]?.label || "Chưa cập nhật"} />
                       <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatLeaveDateTime(leave.dateCreate)} />
                       <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
+                      <DetailItem icon={UserRound} label="Người phê duyệt" value={leave.approvedByName} />
+                      <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
+                      <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
                     </div>
                   </div>
 
@@ -235,6 +250,6 @@ export default function LeaveRequestDetail() {
           )}
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }

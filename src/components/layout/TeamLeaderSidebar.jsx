@@ -1,13 +1,15 @@
 import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { ClipboardList, ClipboardCheck, LogOut } from "lucide-react";
+import { ClipboardList, ClipboardCheck, LogOut, Users } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
   { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ClipboardList },
+  { to: "/production-plan/assign", label: "Phân công thợ", icon: Users },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardList },
+  { to: "/leave-requests", label: "Đơn nghỉ phép", icon: ClipboardCheck },
 ];
 
 function getInitials(name = "") {

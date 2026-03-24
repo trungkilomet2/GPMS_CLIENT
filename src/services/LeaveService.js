@@ -77,7 +77,20 @@ const normalizeLeaveItem = (item = {}) => ({
     item.repliedDate ??
     item.updatedAt
   ),
+  fromDate: normalizeLeaveDate(
+    item.fromDate ??
+    item.from_date ??
+    item.leaveFrom ??
+    item.startDate
+  ),
+  toDate: normalizeLeaveDate(
+    item.toDate ??
+    item.to_date ??
+    item.leaveTo ??
+    item.endDate
+  ),
   denyContent: item.denyContent ?? "",
+  approvedByName: item.approvedByName ?? item.approverName ?? "",
   status: normalizeStatus(item.status),
 });
 

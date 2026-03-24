@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ClipboardCheck, Eraser, Plus, Save } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionService from "@/services/ProductionService";
 import CuttingNotebookService from "@/services/CuttingNotebookService";
 import { getStoredUser } from "@/lib/authStorage";
@@ -364,6 +364,74 @@ const normalizeBooks = (data) => {
   return [];
 };
 
+const normalizeApiPayload = (rawResponse) => {
+  if (typeof rawResponse !== "string") {
+    return rawResponse ?? {};
+  }
+
+  try {
+    return JSON.parse(rawResponse);
+  } catch {
+    return {};
+  }
+};
+
+const normalizeNotebookLog = (item = {}) => ({
+  id: String(item.id ?? item.cnlId ?? item.logId ?? Date.now()),
+  color: String(item.color ?? ""),
+  meterPerKg: String(item.meterPerKg ?? ""),
+  layer: String(item.layer ?? ""),
+  productQty: String(item.productQty ?? ""),
+  avgConsumption: String(item.avgConsumption ?? ""),
+  dateCreate: String(item.dateCreate ?? item.createdAt ?? ""),
+  note: String(item.note ?? ""),
+  isReadOnly: Boolean(item.isReadOnly),
+  isPayment: Boolean(item.isPayment),
+});
+
+const normalizeNotebookBook = (notebook = {}, logs = [], productionName = "") => {
+  const notebookId = notebook.id ?? notebook.notebookId ?? notebook.cnId ?? null;
+  const productionId = String(notebook.productionId ?? notebook.prId ?? notebook.production?.id ?? "");
+  const updatedAt = logs[0]?.dateCreate || notebook.updatedAt || notebook.createdAt || new Date().toISOString();
+
+  return {
+    notebookId,
+    productionId,
+    meta: {
+      productionId,
+      productionName: notebook.productionName ?? notebook.orderName ?? productionName,
+      markerLength: String(notebook.markerLength ?? ""),
+      fabricWidth: String(notebook.fabricWidth ?? ""),
+    },
+    records: logs.map(normalizeNotebookLog),
+    updatedAt,
+  };
+};
+
+const upsertBook = (books = [], nextBook) => {
+  const key = String(nextBook?.productionId ?? "");
+  if (!key) return books;
+
+  const existingIndex = books.findIndex((book) => String(book.productionId) === key);
+  if (existingIndex === -1) {
+    return [nextBook, ...books];
+  }
+
+  const current = books[existingIndex];
+  const merged = {
+    ...current,
+    ...nextBook,
+    meta: {
+      ...(current?.meta || {}),
+      ...(nextBook?.meta || {}),
+    },
+    records: Array.isArray(nextBook?.records) ? nextBook.records : (current?.records || []),
+  };
+  const next = books.slice();
+  next[existingIndex] = merged;
+  return next;
+};
+
 const calcTotalLayers = (records) =>
   records.reduce((sum, item) => sum + (Number(item.layer) || 0), 0);
 
@@ -412,6 +480,8 @@ export default function WorkerCuttingBook() {
   const [productionError, setProductionError] = useState("");
   const [productionLoading, setProductionLoading] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [bookError, setBookError] = useState("");
+  const [bookLoading, setBookLoading] = useState(false);
 
   useEffect(() => {
     try {
@@ -437,7 +507,7 @@ export default function WorkerCuttingBook() {
       setIsEditing(false);
       return;
     }
-    setSelectedProductionId(null);
+    setSelectedProductionId(locationProductionId);
     setMeta((prev) => ({ ...prev, productionId: locationProductionId }));
     setShowCreate(true);
     setNewBook((prev) => ({ ...prev, productionId: locationProductionId }));
@@ -526,6 +596,60 @@ export default function WorkerCuttingBook() {
     [books, selectedProductionId]
   );
 
+  useEffect(() => {
+    if (!selectedProductionId) return;
+
+    let active = true;
+    const fetchNotebook = async () => {
+      try {
+        setBookLoading(true);
+        setBookError("");
+        const notebookResponse = await CuttingNotebookService.getNotebookByProduction(selectedProductionId);
+        if (!active) return;
+
+        const notebookPayload = normalizeApiPayload(notebookResponse);
+        const notebook = notebookPayload?.data ?? notebookPayload;
+        const notebookId = notebook?.id ?? notebook?.notebookId ?? notebook?.cnId ?? null;
+
+        if (!notebookId) {
+          setBookLoading(false);
+          return;
+        }
+
+        const logsResponse = await CuttingNotebookService.getLogs(notebookId);
+        if (!active) return;
+
+        const logsPayload = normalizeApiPayload(logsResponse);
+        const logs = Array.isArray(logsPayload?.data)
+          ? logsPayload.data
+          : Array.isArray(logsPayload)
+            ? logsPayload
+            : [];
+        const productionName = getProductionName(productionMap.get(String(selectedProductionId)));
+        const nextBook = normalizeNotebookBook(notebook, logs, productionName);
+
+        setBooks((prev) => upsertBook(prev, nextBook));
+        setMeta(nextBook.meta || DEFAULT_META);
+        setShowCreate(false);
+      } catch (error) {
+        if (!active) return;
+        setBookError(
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          ""
+        );
+      } finally {
+        if (active) setBookLoading(false);
+      }
+    };
+
+    fetchNotebook();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedProductionId, productionMap]);
+
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(books.length / PAGE_SIZE)),
     [books.length]
@@ -602,47 +726,11 @@ export default function WorkerCuttingBook() {
       return false;
     }
     const productionKey = String(meta.productionId || "UNASSIGNED");
-    const nextRecord = {
+    const draftRecord = {
       id: editingRecordId || Date.now().toString(36),
       ...record,
       dateCreate: record.dateCreate || getTodayString(),
     };
-    const nextBooks = (() => {
-      const existing = books.find((book) => String(book.productionId) === productionKey);
-      if (!existing) {
-        return [
-          ...books,
-          {
-            productionId: productionKey,
-            meta: { ...meta },
-            records: [nextRecord],
-            updatedAt: new Date().toISOString(),
-          },
-        ];
-      }
-      return books.map((book) => {
-        if (String(book.productionId) !== productionKey) return book;
-        if (editingRecordId) {
-          const nextRecords = (book.records || []).map((item) =>
-            String(item.id) === String(editingRecordId)
-              ? { ...item, ...nextRecord, id: editingRecordId }
-              : item
-          );
-          return {
-            ...book,
-            meta: { ...meta },
-            records: nextRecords,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return {
-          ...book,
-          meta: { ...meta },
-          records: [...(book.records || []), nextRecord],
-          updatedAt: new Date().toISOString(),
-        };
-      });
-    })();
 
     try {
       setIsSavingRecord(true);
@@ -664,8 +752,28 @@ export default function WorkerCuttingBook() {
         note: String(record.note || "")
       };
 
-      // Gọi API create-logs với notebookId = productionId (dựa theo cấu trúc backend hiện tại)
-      await CuttingNotebookService.createLog(productionKey, payload);
+      const notebookId = currentBook?.notebookId || Number(productionKey);
+      const createResponse = await CuttingNotebookService.createLog(notebookId, payload);
+      const createPayload = normalizeApiPayload(createResponse);
+      const savedRecord = normalizeNotebookLog(createPayload?.data ?? draftRecord);
+      const nextBooks = books.map((book) => {
+        if (String(book.productionId) !== productionKey) return book;
+        const currentRecords = Array.isArray(book.records) ? book.records : [];
+        const nextRecords = editingRecordId
+          ? currentRecords.map((item) =>
+              String(item.id) === String(editingRecordId)
+                ? { ...item, ...savedRecord, id: String(editingRecordId) }
+                : item
+            )
+          : [...currentRecords, savedRecord];
+
+        return {
+          ...book,
+          meta: { ...book.meta, ...meta },
+          records: nextRecords,
+          updatedAt: createPayload?.data?.dateCreate || new Date().toISOString(),
+        };
+      });
 
       setBooks(nextBooks);
       setSelectedProductionId(productionKey);
@@ -795,11 +903,15 @@ export default function WorkerCuttingBook() {
         fabricWidth: Number(newBook.fabricWidth || 0),
       };
 
-      await CuttingNotebookService.createNotebook(payload);
+      const createResponse = await CuttingNotebookService.createNotebook(payload);
+      const createPayload = normalizeApiPayload(createResponse);
+      const createdNotebook = createPayload?.data ?? createPayload;
+      const notebookId = createdNotebook?.id ?? createdNotebook?.notebookId ?? createdNotebook?.cnId ?? null;
 
       const selectedProduction = productionMap.get(productionKey);
       const nextBooks = [
         {
+          notebookId,
           productionId: productionKey,
           meta: {
             ...newBook,
@@ -845,7 +957,7 @@ export default function WorkerCuttingBook() {
   };
 
   return (
-    <OwnerLayout>
+    <WorkerLayout>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -890,6 +1002,18 @@ export default function WorkerCuttingBook() {
               </button>
             )}
           </div>
+
+          {bookLoading ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+              Đang đồng bộ sổ cắt từ backend...
+            </div>
+          ) : null}
+
+          {bookError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+              {bookError}
+            </div>
+          ) : null}
 
           {!selectedProductionId && (
             <div className="space-y-3">
@@ -1289,7 +1413,7 @@ export default function WorkerCuttingBook() {
           </div>
         </div>
       )}
-    </OwnerLayout>
+    </WorkerLayout>
   );
 }
 

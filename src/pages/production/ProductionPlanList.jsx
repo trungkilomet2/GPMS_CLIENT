@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import WorkerService from "@/services/WorkerService";
 import { useAuth } from "@/hooks/useAuth";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useProductionList } from "@/hooks/useProductionList";
 import { STATUS_STYLES, getPlanStatusLabel } from "@/utils/statusUtils";
 import "@/styles/homepage.css";
@@ -15,7 +18,14 @@ import "@/styles/leave.css";
 
 
 export default function ProductionPlanList() {
-  const { isWorker } = useAuth();
+  const location = useLocation();
+  const { isWorker, roleValue } = useAuth();
+  const primaryRole = getPrimaryWorkspaceRole(roleValue);
+  const isWorkerRoute = location.pathname.startsWith("/worker/");
+  const isWorkerView = primaryRole === "worker";
+  const isTeamLeaderView = primaryRole === "teamLeader";
+  const LayoutComponent = isWorkerView ? WorkerLayout : isTeamLeaderView ? TeamLeaderLayout : PmOwnerLayout;
+  const detailBasePath = isWorkerRoute ? "/worker/production-plan" : "/production-plan";
   const { productions, loading, error } = useProductionList();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -149,7 +159,7 @@ export default function ProductionPlanList() {
   }, [partCounts, plans]);
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -328,7 +338,7 @@ export default function ProductionPlanList() {
                           </span>
                         </td>
                         <td className="px-2 py-3 text-right whitespace-nowrap">
-                          <Link to={`/production-plan/${item.productionId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                          <Link to={`${detailBasePath}/${item.productionId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
                             Xem chi tiết
                           </Link>
                         </td>
@@ -351,6 +361,6 @@ export default function ProductionPlanList() {
           )}
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }

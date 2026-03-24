@@ -4,7 +4,7 @@ import WorkerLayout from "@/layouts/WorkerLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 
-export default function OwnerLayout({ children }) {
+export default function PmOwnerLayout({ children }) {
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
 

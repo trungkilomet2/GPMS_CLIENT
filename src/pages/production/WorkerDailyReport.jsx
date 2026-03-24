@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays } from "lucide-react";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -81,7 +81,7 @@ export default function WorkerDailyReport() {
   };
 
   return (
-    <OwnerLayout>
+    <WorkerLayout>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -209,6 +209,6 @@ export default function WorkerDailyReport() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </WorkerLayout>
   );
 }

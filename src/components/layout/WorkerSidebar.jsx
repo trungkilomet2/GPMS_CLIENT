@@ -1,14 +1,24 @@
 ﻿import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
+import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut, Scissors, BriefcaseBusiness } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
-const NAV_ITEMS = [
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
-  { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
+const WORKER_NAV_ITEMS = [
+  { to: "/worker/assignments", label: "Công việc", icon: BriefcaseBusiness },
+  { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
+  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
+  { to: "/worker/cutting-book", label: "Sổ cắt", icon: Scissors },
   { to: "/worker/error-report", label: "Báo lỗi", icon: AlertTriangle },
+  { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
+];
+
+const KCS_NAV_ITEMS = [
+  { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
+  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
+  { to: "/worker/error-report", label: "Kiểm lỗi KCS", icon: AlertTriangle },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
 
@@ -34,6 +44,11 @@ export default function WorkerSidebar() {
   });
 
   const user = getStoredUser();
+  const isKcsUser = hasAnyRole(user?.role, ["kcs", "quality control", "qc"]);
+  const navItems = isKcsUser ? KCS_NAV_ITEMS : WORKER_NAV_ITEMS;
+  const brandSubtitle = isKcsUser ? "KCS" : "Nhân viên";
+  const defaultName = isKcsUser ? "KCS" : "Nhân viên";
+  const roleLabel = isKcsUser ? "Worker / KCS" : "Worker";
 
   useEffect(() => {
     try {
@@ -63,13 +78,13 @@ export default function WorkerSidebar() {
         {!collapsed && (
           <div className="dashboard-sidebar__brand-text">
             <div className="dashboard-sidebar__brand-title">GPMS</div>
-            <div className="dashboard-sidebar__brand-subtitle">Thợ may</div>
+            <div className="dashboard-sidebar__brand-subtitle">{brandSubtitle}</div>
           </div>
         )}
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -93,8 +108,8 @@ export default function WorkerSidebar() {
           </div>
           {!collapsed && (
             <div className="dashboard-sidebar__user">
-              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Thợ may"}</div>
-              <div className="dashboard-sidebar__user-role">Worker</div>
+              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || defaultName}</div>
+              <div className="dashboard-sidebar__user-role">{roleLabel}</div>
             </div>
           )}
         </NavLink>

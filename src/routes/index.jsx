@@ -29,8 +29,10 @@ const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAss
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
 const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
 const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
+const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
+const EmployeeDirectory = lazy(() => import("@/pages/employees/EmployeeDirectory"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
@@ -89,11 +91,17 @@ export const routes = [
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
   { path: "/worker/error-report", element: <WorkerErrorReport /> },
   { path: "/worker/cutting-book", element: <WorkerCuttingBook /> },
+  { path: "/worker/assignments", element: <WorkerAssignment /> },
+  { path: "/worker/production-plan", element: <ProductionPlanList /> },
+  { path: "/worker/production-plan/:id", element: <ProductionPlanDetail /> },
+  { path: "/worker/output-history", element: <OutputHistory /> },
   { path: "/worker/leave-requests", element: <LeaveRequests /> },
   { path: "/worker/leave-requests/:id", element: <LeaveRequestDetail /> },
   { path: "/output-history", element: <OutputHistory /> },
   { path: "/leave-requests", element: <LeaveRequests /> },
-  { path: "/employees", element: <EmployeeList /> },
+  { path: "/employees", element: <EmployeeDirectory /> },
+  { path: "/employees/management", element: <EmployeeList /> },
+  { path: "/employees/workers", element: <EmployeeList /> },
   { path: "/employees/create", element: <EmployeeCreate /> },
   { path: "/employees/:id/edit", element: <EmployeeUpdate /> },
   { path: "/employees/:id", element: <EmployeeDetail /> },

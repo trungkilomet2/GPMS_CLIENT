@@ -7,227 +7,6 @@ import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const STORAGE_KEY = "gpms-error-reports";
-
-const MOCK_ERRORS = [
-  {
-    id: "e1",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân trước",
-    severity: "medium",
-    title: "Sai biên cắt",
-    description: "Biên vải lệch 3mm ở đầu thân.",
-    quantity: 14,
-    happenAt: "2026-03-18T09:10",
-    createdAt: "2026-03-18T09:15:00.000Z",
-  },
-  {
-    id: "e2",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May sườn",
-    severity: "low",
-    title: "Đường may hở",
-    description: "Lỗi hở đường may ở sườn trái.",
-    quantity: 6,
-    happenAt: "2026-03-18T14:20",
-    createdAt: "2026-03-18T14:22:00.000Z",
-  },
-  {
-    id: "e3",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đính mác",
-    severity: "high",
-    title: "Sai vị trí mác",
-    description: "Mác dán lệch khỏi vị trí chuẩn 1cm.",
-    quantity: 9,
-    happenAt: "2026-03-19T08:05",
-    createdAt: "2026-03-19T08:08:00.000Z",
-  },
-  {
-    id: "e4",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Hoàn thiện",
-    severity: "critical",
-    title: "Bẩn dầu máy",
-    description: "Dính dầu máy ở 4 sản phẩm lô 2.",
-    quantity: 4,
-    happenAt: "2026-03-19T15:45",
-    createdAt: "2026-03-19T15:46:00.000Z",
-  },
-  {
-    id: "e5",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May tay",
-    severity: "medium",
-    title: "Lệch đường ráp tay",
-    description: "Ráp tay lệch nhẹ ở size M.",
-    quantity: 11,
-    happenAt: "2026-03-20T10:22",
-    createdAt: "2026-03-20T10:24:00.000Z",
-  },
-  {
-    id: "e6",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân sau",
-    severity: "low",
-    title: "Sơ đồ cắt nhăn",
-    description: "Sơ đồ bị nhăn khi cắt, cần trải lại.",
-    quantity: 5,
-    happenAt: "2026-03-20T14:18",
-    createdAt: "2026-03-20T14:20:00.000Z",
-  },
-  {
-    id: "e7",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May cổ",
-    severity: "high",
-    title: "Sai kích thước cổ",
-    description: "Chu vi cổ nhỏ hơn tiêu chuẩn 0.7cm.",
-    quantity: 7,
-    happenAt: "2026-03-21T09:30",
-    createdAt: "2026-03-21T09:32:00.000Z",
-  },
-  {
-    id: "e8",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Là ủi",
-    severity: "medium",
-    title: "Bóng vải",
-    description: "Bóng vải ở thân trước do nhiệt cao.",
-    quantity: 8,
-    happenAt: "2026-03-21T13:05",
-    createdAt: "2026-03-21T13:08:00.000Z",
-  },
-  {
-    id: "e9",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đóng gói",
-    severity: "low",
-    title: "Thiếu tem size",
-    description: "Tem size không được dán ở 6 sản phẩm.",
-    quantity: 6,
-    happenAt: "2026-03-21T15:10",
-    createdAt: "2026-03-21T15:12:00.000Z",
-  },
-  {
-    id: "e10",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May sườn",
-    severity: "medium",
-    title: "Đường may lệch",
-    description: "Sai độ rộng đường may 2mm.",
-    quantity: 10,
-    happenAt: "2026-03-22T08:40",
-    createdAt: "2026-03-22T08:42:00.000Z",
-  },
-  {
-    id: "e11",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Kiểm hàng",
-    severity: "high",
-    title: "Phát hiện lỗi dính bẩn",
-    description: "Bẩn mực ở 3 sản phẩm size L.",
-    quantity: 3,
-    happenAt: "2026-03-22T11:20",
-    createdAt: "2026-03-22T11:25:00.000Z",
-  },
-  {
-    id: "e12",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt tay áo",
-    severity: "medium",
-    title: "Sai kích thước tay",
-    description: "Tay áo dài hơn tiêu chuẩn 0.5cm.",
-    quantity: 9,
-    happenAt: "2026-03-22T14:55",
-    createdAt: "2026-03-22T14:58:00.000Z",
-  },
-  {
-    id: "e13",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Hoàn thiện",
-    severity: "low",
-    title: "Chỉ thừa",
-    description: "Chỉ thừa ở 5 sản phẩm size S.",
-    quantity: 5,
-    happenAt: "2026-03-23T09:12",
-    createdAt: "2026-03-23T09:15:00.000Z",
-  },
-  {
-    id: "e14",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Cắt thân trước",
-    severity: "high",
-    title: "Sai sơ đồ",
-    description: "Sơ đồ cắt không đúng phiên bản.",
-    quantity: 4,
-    happenAt: "2026-03-23T13:25",
-    createdAt: "2026-03-23T13:28:00.000Z",
-  },
-  {
-    id: "e15",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May tay",
-    severity: "medium",
-    title: "Bong đường may",
-    description: "Đường may bong sau khi kéo thử.",
-    quantity: 8,
-    happenAt: "2026-03-24T08:05",
-    createdAt: "2026-03-24T08:08:00.000Z",
-  },
-  {
-    id: "e16",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Là ủi",
-    severity: "low",
-    title: "Nếp gấp không đều",
-    description: "Nếp gấp sau khi là bị lệch nhẹ.",
-    quantity: 6,
-    happenAt: "2026-03-24T10:40",
-    createdAt: "2026-03-24T10:42:00.000Z",
-  },
-  {
-    id: "e17",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "Đóng gói",
-    severity: "medium",
-    title: "Sai màu bao bì",
-    description: "Bao bì màu xanh thay vì trắng.",
-    quantity: 5,
-    happenAt: "2026-03-24T15:30",
-    createdAt: "2026-03-24T15:32:00.000Z",
-  },
-  {
-    id: "e18",
-    productionId: 2,
-    orderName: "Áo thun đồng phục",
-    partName: "May cổ",
-    severity: "critical",
-    title: "Vải rách khi ráp cổ",
-    description: "Rách vải do kéo sai lực.",
-    quantity: 2,
-    happenAt: "2026-03-25T09:18",
-    createdAt: "2026-03-25T09:20:00.000Z",
-  },
-];
-
 const SEVERITY_LABELS = {
   low: "Thấp",
   medium: "Trung bình",
@@ -243,22 +22,43 @@ const SEVERITY_STYLES = {
   default: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
-function normalizeErrors(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw.items)) return raw.items;
-  if (Array.isArray(raw.data)) return raw.data;
-  return [];
+function mapPriorityToSeverity(priority) {
+  const value = Number(priority);
+  if (value >= 4) return "critical";
+  if (value >= 3) return "high";
+  if (value >= 2) return "medium";
+  return "low";
 }
 
-function readStoredErrors() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return normalizeErrors(JSON.parse(raw));
-  } catch {
-    return [];
-  }
+function mapTypeIssueToPartName(typeIssue) {
+  const normalized = Number(typeIssue);
+  const labels = {
+    1: "Cắt",
+    2: "May",
+    3: "Hoàn thiện",
+    4: "Kiểm hàng",
+    5: "Lỗi công đoạn",
+  };
+  return labels[normalized] || "Không phân loại";
+}
+
+function normalizeIssueCollection(response = {}) {
+  const rawItems = response?.data ?? response?.items ?? response?.records ?? response ?? [];
+  if (!Array.isArray(rawItems)) return [];
+
+  return rawItems.map((item, index) => ({
+    id: item.issueId ?? item.id ?? `issue-${index + 1}`,
+    productionId: item.productionId ?? item.prId ?? null,
+    orderName: item.orderName ?? "",
+    partName: item.partName ?? mapTypeIssueToPartName(item.typeIssue),
+    severity: item.severity ?? mapPriorityToSeverity(item.priority),
+    title: item.title ?? "Không có tiêu đề",
+    description: item.description ?? "",
+    quantity: Number(item.quantity ?? 0),
+    happenAt: item.happenAt ?? item.createdAt ?? "",
+    createdAt: item.createdAt ?? item.happenAt ?? "",
+    imageUrl: item.imageUrl ?? "",
+  }));
 }
 
 export default function ProductionErrorSummary() {
@@ -267,6 +67,7 @@ export default function ProductionErrorSummary() {
   const [production, setProduction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -298,12 +99,35 @@ export default function ProductionErrorSummary() {
   }, [id]);
 
   useEffect(() => {
-    const stored = readStoredErrors();
-    const merged = [...stored, ...MOCK_ERRORS];
-    const filtered = merged.filter((item) => String(item.productionId) === String(id));
-    const sorted = filtered.sort((a, b) => new Date(b.createdAt || b.happenAt || 0) - new Date(a.createdAt || a.happenAt || 0));
-    setErrors(sorted);
-    setCurrentPage(1);
+    let active = true;
+
+    const fetchIssues = async () => {
+      try {
+        setErrorMessage("");
+        const response = await ProductionService.getProductionIssues(id);
+        if (!active) return;
+        const payload = response?.data ?? response;
+        const normalized = normalizeIssueCollection(payload)
+          .sort((a, b) => new Date(b.createdAt || b.happenAt || 0) - new Date(a.createdAt || a.happenAt || 0));
+        setErrors(normalized);
+      } catch (error) {
+        if (!active) return;
+        setErrors([]);
+        setErrorMessage(
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          "Không thể tải danh sách lỗi production."
+        );
+      } finally {
+        if (active) setCurrentPage(1);
+      }
+    };
+
+    fetchIssues();
+
+    return () => {
+      active = false;
+    };
   }, [id]);
 
   const severityCounts = useMemo(() => {
@@ -403,6 +227,11 @@ export default function ProductionErrorSummary() {
               </div>
               <div className="text-xs text-slate-500">Gộp lỗi theo công đoạn</div>
             </div>
+            {errorMessage ? (
+              <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
+                {errorMessage}
+              </div>
+            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">

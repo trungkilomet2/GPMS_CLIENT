@@ -1,7 +1,7 @@
 ﻿import { useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -153,7 +153,7 @@ export default function WorkerErrorReport() {
   };
 
   return (
-    <OwnerLayout>
+    <WorkerLayout>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -398,7 +398,7 @@ export default function WorkerErrorReport() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </WorkerLayout>
   );
 }
 

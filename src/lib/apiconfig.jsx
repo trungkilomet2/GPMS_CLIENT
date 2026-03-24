@@ -37,6 +37,8 @@ export const API_ENDPOINTS = {
     UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
     APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
     REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
+    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
+    ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>
@@ -50,7 +52,10 @@ export const API_ENDPOINTS = {
   
   CUTTING_NOTEBOOK: {
     CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
+    GET_BY_PRODUCTION: (productionId) => `${BASE_URL}/api/CuttingNotebook/notebook/production/${productionId}`,
+    GET_BY_ID: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/${notebookId}`,
     CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
+    GET_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
   },
 
   CLOUDINARY: {
@@ -74,6 +79,10 @@ export const API_ENDPOINTS = {
     ADMIN_UPDATE_USER: (id) => `${BASE_URL}/api/User/update-user-for-admin/${id}`,
     // PUT — multipart/form-data
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
+  },
+
+  PERMISSION: {
+    GET_ALL: `${BASE_URL}/api/Permission`,
   },
 
   WORKER: {
