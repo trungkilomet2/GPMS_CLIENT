@@ -94,7 +94,7 @@ export default function PayrollDetail() {
               </Link>
               <h1 className="payroll-hero__title">Chi tiết bảng lương</h1>
               <p className="payroll-hero__subtitle">
-                Theo dõi thực lĩnh của worker cùng chuỗi đối soát PM và xác nhận thanh toán từ owner.
+                Theo dõi bảng lương được tính từ sản lượng đầu ra đã được KCS xác nhận.
               </p>
             </div>
           </div>
@@ -135,11 +135,11 @@ export default function PayrollDetail() {
                       Chi tiết bảng lương: {record.fullName}
                     </h2>
                     <p className="payroll-detail-panel__subtitle">
-                      Bảng kê sản lượng chi tiết kỳ lương {formatMonthLabel(activeMonth)} ·{" "}
+                      Bảng kê sản lượng đã xác nhận cho kỳ lương {formatMonthLabel(activeMonth)} ·{" "}
                       {record.employeeCode}
                     </p>
                     <p className="payroll-detail-panel__subtitle">
-                      Luồng nghiệp vụ: {getPayrollFlowLabel(record)}
+                      Cơ sở tính lương: sản lượng đầu ra đã được KCS xác nhận
                     </p>
                   </div>
                 </div>
@@ -181,11 +181,11 @@ export default function PayrollDetail() {
                     </div>
                     <div className="payroll-highlight-card__status">
                       <span className="payroll-status payroll-status--pending">
-                        PM: {record.workflow.managerName}
+                        KCS xác nhận đầu ra
                       </span>
                     </div>
                     <p className="payroll-highlight-card__meta">
-                      Owner xác nhận: {record.workflow.ownerName}
+                      Thanh toán được owner xác nhận ở bước cuối.
                     </p>
                   </article>
                 </div>
@@ -211,7 +211,7 @@ export default function PayrollDetail() {
                     </div>
                     <div className="payroll-field-card__note">{record.note}</div>
                     <p className="payroll-field-card__text">
-                      Nguồn đối soát mock: {record.workflow.sourceTables.join(", ")}.
+                      Nguồn tính lương: dữ liệu sản lượng đầu ra đã được xác nhận trong kỳ.
                     </p>
                   </article>
                 </div>
@@ -223,7 +223,7 @@ export default function PayrollDetail() {
                         Danh sách công đoạn đã làm
                       </h3>
                       <p className="payroll-detail-list-card__subtitle">
-                        Chi tiết sản lượng đã được chốt cho kỳ lương này.
+                        Chi tiết sản lượng đầu ra đã được KCS xác nhận cho kỳ lương này.
                       </p>
                     </div>
                     <span className="payroll-detail-list-card__count">
@@ -251,7 +251,7 @@ export default function PayrollDetail() {
                             {item.quantity.toLocaleString("en-US")} cái x{" "}
                             {formatCurrency(item.unitPrice)}
                           </span>
-                          <span className="payroll-task-card__pill">Đã chốt công</span>
+                          <span className="payroll-task-card__pill">Đã KCS xác nhận</span>
                         </div>
                       </article>
                     ))}

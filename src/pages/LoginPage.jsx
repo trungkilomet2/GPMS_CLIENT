@@ -76,6 +76,14 @@ export default function LoginPage() {
   const [formData,     setFormData]     = useState(initialValues);
   const [errors,       setErrors]       = useState({});
 
+  useEffect(() => {
+    const saved = localStorage.getItem("rememberUserName");
+    if (saved) {
+      setFormData(p => ({ ...p, userName: saved }));
+      setRemember(true);
+    }
+  }, []);
+
   if (storedUser) {
     return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
   }
@@ -85,14 +93,6 @@ export default function LoginPage() {
     if (name === "password") return validatePassword(value);
     return "";
   };
-
-  useEffect(() => {
-    const saved = localStorage.getItem("rememberUserName");
-    if (saved) {
-      setFormData(p => ({ ...p, userName: saved }));
-      setRemember(true);
-    }
-  }, []);
 
   const validate = () => {
     const e = {

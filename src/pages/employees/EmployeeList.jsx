@@ -12,6 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
@@ -104,6 +106,9 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 
 export default function EmployeeList() {
   const location = useLocation();
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isOwner = primaryRole === "owner";
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -293,10 +298,12 @@ export default function EmployeeList() {
               <p className="employee-hero__subtitle">{pageSubtitle}</p>
             </div>
 
-            <Link to="/employees/create" className="employee-hero__action">
-              <Plus size={18} />
-              <span>Thêm nhân viên</span>
-            </Link>
+            {isOwner ? (
+              <Link to="/employees/create" className="employee-hero__action">
+                <Plus size={18} />
+                <span>Thêm nhân viên</span>
+              </Link>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -455,7 +462,7 @@ export default function EmployeeList() {
                       >
                         Xóa bộ lọc
                       </button>
-                    ) : (
+                    ) : isOwner ? (
                       <Link
                         to="/employees/create"
                         className="employee-state-btn employee-state-btn--primary"

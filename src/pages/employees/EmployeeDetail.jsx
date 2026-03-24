@@ -13,6 +13,8 @@ import {
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-detail.css";
 
@@ -33,6 +35,9 @@ function getInitials(name = "") {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
+  const currentUser = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
+  const isOwner = primaryRole === "owner";
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -100,10 +105,12 @@ export default function EmployeeDetail() {
               <p className="employee-detail-hero__subtitle">Thông tin tài khoản, vai trò hệ thống, chuyên môn và tuyến quản lý của nhân viên trong hệ thống.</p>
             </div>
 
-            <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
-              <Pencil size={18} />
-              <span>Sửa hồ sơ</span>
-            </Link>
+            {isOwner ? (
+              <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
+                <Pencil size={18} />
+                <span>Sửa hồ sơ</span>
+              </Link>
+            ) : null}
           </div>
 
           {loading ? (

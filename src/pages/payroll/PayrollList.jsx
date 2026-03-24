@@ -160,8 +160,7 @@ export default function PayrollList() {
                 </Link>
                 <h1 className="payroll-hero__title">Bảng lương</h1>
                 <p className="payroll-hero__subtitle">
-                  Theo dõi bảng lương worker theo cây quản lý 1 owner, nhiều PM,
-                  mỗi PM phụ trách team lead và worker của line mình.
+                  Bảng lương được tính toán hoàn toàn dựa trên số lượng sản phẩm đầu ra đã được KCS xác nhận.
                 </p>
 
                 <div className="payroll-hero__chips">
@@ -240,7 +239,7 @@ export default function PayrollList() {
 
           <div className="payroll-summary-note">
             <strong>Kỳ lương tổng quan</strong>
-            <span>Dữ liệu đang bám cây quản lý Owner / PM / Team Lead / Worker theo schema USER, USER_ROLE, MANAGER_ID, PART_WORK_LOG.</span>
+            <span>Dữ liệu lương được tổng hợp từ sản lượng đầu ra đã chốt và xác nhận bởi KCS trong từng kỳ.</span>
           </div>
 
           <section className="payroll-card">
@@ -249,7 +248,7 @@ export default function PayrollList() {
                 <span className="payroll-table-card__eyebrow">Danh sách chi trả</span>
                 <h2 className="payroll-table-card__title">Danh sách bảng lương</h2>
                 <p className="payroll-table-card__subtitle">
-                  Theo dõi thu nhập, phụ cấp và trạng thái đối soát theo từng worker.
+                  Theo dõi thu nhập, phụ cấp và trạng thái thanh toán theo từng nhân viên.
                 </p>
                 <div className="payroll-table-card__insights">
                   <span className="payroll-table-card__insight">
@@ -382,7 +381,7 @@ export default function PayrollList() {
                                     {record.workItems.length} mục
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Log đã chốt từ worker
+                                    Sản lượng đã được KCS xác nhận
                                   </span>
                                 </div>
                               </td>
@@ -412,7 +411,7 @@ export default function PayrollList() {
                                     {formatCurrency(record.netIncome)}
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Owner xác nhận cuối kỳ
+                                    Thực lĩnh kỳ này
                                   </span>
                                 </div>
                               </td>

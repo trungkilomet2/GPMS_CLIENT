@@ -2,21 +2,17 @@ import { useMemo, useState } from "react";
 import {
   ClipboardList,
   Search,
-  ShieldAlert,
   ShieldCheck,
   Table2,
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  ADMIN_DB_LOG_GAPS,
   ADMIN_DB_LOG_SOURCES,
-  ADMIN_DB_SCHEMA_VERSION,
   ADMIN_DB_SYSTEM_LOG_EVENTS,
   getAdminDbLogSource,
 } from "@/lib/admin/adminSchemaBlueprint";
 import {
-  AdminBanner,
   AdminRoleBadge,
   AdminStatCard,
   formatAdminDateTime,
@@ -89,7 +85,6 @@ export default function AdminSystemLog() {
       paymentAware: ADMIN_DB_LOG_SOURCES.filter((source) =>
         source.flags.some((flag) => flag === "IS_PAYMENT" || flag === "IS_READ_ONLY")
       ).length,
-      securityGaps: ADMIN_DB_LOG_GAPS.length,
     }),
     []
   );
@@ -107,10 +102,9 @@ export default function AdminSystemLog() {
         <div className="admin-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="admin-hero">
             <div className="admin-hero__heading">
-              <h1 className="admin-hero__title">View System Log Screen</h1>
+              <h1 className="admin-hero__title">Màn hình nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Màn này tổng hợp các nguồn log hiện có trong hệ thống để Admin theo dõi nhanh. Hiện backend chưa có
-                bảng log tổng như `SYSTEM_LOG`, nên web đang gom từ các bảng nghiệp vụ đang có.
+                Màn này tổng hợp các nguồn log hiện có trong hệ thống để Admin theo dõi nhanh.
               </p>
             </div>
           </div>
@@ -118,10 +112,9 @@ export default function AdminSystemLog() {
         
 
           <div className="admin-stats-grid">
-            <AdminStatCard icon={ClipboardList} label="Nguồn log hiện có" value={stats.sources} meta="Các bảng log và workflow đang dùng được" tone="primary" />
+            <AdminStatCard icon={ClipboardList} label="Nguồn log hiện có" value={stats.sources} meta="Các bảng log và luồng xử lý đang sử dụng" tone="primary" />
             <AdminStatCard icon={Users} label="Có USER_ID" value={stats.actorBound} meta="Nguồn có thể lần ra user trực tiếp" tone="success" />
-            <AdminStatCard icon={ShieldCheck} label="Có trạng thái" value={stats.paymentAware} meta="Nguồn lưu IS_PAYMENT hoặc IS_READ_ONLY" tone="info" />
-            <AdminStatCard icon={ShieldAlert} label="Phần còn thiếu" value={stats.securityGaps} meta="Các phần backend cần bổ sung nếu muốn log đầy đủ hơn" tone="danger" />
+            <AdminStatCard icon={ShieldCheck} label="Có trạng thái" value={stats.paymentAware} meta="Nguồn có lưu trạng thái xử lý" tone="info" />
           </div>
 
           <div className="admin-filter-card">
@@ -132,18 +125,18 @@ export default function AdminSystemLog() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Table, action, entity, cột dữ liệu..."
+                  placeholder="Bảng, thao tác, đối tượng, cột dữ liệu..."
                   className="admin-field__control"
                 />
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Source table</span>
+                <span className="admin-field__label">Bảng nguồn</span>
                 <Table2 size={18} className="admin-field__icon" />
                 <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="admin-field__control">
                   {sourceOptions.map((source) => (
                     <option key={source} value={source}>
-                      {source === "all" ? "Tất cả source" : source}
+                      {source === "all" ? "Tất cả bảng nguồn" : source}
                     </option>
                   ))}
                 </select>
@@ -162,12 +155,12 @@ export default function AdminSystemLog() {
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Actor trace</span>
+                <span className="admin-field__label">Dấu vết người thực hiện</span>
                 <Users size={18} className="admin-field__icon" />
                 <select value={actorFilter} onChange={(event) => setActorFilter(event.target.value)} className="admin-field__control">
                   <option value="all">Tất cả</option>
                   <option value="user">Có USER_ID</option>
-                  <option value="missing">Thiếu actor trực tiếp</option>
+                  <option value="missing">Không có actor trực tiếp</option>
                 </select>
               </label>
 
@@ -186,10 +179,8 @@ export default function AdminSystemLog() {
           <div className="admin-table-card">
             <div className="admin-table-card__header">
               <div>
-                <h2 className="admin-card__title">Operational log feed</h2>
-                <p className="admin-card__subtitle">
-                  Danh sách bên dưới là dữ liệu tổng hợp từ các bảng đang có, chưa phải hệ thống audit đầy đủ.
-                </p>
+                <h2 className="admin-card__title">Danh sách nhật ký hoạt động</h2>
+                <p className="admin-card__subtitle">Danh sách sự kiện để Admin theo dõi nhanh các hoạt động trong hệ thống.</p>
               </div>
             </div>
 
@@ -207,8 +198,8 @@ export default function AdminSystemLog() {
                     <tr>
                       <th>Thời gian</th>
                       <th>Nguồn</th>
-                      <th>Action</th>
-                      <th>Entity</th>
+                      <th>Thao tác</th>
+                      <th>Đối tượng</th>
                       <th>Người thực hiện</th>
                       <th>Ghi chú</th>
                     </tr>
@@ -243,21 +234,12 @@ export default function AdminSystemLog() {
                             <div className="admin-table__secondary">{log.actorTrace}</div>
                             <div className="admin-chips mt-2">
                               <AdminRoleBadge tone={hasActor ? "success" : "warning"}>
-                                {hasActor ? "Có actor trực tiếp" : "Thiếu actor trực tiếp"}
+                                {hasActor ? "Có actor trực tiếp" : "Không có actor trực tiếp"}
                               </AdminRoleBadge>
                             </div>
                           </td>
                           <td>
                             <div className="admin-table__secondary">{source?.description}</div>
-                            {log.flags?.length ? (
-                              <div className="admin-chips mt-2">
-                                {log.flags.map((flag) => (
-                                  <AdminRoleBadge key={flag} tone="info">
-                                    {flag}
-                                  </AdminRoleBadge>
-                                ))}
-                              </div>
-                            ) : null}
                           </td>
                         </tr>
                       );
@@ -272,8 +254,8 @@ export default function AdminSystemLog() {
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Các bảng log đang dùng</h2>
-                  <p className="admin-card__subtitle">Mỗi card bên dưới là một nguồn log hoặc workflow mà web đang có thể đọc.</p>
+                  <h2 className="admin-card__title">Nguồn dữ liệu log</h2>
+                  <p className="admin-card__subtitle">Mỗi card bên dưới thể hiện một nguồn dữ liệu đang được dùng để hiển thị log.</p>
                 </div>
               </div>
 
@@ -285,32 +267,14 @@ export default function AdminSystemLog() {
                     <span>{source.description}</span>
                     <div className="admin-preview-list mt-3">
                       <div className="admin-preview-list__item">
-                        <strong>Time column</strong>
+                        <strong>Cột thời gian</strong>
                         <span>{source.timeColumn}</span>
                       </div>
                       <div className="admin-preview-list__item">
-                        <strong>Actor trace</strong>
+                        <strong>Dấu vết người thực hiện</strong>
                         <span>{source.actorLabel}</span>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="admin-card">
-              <div className="admin-card__header">
-                <div>
-                  <h2 className="admin-card__title">Những phần còn thiếu</h2>
-                  <p className="admin-card__subtitle">Những phần backend hiện chưa có nên web chưa thể hiện log đầy đủ hơn.</p>
-                </div>
-              </div>
-
-              <div className="admin-preview-list">
-                {ADMIN_DB_LOG_GAPS.map((gap) => (
-                  <div key={gap.table} className="admin-preview-list__item">
-                    <strong>{gap.table}</strong>
-                    <span>{gap.impact}</span>
                   </div>
                 ))}
               </div>

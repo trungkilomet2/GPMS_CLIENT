@@ -5,8 +5,8 @@ const ProductionService = {
   createProduction(payload) {
     return axiosClient.post(API_ENDPOINTS.PRODUCTION.CREATE, payload);
   },
-  getProductionList(params) {
-    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params });
+  getProductionList(params, config = {}) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params, ...config });
   },
   getProductionDetail(id) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION.DETAIL(id));
