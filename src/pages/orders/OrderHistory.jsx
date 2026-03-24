@@ -65,7 +65,7 @@ export default function Orders({
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [sortBy, setSortBy] = useState({ key: 'id', dir: 'asc' });
+  const [sortBy, setSortBy] = useState({ key: 'id', dir: 'desc' });
 
   const shouldFetchAll = true;
 
