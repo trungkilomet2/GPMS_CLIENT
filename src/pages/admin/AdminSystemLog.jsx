@@ -115,11 +115,7 @@ export default function AdminSystemLog() {
             </div>
           </div>
 
-          <AdminBanner
-            title="Backend chưa có log bảo mật riêng."
-            description="Hiện chưa có `SYSTEM_LOG`, `LOGIN_AUDIT` hay `IP_TRACKING`, nên màn này đang hiển thị log từ các bảng nghiệp vụ như reject reason, work log và history update."
-            tone="warning"
-          />
+        
 
           <div className="admin-stats-grid">
             <AdminStatCard icon={ClipboardList} label="Nguồn log hiện có" value={stats.sources} meta="Các bảng log và workflow đang dùng được" tone="primary" />

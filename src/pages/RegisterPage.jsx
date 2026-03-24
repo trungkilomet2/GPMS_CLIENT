@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Navigate, useNavigate, Link } from "react-router-dom";
+import { getPostLoginPath } from "@/lib/authRouting";
+import { getStoredUser } from "@/lib/authStorage";
 import { authService } from "../services/authService";
 import SuccessModal from "@/components/SuccessModal";
 import {
@@ -24,6 +26,7 @@ const initialValues = {
 };
 
 export default function RegisterPage() {
+  const storedUser = getStoredUser();
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +37,10 @@ export default function RegisterPage() {
   const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+
+  if (storedUser) {
+    return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
+  }
 
   const getApiErrorDetails = (errData) => {
     const rawErrors =

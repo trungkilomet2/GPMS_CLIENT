@@ -220,11 +220,7 @@ export default function AdminUserList() {
             </div>
           </div>
 
-          <AdminBanner
-            title="Danh sách user đang lấy từ API admin thật."
-            description="Role hiển thị theo dữ liệu backend hiện tại. User nào chưa có role từ API sẽ được đánh dấu để Admin rà soát."
-            tone="info"
-          />
+         
 
           {notice ? (
             <AdminBanner

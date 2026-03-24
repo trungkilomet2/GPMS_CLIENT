@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Navigate, useNavigate, Link } from "react-router-dom";
 import { getPostLoginPath } from "@/lib/authRouting";
+import { getStoredUser } from "@/lib/authStorage";
 import { isProfileComplete } from "@/lib/profileCompletion";
 import { authService } from "@/services/authService";
 import { validatePassword, validateUserName } from "@/lib/validators";
@@ -67,12 +68,17 @@ function mapLoginError(err) {
 }
 
 export default function LoginPage() {
+  const storedUser = getStoredUser();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [remember,     setRemember]     = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [formData,     setFormData]     = useState(initialValues);
   const [errors,       setErrors]       = useState({});
+
+  if (storedUser) {
+    return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
+  }
 
   const validateField = (name, value) => {
     if (name === "userName") return validateUserName(value);
