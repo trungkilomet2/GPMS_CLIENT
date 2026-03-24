@@ -27,6 +27,7 @@ const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPla
 const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
+const WorkerDailyReportEdit = lazy(() => import("@/pages/production/WorkerDailyReportEdit"));
 const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
 const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
 const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
@@ -89,6 +90,7 @@ export const routes = [
   { path: "/production-plan/assign", element: <ProductionAssignment /> },
   { path: "/production-plan/assign/:id", element: <ProductionAssignment /> },
   { path: "/worker/daily-report", element: <WorkerDailyReport /> },
+  { path: "/worker/daily-report/edit", element: <WorkerDailyReportEdit /> },
   { path: "/worker/error-report", element: <WorkerErrorReport /> },
   { path: "/worker/cutting-book", element: <WorkerCuttingBook /> },
   { path: "/worker/assignments", element: <WorkerAssignment /> },

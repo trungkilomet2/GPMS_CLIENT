@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -22,73 +22,117 @@ const SEVERITY_STYLES = {
   default: "bg-slate-50 text-slate-600 border-slate-200",
 };
 
-function mapPriorityToSeverity(priority) {
-  const value = Number(priority);
-  if (value >= 4) return "critical";
-  if (value >= 3) return "high";
-  if (value >= 2) return "medium";
+const TYPE_ISSUE_LABELS = {
+  0: "Lỗi công đoạn",
+  1: "Lỗi cắt",
+  2: "Lỗi may",
+  3: "Lỗi khác",
+};
+
+const SEVERITY_ORDER = ["low", "medium", "high", "critical"];
+
+const getSeverityFromPriority = (priority, fallbackSeverity) => {
+  if (typeof fallbackSeverity === "string" && SEVERITY_ORDER.includes(fallbackSeverity)) {
+    return fallbackSeverity;
+  }
+
+  const p = Number(priority);
+  if (!Number.isFinite(p)) return "low";
+  if (p >= 4) return "critical";
+  if (p === 3) return "high";
+  if (p === 2) return "medium";
   return "low";
-}
+};
 
-function mapTypeIssueToPartName(typeIssue) {
-  const normalized = Number(typeIssue);
-  const labels = {
-    1: "Cắt",
-    2: "May",
-    3: "Hoàn thiện",
-    4: "Kiểm hàng",
-    5: "Lỗi công đoạn",
+const getTypeIssueLabel = (typeIssue) => {
+  const n = Number(typeIssue);
+  if (Number.isFinite(n) && TYPE_ISSUE_LABELS[n]) return TYPE_ISSUE_LABELS[n];
+  return "Chưa phân loại";
+};
+
+const parsePayload = (payload) => {
+  if (typeof payload !== "string") return payload;
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return payload;
+  }
+};
+
+const extractList = (payload) => {
+  const parsed = parsePayload(payload);
+  if (Array.isArray(parsed?.data)) return parsed.data;
+  if (Array.isArray(parsed?.items)) return parsed.items;
+  if (Array.isArray(parsed?.list)) return parsed.list;
+  if (Array.isArray(parsed?.results)) return parsed.results;
+  if (Array.isArray(parsed)) return parsed;
+  return [];
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleString("vi-VN");
+};
+
+const normalizeIssue = (item, index) => {
+  const typeLabel = getTypeIssueLabel(item?.typeIssue);
+  const partName =
+    item?.partName ??
+    item?.part?.partName ??
+    item?.stageName ??
+    item?.stepName ??
+    (item?.partId ? `Công đoạn #${item.partId}` : typeLabel);
+
+  const severity = getSeverityFromPriority(item?.priority, item?.severity);
+
+  return {
+    id: item?.issueId ?? item?.id ?? `issue-${index}`,
+    partName,
+    typeIssue: item?.typeIssue,
+    typeIssueLabel: typeLabel,
+    title: item?.title ?? "Không có tiêu đề",
+    description: item?.description ?? "",
+    severity,
+    priority: item?.priority ?? 0,
+    quantity: Number(item?.quantity) || 0,
+    imageUrl: item?.imageUrl ?? "",
+    createdAt: item?.createdAt ?? "",
   };
-  return labels[normalized] || "Không phân loại";
-}
-
-function normalizeIssueCollection(response = {}) {
-  const rawItems = response?.data ?? response?.items ?? response?.records ?? response ?? [];
-  if (!Array.isArray(rawItems)) return [];
-
-  return rawItems.map((item, index) => ({
-    id: item.issueId ?? item.id ?? `issue-${index + 1}`,
-    productionId: item.productionId ?? item.prId ?? null,
-    orderName: item.orderName ?? "",
-    partName: item.partName ?? mapTypeIssueToPartName(item.typeIssue),
-    severity: item.severity ?? mapPriorityToSeverity(item.priority),
-    title: item.title ?? "Không có tiêu đề",
-    description: item.description ?? "",
-    quantity: Number(item.quantity ?? 0),
-    happenAt: item.happenAt ?? item.createdAt ?? "",
-    createdAt: item.createdAt ?? item.happenAt ?? "",
-    imageUrl: item.imageUrl ?? "",
-  }));
-}
+};
 
 export default function ProductionErrorSummary() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [production, setProduction] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [productionLoading, setProductionLoading] = useState(false);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+  const [issueError, setIssueError] = useState("");
   const [errors, setErrors] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
     let active = true;
+
     const fetchProduction = async () => {
       try {
-        setLoading(true);
+        setProductionLoading(true);
         const response = await ProductionService.getProductionDetail(id);
         if (!active) return;
         const payload = response?.data?.data ?? response?.data ?? {};
-        const order = payload.order ?? {};
+        const order = payload?.order ?? {};
         setProduction({
-          productionId: payload.productionId ?? payload.id ?? id,
-          orderName: order.orderName ?? order.name ?? "",
+          productionId: payload?.productionId ?? payload?.id ?? id,
+          orderName: order?.orderName ?? order?.name ?? "",
         });
       } catch {
         if (!active) return;
         setProduction({ productionId: id, orderName: "" });
       } finally {
-        if (active) setLoading(false);
+        if (active) setProductionLoading(false);
       }
     };
 
@@ -103,48 +147,57 @@ export default function ProductionErrorSummary() {
 
     const fetchIssues = async () => {
       try {
-        setErrorMessage("");
+        setIssuesLoading(true);
+        setIssueError("");
+
         const response = await ProductionService.getProductionIssues(id);
         if (!active) return;
+
         const payload = response?.data ?? response;
-        const normalized = normalizeIssueCollection(payload)
-          .sort((a, b) => new Date(b.createdAt || b.happenAt || 0) - new Date(a.createdAt || a.happenAt || 0));
-        setErrors(normalized);
-      } catch (error) {
+        const list = extractList(payload).map(normalizeIssue);
+        const sorted = list.sort((a, b) => {
+          const aTs = new Date(a.createdAt || 0).getTime();
+          const bTs = new Date(b.createdAt || 0).getTime();
+          return bTs - aTs;
+        });
+
+        setErrors(sorted);
+      } catch {
         if (!active) return;
         setErrors([]);
-        setErrorMessage(
-          error?.response?.data?.detail ||
-          error?.response?.data?.message ||
-          "Không thể tải danh sách lỗi production."
-        );
+        setIssueError("Không thể tải danh sách lỗi từ hệ thống.");
       } finally {
-        if (active) setCurrentPage(1);
+        if (active) {
+          setIssuesLoading(false);
+          setCurrentPage(1);
+        }
       }
     };
 
     fetchIssues();
-
     return () => {
       active = false;
     };
   }, [id]);
 
-  const severityCounts = useMemo(() => {
-    return errors.reduce(
-      (acc, item) => {
-        const key = item.severity || "default";
-        acc[key] = (acc[key] || 0) + 1;
-        return acc;
-      },
-      { low: 0, medium: 0, high: 0, critical: 0 }
-    );
-  }, [errors]);
+  const severityCounts = useMemo(
+    () =>
+      errors.reduce(
+        (acc, item) => {
+          const key = item.severity || "low";
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        },
+        { low: 0, medium: 0, high: 0, critical: 0 }
+      ),
+    [errors]
+  );
 
   const byPart = useMemo(() => {
     const map = new Map();
+
     errors.forEach((item) => {
-      const key = item.partName || "Không rõ";
+      const key = item.partName || "Chưa xác định";
       const current = map.get(key) || {
         partName: key,
         count: 0,
@@ -152,26 +205,36 @@ export default function ProductionErrorSummary() {
         latestAt: "",
         highestSeverity: "low",
       };
+
       current.count += 1;
       current.totalQuantity += Number(item.quantity) || 0;
-      const ts = new Date(item.happenAt || item.createdAt || 0);
-      if (!current.latestAt || ts > new Date(current.latestAt)) {
-        current.latestAt = item.happenAt || item.createdAt || "";
+
+      const nextTs = new Date(item.createdAt || 0).getTime();
+      const currentTs = new Date(current.latestAt || 0).getTime();
+      if (!current.latestAt || nextTs > currentTs) {
+        current.latestAt = item.createdAt || "";
       }
-      const severityRank = ["low", "medium", "high", "critical"];
-      const currentRank = severityRank.indexOf(current.highestSeverity);
-      const nextRank = severityRank.indexOf(item.severity || "low");
-      if (nextRank > currentRank) current.highestSeverity = item.severity || "low";
+
+      const currentRank = SEVERITY_ORDER.indexOf(current.highestSeverity);
+      const nextRank = SEVERITY_ORDER.indexOf(item.severity || "low");
+      if (nextRank > currentRank) {
+        current.highestSeverity = item.severity || "low";
+      }
+
       map.set(key, current);
     });
+
     return Array.from(map.values());
   }, [errors]);
 
   const totalPages = Math.max(1, Math.ceil(errors.length / pageSize));
+
   const pagedErrors = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return errors.slice(start, start + pageSize);
-  }, [errors, currentPage, pageSize]);
+  }, [errors, currentPage]);
+
+  const loading = productionLoading || issuesLoading;
 
   return (
     <OwnerLayout>
@@ -191,7 +254,9 @@ export default function ProductionErrorSummary() {
                   Tổng hợp lỗi Production #{production?.productionId ?? id}
                 </h1>
                 <p className="text-slate-600">
-                  {production?.orderName ? `Đơn hàng: ${production.orderName}` : "Theo dõi lỗi theo từng công đoạn."}
+                  {production?.orderName
+                    ? `Đơn hàng: ${production.orderName}`
+                    : "Theo dõi lỗi theo từng công đoạn."}
                 </p>
               </div>
             </div>
@@ -201,6 +266,12 @@ export default function ProductionErrorSummary() {
               </span>
             </div>
           </div>
+
+          {issueError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {issueError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             {[
@@ -227,11 +298,6 @@ export default function ProductionErrorSummary() {
               </div>
               <div className="text-xs text-slate-500">Gộp lỗi theo công đoạn</div>
             </div>
-            {errorMessage ? (
-              <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-sm text-rose-700">
-                {errorMessage}
-              </div>
-            ) : null}
             <div className="overflow-x-auto">
               <table className="w-full divide-y divide-slate-100 text-sm">
                 <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
@@ -246,7 +312,9 @@ export default function ProductionErrorSummary() {
                     <tr key={row.partName} className="hover:bg-slate-50/70">
                       <td className="px-4 py-2">
                         <div className="font-semibold text-slate-800">{row.partName}</div>
-                        <div className="text-[10px] text-slate-400">Lỗi gần nhất: {row.latestAt || "-"}</div>
+                        <div className="text-[10px] text-slate-400">
+                          Lỗi gần nhất: {formatDateTime(row.latestAt)}
+                        </div>
                       </td>
                       <td className="px-4 py-2">
                         <div className="flex flex-wrap items-center gap-2 text-slate-700">
@@ -259,7 +327,11 @@ export default function ProductionErrorSummary() {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-center">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
+                          }`}
+                        >
                           {SEVERITY_LABELS[row.highestSeverity] || "-"}
                         </span>
                       </td>
@@ -307,12 +379,16 @@ export default function ProductionErrorSummary() {
                         <div className="text-[11px] text-slate-400">{item.description || ""}</div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default}`}>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                            SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
+                          }`}
+                        >
                           {SEVERITY_LABELS[item.severity] || "-"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{item.happenAt || "-"}</td>
+                      <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
                     </tr>
                   ))}
                   {errors.length === 0 && (
@@ -339,6 +415,7 @@ export default function ProductionErrorSummary() {
           </div>
         </div>
       </div>
+
       {loading && (
         <div className="fixed bottom-6 right-6 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 shadow">
           Đang tải dữ liệu production...

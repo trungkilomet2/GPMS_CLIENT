@@ -1,50 +1,19 @@
-﻿import { useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import WorkerLayout from "@/layouts/WorkerLayout";
+import { toast } from "react-toastify";
+import OwnerLayout from "@/layouts/OwnerLayout";
+import ProductionService from "@/services/ProductionService";
+import ProductionPartService from "@/services/ProductionPartService";
+import { getAuthItem, getStoredUser } from "@/lib/authStorage";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const MOCK_ASSIGNMENTS = [
-  {
-    id: 1,
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Diễu nẹp cổ",
-    startDate: "2026-04-22",
-    endDate: "2026-04-23",
-  },
-  {
-    id: 2,
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Đính mác",
-    startDate: "2026-04-23",
-    endDate: "2026-04-24",
-  },
-  {
-    id: 3,
-    productionId: 1002,
-    orderName: "Áo hoodie mùa đông",
-    partName: "May thân",
-    startDate: "2026-04-19",
-    endDate: "2026-04-20",
-  },
-  {
-    id: 4,
-    productionId: 1002,
-    orderName: "Áo hoodie mùa đông",
-    partName: "May tay",
-    startDate: "2026-04-20",
-    endDate: "2026-04-21",
-  },
-];
-
 const SEVERITIES = [
-  { value: "low", label: "Thấp" },
-  { value: "medium", label: "Trung bình" },
-  { value: "high", label: "Cao" },
-  { value: "critical", label: "Nghiêm trọng" },
+  { value: "low", label: "Thấp", priority: 1 },
+  { value: "medium", label: "Trung bình", priority: 2 },
+  { value: "high", label: "Cao", priority: 3 },
+  { value: "critical", label: "Nghiêm trọng", priority: 4 },
 ];
 
 const ERROR_TYPES = [
@@ -54,24 +23,60 @@ const ERROR_TYPES = [
   { value: "other", label: "Lỗi khác" },
 ];
 
+const toList = (payload) => {
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.list)) return payload.list;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload)) return payload;
+  return [];
+};
+
+const mapPart = (part, fallbackProductionId) => ({
+  id: part?.id ?? part?.partId ?? null,
+  productionId:
+    part?.productionId ??
+    part?.planId ??
+    part?.production?.id ??
+    fallbackProductionId ??
+    "",
+  orderName: part?.orderName ?? part?.order?.orderName ?? "",
+  partName: part?.partName ?? part?.name ?? part?.title ?? "",
+  startDate: part?.startDate ?? part?.planStartDate ?? "",
+  endDate: part?.endDate ?? part?.planEndDate ?? "",
+});
+
+const getPriorityBySeverity = (severity) =>
+  SEVERITIES.find((item) => item.value === severity)?.priority ?? 2;
+
+const getErrorTypeLabel = (value) =>
+  ERROR_TYPES.find((item) => item.value === value)?.label ?? value;
+
 export default function WorkerErrorReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const fileInputRef = useRef(null);
+
   const assignment = location.state?.assignment ?? null;
-  const normalizedAssignment = assignment
-    ? {
-        id: assignment?.id ?? `plan-${assignment?.productionId ?? ""}-${assignment?.partName ?? ""}`,
-        productionId: assignment?.productionId ?? "",
-        orderName: assignment?.orderName ?? "",
-        partName: assignment?.partName ?? "",
-        startDate: assignment?.startDate ?? "",
-        endDate: assignment?.endDate ?? "",
-      }
-    : null;
+  const normalizedAssignment = useMemo(() => {
+    if (!assignment) return null;
+    return {
+      partId: assignment?.partId ?? assignment?.id ?? "",
+      productionId: assignment?.productionId ?? "",
+      orderName: assignment?.orderName ?? "",
+      partName: assignment?.partName ?? "",
+      startDate: assignment?.startDate ?? "",
+      endDate: assignment?.endDate ?? "",
+      errorType: assignment?.errorType ?? "process",
+      otherErrorDetail: assignment?.otherErrorDetail ?? "",
+    };
+  }, [assignment]);
+
   const [form, setForm] = useState({
-    productionId: normalizedAssignment?.productionId ? String(normalizedAssignment.productionId) : "",
-    partName: normalizedAssignment?.partName || "",
+    productionId: normalizedAssignment?.productionId
+      ? String(normalizedAssignment.productionId)
+      : "",
+    partId: normalizedAssignment?.partId ? String(normalizedAssignment.partId) : "",
     errorType: normalizedAssignment?.errorType || "process",
     otherErrorDetail: normalizedAssignment?.otherErrorDetail || "",
     severity: "medium",
@@ -81,55 +86,242 @@ export default function WorkerErrorReport() {
     happenAt: "",
     suggestion: "",
   });
+
   const [notice, setNotice] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [attachments, setAttachments] = useState([]);
-  const isPrefilled = Boolean(normalizedAssignment?.productionId || normalizedAssignment?.partName);
 
-  const productions = useMemo(() => {
-    const map = new Map();
-    MOCK_ASSIGNMENTS.forEach((item) => {
-      if (!map.has(item.productionId)) {
-        map.set(item.productionId, item.orderName);
+  const [productions, setProductions] = useState([]);
+  const [parts, setParts] = useState([]);
+  const [loadingProductions, setLoadingProductions] = useState(false);
+  const [loadingParts, setLoadingParts] = useState(false);
+  const [partsError, setPartsError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isProductionLocked = Boolean(normalizedAssignment?.productionId);
+  const isPartLocked = Boolean(normalizedAssignment?.partId);
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((item) => {
+        if (item?.preview) URL.revokeObjectURL(item.preview);
+      });
+    };
+  }, [attachments]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchProductions = async () => {
+      try {
+        setLoadingProductions(true);
+        const allItems = [];
+        const seen = new Set();
+        let pageIndex = 0;
+        let recordCount = null;
+        const pageSize = 50;
+        const maxPages = 200;
+
+        while (pageIndex < maxPages) {
+          const response = await ProductionService.getProductionList({
+            PageIndex: pageIndex,
+            PageSize: pageSize,
+            SortColumn: "Name",
+            SortOrder: "ASC",
+          });
+
+          if (!active) return;
+
+          const payload = response?.data ?? response;
+          const list = toList(payload);
+          let added = 0;
+
+          list.forEach((item) => {
+            const key = String(item?.productionId ?? item?.id ?? "");
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            allItems.push(item);
+            added += 1;
+          });
+
+          if (recordCount == null) {
+            const reported = Number(payload?.recordCount ?? payload?.totalCount ?? 0);
+            recordCount = Number.isFinite(reported) && reported > 0 ? reported : null;
+          }
+
+          if (list.length === 0 || added === 0) break;
+          if (recordCount != null && allItems.length >= recordCount) break;
+          if (list.length < pageSize) break;
+          pageIndex += 1;
+        }
+
+        if (!active) return;
+        setProductions(allItems);
+      } catch {
+        if (!active) return;
+        setProductions([]);
+      } finally {
+        if (active) setLoadingProductions(false);
       }
-    });
-    if (normalizedAssignment?.productionId && !map.has(normalizedAssignment.productionId)) {
-      map.set(normalizedAssignment.productionId, normalizedAssignment.orderName || "Kế hoạch từ chi tiết");
-    }
-    return Array.from(map.entries()).map(([productionId, orderName]) => ({
-      productionId,
-      orderName,
-    }));
-  }, [normalizedAssignment]);
+    };
 
-  const availableParts = useMemo(() => {
-    const pid = Number(form.productionId);
-    if (!pid) return [];
-    const base = MOCK_ASSIGNMENTS.filter((item) => item.productionId === pid);
-    if (normalizedAssignment && Number(normalizedAssignment.productionId) === pid) {
-      const exists = base.some((item) => item.partName === normalizedAssignment.partName);
-      if (!exists) return [normalizedAssignment, ...base];
+    fetchProductions();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const productionId = String(form.productionId || "").trim();
+    if (!productionId) {
+      setParts([]);
+      setPartsError("");
+      return;
     }
-    return base;
-  }, [form.productionId, normalizedAssignment]);
+
+    const fallbackAssignedPart =
+      normalizedAssignment?.partId &&
+      normalizedAssignment?.productionId &&
+      String(normalizedAssignment.productionId) === productionId
+        ? {
+            id: normalizedAssignment.partId,
+            productionId,
+            orderName: normalizedAssignment.orderName,
+            partName: normalizedAssignment.partName,
+            startDate: normalizedAssignment.startDate,
+            endDate: normalizedAssignment.endDate,
+          }
+        : null;
+
+    // When opened from plan detail with a fixed part, don't block the UI by part list API.
+    if (isPartLocked && fallbackAssignedPart) {
+      setParts([fallbackAssignedPart]);
+      setPartsError("");
+      setLoadingParts(false);
+      return;
+    }
+
+    let active = true;
+
+    const fetchParts = async () => {
+      try {
+        setLoadingParts(true);
+        setPartsError("");
+
+        const response = await ProductionPartService.getPartsByProduction(productionId, {
+          PageIndex: 0,
+          PageSize: 200,
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        });
+
+        if (!active) return;
+
+        const payload = response?.data ?? response;
+        const mappedParts = toList(payload).map((item) => mapPart(item, productionId));
+        const hasAssignedPart = mappedParts.some(
+          (item) => String(item.id ?? "") === String(normalizedAssignment?.partId ?? "")
+        );
+
+        if (fallbackAssignedPart && !hasAssignedPart) {
+          mappedParts.unshift(fallbackAssignedPart);
+        }
+
+        setParts(mappedParts);
+      } catch {
+        if (!active) return;
+        if (fallbackAssignedPart) {
+          setParts([fallbackAssignedPart]);
+          setPartsError("");
+        } else {
+          setParts([]);
+          setPartsError("Không thể tải danh sách công đoạn.");
+        }
+      } finally {
+        if (active) setLoadingParts(false);
+      }
+    };
+
+    fetchParts();
+
+    return () => {
+      active = false;
+    };
+  }, [form.productionId, normalizedAssignment, isPartLocked]);
+
+  const productionOptions = useMemo(() => {
+    const map = new Map();
+
+    productions.forEach((item) => {
+      const productionId = String(item?.productionId ?? item?.id ?? "");
+      if (!productionId || map.has(productionId)) return;
+      map.set(productionId, {
+        productionId,
+        orderName: item?.orderName ?? item?.order?.orderName ?? item?.name ?? "",
+      });
+    });
+
+    if (normalizedAssignment?.productionId) {
+      const productionId = String(normalizedAssignment.productionId);
+      if (!map.has(productionId)) {
+        map.set(productionId, {
+          productionId,
+          orderName: normalizedAssignment.orderName || "Kế hoạch từ chi tiết",
+        });
+      }
+    }
+
+    return Array.from(map.values());
+  }, [productions, normalizedAssignment]);
 
   const selectedPart = useMemo(() => {
-    if (!form.partName) return null;
-    if (normalizedAssignment && normalizedAssignment.partName === form.partName) return normalizedAssignment;
-    return availableParts.find((item) => item.partName === form.partName) || null;
-  }, [availableParts, form.partName, normalizedAssignment]);
+    if (!form.partId) return null;
+    const fromList = parts.find((item) => String(item.id) === String(form.partId));
+    if (fromList) return fromList;
+
+    if (
+      normalizedAssignment?.partId &&
+      String(normalizedAssignment.partId) === String(form.partId)
+    ) {
+      return {
+        id: normalizedAssignment.partId,
+        productionId: normalizedAssignment.productionId,
+        orderName: normalizedAssignment.orderName,
+        partName: normalizedAssignment.partName,
+        startDate: normalizedAssignment.startDate,
+        endDate: normalizedAssignment.endDate,
+      };
+    }
+
+    return null;
+  }, [form.partId, parts, normalizedAssignment]);
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setNotice("");
+    setSubmitError("");
+  };
+
+  const handleProductionChange = (value) => {
+    setForm((prev) => ({
+      ...prev,
+      productionId: value,
+      partId: isPartLocked ? prev.partId : "",
+    }));
+    setNotice("");
+    setSubmitError("");
   };
 
   const handleFiles = (fileList) => {
     const next = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
     if (next.length === 0) return;
+
     const mapped = next.map((file) => ({
       id: `${file.name}-${file.size}-${file.lastModified}`,
       file,
       preview: URL.createObjectURL(file),
     }));
+
     setAttachments((prev) => [...prev, ...mapped]);
   };
 
@@ -147,13 +339,120 @@ export default function WorkerErrorReport() {
     });
   };
 
-  const handleSubmit = (event) => {
+  const buildDescription = () => {
+    const lines = [];
+
+    if (form.description?.trim()) lines.push(form.description.trim());
+    lines.push(`Loại lỗi: ${getErrorTypeLabel(form.errorType)}`);
+
+    if (form.errorType === "other" && form.otherErrorDetail?.trim()) {
+      lines.push(`Chi tiết lỗi khác: ${form.otherErrorDetail.trim()}`);
+    }
+    if (form.happenAt) lines.push(`Thời gian phát sinh: ${form.happenAt}`);
+    if (form.suggestion?.trim()) lines.push(`Gợi ý xử lý: ${form.suggestion.trim()}`);
+
+    return lines.join("\n");
+  };
+
+  const resetFormAfterSubmit = () => {
+    setForm((prev) => ({
+      ...prev,
+      title: "",
+      description: "",
+      quantity: "",
+      happenAt: "",
+      suggestion: "",
+      otherErrorDetail: "",
+    }));
+
+    attachments.forEach((item) => {
+      if (item?.preview) URL.revokeObjectURL(item.preview);
+    });
+    setAttachments([]);
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setNotice("Báo cáo đã được ghi nhận. Tổ trưởng sẽ xử lý trong hôm nay.");
+    setNotice("");
+    setSubmitError("");
+
+    const productionId = String(form.productionId || "").trim();
+    const partId = String(form.partId || "").trim();
+    const title = String(form.title || "").trim();
+
+    if (!productionId) {
+      setSubmitError("Vui lòng chọn production.");
+      return;
+    }
+    if (!partId) {
+      setSubmitError("Vui lòng chọn công đoạn để báo lỗi.");
+      return;
+    }
+    if (!title) {
+      setSubmitError("Vui lòng nhập tiêu đề lỗi.");
+      return;
+    }
+
+    const qtyRaw = String(form.quantity || "").trim();
+    if (qtyRaw) {
+      const qty = Number(qtyRaw);
+      if (!Number.isFinite(qty) || qty < 0) {
+        setSubmitError("Số lượng lỗi không hợp lệ.");
+        return;
+      }
+    }
+
+    const storedUser = getStoredUser() || {};
+    const createdBy = Number(storedUser?.userId ?? storedUser?.id ?? getAuthItem("userId"));
+    if (!Number.isFinite(createdBy) || createdBy <= 0) {
+      setSubmitError("Không xác định được người tạo báo lỗi. Vui lòng đăng nhập lại.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const formData = new FormData();
+      formData.append("CreatedBy", String(createdBy));
+      formData.append("Priority", String(getPriorityBySeverity(form.severity)));
+      formData.append("Title", title);
+
+      const description = buildDescription();
+      if (description) formData.append("Description", description);
+
+      if (qtyRaw) {
+        formData.append("Quantity", String(Number(qtyRaw)));
+      }
+
+      if (attachments.length > 0 && attachments[0]?.file) {
+        formData.append("Image", attachments[0].file);
+      }
+
+      await ProductionPartService.createIssue(Number(partId), formData);
+
+      resetFormAfterSubmit();
+      toast.success("Gửi báo cáo lỗi thành công.");
+      navigate(-1);
+    } catch (error) {
+      const data = error?.response?.data;
+      let message = "Gửi báo cáo lỗi thất bại.";
+      if (data?.errors) {
+        message = Object.values(data.errors).flat().join(" | ");
+      } else if (data?.detail) {
+        message = data.detail;
+      } else if (data?.title) {
+        message = data.title;
+      } else if (data?.message) {
+        message = data.message;
+      }
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <WorkerLayout>
+    <OwnerLayout>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -177,9 +476,10 @@ export default function WorkerErrorReport() {
             <button
               type="submit"
               form="error-report-form"
-              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Send size={16} /> Gửi báo cáo
+              <Send size={16} /> {isSubmitting ? "Đang gửi..." : "Gửi báo cáo"}
             </button>
           </div>
 
@@ -194,18 +494,22 @@ export default function WorkerErrorReport() {
                   <label className="text-xs font-semibold uppercase text-slate-500">Production</label>
                   <select
                     value={form.productionId}
-                    onChange={(event) => handleChange("productionId", event.target.value)}
-                    disabled={isPrefilled}
+                    onChange={(event) => handleProductionChange(event.target.value)}
+                    disabled={isProductionLocked}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
                     <option value="">Chọn production...</option>
-                    {productions.map((item) => (
+                    {productionOptions.map((item) => (
                       <option key={item.productionId} value={item.productionId}>
-                        {`#PR-${item.productionId} - ${item.orderName}`}
+                        {`#PR-${item.productionId}${item.orderName ? ` - ${item.orderName}` : ""}`}
                       </option>
                     ))}
                   </select>
+                  {loadingProductions && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải production...</div>
+                  )}
                 </div>
+
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Mức độ</label>
                   <select
@@ -218,6 +522,28 @@ export default function WorkerErrorReport() {
                     ))}
                   </select>
                 </div>
+
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
+                  <select
+                    value={form.partId}
+                    onChange={(event) => handleChange("partId", event.target.value)}
+                    disabled={!form.productionId || isPartLocked}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    <option value="">Chọn công đoạn...</option>
+                    {parts.map((item) => (
+                      <option key={item.id} value={item.id}>{item.partName || `Part #${item.id}`}</option>
+                    ))}
+                  </select>
+                  {loadingParts && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải công đoạn...</div>
+                  )}
+                  {!loadingParts && partsError && (
+                    <div className="mt-1 text-xs text-rose-600">{partsError}</div>
+                  )}
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="text-xs font-semibold uppercase text-slate-500">Loại lỗi</label>
                   <select
@@ -241,22 +567,7 @@ export default function WorkerErrorReport() {
                     </div>
                   )}
                 </div>
-                {form.errorType === "process" && (
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
-                    <select
-                      value={form.partName}
-                      onChange={(event) => handleChange("partName", event.target.value)}
-                      disabled={isPrefilled}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    >
-                      <option value="">Chọn công đoạn...</option>
-                      {availableParts.map((item) => (
-                        <option key={item.id} value={item.partName}>{item.partName}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
                   <input
@@ -266,6 +577,7 @@ export default function WorkerErrorReport() {
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   />
                 </div>
+
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Thời gian phát sinh</label>
                   <input
@@ -358,6 +670,12 @@ export default function WorkerErrorReport() {
                 )}
               </div>
 
+              {submitError && (
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {submitError}
+                </div>
+              )}
+
               {notice && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                   {notice}
@@ -373,11 +691,12 @@ export default function WorkerErrorReport() {
                 </div>
                 {selectedPart ? (
                   <div className="space-y-2 text-sm text-slate-700">
+                    <InfoItem label="Part ID" value={selectedPart.id} />
                     <InfoItem label="Production" value={`#PR-${selectedPart.productionId}`} />
-                    <InfoItem label="Đơn hàng" value={selectedPart.orderName} />
-                    <InfoItem label="Công đoạn" value={selectedPart.partName} />
-                    <InfoItem label="Bắt đầu" value={selectedPart.startDate} />
-                    <InfoItem label="Kết thúc" value={selectedPart.endDate} />
+                    <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
+                    <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
+                    <InfoItem label="Bắt đầu" value={selectedPart.startDate || "-"} />
+                    <InfoItem label="Kết thúc" value={selectedPart.endDate || "-"} />
                   </div>
                 ) : (
                   <div className="text-sm text-slate-500">Chọn production và công đoạn để xem thông tin.</div>
@@ -398,7 +717,7 @@ export default function WorkerErrorReport() {
           </div>
         </div>
       </div>
-    </WorkerLayout>
+    </OwnerLayout>
   );
 }
 
