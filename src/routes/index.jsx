@@ -1,4 +1,4 @@
-import { lazy } from "react";
+﻿import { lazy } from "react";
 import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 import RoleRouteGuard from "@/routes/RoleRouteGuard";
@@ -92,8 +92,8 @@ export const routes = [
   { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanList />) },
   { path: "/production-plan/create", element: guardByRoles(["Owner", "PM"], <ProductionPlan />) },
   { path: "/production-plan/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanDetail />) },
-  { path: "/production-plan/assign", element: guardByRoles(["Team Leader"], <ProductionAssignment />) },
-  { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader"], <ProductionAssignment />) },
+  { path: "/production-plan/assign", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
+  { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/worker/daily-report", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReport />) },
   { path: "/worker/daily-report/edit", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReportEdit />) },
   { path: "/worker/error-report", element: guardByRoles(["Worker", "KCS"], <WorkerErrorReport />) },
