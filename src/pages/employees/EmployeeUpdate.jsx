@@ -13,6 +13,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_FORM_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
+  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -22,6 +23,27 @@ import {
 import { normalizeSpaces, validateFullName } from "@/lib/validators";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
+
+function isEmployeeUpdateApplied(employee, expected) {
+  if (!employee) return false;
+
+  const actualRole = pickPrimarySystemRole(employee.role);
+  const actualManagerId =
+    employee.managerId == null || employee.managerId === "" ? null : Number(employee.managerId);
+  const expectedManagerId =
+    expected.managerId == null || expected.managerId === "" ? null : Number(expected.managerId);
+  const actualStatusId =
+    employee.statusId == null || employee.statusId === "" ? null : Number(employee.statusId);
+  const expectedStatusId =
+    expected.statusId == null || expected.statusId === "" ? null : Number(expected.statusId);
+
+  return (
+    normalizeSpaces(employee.fullName || "") === normalizeSpaces(expected.fullName || "") &&
+    actualRole === expected.role &&
+    actualManagerId === expectedManagerId &&
+    actualStatusId === expectedStatusId
+  );
+}
 
 export default function EmployeeUpdate() {
   const navigate = useNavigate();
@@ -39,6 +61,7 @@ export default function EmployeeUpdate() {
     fullName: "",
     role: "PM",
     managerId: "",
+    statusId: USER_STATUS_IDS.Active,
   });
 
   useEffect(() => {
@@ -51,14 +74,28 @@ export default function EmployeeUpdate() {
       setManagerError("");
 
       try {
-        const [employee, managerResponse] = await Promise.all([
+        const [employeeDetail, managerResponse] = await Promise.all([
           WorkerService.getEmployeeById(id),
           WorkerService.getAllEmployees(),
         ]);
 
         if (!mounted) return;
 
-        const managers = (managerResponse?.data ?? []).filter(
+        const directoryEmployees = managerResponse?.data ?? [];
+        const employeeFromDirectory = directoryEmployees.find(
+          (item) => String(item.id) === String(id)
+        ) ?? null;
+        const employee = employeeFromDirectory
+          ? {
+              ...employeeDetail,
+              ...employeeFromDirectory,
+              role: employeeFromDirectory.role || employeeDetail?.role,
+              managerId: employeeFromDirectory.managerId ?? employeeDetail?.managerId ?? null,
+              statusId: employeeFromDirectory.statusId ?? employeeDetail?.statusId ?? USER_STATUS_IDS.Active,
+            }
+          : employeeDetail;
+
+        const managers = directoryEmployees.filter(
           (item) => String(item.id) !== String(id)
         );
         setManagerOptions(managers);
@@ -73,6 +110,7 @@ export default function EmployeeUpdate() {
           fullName: employee.fullName || "",
           role: pickPrimarySystemRole(employee.role) || "PM",
           managerId: employee.managerId != null ? String(employee.managerId) : "",
+          statusId: employee.statusId ?? USER_STATUS_IDS.Active,
         });
       } catch (err) {
         if (!mounted) return;
@@ -161,13 +199,65 @@ export default function EmployeeUpdate() {
     setSubmitError("");
 
     try {
-      await WorkerService.updateEmployee(id, {
+      const parsedManagerId = Number(form.managerId);
+      const selectedManager = managerOptions.find(
+        (manager) => String(manager.id) === String(form.managerId)
+      ) ?? null;
+      const desiredPayload = {
         fullName: normalizedFullName,
-        managerId: form.role === "Owner" ? null : Number(form.managerId),
+        managerId:
+          form.role === "Owner" || !Number.isFinite(parsedManagerId) || parsedManagerId <= 0
+            ? null
+            : parsedManagerId,
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
-      });
+        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
+      };
 
-      navigate(`/employees/${id}`);
+      await WorkerService.updateEmployee(id, desiredPayload);
+
+      let refreshedEmployee = null;
+      try {
+        const refreshedDirectory = await WorkerService.getAllEmployees();
+        refreshedEmployee = (refreshedDirectory?.data ?? []).find(
+          (employee) => String(employee.id) === String(id)
+        ) ?? null;
+      } catch {
+        refreshedEmployee = await WorkerService.getEmployeeById(id);
+      }
+
+      if (!isEmployeeUpdateApplied(refreshedEmployee, {
+        fullName: desiredPayload.fullName,
+        role: form.role,
+        managerId: desiredPayload.managerId,
+        statusId: desiredPayload.statusId,
+      })) {
+        navigate(`/employees/${id}`, {
+          state: {
+            updatedEmployeeSnapshot: {
+              ...(refreshedEmployee ?? {}),
+              id: Number(id),
+              userName: form.userName,
+              fullName: normalizedFullName,
+              role: form.role,
+              roles: [form.role],
+              roleLabels: [getSystemRoleLabel(form.role)],
+              primarySystemRole: form.role,
+              primarySystemRoleLabel: getSystemRoleLabel(form.role),
+              managerId: desiredPayload.managerId,
+              managerName: selectedManager?.fullName || refreshedEmployee?.managerName || "",
+              statusId: desiredPayload.statusId,
+              status: desiredPayload.statusId === USER_STATUS_IDS.Inactive ? "inactive" : "active",
+            },
+          },
+        });
+        return;
+      }
+
+      navigate(`/employees/${id}`, {
+        state: {
+          updatedEmployeeSnapshot: refreshedEmployee,
+        },
+      });
     } catch (err) {
       setSubmitError(
         getEmployeeModuleErrorMessage(

@@ -8,75 +8,96 @@ import {
   CircleAlert,
   ClipboardList,
   FileText,
-  Wallet,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
+  getCurrentMonthValue,
   formatCurrency,
   formatDateLabel,
   formatMonthLabel,
-  getLatestPayrollMonth,
   getPayrollFlowLabel,
   getLatestPayrollRecordForEmployee,
   getPayrollInitials,
   getPayrollRecord,
 } from "@/lib/payroll";
+import PayrollPreviewService from "@/services/PayrollPreviewService";
 import "@/styles/payroll.css";
 
 const STATUS_META = {
   paid: {
-    label: "Đã thanh toán",
+    label: "Đã đánh dấu thanh toán",
     className: "payroll-status payroll-status--paid",
-    description: "Khoản lương này đã được owner xác nhận chi trả.",
+    description: "Toàn bộ log hiện có trong kỳ này đã được đánh dấu thanh toán.",
   },
   pending: {
-    label: "Chờ xử lý",
+    label: "Tạm tính",
     className: "payroll-status payroll-status--pending",
-    description: "Cần owner rà soát và xác nhận trước khi thanh toán.",
+    description: "Đây là bản tạm tính từ work log, chưa phải payroll backend chính thức.",
   },
 };
 
 export default function PayrollDetail() {
   const { employeeId } = useParams();
   const [searchParams] = useSearchParams();
-  const requestedMonth = searchParams.get("month") || getLatestPayrollMonth();
+  const requestedMonth = searchParams.get("month") || getCurrentMonthValue();
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const exactRecord = useMemo(
-    () => getPayrollRecord(employeeId, requestedMonth),
-    [employeeId, requestedMonth]
+    () => getPayrollRecord(records, employeeId, requestedMonth),
+    [employeeId, records, requestedMonth]
   );
   const latestRecord = useMemo(
-    () => getLatestPayrollRecordForEmployee(employeeId),
-    [employeeId]
+    () => getLatestPayrollRecordForEmployee(records, employeeId),
+    [employeeId, records]
   );
   const record = exactRecord || latestRecord;
   const activeMonth = record?.month || requestedMonth;
-  const [paymentState, setPaymentState] = useState({
-    status: record?.status ?? "pending",
-    paidAt: record?.paidAt ?? null,
-  });
-  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
-    setPaymentState({
-      status: record?.status ?? "pending",
-      paidAt: record?.paidAt ?? null,
-    });
-    setFeedback("");
-  }, [record]);
+    let active = true;
 
-  const currentStatus = paymentState.status;
-  const paidAt = paymentState.paidAt;
+    const fetchPayrollPreview = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const nextRecords = await PayrollPreviewService.getPayrollPreviewRecords();
+        if (!active) return;
+        setRecords(nextRecords);
+      } catch (_err) {
+        if (!active) return;
+        setRecords([]);
+        setError("Không thể tải chi tiết bảng lương tạm tính.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchPayrollPreview();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const currentStatus = record?.status ?? "pending";
+  const paidAt = record?.paidAt ?? null;
   const statusMeta = STATUS_META[currentStatus] ?? STATUS_META.pending;
   const isFallbackMonth = Boolean(record && !exactRecord && requestedMonth !== activeMonth);
 
-  const handleConfirmPayment = () => {
-    const confirmedAt = new Date().toISOString();
+  const handleMarkAsPaid = async () => {
+    if (!record || currentStatus === "paid") return;
 
-    setPaymentState({
-      status: "paid",
-      paidAt: confirmedAt,
-    });
-    setFeedback("Đã cập nhật trạng thái thanh toán trên giao diện demo.");
+    try {
+      setSubmitting(true);
+      setError("");
+      const nextRecords = await PayrollPreviewService.markPayrollAsPaid(record.employeeId, activeMonth);
+      setRecords(nextRecords);
+    } catch (_err) {
+      setError("Không thể cập nhật trạng thái thanh toán cho bảng lương này.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -94,18 +115,34 @@ export default function PayrollDetail() {
               </Link>
               <h1 className="payroll-hero__title">Chi tiết bảng lương</h1>
               <p className="payroll-hero__subtitle">
-                Theo dõi bảng lương được tính từ sản lượng đầu ra đã được KCS xác nhận.
+                Theo dõi bảng lương tạm tính được suy ra từ sản lượng đầu ra do worker xác nhận.
               </p>
             </div>
           </div>
 
-          {!record ? (
+          {loading ? (
+            <div className="payroll-state">
+              <CircleAlert size={20} />
+              <div className="payroll-empty__content">
+                <strong>Đang tải chi tiết bảng lương tạm tính</strong>
+                <span>Hệ thống đang tổng hợp work log theo nhân viên.</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="payroll-state payroll-state--error">
+              <CircleAlert size={20} />
+              <div className="payroll-empty__content">
+                <strong>Không tải được chi tiết bảng lương tạm tính</strong>
+                <span>{error}</span>
+              </div>
+            </div>
+          ) : !record ? (
             <div className="payroll-state payroll-state--error">
               <CircleAlert size={20} />
               <div className="payroll-empty__content">
                 <strong>Không tìm thấy bảng lương phù hợp</strong>
                 <span>
-                  Kiểm tra lại nhân viên hoặc kỳ lương đang chọn rồi thử lại.
+                  Chưa có dữ liệu work log phù hợp để suy ra bảng lương tạm tính cho nhân viên này.
                 </span>
               </div>
               <div className="payroll-empty__actions">
@@ -132,14 +169,14 @@ export default function PayrollDetail() {
                   <div className="payroll-detail-panel__identity">
                     <div className="payroll-detail-panel__eyebrow">{record.team}</div>
                     <h2 className="payroll-detail-panel__title">
-                      Chi tiết bảng lương: {record.fullName}
+                      Chi tiết bảng lương tạm tính: {record.fullName}
                     </h2>
                     <p className="payroll-detail-panel__subtitle">
                       Bảng kê sản lượng đã xác nhận cho kỳ lương {formatMonthLabel(activeMonth)} ·{" "}
                       {record.employeeCode}
                     </p>
                     <p className="payroll-detail-panel__subtitle">
-                      Cơ sở tính lương: sản lượng đầu ra đã được KCS xác nhận
+                      Cơ sở tính lương: sản lượng do worker xác nhận nhân với đơn giá `cpu` của công đoạn
                     </p>
                   </div>
                 </div>
@@ -148,14 +185,13 @@ export default function PayrollDetail() {
                   <article className="payroll-highlight-card payroll-highlight-card--primary">
                     <div className="payroll-highlight-card__label">
                       <BadgeDollarSign size={17} />
-                      <span>Tổng lương tháng này</span>
+                      <span>Tổng tạm tính tháng này</span>
                     </div>
                     <div className="payroll-highlight-card__value">
                       {formatCurrency(record.netIncome)}
                     </div>
                     <p className="payroll-highlight-card__meta">
-                      Gồm {formatCurrency(record.grossIncome)} tiền công và{" "}
-                      {formatCurrency(record.allowance)} phụ cấp.
+                      Toàn bộ tiền công được tính trực tiếp từ sản lượng worker xác nhận nhân với đơn giá `cpu`.
                     </p>
                   </article>
 
@@ -181,11 +217,11 @@ export default function PayrollDetail() {
                     </div>
                     <div className="payroll-highlight-card__status">
                       <span className="payroll-status payroll-status--pending">
-                        KCS xác nhận đầu ra
+                        {getPayrollFlowLabel(record)}
                       </span>
                     </div>
                     <p className="payroll-highlight-card__meta">
-                      Thanh toán được owner xác nhận ở bước cuối.
+                      Worker ghi nhận sản lượng, PM theo dõi và owner dùng để đối soát tạm tính.
                     </p>
                   </article>
                 </div>
@@ -193,25 +229,12 @@ export default function PayrollDetail() {
                 <div className="payroll-detail-panel__grid payroll-detail-panel__grid--secondary">
                   <article className="payroll-field-card">
                     <div className="payroll-field-card__label">
-                      <Wallet size={17} />
-                      <span>Phụ cấp</span>
-                    </div>
-                    <div className="payroll-field-card__value">
-                      {formatCurrency(record.allowance)}
-                    </div>
-                    <p className="payroll-field-card__text">
-                      Bao gồm thưởng năng suất, chuyên cần và hỗ trợ tăng ca nếu có.
-                    </p>
-                  </article>
-
-                  <article className="payroll-field-card">
-                    <div className="payroll-field-card__label">
                       <FileText size={17} />
                       <span>Ghi chú</span>
                     </div>
                     <div className="payroll-field-card__note">{record.note}</div>
                     <p className="payroll-field-card__text">
-                      Nguồn tính lương: dữ liệu sản lượng đầu ra đã được xác nhận trong kỳ.
+                      Nguồn tính lương: `get-work-logs/{partId}` kết hợp `cpu` của từng công đoạn.
                     </p>
                   </article>
                 </div>
@@ -223,7 +246,7 @@ export default function PayrollDetail() {
                         Danh sách công đoạn đã làm
                       </h3>
                       <p className="payroll-detail-list-card__subtitle">
-                        Chi tiết sản lượng đầu ra đã được KCS xác nhận cho kỳ lương này.
+                        Chi tiết sản lượng do worker xác nhận dùng để tính `quantity x cpu` trong kỳ này.
                       </p>
                     </div>
                     <span className="payroll-detail-list-card__count">
@@ -251,7 +274,7 @@ export default function PayrollDetail() {
                             {item.quantity.toLocaleString("en-US")} cái x{" "}
                             {formatCurrency(item.unitPrice)}
                           </span>
-                          <span className="payroll-task-card__pill">Đã KCS xác nhận</span>
+                          <span className="payroll-task-card__pill">{item.sourceLabel || "Work log"}</span>
                         </div>
                       </article>
                     ))}
@@ -286,23 +309,25 @@ export default function PayrollDetail() {
                   </div>
 
                   <div className="payroll-detail-footer__actions">
-                    <div className="payroll-detail-feedback">
-                      {feedback ? (
-                        <p className="payroll-inline-note payroll-inline-note--success">
-                          {feedback}
-                        </p>
-                      ) : null}
-                    </div>
                     <button
                       type="button"
                       className="payroll-detail-cta"
-                      onClick={handleConfirmPayment}
-                      disabled={currentStatus === "paid"}
+                      onClick={handleMarkAsPaid}
+                      disabled={submitting || currentStatus === "paid"}
                     >
                       {currentStatus === "paid"
-                        ? "Đã xác nhận thanh toán"
-                        : "Xác nhận trả lương"}
+                        ? "Đã thanh toán"
+                        : submitting
+                          ? "Đang cập nhật..."
+                          : "Thanh toán"}
                     </button>
+                    <div className="payroll-detail-feedback">
+                      <p className="payroll-inline-note">
+                        {currentStatus === "paid"
+                          ? `Ngày thanh toán được lưu theo thời điểm owner bấm nút thanh toán: ${formatDateLabel(paidAt)}.`
+                          : "Khi owner bấm thanh toán, hệ thống sẽ lưu ngày hiện tại làm ngày thanh toán cho bản tạm tính này."}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </section>

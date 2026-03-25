@@ -11,7 +11,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import { formatOrderDate } from '@/lib/orders/formatters';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
-import { userService } from '@/services/userService';
+import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import { hasAnyRole, splitRoles } from '@/lib/authRouting';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/services/authService";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import Header from "@/components/Header";
 import {
   normalizeSpaces,
@@ -135,6 +135,16 @@ function isEmailVerificationRequiredMessage(value) {
     message.includes("xác thực email trước khi cập nhật") ||
     message.includes("verify email") ||
     message.includes("email not verified")
+  );
+}
+
+function isRegisteredEmailMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được đăng ký") ||
+    message.includes("email da duoc dang ky") ||
+    message.includes("email already registered")
   );
 }
 
@@ -304,6 +314,7 @@ export default function ProfileEdit() {
   const [saving,    setSaving]    = useState(false);
   const [msg,       setMsg]       = useState(null);   // {type, text}
   const [touched,   setTouched]   = useState({});
+  const [originalEmail, setOriginalEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpStage, setOtpStage] = useState("idle");
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -332,6 +343,7 @@ export default function ProfileEdit() {
       Bio: fallback.bio,
       CooperationNotes: fallback.cooperationNotes,
     });
+    setOriginalEmail(String(fallback.email || "").trim().toLowerCase());
     if (fallback.avatarUrl) {
       setAvatarPreview(fallback.avatarUrl);
     }
@@ -346,6 +358,7 @@ export default function ProfileEdit() {
           Bio:         fallback.bio,
           CooperationNotes: fallback.cooperationNotes,
         });
+        setOriginalEmail(String(data.email ?? data.Email ?? fallback.email ?? "").trim().toLowerCase());
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);
@@ -419,12 +432,12 @@ export default function ProfileEdit() {
       });
     } catch (err) {
       const errData = err?.response?.data;
+      const rawMessage = errData?.message || errData?.title || "";
       setMsg({
         type: "error",
-        text:
-          errData?.message ||
-          errData?.title ||
-          "Không thể gửi mã xác thực. Vui lòng thử lại.",
+        text: isRegisteredEmailMessage(rawMessage)
+          ? "Email này đã tồn tại trong hệ thống. Backend hiện chưa hỗ trợ gửi OTP xác thực lại cho email đã đăng ký ở màn cập nhật hồ sơ."
+          : rawMessage || "Không thể gửi mã xác thực. Vui lòng thử lại.",
       });
     } finally {
       setSendingOtp(false);
@@ -496,7 +509,11 @@ export default function ProfileEdit() {
       fd.append("FullName", normalizeSpaces(form.FullName));
       fd.append("PhoneNumber", form.PhoneNumber.trim());
       fd.append("Location", normalizeSpaces(form.Location));
-      fd.append("Email", form.Email.trim());
+      const normalizedEmail = String(form.Email || "").trim();
+      const normalizedOriginalEmail = String(originalEmail || "").trim().toLowerCase();
+      if (normalizedEmail.toLowerCase() !== normalizedOriginalEmail) {
+        fd.append("Email", normalizedEmail);
+      }
 
       const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
       fd.append("AvartarUrl", avatarUpload);
@@ -540,10 +557,15 @@ export default function ProfileEdit() {
 
       console.error("update-profile error:", errData);
       if (shouldPromptVerify) {
+        const normalizedCurrentEmail = String(form.Email || "").trim().toLowerCase();
+        const normalizedOriginalEmail = String(originalEmail || "").trim().toLowerCase();
+        const isEmailChanged = normalizedCurrentEmail !== normalizedOriginalEmail;
         setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
         setMsg({
           type: "error",
-          text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
+          text: isEmailChanged
+            ? "Email mới này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ."
+            : "Backend đang yêu cầu email hiện tại phải được xác thực trước khi cập nhật, dù web không gửi thay đổi email. Nếu bấm gửi OTP vẫn báo email đã được đăng ký thì đây là lỗi luồng xác thực từ backend.",
         });
       } else {
         setMsg({ type: "error", text: message });
@@ -555,6 +577,9 @@ export default function ProfileEdit() {
 
   const errs     = validate();
   const initials = getInitials(form.FullName);
+  const normalizedCurrentEmail = String(form.Email || "").trim().toLowerCase();
+  const normalizedOriginalEmail = String(originalEmail || "").trim().toLowerCase();
+  const isEmailChanged = normalizedCurrentEmail !== normalizedOriginalEmail;
 
   /* ── Loading ── */
   if (loading) return (
@@ -681,7 +706,9 @@ export default function ProfileEdit() {
                       </span>
                     </div>
                     <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
-                      Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                      {isEmailChanged
+                        ? "Bạn đang đổi email. Hệ thống sẽ yêu cầu xác minh email mới bằng mã OTP trước khi cập nhật hồ sơ."
+                        : "Nếu bạn giữ nguyên email hiện tại, web sẽ không gửi field Email khi lưu hồ sơ. Chỉ khi đổi email mới cần xác minh OTP."}
                     </div>
                   </div>
                   <button
@@ -706,7 +733,7 @@ export default function ProfileEdit() {
                       opacity: sendingOtp || verifyingOtp ? .7 : 1,
                     }}
                   >
-                    {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                    {sendingOtp ? "Đang gửi..." : (isEmailChanged ? "Gửi mã OTP" : "Thử gửi OTP")}
                   </button>
                 </div>
 
@@ -749,7 +776,9 @@ export default function ProfileEdit() {
 
                 {otpStage === "verified" && (
                   <div style={{ fontSize: ".74rem", fontWeight: 700, color: T.mid }}>
-                    Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
+                    {isEmailChanged
+                      ? "Email mới đã được xác minh. Bạn có thể lưu thay đổi hồ sơ."
+                      : "Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ."}
                   </div>
                 )}
               </div>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
-import { userService } from '@/services/userService';
+import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';

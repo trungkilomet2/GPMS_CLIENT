@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import OrderService from "@/services/OrderService";
 import Header from "@/components/Header";
 import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";
@@ -169,21 +169,6 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
             ))}
           </div>
         </CardSection>
-
-        <CardSection title="Giới thiệu khách hàng" mb="0">
-          <p style={{fontSize:".88rem",color:T.textMid,lineHeight:1.8}}>
-            {defaultBio}
-          </p>
-          {!!user.skills?.length && (
-            <div style={{display:"flex",flexWrap:"wrap",gap:".5rem",marginTop:"1rem"}}>
-              {user.skills.map((s)=>(
-                <span key={s} style={{background:T.light,color:T.mid,fontSize:".75rem",fontWeight:700,padding:".3rem .8rem",borderRadius:20,border:`1px solid ${T.border}`}}>
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
-        </CardSection>
       </div>
 
       <div>
@@ -201,21 +186,6 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
           <div style={{display:"flex",gap:".75rem",flexWrap:"wrap"}}>
             <BtnPrimary onClick={onViewOrders}>📋 Xem đơn hàng</BtnPrimary>
             <BtnSecondary onClick={onCreateOrder}>➕ Tạo yêu cầu mới</BtnSecondary>
-          </div>
-        </CardSection>
-
-        <CardSection title="Ghi chú hợp tác" mb="0">
-          <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-            {(cooperationNotes.length ? cooperationNotes : [
-              "Ưu tiên cập nhật tiến độ đơn hàng theo từng giai đoạn sản xuất.",
-              "Theo dõi lịch sử tương tác để hỗ trợ báo giá và xử lý yêu cầu nhanh hơn.",
-              "Phù hợp với khách hàng là công ty may mặc, thương hiệu thời trang hoặc chủ doanh nghiệp lớn.",
-            ]).map((item) => (
-              <div key={item} style={{display:"flex",gap:".65rem",alignItems:"flex-start",color:T.textMid,fontSize:".84rem",lineHeight:1.7}}>
-                <span style={{color:T.base,fontWeight:800}}>•</span>
-                <span>{item}</span>
-              </div>
-            ))}
           </div>
         </CardSection>
       </div>

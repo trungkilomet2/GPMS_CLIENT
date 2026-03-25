@@ -13,6 +13,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_FORM_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
+  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -36,6 +37,7 @@ export default function EmployeeCreate() {
     fullName: "",
     role: "PM",
     managerId: "",
+    statusId: USER_STATUS_IDS.Active,
   });
 
   useEffect(() => {
@@ -137,12 +139,17 @@ export default function EmployeeCreate() {
     setSubmitError("");
 
     try {
+      const parsedManagerId = Number(form.managerId);
       await WorkerService.createEmployee({
         userName: normalizedUserName,
         password: form.password,
         fullName: normalizedFullName,
-        managerId: form.role === "Owner" ? null : Number(form.managerId),
+        managerId:
+          form.role === "Owner" || !Number.isFinite(parsedManagerId) || parsedManagerId <= 0
+            ? null
+            : parsedManagerId,
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
+        statusId: USER_STATUS_IDS.Active,
       });
 
       navigate("/employees");

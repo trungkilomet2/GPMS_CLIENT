@@ -206,7 +206,7 @@ export default function AdminUserList() {
         <div className="admin-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="admin-hero">
             <div className="admin-hero__heading">
-              <h1 className="admin-hero__title">View User List Screen</h1>
+              <h1 className="admin-hero__title">Quản lý user</h1>
               <p className="admin-hero__subtitle">
                 Màn quản trị tập trung để Admin rà soát tài khoản, trạng thái truy cập, role và mức độ rủi ro của từng user.
               </p>
@@ -215,7 +215,7 @@ export default function AdminUserList() {
             <div className="admin-hero__actions">
               <Link to="/admin/users/create" className="admin-btn admin-btn--primary">
                 <Plus size={18} />
-                <span>Add New User</span>
+                <span>Thêm user</span>
               </Link>
             </div>
           </div>
@@ -385,7 +385,7 @@ export default function AdminUserList() {
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
                             <span className="admin-badge admin-badge--tone-info">
-                              {user.hasKnownRole ? `${user.grantedPermissionCount} quyền đang hiển thị` : "Chưa có role từ backend"}
+                              {user.hasKnownRole ? "Role đã đồng bộ từ backend" : "Chưa có role từ backend"}
                             </span>
                           </div>
                           <div className="admin-table__secondary">{user.roleDescription}</div>
@@ -402,10 +402,10 @@ export default function AdminUserList() {
                         <td>
                           <div className="admin-table__actions">
                             <Link to={`/admin/users/${user.id}`} className="admin-link-btn admin-link-btn--primary">
-                              View Detail
+                              Xem chi tiết
                             </Link>
                             <Link to={`/admin/users/${user.id}/edit`} className="admin-link-btn admin-link-btn--secondary">
-                              Update User
+                              Cập nhật
                             </Link>
                             <button
                               type="button"
@@ -414,10 +414,10 @@ export default function AdminUserList() {
                               disabled={user.status === "inactive" || disablingId === user.id}
                             >
                               {disablingId === user.id
-                                ? "Disabling..."
+                                ? "Đang khóa..."
                                 : user.status === "inactive"
-                                  ? "Disabled"
-                                  : "Disable"}
+                                  ? "Đã khóa"
+                                  : "Khóa"}
                             </button>
                           </div>
                         </td>

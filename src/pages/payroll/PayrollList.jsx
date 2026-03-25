@@ -6,9 +6,11 @@ import {
   BadgeDollarSign,
   CalendarRange,
   CheckCircle2,
+  CircleAlert,
   Download,
   Eye,
   FileText,
+  LoaderCircle,
   Search,
   Users,
 } from "lucide-react";
@@ -17,6 +19,7 @@ import {
   PAYROLL_PAGE_SIZE,
   downloadPayrollCsv,
   formatCurrency,
+  getCurrentMonthValue,
   formatMonthLabel,
   getLatestPayrollMonth,
   getPayrollInitials,
@@ -25,15 +28,16 @@ import {
   getPayrollSummary,
   normalizeSearchText,
 } from "@/lib/payroll";
+import PayrollPreviewService from "@/services/PayrollPreviewService";
 import "@/styles/payroll.css";
 
 const STATUS_META = {
   paid: {
-    label: "Đã thanh toán",
+    label: "Đã đánh dấu thanh toán",
     className: "payroll-status payroll-status--paid",
   },
   pending: {
-    label: "Chờ xử lý",
+    label: "Tạm tính",
     className: "payroll-status payroll-status--pending",
   },
 };
@@ -60,26 +64,63 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 
 export default function PayrollList() {
   const [searchParams] = useSearchParams();
-  const monthOptions = useMemo(() => getPayrollMonths(), []);
   const monthFromQuery = searchParams.get("month");
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submittingKey, setSubmittingKey] = useState("");
+  const [error, setError] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(
     monthFromQuery && monthFromQuery.length === 7
       ? monthFromQuery
-      : getLatestPayrollMonth()
+      : getCurrentMonthValue()
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const monthOptions = useMemo(() => getPayrollMonths(records), [records]);
+  const hasPayrollData = monthOptions.length > 0;
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchPayrollPreview = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const nextRecords = await PayrollPreviewService.getPayrollPreviewRecords();
+        if (!active) return;
+        setRecords(nextRecords);
+      } catch (_err) {
+        if (!active) return;
+        setRecords([]);
+        setError("Không thể tải bảng lương tạm tính từ dữ liệu sản lượng hiện có.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchPayrollPreview();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!monthFromQuery || monthFromQuery.length !== 7) return;
+    if (monthFromQuery !== selectedMonth) {
+      setSelectedMonth(monthFromQuery);
+    }
+  }, [monthFromQuery, selectedMonth]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [search, selectedMonth, statusFilter]);
 
   const monthRecords = useMemo(() => (
-    getPayrollRecordsByMonth(selectedMonth)
+    getPayrollRecordsByMonth(records, selectedMonth)
       .slice()
       .sort((recordA, recordB) => recordB.netIncome - recordA.netIncome)
-  ), [selectedMonth]);
+  ), [records, selectedMonth]);
 
   const filteredRecords = useMemo(() => {
     const keyword = normalizeSearchText(search);
@@ -96,7 +137,7 @@ export default function PayrollList() {
     });
   }, [monthRecords, search, statusFilter]);
 
-  const summary = useMemo(() => getPayrollSummary(selectedMonth), [selectedMonth]);
+  const summary = useMemo(() => getPayrollSummary(records, selectedMonth), [records, selectedMonth]);
   const totalPages = Math.max(
     1,
     Math.ceil(filteredRecords.length / PAYROLL_PAGE_SIZE)
@@ -147,6 +188,26 @@ export default function PayrollList() {
     setStatusFilter("all");
   };
 
+  const handleMarkAsPaid = async (record) => {
+    if (!record || record.status === "paid") return;
+
+    const recordKey = `${record.employeeId}-${record.month}`;
+
+    try {
+      setSubmittingKey(recordKey);
+      setError("");
+      const nextRecords = await PayrollPreviewService.markPayrollAsPaid(
+        record.employeeId,
+        record.month
+      );
+      setRecords(nextRecords);
+    } catch (_err) {
+      setError(`Không thể cập nhật thanh toán cho ${record.fullName}.`);
+    } finally {
+      setSubmittingKey("");
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="payroll-page payroll-page--list">
@@ -158,25 +219,27 @@ export default function PayrollList() {
                   <ArrowLeft size={20} />
                   <span>Quay lại dashboard</span>
                 </Link>
-                <h1 className="payroll-hero__title">Bảng lương</h1>
+                <h1 className="payroll-hero__title">Bảng lương tạm tính</h1>
                 <p className="payroll-hero__subtitle">
-                  Bảng lương được tính toán hoàn toàn dựa trên số lượng sản phẩm đầu ra đã được KCS xác nhận.
+                  Tạm tính tiền công theo sản lượng đầu ra do worker xác nhận nhân với đơn giá `cpu` của từng công đoạn.
                 </p>
 
-                <div className="payroll-hero__chips">
-                  <div className="payroll-hero-chip">
-                    <span>Kỳ đang xem</span>
-                    <strong>{formatMonthLabel(selectedMonth)}</strong>
+                {hasPayrollData ? (
+                  <div className="payroll-hero__chips">
+                    <div className="payroll-hero-chip">
+                      <span>Kỳ đang xem</span>
+                      <strong>{formatMonthLabel(selectedMonth)}</strong>
+                    </div>
+                    <div className="payroll-hero-chip">
+                      <span>Đang hiển thị</span>
+                      <strong>{filteredRecords.length} hồ sơ</strong>
+                    </div>
+                    <div className="payroll-hero-chip">
+                      <span>Cần xử lý</span>
+                      <strong>{summary.pendingCount} hồ sơ</strong>
+                    </div>
                   </div>
-                  <div className="payroll-hero-chip">
-                    <span>Đang hiển thị</span>
-                    <strong>{filteredRecords.length} hồ sơ</strong>
-                  </div>
-                  <div className="payroll-hero-chip">
-                    <span>Cần xử lý</span>
-                    <strong>{summary.pendingCount} hồ sơ</strong>
-                  </div>
-                </div>
+                ) : null}
               </div>
 
               <div className="payroll-hero__aside">
@@ -185,8 +248,6 @@ export default function PayrollList() {
                   <input
                     type="month"
                     value={selectedMonth}
-                    min={monthOptions[monthOptions.length - 1]}
-                    max={monthOptions[0]}
                     onChange={(event) => setSelectedMonth(event.target.value)}
                     aria-label="Chọn kỳ lương"
                   />
@@ -195,60 +256,83 @@ export default function PayrollList() {
                 <div className="payroll-hero__period-card">
                   <span className="payroll-hero__period-label">Tổng quan kỳ lương</span>
                   <strong className="payroll-hero__period-value">
-                    {formatMonthLabel(selectedMonth)}
+                    {hasPayrollData ? formatMonthLabel(selectedMonth) : "Chưa có dữ liệu"}
                   </strong>
                   <p className="payroll-hero__period-meta">
-                    {summary.payrollCreated} bảng lương worker đã tạo, {summary.paidCount}{" "}
-                    bảng đã owner xác nhận và {summary.pendingCount} bảng đang chờ đối soát.
+                    {hasPayrollData
+                      ? `${summary.payrollCreated} bảng tạm tính được suy ra từ work log hiện có, ${summary.paidCount} bảng đã có toàn bộ log đánh dấu thanh toán.`
+                      : "Chưa có dữ liệu work log phù hợp để suy ra bảng lương tạm tính."}
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard
-              icon={BadgeDollarSign}
-              label="Tổng lương tháng này"
-              value={formatCurrency(summary.totalPayroll)}
-              meta={comparisonText}
-              tone="primary"
-            />
-            <SummaryCard
-              icon={FileText}
-              label="Bảng lương đã tạo"
-              value={summary.payrollCreated}
-              meta={`${summary.paidCount} bảng lương đã thanh toán`}
-              tone="info"
-            />
-            <SummaryCard
-              icon={AlertTriangle}
-              label="Chờ xử lý"
-              value={summary.pendingCount}
-              meta={pendingText}
-              tone="warning"
-            />
-            <SummaryCard
-              icon={Users}
-              label="Số nhân viên"
-              value={summary.employeeCount}
-              meta={employeeText}
-              tone="accent"
-            />
-          </div>
+          {loading ? (
+            <div className="payroll-state">
+              <LoaderCircle size={20} className="employee-table-state__spin" />
+              <div className="payroll-empty__content">
+                <strong>Đang tổng hợp bảng lương tạm tính</strong>
+                <span>Hệ thống đang gom production, công đoạn và work log để tính `quantity x cpu`.</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="payroll-state payroll-state--error">
+              <CircleAlert size={20} />
+              <div className="payroll-empty__content">
+                <strong>Không tải được bảng lương tạm tính</strong>
+                <span>{error}</span>
+              </div>
+            </div>
+          ) : hasPayrollData ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <SummaryCard
+                icon={BadgeDollarSign}
+                label="Tổng tạm tính tháng"
+                value={formatCurrency(summary.totalPayroll)}
+                meta={comparisonText}
+                tone="primary"
+              />
+              <SummaryCard
+                icon={FileText}
+                label="Bảng tạm tính"
+                value={summary.payrollCreated}
+                meta={`${summary.paidCount} bảng đã có log thanh toán`}
+                tone="info"
+              />
+              <SummaryCard
+                icon={AlertTriangle}
+                label="Chưa chốt"
+                value={summary.pendingCount}
+                meta={pendingText}
+                tone="warning"
+              />
+              <SummaryCard
+                icon={Users}
+                label="Số nhân viên"
+                value={summary.employeeCount}
+                meta={employeeText}
+                tone="accent"
+              />
+            </div>
+          ) : null}
 
           <div className="payroll-summary-note">
             <strong>Kỳ lương tổng quan</strong>
-            <span>Dữ liệu lương được tổng hợp từ sản lượng đầu ra đã chốt và xác nhận bởi KCS trong từng kỳ.</span>
+              <span>
+                {hasPayrollData
+                ? "Dữ liệu này là bản tạm tính từ get-work-logs của từng công đoạn kết hợp đơn giá cpu, chưa thay thế cho payroll backend chính thức."
+                : "Chưa có dữ liệu work log phù hợp nên hệ thống không hiển thị số liệu mẫu."}
+              </span>
           </div>
 
           <section className="payroll-card">
             <div className="payroll-table-card__header">
               <div className="payroll-table-card__intro">
                 <span className="payroll-table-card__eyebrow">Danh sách chi trả</span>
-                <h2 className="payroll-table-card__title">Danh sách bảng lương</h2>
+                <h2 className="payroll-table-card__title">Danh sách bảng lương tạm tính</h2>
                 <p className="payroll-table-card__subtitle">
-                  Theo dõi thu nhập, phụ cấp và trạng thái thanh toán theo từng nhân viên.
+                  Theo dõi tiền công tạm tính theo từng nhân viên từ dữ liệu `quantity x cpu`.
                 </p>
                 <div className="payroll-table-card__insights">
                   <span className="payroll-table-card__insight">
@@ -296,20 +380,20 @@ export default function PayrollList() {
             </div>
 
             <div className="overflow-x-auto">
-              {filteredRecords.length === 0 ? (
+              {!loading && filteredRecords.length === 0 ? (
                 <div className="payroll-empty">
                   <CheckCircle2 size={20} />
                   <div className="payroll-empty__content">
                     <strong>
                       {monthRecords.length === 0
-                        ? `Chưa có bảng lương cho kỳ ${formatMonthLabel(selectedMonth)}`
+                        ? `Chưa có bảng lương tạm tính cho kỳ ${formatMonthLabel(selectedMonth)}`
                         : "Không có nhân viên phù hợp với bộ lọc hiện tại"}
                     </strong>
-                    <span>
-                      {monthRecords.length === 0
-                        ? "Hãy chọn kỳ lương khác hoặc kết nối dữ liệu bảng lương từ hệ thống."
+                      <span>
+                        {monthRecords.length === 0
+                        ? "Chưa có production part work log phù hợp trong kỳ này."
                         : "Thử xoá bớt từ khoá tìm kiếm hoặc trạng thái để xem lại toàn bộ danh sách."}
-                    </span>
+                      </span>
                   </div>
 
                   {hasFilters ? (
@@ -334,16 +418,13 @@ export default function PayrollList() {
                             Worker
                           </th>
                           <th className="payroll-table__cell payroll-table__cell--count">
-                            Số công đoạn
+                            Số mục
                           </th>
                           <th className="payroll-table__cell payroll-table__cell--money">
-                            Tổng thu nhập
+                            Tiền công
                           </th>
                           <th className="payroll-table__cell payroll-table__cell--money">
-                            Phụ cấp
-                          </th>
-                          <th className="payroll-table__cell payroll-table__cell--money">
-                            Thực lĩnh
+                            Tổng tạm tính
                           </th>
                           <th className="payroll-table__cell payroll-table__cell--status">
                             Trạng thái
@@ -356,6 +437,8 @@ export default function PayrollList() {
                       <tbody>
                         {paginatedRecords.map((record) => {
                           const statusMeta = STATUS_META[record.status] ?? STATUS_META.pending;
+                          const recordKey = `${record.employeeId}-${record.month}`;
+                          const isSubmitting = submittingKey === recordKey;
 
                           return (
                             <tr key={`${record.employeeId}-${record.month}`}>
@@ -370,7 +453,7 @@ export default function PayrollList() {
                                       {record.employeeCode} · {record.team}
                                     </div>
                                     <div className="payroll-person__meta">
-                                      TL: {record.workflow.teamLeadName} · PM: {record.workflow.pmName}
+                                      PM phụ trách: {record.workflow.pmName}
                                     </div>
                                   </div>
                                 </div>
@@ -381,7 +464,7 @@ export default function PayrollList() {
                                     {record.workItems.length} mục
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Sản lượng đã được KCS xác nhận
+                                    Sản lượng do worker xác nhận
                                   </span>
                                 </div>
                               </td>
@@ -391,17 +474,7 @@ export default function PayrollList() {
                                     {formatCurrency(record.grossIncome)}
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Thu nhập công đoạn
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="payroll-table__body payroll-table__cell--money">
-                                <div className="payroll-data-block">
-                                  <strong className="payroll-data-block__value">
-                                    {formatCurrency(record.allowance)}
-                                  </strong>
-                                  <span className="payroll-data-block__meta">
-                                    Thưởng và hỗ trợ
+                                    `quantity x cpu`
                                   </span>
                                 </div>
                               </td>
@@ -411,7 +484,7 @@ export default function PayrollList() {
                                     {formatCurrency(record.netIncome)}
                                   </strong>
                                   <span className="payroll-data-block__meta">
-                                    Thực lĩnh kỳ này
+                                    Bằng tiền công công đoạn kỳ này
                                   </span>
                                 </div>
                               </td>
@@ -435,6 +508,21 @@ export default function PayrollList() {
                                   >
                                     <Download size={16} />
                                   </button>
+                                  <button
+                                    type="button"
+                                    className="payroll-action-btn payroll-action-btn--secondary payroll-action-btn--text"
+                                    onClick={() => handleMarkAsPaid(record)}
+                                    disabled={record.status === "paid" || isSubmitting}
+                                    aria-label={`Thanh toán cho ${record.fullName}`}
+                                  >
+                                    <span>
+                                      {record.status === "paid"
+                                        ? "Đã thanh toán"
+                                        : isSubmitting
+                                          ? "Đang lưu..."
+                                          : "Thanh toán"}
+                                    </span>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -447,6 +535,8 @@ export default function PayrollList() {
                   <div className="payroll-mobile-list">
                     {paginatedRecords.map((record) => {
                       const statusMeta = STATUS_META[record.status] ?? STATUS_META.pending;
+                      const recordKey = `${record.employeeId}-${record.month}`;
+                      const isSubmitting = submittingKey === recordKey;
 
                       return (
                         <article
@@ -464,7 +554,7 @@ export default function PayrollList() {
                                   {record.employeeCode} · {record.team}
                                 </div>
                                 <div className="payroll-person__meta">
-                                  TL: {record.workflow.teamLeadName} · PM: {record.workflow.pmName}
+                                  PM phụ trách: {record.workflow.pmName}
                                 </div>
                               </div>
                             </div>
@@ -477,15 +567,11 @@ export default function PayrollList() {
                               <strong>{record.workItems.length} mục</strong>
                             </div>
                             <div className="payroll-mobile-card__metric">
-                              <span>Tổng thu nhập</span>
+                              <span>Tiền công</span>
                               <strong>{formatCurrency(record.grossIncome)}</strong>
                             </div>
-                            <div className="payroll-mobile-card__metric">
-                              <span>Phụ cấp</span>
-                              <strong>{formatCurrency(record.allowance)}</strong>
-                            </div>
                             <div className="payroll-mobile-card__metric payroll-mobile-card__metric--highlight">
-                              <span>Thực lĩnh</span>
+                              <span>Tổng tạm tính</span>
                               <strong>{formatCurrency(record.netIncome)}</strong>
                             </div>
                           </div>
@@ -506,6 +592,20 @@ export default function PayrollList() {
                               <Download size={16} />
                               <span>Xuất phiếu</span>
                             </button>
+                            <button
+                              type="button"
+                              className="payroll-action-btn payroll-action-btn--secondary payroll-action-btn--text"
+                              onClick={() => handleMarkAsPaid(record)}
+                              disabled={record.status === "paid" || isSubmitting}
+                            >
+                              <span>
+                                {record.status === "paid"
+                                  ? "Đã thanh toán"
+                                  : isSubmitting
+                                    ? "Đang lưu..."
+                                    : "Thanh toán"}
+                              </span>
+                            </button>
                           </div>
                         </article>
                       );
@@ -519,7 +619,7 @@ export default function PayrollList() {
               <div className="payroll-table-card__footer">
                 <p className="payroll-table-card__summary">
                   Hiển thị {rangeStart}-{rangeEnd} trong tổng số {filteredRecords.length}{" "}
-                  bảng lương của kỳ {formatMonthLabel(selectedMonth)}
+                  bảng tạm tính của kỳ {formatMonthLabel(selectedMonth)}
                 </p>
 
                 <div className="payroll-pagination">
