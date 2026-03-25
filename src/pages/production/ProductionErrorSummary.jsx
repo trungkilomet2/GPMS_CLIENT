@@ -251,7 +251,7 @@ export default function ProductionErrorSummary() {
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Tổng hợp lỗi Production #{production?.productionId ?? id}
+                  Tổng hợp lỗi đơn sản xuất #{production?.productionId ?? id}
                 </h1>
                 <p className="text-slate-600">
                   {production?.orderName
@@ -340,7 +340,7 @@ export default function ProductionErrorSummary() {
                   {byPart.length === 0 && (
                     <tr>
                       <td colSpan={3} className="py-8 text-center text-slate-500">
-                        Chưa có lỗi nào cho production này.
+                        Chưa có lỗi nào cho đơn sản xuất này.
                       </td>
                     </tr>
                   )}
@@ -418,7 +418,7 @@ export default function ProductionErrorSummary() {
 
       {loading && (
         <div className="fixed bottom-6 right-6 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 shadow">
-          Đang tải dữ liệu production...
+          Đang tải dữ liệu đơn sản xuất...
         </div>
       )}
     </OwnerLayout>

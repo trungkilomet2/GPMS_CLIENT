@@ -68,7 +68,7 @@ export default function ProductionAssignment() {
         },
       });
     }).catch(() => {
-      setWorkerError("Không thể tải thông tin production.");
+      setWorkerError("Không thể tải thông tin đơn sản xuất.");
     });
     return () => { active = false; };
   }, [selectedProductionId, incoming]);
@@ -180,7 +180,7 @@ export default function ProductionAssignment() {
     const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
       || selectedProduction?.product?.endDate || "2026-12-31";
     if (!pmId) {
-      setWorkerError("Không tìm thấy thông tin PM quản lý production này.");
+      setWorkerError("Không tìm thấy thông tin PM quản lý đơn sản xuất này.");
       return;
     }
     ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
@@ -422,7 +422,7 @@ export default function ProductionAssignment() {
           {incoming?.production && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
-                <InfoItem label="Production" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
+                <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
                 <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
                 <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />
@@ -653,7 +653,7 @@ export default function ProductionAssignment() {
                           ) : visibleWorkers.length === 0 ? (
                             <div className="text-xs text-slate-500">Không có thợ phù hợp.</div>
                           ) : (
-                            <div className="max-h-96 min-h-80 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                            <div className="max-h-96 min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                               {visibleWorkers.map((worker) => {
                                 const checked = selectedIds.includes(worker.id);
                                 const frequentText = worker.frequentSteps.length
@@ -669,10 +669,13 @@ export default function ProductionAssignment() {
                                     key={`${activeRow.ppId}-${worker.id}`}
                                     onClick={() => toggleWorker(activeRow.ppId, worker.id)}
                                     disabled={!canSelect}
-                                    className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${checked
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : "bg-white text-slate-700 hover:bg-slate-50"
-                                      }`}
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-5 text-sm font-semibold transition ${
+                                      !canSelect
+                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                        : checked
+                                          ? "cursor-pointer border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                          : "cursor-pointer border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"
+                                    }`}
                                   >
                                     <div className="min-w-0 text-left">
                                       <div className="flex flex-wrap items-center gap-2">

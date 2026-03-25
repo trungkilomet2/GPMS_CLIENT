@@ -71,6 +71,8 @@ export const API_ENDPOINTS = {
   USER: {
     // GET — không có ID, backend decode từ token
     VIEW_PROFILE: `${BASE_URL}/api/User/view-profile`,
+    USER_DETAIL: (id) => `${BASE_URL}/api/User/user-detail/${id}`,
+    GET_USER_DETAIL: (id) => `${BASE_URL}/api/User/get-user-detail/${id}`,
     ADMIN_USER_LIST: `${BASE_URL}/api/User/admin/user-list`,
     ADMIN_USER_DETAIL: (id) => `${BASE_URL}/api/User/get-user-detail-for-admin/${id}`,
     ADMIN_CREATE_USER: `${BASE_URL}/api/User/admin/create-user`,

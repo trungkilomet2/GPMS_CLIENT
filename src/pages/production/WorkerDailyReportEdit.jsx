@@ -144,7 +144,7 @@ export default function WorkerDailyReportEdit() {
                   <thead className="leave-table-head">
                     <tr>
                       <th className="leave-table-th w-14 px-3 py-3 text-center">STT</th>
-                      <th className="leave-table-th w-36 px-3 py-3 text-left">Production</th>
+                      <th className="leave-table-th w-36 px-3 py-3 text-left">Đơn sản xuất</th>
                       <th className="leave-table-th w-44 px-3 py-3 text-left">Đơn hàng</th>
                       <th className="leave-table-th w-52 px-3 py-3 text-left">Công đoạn</th>
                       <th className="leave-table-th w-28 px-3 py-3 text-center">Đơn giá</th>

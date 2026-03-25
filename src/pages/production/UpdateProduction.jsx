@@ -5,6 +5,7 @@ import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import MaterialsTable from "@/components/orders/MaterialsTable";
+import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
@@ -169,10 +170,10 @@ export default function UpdateProduction() {
         }
         const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
         setProduction(fallback);
-        if (!fallback) setProductionError(`Không tìm thấy production #${id}.`);
+        if (!fallback) setProductionError(`Không tìm thấy đơn sản xuất #${id}.`);
       } catch (_err) {
         if (!active) return;
-        setProductionError("Không thể tải thông tin production.");
+        setProductionError("Không thể tải thông tin đơn sản xuất.");
         const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
         setProduction(fallback);
       } finally {
@@ -194,7 +195,7 @@ export default function UpdateProduction() {
     });
   }, [production]);
 
-  const order = production?.order || {};
+  const order = useMemo(() => production?.order || {}, [production]);
   const orderSummaryRows = useMemo(() => ([
     ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
     ["Tên đơn hàng", order?.orderName ?? "-"],
@@ -211,7 +212,7 @@ export default function UpdateProduction() {
       <OwnerLayout>
         <div className="flex flex-col items-center justify-center min-h-400px">
           <Loader2 className="animate-spin text-emerald-600 mb-4" size={40} />
-          <p className="text-gray-500 text-sm font-medium">Đang tải thông tin production...</p>
+          <p className="text-gray-500 text-sm font-medium">Đang tải thông tin đơn sản xuất...</p>
         </div>
       </OwnerLayout>
     );
@@ -221,7 +222,7 @@ export default function UpdateProduction() {
     return (
       <OwnerLayout>
         <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
-          {productionError || `Không tìm thấy production #${id}.`}
+          {productionError || `Không tìm thấy đơn sản xuất #${id}.`}
         </div>
       </OwnerLayout>
     );
@@ -286,9 +287,9 @@ export default function UpdateProduction() {
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Cập nhật Production cho đơn hàng #{order?.id ?? "--"}
+                  Cập nhật đơn sản xuất cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
+                <p className="text-slate-600">Thiết lập PM quản lý cho đơn sản xuất.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -301,7 +302,7 @@ export default function UpdateProduction() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-600 mb-4">
                   <UserCheck size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin đơn sản xuất</h2>
                 </div>
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -330,13 +331,13 @@ export default function UpdateProduction() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú Production</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú đơn sản xuất</label>
                     <textarea
                       name="productionNote"
                       rows={3}
                       value={form.productionNote}
                       onChange={handleChange}
-                      placeholder="Nhập ghi chú cho production..."
+                      placeholder="Nhập ghi chú cho đơn sản xuất..."
                       className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                     />
                   </div>
@@ -354,7 +355,7 @@ export default function UpdateProduction() {
                       disabled={isSubmitting}
                       className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
                     >
-                      {isSubmitting ? "Đang cập nhật..." : "Cập nhật Production"}
+                      {isSubmitting ? "Đang cập nhật..." : "Cập nhật đơn sản xuất"}
                     </button>
                   </div>
                 </form>
@@ -405,31 +406,13 @@ export default function UpdateProduction() {
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">
-                  Thông tin bổ sung
-                </div>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Khách hàng</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">SĐT</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Địa chỉ</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || "-"}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <CustomerInfoCard
+                order={order}
+                title="Thông tin bổ sung"
+                nameLabel="Khách hàng"
+                phoneLabel="SĐT"
+                addressLabel="Địa chỉ"
+              />
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>

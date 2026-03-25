@@ -92,7 +92,7 @@ export default function ProductionList() {
             </div>
             {(!isPm || isOwner) && (
               <Link className="order-create-btn" to="/production/create">
-                + Tạo production
+                + Tạo đơn sản xuất
               </Link>
             )}
           </div>
@@ -170,7 +170,7 @@ export default function ProductionList() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm mã production, mã đơn, tên đơn, PM..."
+                  placeholder="Tìm mã đơn sản xuất, mã đơn, tên đơn, PM..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
@@ -213,7 +213,7 @@ export default function ProductionList() {
               <table className="w-full divide-y divide-slate-200 table-fixed">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Production</th>
+                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn sản xuất</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn hàng</th>
                     <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên đơn</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">PM quản lý</th>
@@ -227,7 +227,7 @@ export default function ProductionList() {
                   {loading ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center text-slate-600">
-                        Đang tải danh sách production...
+                        Đang tải danh sách đơn sản xuất...
                       </td>
                     </tr>
                   ) : error ? (
@@ -239,7 +239,7 @@ export default function ProductionList() {
                   ) : pageData.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-16 text-center text-slate-600">
-                        Không có production phù hợp
+                        Không có đơn sản xuất phù hợp
                       </td>
                     </tr>
                   ) : (
