@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
   },
   ORDER_REJECT: {
     REJECT: `${BASE_URL}/api/OrderReject/order-reject`,
+    GET_BY_ID: (id) => `${BASE_URL}/api/OrderReject/order-reject-by-id/${id}`,
   },
   PRODUCTION: {
     CREATE: `${BASE_URL}/api/Production/production/create`,

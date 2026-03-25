@@ -82,8 +82,7 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderImageFile, setOrderImageFile] = useState(null);
   const [orderImagePreview, setOrderImagePreview] = useState('');
-  const [templateFiles, setTemplateFiles] = useState([]);
-  const [hardCopyQty, setHardCopyQty] = useState('');
+  const [templateItems, setTemplateItems] = useState([]);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   const validateForm = () => {
@@ -221,8 +220,26 @@ export default function CreateOrder() {
     setOrderImagePreview(previewUrl);
   };
 
-  const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx'];
+  const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx', '.png', '.jpg', '.jpeg'];
+  const IMAGE_TEMPLATE_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
   const MAX_TEMPLATE_SIZE = 10 * 1024 * 1024;
+  const getTemplateNameFromFile = (fileName = '') => fileName.replace(/\.[^/.]+$/, '') || fileName;
+  const buildTemplateId = (file) => `${Date.now()}-${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`;
+  const getFileExtension = (fileName = '') => {
+    const parts = String(fileName).toLowerCase().split('.');
+    return parts.length > 1 ? `.${parts.pop()}` : '';
+  };
+  const detectTemplateType = (file) => {
+    const mime = String(file?.type || '').toLowerCase();
+    if (mime.startsWith('image/')) return 'IMAGE';
+    const ext = getFileExtension(file?.name || '');
+    return IMAGE_TEMPLATE_EXTENSIONS.includes(ext) ? 'IMAGE' : 'FILE';
+  };
+  const uploadTemplateByType = (item) => {
+    const normalizedType = String(item?.type || '').toUpperCase();
+    if (normalizedType === 'IMAGE') return CloudinaryService.uploadImage(item.file);
+    return CloudinaryService.uploadTemplateFile(item.file);
+  };
 
   const handleTemplateFileChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -247,14 +264,30 @@ export default function CreateOrder() {
     }
 
     if (valid.length > 0) {
-      setTemplateFiles((prev) => [...prev, ...valid]);
+      setTemplateItems((prev) => [
+        ...prev,
+        ...valid.map((file) => ({
+          id: buildTemplateId(file),
+          file,
+          fileName: file.name,
+          templateName: getTemplateNameFromFile(file.name),
+          type: detectTemplateType(file),
+          note: '',
+        })),
+      ]);
     }
 
     e.target.value = '';
   };
 
-  const removeTemplateFile = (index) => {
-    setTemplateFiles((prev) => prev.filter((_, i) => i !== index));
+  const updateTemplateMeta = (index, field, value) => {
+    setTemplateItems((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
+  };
+
+  const removeTemplateItem = (index) => {
+    setTemplateItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -281,58 +314,50 @@ export default function CreateOrder() {
 
       const materialsPayload = await Promise.all(
         materials.map(async (m) => {
-          if (m.imageFile) {
-            const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
-            return {
-              ...m,
-              color: m.color ?? '',
-              image: uploadRes?.url || '',
-              imageFile: undefined,
-              imagePreview: undefined,
-            };
-          }
+          const imageUrl = m.imageFile
+            ? (await CloudinaryService.uploadImage(m.imageFile))?.url || ''
+            : (typeof m.image === 'string' && /^https?:\/\//i.test(m.image) ? m.image : '');
 
-          const isRemoteUrl = typeof m.image === 'string' && /^https?:\/\//i.test(m.image);
           return {
-            ...m,
-            color: m.color ?? '',
-            image: isRemoteUrl ? m.image : '',
-            imageFile: undefined,
-            imagePreview: undefined,
+            materialName: m.materialName ?? '',
+            image: imageUrl,
+            value: Number(m.value) || 0,
+            note: m.note ?? '',
+            uom: m.uom ?? '',
           };
         })
       );
 
       const templatesPayload = [];
-      if (templateFiles.length > 0) {
+      if (templateItems.length > 0) {
         const uploadResults = await Promise.all(
-          templateFiles.map((file) => CloudinaryService.uploadTemplateFile(file))
+          templateItems.map((item) => uploadTemplateByType(item))
         );
         uploadResults.forEach((res, idx) => {
           const url = res?.url || '';
           if (!url) return;
+          const item = templateItems[idx];
           templatesPayload.push({
-            templateName: templateFiles[idx]?.name || 'Bản mềm',
-            type: 'SOFT',
+            templateName: item?.templateName?.trim() || getTemplateNameFromFile(item?.fileName || '') || 'Template',
+            type: item?.type || detectTemplateType(item?.file),
             file: url,
-            quantity: null,
-            note: '',
+            note: item?.note?.trim() || '',
           });
-        });
-      }
-      if (Number(hardCopyQty) > 0) {
-        templatesPayload.push({
-          templateName: 'Bản cứng',
-          type: 'HARD',
-          file: null,
-          quantity: Number(hardCopyQty),
-          note: '',
         });
       }
 
       const payload = {
-        ...orderData,
-        image: orderImageUrl,
+        userId: Number(orderData.userId ?? userId) || 0,
+        image: orderImageUrl || '',
+        orderName: orderData.orderName ?? '',
+        type: orderData.type ?? '',
+        size: orderData.size ?? '',
+        color: orderData.color ?? '',
+        startDate: orderData.startDate ?? '',
+        endDate: orderData.endDate ?? '',
+        quantity: Number(orderData.quantity) || 0,
+        cpu: Number(orderData.cpu) || 0,
+        note: orderData.note ?? '',
         materials: materialsPayload,
         templates: templatesPayload,
       };
@@ -427,11 +452,10 @@ export default function CreateOrder() {
                   setIsModalOpen(true);
                 }}
                 onDeleteMaterial={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
-                templateFiles={templateFiles}
+                templateItems={templateItems}
                 onTemplateFileChange={handleTemplateFileChange}
-                onRemoveTemplateFile={removeTemplateFile}
-                hardCopyQty={hardCopyQty}
-                onHardCopyQtyChange={(e) => setHardCopyQty(e.target.value)}
+                onTemplateMetaChange={updateTemplateMeta}
+                onRemoveTemplateItem={removeTemplateItem}
                 totalCost={totalCost}
                 isSubmitting={isSubmitting}
                 onCancel={() => navigate(-1)}
