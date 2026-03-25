@@ -88,6 +88,10 @@ export const API_ENDPOINTS = {
     UPDATE: (id) => `${BASE_URL}/api/Permission/${id}`,
   },
 
+  LOG: {
+    GET_ALL: `${BASE_URL}/api/Log/get-all-log-events`,
+  },
+
   WORKER: {
     GET_ALL_EMPLOYEES: `${BASE_URL}/api/Worker/get-all-employees`,
     GET_BY_ID: (userId) => `${BASE_URL}/api/Worker/get-employee-by-id/${userId}`,

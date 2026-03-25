@@ -829,6 +829,117 @@ textarea.admin-field__control {
   line-height: 1.5;
 }
 
+.admin-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.admin-log-item {
+  border: 1px solid #e0e9e3;
+  border-left-width: 5px;
+  border-radius: 1.3rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(249, 252, 250, 0.96) 100%);
+  box-shadow: 0 16px 30px rgba(19, 38, 29, 0.05);
+  padding: 1.15rem 1.2rem;
+}
+
+.admin-log-item--error {
+  border-left-color: #c05343;
+  background: linear-gradient(180deg, rgba(255, 251, 250, 0.98) 0%, rgba(255, 244, 242, 0.96) 100%);
+}
+
+.admin-log-item--warning {
+  border-left-color: #b78111;
+  background: linear-gradient(180deg, rgba(255, 252, 245, 0.98) 0%, rgba(255, 247, 230, 0.96) 100%);
+}
+
+.admin-log-item--information {
+  border-left-color: #2d9058;
+}
+
+.admin-log-item__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-log-item__message {
+  margin-top: 0.95rem;
+  color: #173025;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-item__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.admin-log-item__meta-card {
+  border: 1px solid #e4ece7;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 0.85rem 0.95rem;
+}
+
+.admin-log-item__meta-card strong {
+  display: block;
+  color: #183025;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-log-item__meta-card span {
+  display: block;
+  margin-top: 0.35rem;
+  color: #60756a;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-item__exception {
+  margin-top: 1rem;
+  border: 1px solid #edd9d5;
+  border-radius: 1rem;
+  background: rgba(94, 24, 24, 0.04);
+  padding: 0.95rem 1rem;
+}
+
+.admin-log-item__exception strong {
+  display: block;
+  color: #7d3024;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-log-item__exception pre {
+  margin: 0.7rem 0 0;
+  color: #6e4039;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-table-card__footer {
+  align-items: center;
+  padding-top: 1rem;
+}
+
 .admin-role-grid {
   display: grid;
   gap: 1rem;
@@ -1175,6 +1286,10 @@ textarea.admin-field__control {
   }
 
   .admin-permission-item__body {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-log-item__meta {
     grid-template-columns: 1fr;
   }
 }

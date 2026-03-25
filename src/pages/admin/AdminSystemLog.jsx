@@ -1,22 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ClipboardList,
+  RefreshCcw,
   Search,
+  ShieldAlert,
   ShieldCheck,
-  Table2,
-  Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  ADMIN_DB_LOG_SOURCES,
-  ADMIN_DB_SYSTEM_LOG_EVENTS,
-  getAdminDbLogSource,
-} from "@/lib/admin/adminSchemaBlueprint";
-import {
+  AdminBanner,
   AdminRoleBadge,
+  AdminSeverityBadge,
   AdminStatCard,
   formatAdminDateTime,
 } from "@/pages/admin/adminShared";
+import LogService from "@/services/LogService";
 
 function normalizeSearchText(value = "") {
   return String(value ?? "")
@@ -28,72 +27,177 @@ function normalizeSearchText(value = "") {
     .trim();
 }
 
+function toApiTimestamp(value = "") {
+  if (!value) return undefined;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function extractPropertyValue(properties = "", key = "") {
+  if (!properties || !key) return "";
+
+  const escapedKey = String(key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`<property key='${escapedKey}'>([\\s\\S]*?)<\\/property>`, "i");
+  const match = String(properties).match(pattern);
+  if (!match) return "";
+
+  return match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeLogItem(item = {}) {
+  return {
+    id: item.id ?? Math.random().toString(36).slice(2),
+    message: String(item.message ?? "").trim(),
+    messageTemplate: String(item.messageTemplate ?? "").trim(),
+    level: String(item.level ?? "Information").trim(),
+    timestamp: item.timeStemp ?? item.timeStamp ?? item.timestamp ?? item.createdAt ?? "",
+    exception: String(item.exception ?? "").trim(),
+    properties: String(item.properties ?? "").trim(),
+    requestPath: extractPropertyValue(item.properties, "RequestPath"),
+    actionName: extractPropertyValue(item.properties, "ActionName"),
+    sourceContext: extractPropertyValue(item.properties, "SourceContext"),
+    requestId: extractPropertyValue(item.properties, "RequestId"),
+  };
+}
+
+function getLevelLabel(level = "") {
+  const normalized = String(level).toLowerCase();
+  if (normalized === "error") return "Lỗi";
+  if (normalized === "warning") return "Cảnh báo";
+  if (normalized === "debug") return "Debug";
+  if (normalized === "trace") return "Trace";
+  return level || "Thông tin";
+}
+
+function getLevelTone(level = "") {
+  const normalized = String(level).toLowerCase();
+  if (normalized === "error" || normalized === "fatal" || normalized === "critical") return "danger";
+  if (normalized === "warning") return "warning";
+  if (normalized === "debug" || normalized === "trace") return "info";
+  return "success";
+}
+
 export default function AdminSystemLog() {
   const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [moduleFilter, setModuleFilter] = useState("all");
-  const [actorFilter, setActorFilter] = useState("all");
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [fromTimestamp, setFromTimestamp] = useState("");
+  const [toTimestamp, setToTimestamp] = useState("");
+  const [logs, setLogs] = useState([]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize] = useState(20);
+  const [recordCount, setRecordCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const sourceOptions = useMemo(
-    () => ["all", ...ADMIN_DB_LOG_SOURCES.map((source) => source.table)],
-    []
-  );
+  const levelOptions = useMemo(() => ["all", "Information", "Warning", "Error"], []);
 
-  const moduleOptions = useMemo(
-    () => ["all", ...new Set(ADMIN_DB_LOG_SOURCES.map((source) => source.moduleLabel))],
-    []
-  );
+  const loadLogs = async ({
+    nextPageIndex = pageIndex,
+    nextSearch = search,
+    nextFromTimestamp = fromTimestamp,
+    nextToTimestamp = toTimestamp,
+  } = {}) => {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const response = await LogService.getAll({
+        PageIndex: nextPageIndex,
+        PageSize: pageSize,
+        SortColumn: "Name",
+        SortOrder: "DESC",
+        ...(String(nextSearch ?? "").trim() ? { FilterQuery: String(nextSearch).trim() } : {}),
+        ...(toApiTimestamp(nextFromTimestamp) ? { fromTimestamp: toApiTimestamp(nextFromTimestamp) } : {}),
+        ...(toApiTimestamp(nextToTimestamp) ? { toTimestamp: toApiTimestamp(nextToTimestamp) } : {}),
+      });
+
+      const items = Array.isArray(response?.data) ? response.data.map(normalizeLogItem) : [];
+      setLogs(items);
+      setRecordCount(Number(response?.recordCount ?? items.length ?? 0));
+    } catch (nextError) {
+      setLogs([]);
+      setRecordCount(0);
+      setError(
+        nextError?.response?.data?.detail ||
+        nextError?.response?.data?.message ||
+        "Không thể tải nhật ký hệ thống từ backend."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLogs();
+  }, [pageIndex]);
 
   const filteredLogs = useMemo(() => {
     const keyword = normalizeSearchText(search);
 
-    return ADMIN_DB_SYSTEM_LOG_EVENTS.filter((log) => {
-      const searchableText = normalizeSearchText(
-        [
-          log.sourceTable,
-          log.moduleLabel,
-          log.action,
-          log.entityLabel,
-          log.actorLabel,
-          log.actorTrace,
-          log.detail,
-          ...(log.flags || []),
-        ]
-          .filter(Boolean)
-          .join(" ")
-      );
-
-      const source = getAdminDbLogSource(log.sourceKey);
-      const hasActor = source?.actorMode === "user";
+    return logs.filter((log) => {
+      const searchableText = normalizeSearchText([
+        log.message,
+        log.messageTemplate,
+        log.level,
+        log.requestPath,
+        log.actionName,
+        log.sourceContext,
+        log.requestId,
+        log.exception,
+      ].filter(Boolean).join(" "));
 
       const searchMatch = !keyword || searchableText.includes(keyword);
-      const sourceMatch = sourceFilter === "all" || log.sourceTable === sourceFilter;
-      const moduleMatch = moduleFilter === "all" || log.moduleLabel === moduleFilter;
-      const actorMatch =
-        actorFilter === "all" ||
-        (actorFilter === "user" && hasActor) ||
-        (actorFilter === "missing" && !hasActor);
+      const levelMatch = levelFilter === "all" || log.level === levelFilter;
 
-      return searchMatch && sourceMatch && moduleMatch && actorMatch;
+      return searchMatch && levelMatch;
     });
-  }, [actorFilter, moduleFilter, search, sourceFilter]);
+  }, [levelFilter, logs, search]);
 
   const stats = useMemo(
     () => ({
-      sources: ADMIN_DB_LOG_SOURCES.length,
-      actorBound: ADMIN_DB_LOG_SOURCES.filter((source) => source.actorMode === "user").length,
-      paymentAware: ADMIN_DB_LOG_SOURCES.filter((source) =>
-        source.flags.some((flag) => flag === "IS_PAYMENT" || flag === "IS_READ_ONLY")
-      ).length,
+      total: recordCount,
+      errors: filteredLogs.filter((log) => String(log.level).toLowerCase() === "error").length,
+      warnings: filteredLogs.filter((log) => String(log.level).toLowerCase() === "warning").length,
+      exceptions: filteredLogs.filter((log) => Boolean(log.exception)).length,
     }),
-    []
+    [filteredLogs, recordCount]
   );
+
+  const totalPages = Math.max(1, Math.ceil((recordCount || 0) / pageSize));
+  const currentPage = pageIndex + 1;
+
+  const applyFilters = () => {
+    setPageIndex(0);
+    loadLogs({
+      nextPageIndex: 0,
+      nextSearch: search,
+      nextFromTimestamp: fromTimestamp,
+      nextToTimestamp: toTimestamp,
+    });
+  };
 
   const clearFilters = () => {
     setSearch("");
-    setSourceFilter("all");
-    setModuleFilter("all");
-    setActorFilter("all");
+    setLevelFilter("all");
+    setFromTimestamp("");
+    setToTimestamp("");
+    setPageIndex(0);
+    loadLogs({
+      nextPageIndex: 0,
+      nextSearch: "",
+      nextFromTimestamp: "",
+      nextToTimestamp: "",
+    });
   };
 
   return (
@@ -102,73 +206,102 @@ export default function AdminSystemLog() {
         <div className="admin-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="admin-hero">
             <div className="admin-hero__heading">
-              <h1 className="admin-hero__title">Màn hình nhật ký hệ thống</h1>
+              <h1 className="admin-hero__title">Nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Màn này tổng hợp các nguồn log hiện có trong hệ thống để Admin theo dõi nhanh.
+                Theo dõi log thật từ hệ thống để rà soát lỗi, cảnh báo và các request quan trọng trong backend.
               </p>
+            </div>
+
+            <div className="admin-hero__actions">
+              <button
+                type="button"
+                className="admin-btn admin-btn--secondary admin-focusable"
+                onClick={() => loadLogs()}
+                disabled={isLoading}
+              >
+                <RefreshCcw size={18} />
+                Làm mới log
+              </button>
             </div>
           </div>
 
-        
+          <AdminBanner
+            title={
+              isLoading
+                ? "Đang tải nhật ký hệ thống từ backend."
+                : error
+                  ? "Không thể tải dữ liệu log."
+                  : `Đã tải ${filteredLogs.length} log trong trang ${currentPage}/${totalPages}.`
+            }
+            description={
+              error ||
+              "Màn này đang đọc trực tiếp từ API log thật, ưu tiên hiển thị rõ các lỗi và cảnh báo để Admin xử lý nhanh."
+            }
+            tone={error ? "warning" : stats.errors > 0 ? "warning" : "success"}
+          />
 
           <div className="admin-stats-grid">
-            <AdminStatCard icon={ClipboardList} label="Nguồn log hiện có" value={stats.sources} meta="Các bảng log và luồng xử lý đang sử dụng" tone="primary" />
-            <AdminStatCard icon={Users} label="Có USER_ID" value={stats.actorBound} meta="Nguồn có thể lần ra user trực tiếp" tone="success" />
-            <AdminStatCard icon={ShieldCheck} label="Có trạng thái" value={stats.paymentAware} meta="Nguồn có lưu trạng thái xử lý" tone="info" />
+            <AdminStatCard icon={ClipboardList} label="Tổng bản ghi" value={isLoading ? "..." : stats.total} meta="Tổng số log backend trả về theo bộ lọc hiện tại" tone="primary" />
+            <AdminStatCard icon={ShieldAlert} label="Log lỗi" value={isLoading ? "..." : stats.errors} meta="Các bản ghi mức Error trong trang đang xem" tone="danger" />
+            <AdminStatCard icon={AlertTriangle} label="Cảnh báo" value={isLoading ? "..." : stats.warnings} meta="Các bản ghi mức Warning trong trang đang xem" tone="warning" />
+            <AdminStatCard icon={ShieldCheck} label="Có exception" value={isLoading ? "..." : stats.exceptions} meta="Log có stack trace hoặc lỗi DB đi kèm" tone="info" />
           </div>
 
           <div className="admin-filter-card">
             <div className="admin-filter-grid">
               <label className="admin-field">
-                <span className="admin-field__label">Tìm trong feed</span>
+                <span className="admin-field__label">Tìm trong log</span>
                 <Search size={18} className="admin-field__icon" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Bảng, thao tác, đối tượng, cột dữ liệu..."
+                  placeholder="Message, request path, action, lỗi..."
                   className="admin-field__control"
                 />
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Bảng nguồn</span>
-                <Table2 size={18} className="admin-field__icon" />
-                <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="admin-field__control">
-                  {sourceOptions.map((source) => (
-                    <option key={source} value={source}>
-                      {source === "all" ? "Tất cả bảng nguồn" : source}
+                <span className="admin-field__label">Mức độ</span>
+                <ShieldCheck size={18} className="admin-field__icon" />
+                <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="admin-field__control">
+                  {levelOptions.map((level) => (
+                    <option key={level} value={level}>
+                      {level === "all" ? "Tất cả mức độ" : getLevelLabel(level)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Module</span>
+                <span className="admin-field__label">Từ thời gian</span>
                 <ClipboardList size={18} className="admin-field__icon" />
-                <select value={moduleFilter} onChange={(event) => setModuleFilter(event.target.value)} className="admin-field__control">
-                  {moduleOptions.map((moduleName) => (
-                    <option key={moduleName} value={moduleName}>
-                      {moduleName === "all" ? "Tất cả module" : moduleName}
-                    </option>
-                  ))}
-                </select>
+                <input
+                  type="datetime-local"
+                  value={fromTimestamp}
+                  onChange={(event) => setFromTimestamp(event.target.value)}
+                  className="admin-field__control"
+                />
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Dấu vết người thực hiện</span>
-                <Users size={18} className="admin-field__icon" />
-                <select value={actorFilter} onChange={(event) => setActorFilter(event.target.value)} className="admin-field__control">
-                  <option value="all">Tất cả</option>
-                  <option value="user">Có USER_ID</option>
-                  <option value="missing">Không có actor trực tiếp</option>
-                </select>
+                <span className="admin-field__label">Đến thời gian</span>
+                <ClipboardList size={18} className="admin-field__icon" />
+                <input
+                  type="datetime-local"
+                  value={toTimestamp}
+                  onChange={(event) => setToTimestamp(event.target.value)}
+                  className="admin-field__control"
+                />
               </label>
 
               <div className="admin-filter-actions">
                 <div className="admin-filter-info">
-                  <Users size={16} />
-                  <span>{filteredLogs.length} sự kiện mẫu</span>
+                  <ClipboardList size={16} />
+                  <span>{filteredLogs.length} log trong trang</span>
                 </div>
+                <button type="button" className="admin-filter-reset admin-focusable" onClick={applyFilters}>
+                  Áp dụng bộ lọc
+                </button>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={clearFilters}>
                   Xóa bộ lọc
                 </button>
@@ -180,105 +313,93 @@ export default function AdminSystemLog() {
             <div className="admin-table-card__header">
               <div>
                 <h2 className="admin-card__title">Danh sách nhật ký hoạt động</h2>
-                <p className="admin-card__subtitle">Danh sách sự kiện để Admin theo dõi nhanh các hoạt động trong hệ thống.</p>
+                <p className="admin-card__subtitle">Ưu tiên hiển thị rõ request path, nguồn sinh log và nội dung lỗi để rà soát nhanh.</p>
               </div>
             </div>
 
-            <div className="admin-table-wrap">
-              {filteredLogs.length === 0 ? (
+            <div className="admin-log-list">
+              {!isLoading && filteredLogs.length === 0 ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
                     <strong>Không có sự kiện phù hợp với bộ lọc hiện tại</strong>
-                    <span>Thử đổi bộ lọc để xem thêm các nguồn log hiện có trong hệ thống.</span>
+                    <span>Thử đổi thời gian, từ khóa hoặc mức độ để xem thêm log từ backend.</span>
                   </div>
                 </div>
               ) : (
-                <table className="admin-table admin-log-table">
-                  <thead>
-                    <tr>
-                      <th>Thời gian</th>
-                      <th>Nguồn</th>
-                      <th>Thao tác</th>
-                      <th>Đối tượng</th>
-                      <th>Người thực hiện</th>
-                      <th>Ghi chú</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLogs.map((log) => {
-                      const source = getAdminDbLogSource(log.sourceKey);
-                      const hasActor = source?.actorMode === "user";
-
-                      return (
-                        <tr key={log.id}>
-                          <td>
-                            <div className="admin-table__primary">{formatAdminDateTime(log.timestamp)}</div>
-                            <div className="admin-table__secondary">{log.id}</div>
-                          </td>
-                          <td>
-                            <div className="admin-table__primary">{log.sourceTable}</div>
-                            <div className="admin-table__secondary">{log.moduleLabel}</div>
-                            <div className="admin-chips mt-2">
-                              <AdminRoleBadge tone={source?.tone || "primary"}>{source?.actorLabel || "Nguồn log"}</AdminRoleBadge>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="admin-table__primary">{log.action}</div>
-                            <div className="admin-table__secondary">{log.detail}</div>
-                          </td>
-                          <td>
-                            <div className="admin-table__primary">{log.entityLabel}</div>
-                          </td>
-                          <td>
-                            <div className="admin-table__primary">{log.actorLabel}</div>
-                            <div className="admin-table__secondary">{log.actorTrace}</div>
-                            <div className="admin-chips mt-2">
-                              <AdminRoleBadge tone={hasActor ? "success" : "warning"}>
-                                {hasActor ? "Có actor trực tiếp" : "Không có actor trực tiếp"}
-                              </AdminRoleBadge>
-                            </div>
-                          </td>
-                          <td>
-                            <div className="admin-table__secondary">{source?.description}</div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-
-          <div className="admin-grid admin-grid--permissions">
-            <section className="admin-card">
-              <div className="admin-card__header">
-                <div>
-                  <h2 className="admin-card__title">Nguồn dữ liệu log</h2>
-                  <p className="admin-card__subtitle">Mỗi card bên dưới thể hiện một nguồn dữ liệu đang được dùng để hiển thị log.</p>
-                </div>
-              </div>
-
-              <div className="admin-role-grid">
-                {ADMIN_DB_LOG_SOURCES.map((source) => (
-                  <div key={source.key} className="admin-role-card">
-                    <AdminRoleBadge tone={source.tone}>{source.table}</AdminRoleBadge>
-                    <strong className="mt-3">{source.moduleLabel}</strong>
-                    <span>{source.description}</span>
-                    <div className="admin-preview-list mt-3">
-                      <div className="admin-preview-list__item">
-                        <strong>Cột thời gian</strong>
-                        <span>{source.timeColumn}</span>
+                filteredLogs.map((log) => (
+                  <article
+                    key={log.id}
+                    className={`admin-log-item admin-log-item--${String(log.level).toLowerCase()}`}
+                  >
+                    <div className="admin-log-item__top">
+                      <div>
+                        <div className="admin-table__primary">{formatAdminDateTime(log.timestamp)}</div>
+                        <div className="admin-table__secondary">Log #{log.id}</div>
                       </div>
-                      <div className="admin-preview-list__item">
-                        <strong>Dấu vết người thực hiện</strong>
-                        <span>{source.actorLabel}</span>
+
+                      <div className="admin-chips">
+                        <AdminSeverityBadge severity={String(log.level).toLowerCase()} />
+                        {log.requestPath ? (
+                          <AdminRoleBadge tone={getLevelTone(log.level)}>
+                            {log.requestPath}
+                          </AdminRoleBadge>
+                        ) : null}
                       </div>
                     </div>
-                  </div>
-                ))}
+
+                    <div className="admin-log-item__message">
+                      {log.message || "Không có nội dung message."}
+                    </div>
+
+                    <div className="admin-log-item__meta">
+                      <div className="admin-log-item__meta-card">
+                        <strong>Action</strong>
+                        <span>{log.actionName || "Chưa có ActionName"}</span>
+                      </div>
+                      <div className="admin-log-item__meta-card">
+                        <strong>Source</strong>
+                        <span>{log.sourceContext || "Chưa có SourceContext"}</span>
+                      </div>
+                      <div className="admin-log-item__meta-card">
+                        <strong>Request ID</strong>
+                        <span>{log.requestId || "Chưa có RequestId"}</span>
+                      </div>
+                    </div>
+
+                    {log.exception ? (
+                      <div className="admin-log-item__exception">
+                        <strong>Exception</strong>
+                        <pre>{log.exception}</pre>
+                      </div>
+                    ) : null}
+                  </article>
+                ))
+              )}
+            </div>
+
+            <div className="admin-table-card__header admin-table-card__footer">
+              <div className="admin-card__subtitle">
+                Trang {currentPage}/{totalPages} • Hiển thị tối đa {pageSize} log mỗi trang
               </div>
-            </section>
+              <div className="admin-table__actions">
+                <button
+                  type="button"
+                  className="admin-link-btn admin-link-btn--secondary"
+                  disabled={pageIndex === 0 || isLoading}
+                  onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+                >
+                  Trang trước
+                </button>
+                <button
+                  type="button"
+                  className="admin-link-btn admin-link-btn--primary"
+                  disabled={currentPage >= totalPages || isLoading}
+                  onClick={() => setPageIndex((current) => current + 1)}
+                >
+                  Trang sau
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
