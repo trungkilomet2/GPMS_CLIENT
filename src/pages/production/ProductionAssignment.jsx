@@ -653,7 +653,7 @@ export default function ProductionAssignment() {
                           ) : visibleWorkers.length === 0 ? (
                             <div className="text-xs text-slate-500">Không có thợ phù hợp.</div>
                           ) : (
-                            <div className="max-h-96 min-h-80 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                            <div className="max-h-96 min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
                               {visibleWorkers.map((worker) => {
                                 const checked = selectedIds.includes(worker.id);
                                 const frequentText = worker.frequentSteps.length
@@ -669,10 +669,13 @@ export default function ProductionAssignment() {
                                     key={`${activeRow.ppId}-${worker.id}`}
                                     onClick={() => toggleWorker(activeRow.ppId, worker.id)}
                                     disabled={!canSelect}
-                                    className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${checked
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : "bg-white text-slate-700 hover:bg-slate-50"
-                                      }`}
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-5 text-sm font-semibold transition ${
+                                      !canSelect
+                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                        : checked
+                                          ? "cursor-pointer border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                          : "cursor-pointer border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"
+                                    }`}
                                   >
                                     <div className="min-w-0 text-left">
                                       <div className="flex flex-wrap items-center gap-2">

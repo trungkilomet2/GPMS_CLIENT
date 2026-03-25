@@ -233,6 +233,15 @@ export default function ProductionDetail() {
     return type.includes("hard");
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+  const approvedStatusLabel = getProductionStatusLabel(4);
+  const rejectedStatusLabel = getProductionStatusLabel(2);
+  const isApprovedProduction =
+    String(getProductionStatusLabel(production.status)).trim().toLowerCase() ===
+    String(approvedStatusLabel).trim().toLowerCase();
+  const isRejectedProduction =
+    String(getProductionStatusLabel(production.status)).trim().toLowerCase() ===
+    String(rejectedStatusLabel).trim().toLowerCase();
+  const isActionLocked = isApprovedProduction || isRejectedProduction;
   const productionStartDateText = formatOrderDate(production.pStartDate);
   const productionEndDateText = formatOrderDate(production.pEndDate);
   const productionDateRangeText =
@@ -242,6 +251,7 @@ export default function ProductionDetail() {
   const productionDurationText = getProductionDurationText(production.pStartDate, production.pEndDate);
 
   const handleApproveProduction = async () => {
+    if (isActionLocked) return;
     try {
       const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
       if (!userId) {
@@ -259,6 +269,7 @@ export default function ProductionDetail() {
   };
 
   const handleRejectProduction = async (reason) => {
+    if (isActionLocked) return;
     try {
       const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
       if (!userId) {
@@ -310,14 +321,24 @@ export default function ProductionDetail() {
                   <button
                     type="button"
                     onClick={() => setIsApproveModalOpen(true)}
-                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                    disabled={isActionLocked}
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
+                      isActionLocked
+                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    }`}
                   >
                     Chấp nhận
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsReasonModalOpen(true)}
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100"
+                    disabled={isActionLocked}
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
+                      isActionLocked
+                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                        : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                    }`}
                   >
                     Từ chối
                   </button>
