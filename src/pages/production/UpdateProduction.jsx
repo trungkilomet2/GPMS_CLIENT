@@ -5,6 +5,7 @@ import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import MaterialsTable from "@/components/orders/MaterialsTable";
+import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
@@ -194,7 +195,7 @@ export default function UpdateProduction() {
     });
   }, [production]);
 
-  const order = production?.order || {};
+  const order = useMemo(() => production?.order || {}, [production]);
   const orderSummaryRows = useMemo(() => ([
     ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
     ["Tên đơn hàng", order?.orderName ?? "-"],
@@ -405,31 +406,13 @@ export default function UpdateProduction() {
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">
-                  Thông tin bổ sung
-                </div>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Khách hàng</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerName || order?.userName || order?.fullName || order?.user?.fullName || order?.user?.name || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">SĐT</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerPhone || order?.phone || order?.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Địa chỉ</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order?.customerAddress || order?.address || order?.location || order?.user?.address || order?.user?.location || "-"}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <CustomerInfoCard
+                order={order}
+                title="Thông tin bổ sung"
+                nameLabel="Khách hàng"
+                phoneLabel="SĐT"
+                addressLabel="Địa chỉ"
+              />
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>

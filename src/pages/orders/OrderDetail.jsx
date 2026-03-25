@@ -7,8 +7,10 @@ import {
 import OrderCommentModal from '@/components/orders/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
+import CustomerInfoCard from '@/components/orders/CustomerInfoCard';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import { formatOrderDate } from '@/lib/orders/formatters';
+import { getOrderCustomerId } from '@/lib/orders/customerInfo';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
@@ -54,7 +56,7 @@ export default function OrderDetail() {
                 const response = await OrderService.getOrderDetail(id);
                 setOrder(response.data.data || response.data);
                 setError(null);
-            } catch (err) {
+            } catch (_err) {
                 setError("Không thể tải thông tin đơn hàng.");
             } finally {
                 setLoading(false);
@@ -64,25 +66,28 @@ export default function OrderDetail() {
     }, [id]);
 
     useEffect(() => {
+        let isMounted = true;
+
         const loadCustomerProfile = async () => {
-            if (!isAdmin) return;
-            const customerId =
-                order?.userId ??
-                order?.customerId ??
-                order?.ownerId ??
-                order?.user?.id ??
-                order?.user?.userId ??
-                null;
-            if (!customerId) return;
+            const customerId = getOrderCustomerId(order);
+            if (!canModerate || !customerId) {
+                if (isMounted) setCustomerProfile(null);
+                return;
+            }
             try {
                 const profile = await userService.getProfileById(customerId);
-                setCustomerProfile(profile || null);
+                if (isMounted) setCustomerProfile(profile || null);
             } catch (err) {
+                if (isMounted) setCustomerProfile(null);
                 console.error('Không thể tải hồ sơ khách hàng:', err);
             }
         };
 
         loadCustomerProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, [order, canModerate]);
 
     if (loading) return (
@@ -111,13 +116,7 @@ export default function OrderDetail() {
         return type.includes('hard');
     });
     const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
-    const orderOwnerId =
-        order?.userId ??
-        order?.customerId ??
-        order?.ownerId ??
-        order?.user?.id ??
-        order?.user?.userId ??
-        null;
+    const orderOwnerId = getOrderCustomerId(order);
     const currentUserId = user?.userId ?? user?.id ?? null;
     const canEdit =
         orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId);
@@ -389,53 +388,16 @@ export default function OrderDetail() {
                         {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                         <div className="space-y-6">
                             {canModerate && (
-                                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                                    <div className="flex items-center gap-2 text-slate-600 mb-3">
-                                        <Info size={16} />
-                                        <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
-                                    </div>
-                                    <div className="space-y-2 text-sm text-slate-700">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.fullName ||
-                                                    customerProfile?.name ||
-                                                    order?.customerName ||
-                                                    order?.userName ||
-                                                    order?.fullName ||
-                                                    order?.user?.fullName ||
-                                                    order?.user?.name ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Số điện thoại</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.phoneNumber ||
-                                                    customerProfile?.phone ||
-                                                    order?.customerPhone ||
-                                                    order?.phone ||
-                                                    order?.phoneNumber ||
-                                                    order?.user?.phoneNumber ||
-                                                    order?.user?.phone ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Địa chỉ</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.location ||
-                                                    customerProfile?.address ||
-                                                    order?.customerAddress ||
-                                                    order?.address ||
-                                                    order?.location ||
-                                                    order?.user?.address ||
-                                                    order?.user?.location ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <CustomerInfoCard
+                                    order={order}
+                                    profile={customerProfile}
+                                    title="Thông tin người đặt hàng"
+                                    nameLabel="Họ và tên"
+                                    phoneLabel="Số điện thoại"
+                                    addressLabel="Địa chỉ"
+                                    showHeaderIcon
+                                    rowClassName="flex items-start justify-between gap-3"
+                                />
                             )}
                             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                                 <div>

@@ -3,11 +3,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
+import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate } from "@/lib/orders/formatters";
+import { getOrderCustomerId } from "@/lib/orders/customerInfo";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import SuccessModal from "@/components/SuccessModal";
 import ProductionService from "@/services/ProductionService";
+import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
@@ -89,11 +92,13 @@ export default function ProductionDetail() {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
   const [production, setProduction] = useState(null);
+  const [customerProfile, setCustomerProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
   const isOwner = hasAnyRole(roleValue, ["owner"]);
+  const customerId = getOrderCustomerId(production?.order);
 
   useEffect(() => {
     let active = true;
@@ -139,7 +144,7 @@ export default function ProductionDetail() {
         const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
         setProduction(fallback);
         if (!fallback) setError(`Không tìm thấy production #${id}.`);
-      } catch (err) {
+      } catch (_err) {
         if (!active) return;
         setError("Không thể tải chi tiết production.");
         const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
@@ -154,6 +159,30 @@ export default function ProductionDetail() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCustomerProfile = async () => {
+      if (!customerId) {
+        if (active) setCustomerProfile(null);
+        return;
+      }
+      try {
+        const profile = await userService.getProfileById(customerId);
+        if (active) setCustomerProfile(profile || null);
+      } catch (err) {
+        if (active) setCustomerProfile(null);
+        console.error("Không thể tải hồ sơ khách hàng:", err);
+      }
+    };
+
+    loadCustomerProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [customerId]);
 
   if (loading) {
     return (
@@ -352,31 +381,14 @@ export default function ProductionDetail() {
             </div>
 
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">
-                  Thông tin khách hàng
-                </div>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Họ tên</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order.customerName || order.userName || order.fullName || order?.user?.fullName || order?.user?.name || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">SĐT</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order.customerPhone || order.phone || order.phoneNumber || order?.user?.phoneNumber || order?.user?.phone || "-"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase">Địa chỉ</span>
-                    <span className="font-semibold text-slate-800 text-right">
-                      {order.customerAddress || order.address || order.location || order?.user?.address || order?.user?.location || "-"}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              <CustomerInfoCard
+                order={order}
+                profile={customerProfile}
+                title="Thông tin khách hàng"
+                nameLabel="Họ tên"
+                phoneLabel="SĐT"
+                addressLabel="Địa chỉ"
+              />
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>
