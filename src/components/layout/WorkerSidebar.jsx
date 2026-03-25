@@ -1,16 +1,14 @@
 ﻿import { createElement, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut, Scissors, BriefcaseBusiness } from "lucide-react";
+import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const WORKER_NAV_ITEMS = [
-  { to: "/worker/assignments", label: "Công việc", icon: BriefcaseBusiness },
   { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
   { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
-  { to: "/worker/cutting-book", label: "Sổ cắt", icon: Scissors },
   { to: "/worker/error-report", label: "Báo lỗi", icon: AlertTriangle },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];

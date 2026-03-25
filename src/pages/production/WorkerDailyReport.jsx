@@ -5,6 +5,7 @@ import WorkerLayout from "@/layouts/WorkerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
+import { getStoredUser } from "@/lib/authStorage";
 
 const MOCK_TASKS = [
   {
@@ -30,6 +31,89 @@ const MOCK_TASKS = [
   },
 ];
 
+function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value == null) return [];
+  return [value];
+}
+
+function normalizeWorkerValue(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function extractWorkerIds(source) {
+  return toArray(source)
+    .flatMap((item) => {
+      if (item == null) return [];
+      if (typeof item === "number") return [String(item)];
+      if (typeof item === "string") {
+        const raw = item.trim();
+        if (!raw) return [];
+        return Number.isNaN(Number(raw)) ? [] : [String(Number(raw))];
+      }
+      if (typeof item === "object") {
+        const id = item?.workerId ?? item?.id ?? item?.userId ?? item?.accountId;
+        return id == null ? [] : [String(id)];
+      }
+      return [];
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function extractWorkerNames(source) {
+  return toArray(source)
+    .flatMap((item) => {
+      if (item == null) return [];
+      if (typeof item === "string") {
+        const raw = normalizeWorkerValue(item);
+        if (!raw || !Number.isNaN(Number(raw))) return [];
+        return [raw];
+      }
+      if (typeof item === "object") {
+        const name = normalizeWorkerValue(
+          item?.fullName ?? item?.name ?? item?.userName ?? item?.username ?? ""
+        );
+        return name ? [name] : [];
+      }
+      return [];
+    })
+    .filter(Boolean);
+}
+
+function hasWorkerAssignmentMetadata(step) {
+  const idSources = [step?.assignedWorkerIds, step?.workerIds, step?.assigneeIds, step?.assignedWorkerId, step?.workerId];
+  const nameSources = [step?.assignedWorkers, step?.workerNames, step?.workers, step?.workerList, step?.assignees, step?.workerName];
+  return (
+    idSources.some((source) => toArray(source).length > 0) ||
+    nameSources.some((source) => toArray(source).length > 0)
+  );
+}
+
+function isStepAssignedToCurrentWorker(step, currentWorkerIdSet, currentWorkerNameSet) {
+  const idCandidates = [
+    ...extractWorkerIds(step?.assignedWorkerIds),
+    ...extractWorkerIds(step?.workerIds),
+    ...extractWorkerIds(step?.assigneeIds),
+    ...extractWorkerIds(step?.assignedWorkerId),
+    ...extractWorkerIds(step?.workers),
+    ...extractWorkerIds(step?.workerList),
+    ...extractWorkerIds(step?.assignees),
+    ...extractWorkerIds(step?.workerId),
+  ];
+  if (idCandidates.some((id) => currentWorkerIdSet.has(id))) return true;
+
+  const nameCandidates = [
+    ...extractWorkerNames(step?.assignedWorkers),
+    ...extractWorkerNames(step?.workerNames),
+    ...extractWorkerNames(step?.workers),
+    ...extractWorkerNames(step?.workerList),
+    ...extractWorkerNames(step?.assignees),
+    ...extractWorkerNames(step?.workerName),
+  ];
+  return nameCandidates.some((name) => currentWorkerNameSet.has(name));
+}
+
 function formatDateInput(date = new Date()) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -43,40 +127,57 @@ export default function WorkerDailyReport() {
   const assignment = location.state?.assignment || null;
   const plan = location.state?.plan || null;
   const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
+  const currentUser = getStoredUser() || {};
+  const currentWorkerIdSet = new Set(
+    [currentUser?.id, currentUser?.userId, currentUser?.accountId, localStorage.getItem("userId")]
+      .filter((value) => value != null && String(value).trim() !== "")
+      .map((value) => String(value).trim())
+  );
+  const currentWorkerNameSet = new Set(
+    [currentUser?.fullName, currentUser?.name, currentUser?.userName, currentUser?.username]
+      .map((value) => normalizeWorkerValue(value))
+      .filter(Boolean)
+  );
+  const filteredPlanSteps = (() => {
+    if (planSteps.length === 0) return [];
+    const hasAssignmentData = planSteps.some((step) => hasWorkerAssignmentMetadata(step));
+    if (!hasAssignmentData) return planSteps;
+    return planSteps.filter((step) =>
+      isStepAssignedToCurrentWorker(step, currentWorkerIdSet, currentWorkerNameSet)
+    );
+  })();
+  const initialBase = planSteps.length > 0
+    ? filteredPlanSteps.map((step, index) => ({
+      id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
+      partId: step?.partId ?? step?.id ?? null,
+      productionId: plan?.production?.productionId ?? step?.productionId ?? "",
+      orderName: plan?.production?.orderName ?? "",
+      partName: step?.partName ?? step?.name ?? "-",
+      cpu: step?.cpu ?? step?.unitPrice ?? 0,
+      workLogId: step?.workLogId ?? null,
+      logReadOnly: false,
+      assignedWorkers: step?.assignedWorkers ?? step?.workerNames ?? step?.workers ?? step?.workerList ?? step?.assignees ?? [],
+      assignedWorkerIds: step?.assignedWorkerIds ?? step?.workerIds ?? step?.assigneeIds ?? [],
+    }))
+    : (assignment
+      ? [assignment].filter((item) =>
+        isStepAssignedToCurrentWorker(item, currentWorkerIdSet, currentWorkerNameSet)
+      )
+      : MOCK_TASKS);
   const today = useMemo(() => formatDateInput(), []);
   const [reportDate, setReportDate] = useState(today);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-  const [rows, setRows] = useState(() => {
-    const base = planSteps.length > 0
-      ? planSteps.map((step, index) => ({
-        id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
-        partId: step?.partId ?? step?.id ?? null,
-        productionId: plan?.production?.productionId ?? step?.productionId ?? "",
-        orderName: plan?.production?.orderName ?? "",
-        partName: step?.partName ?? step?.name ?? "-",
-        cpu: step?.cpu ?? step?.unitPrice ?? 0,
-        workLogId: step?.workLogId ?? null,
-        logReadOnly: false,
-      }))
-      : (assignment ? [assignment] : MOCK_TASKS);
-    return base.map((task) => ({ ...task, quantity: "" }));
-  });
-  const [isEditing, setIsEditing] = useState(Boolean(assignment) || planSteps.length > 0);
+  const [rows, setRows] = useState(() =>
+    initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
+  );
+  const [isEditing, setIsEditing] = useState(
+    Boolean(assignment) || (planSteps.length > 0 && filteredPlanSteps.length > 0)
+  );
   const [draftRows, setDraftRows] = useState(() =>
-    planSteps.length > 0
-      ? planSteps.map((step, index) => ({
-        id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
-        partId: step?.partId ?? step?.id ?? null,
-        productionId: plan?.production?.productionId ?? step?.productionId ?? "",
-        orderName: plan?.production?.orderName ?? "",
-        partName: step?.partName ?? step?.name ?? "-",
-        cpu: step?.cpu ?? step?.unitPrice ?? 0,
-        workLogId: step?.workLogId ?? null,
-        logReadOnly: false,
-        quantity: "",
-      }))
-      : (assignment ? [{ ...assignment, quantity: "" }] : null)
+    planSteps.length > 0 || assignment
+      ? initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
+      : null
   );
 
   const totalAmount = useMemo(
@@ -86,12 +187,13 @@ export default function WorkerDailyReport() {
 
   const handleChange = (id, field, value) => {
     setDraftRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      Array.isArray(prev) ? prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)) : prev
     );
   };
 
   const isToday = reportDate === today;
   const canEdit = isToday && isEditing;
+  const displayedRows = isEditing ? (draftRows || []) : rows;
 
   const normalizeDateString = (target) => {
     if (!target) return "";
@@ -371,7 +473,7 @@ export default function WorkerDailyReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {(isEditing ? draftRows : rows).map((row, index) => (
+                  {displayedRows.map((row, index) => (
                     <tr key={row.id} className="leave-table-row hover:bg-slate-50/80">
                       <td className="px-3 py-2 text-center">{index + 1}</td>
                       <td className="px-3 py-2 text-slate-700">#PR-{row.productionId}</td>
@@ -397,6 +499,13 @@ export default function WorkerDailyReport() {
                       </td>
                     </tr>
                   ))}
+                  {displayedRows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
+                        Không có công đoạn nào được giao cho tài khoản hiện tại.
+                      </td>
+                    </tr>
+                  )}
                   <tr className="bg-slate-50">
                     <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">TOTAL</td>
                     <td className="px-3 py-3 text-center font-semibold text-slate-700">
