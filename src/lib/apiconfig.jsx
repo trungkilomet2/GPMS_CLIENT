@@ -34,10 +34,11 @@ export const API_ENDPOINTS = {
     CREATE: `${BASE_URL}/api/Production/production/create`,
     LIST: `${BASE_URL}/api/Production/production/list`,
     DETAIL: (id) => `${BASE_URL}/api/Production/production/detail/${id}`,
-    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
     UPDATE_PM: (productionId, pmId) => `${BASE_URL}/api/Production/production/update-pm/${productionId}/${pmId}`,
     APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
     REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
+    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
+    ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>
@@ -47,21 +48,14 @@ export const API_ENDPOINTS = {
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
     UPDATE_ASSIGN_WORKERS: (id) =>
       `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
-    CREATE_WORK_LOGS: (partId) =>
-      `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
-    UPDATE_WORK_LOGS: (partId, logId) =>
-      `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
-    GET_WORK_LOGS: (partId) =>
-      `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
-    CREATE_ISSUE: (partId) =>
-      `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
   },
   
   CUTTING_NOTEBOOK: {
     CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
-    CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
     GET_BY_PRODUCTION: (productionId) => `${BASE_URL}/api/CuttingNotebook/notebook/production/${productionId}`,
-    GET_LIST_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
+    GET_BY_ID: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/${notebookId}`,
+    CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
+    GET_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
   },
 
   CLOUDINARY: {
@@ -85,6 +79,10 @@ export const API_ENDPOINTS = {
     ADMIN_UPDATE_USER: (id) => `${BASE_URL}/api/User/update-user-for-admin/${id}`,
     // PUT — multipart/form-data
     UPDATE_PROFILE: `${BASE_URL}/api/User/update-profile`,
+  },
+
+  PERMISSION: {
+    GET_ALL: `${BASE_URL}/api/Permission`,
   },
 
   WORKER: {

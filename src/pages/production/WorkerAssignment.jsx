@@ -1,7 +1,7 @@
 ﻿import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipboardCheck, DollarSign, Calendar, Users, Clock, CheckCircle2, Clock as ClockIcon } from "lucide-react";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
@@ -187,7 +187,7 @@ export default function WorkerAssignment() {
   };
 
   return (
-    <OwnerLayout>
+    <WorkerLayout>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -265,7 +265,7 @@ export default function WorkerAssignment() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </WorkerLayout>
   );
 }
 

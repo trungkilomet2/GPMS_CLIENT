@@ -13,7 +13,8 @@ import {
   UserRoundX,
   XCircle,
 } from "lucide-react";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
@@ -72,6 +73,13 @@ function SummaryCard({ label, value, icon: Icon, borderTone }) {
   );
 }
 
+function toIsoFromLocalDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString();
+}
+
 export default function LeaveRequests() {
   const location = useLocation();
   const [items, setItems] = useState([]);
@@ -79,6 +87,8 @@ export default function LeaveRequests() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [content, setContent] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -89,6 +99,7 @@ export default function LeaveRequests() {
   const [refreshKey, setRefreshKey] = useState(0);
   const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
   const detailBasePath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
+  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
 
   useEffect(() => {
     let active = true;
@@ -164,14 +175,30 @@ export default function LeaveRequests() {
       return;
     }
 
+    if (!fromDate || !toDate) {
+      setError("Vui lòng chọn đầy đủ thời gian nghỉ.");
+      return;
+    }
+
+    if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
+      setError("Thời gian bắt đầu nghỉ không được lớn hơn thời gian kết thúc.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError("");
       setNotice("");
 
-      const created = await LeaveService.createLeaveRequest({ content: normalizedContent });
+      const created = await LeaveService.createLeaveRequest({
+        content: normalizedContent,
+        fromDate: toIsoFromLocalDateTime(fromDate),
+        toDate: toIsoFromLocalDateTime(toDate),
+      });
 
       setContent("");
+      setFromDate("");
+      setToDate("");
       setNotice(`Đã gửi đơn nghỉ${created?.id ? ` #${created.id}` : ""} thành công.`);
       setPage(1);
       setRefreshKey((prev) => prev + 1);
@@ -183,7 +210,7 @@ export default function LeaveRequests() {
   };
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2">
@@ -220,6 +247,28 @@ export default function LeaveRequests() {
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Từ lúc</span>
+                  <input
+                    type="datetime-local"
+                    value={fromDate}
+                    onChange={(event) => setFromDate(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Đến lúc</span>
+                  <input
+                    type="datetime-local"
+                    value={toDate}
+                    onChange={(event) => setToDate(event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                </label>
+              </div>
 
               {notice ? (
                 <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
@@ -350,9 +399,16 @@ export default function LeaveRequests() {
                           <tr key={item.id} className="leave-table-row hover:bg-slate-50/80">
                             <td className="px-5 py-4 align-top">
                               <div className="max-w-xl text-sm leading-6 text-slate-700">{item.content}</div>
+                              <div className="mt-2 text-xs text-slate-500">
+                                Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
+                              </div>
+                              {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                             </td>
                             <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
-                            <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply)}</td>
+                            <td className="px-5 py-4 align-top text-sm text-slate-700">
+                              <div>{formatLeaveDateTime(item.dateReply)}</div>
+                              {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                            </td>
                             <td className="px-5 py-4 align-top">
                               <StatusBadge status={item.status} />
                             </td>
@@ -400,6 +456,6 @@ export default function LeaveRequests() {
           </div>
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }

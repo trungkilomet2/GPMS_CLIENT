@@ -3,8 +3,6 @@ import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { countGrantedPermissions, getPermissionProfiles } from "@/lib/admin/adminMockStore";
 
-const ADMIN_USER_ROLE_CACHE_KEY = "gpms-admin-user-role-cache";
-
 const ROLE_CATALOG = [
   {
     key: "Admin",
@@ -119,50 +117,9 @@ const normalizeManagerId = (value) => {
   return numericValue;
 };
 
-const canUseStorage = () =>
-  typeof window !== "undefined" && typeof window.localStorage !== "undefined";
-
-const readRoleCache = () => {
-  if (!canUseStorage()) return {};
-
-  try {
-    const raw = window.localStorage.getItem(ADMIN_USER_ROLE_CACHE_KEY);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-};
-
-const writeRoleCache = (value) => {
-  if (!canUseStorage()) return;
-
-  try {
-    window.localStorage.setItem(ADMIN_USER_ROLE_CACHE_KEY, JSON.stringify(value));
-  } catch {
-    // Ignore storage write errors to keep admin screens usable.
-  }
-};
-
 const getCurrentUserId = () => {
   const currentUser = getStoredUser();
   return String(currentUser?.userId ?? currentUser?.id ?? "");
-};
-
-const rememberUserRoles = (id, roleKeys = []) => {
-  if (id == null) return;
-
-  const nextRoleKeys = unique(roleKeys);
-  if (!nextRoleKeys.length) return;
-
-  const cache = readRoleCache();
-  cache[String(id)] = {
-    roleKeys: nextRoleKeys,
-    updatedAt: new Date().toISOString(),
-  };
-  writeRoleCache(cache);
 };
 
 const syncCurrentUserRoles = (id, roleKeys = []) => {
@@ -180,17 +137,6 @@ const syncCurrentUserRoles = (id, roleKeys = []) => {
 
   window.dispatchEvent(new Event("auth-change"));
   return true;
-};
-
-const getCurrentUserRoles = (id) => {
-  const currentUser = getStoredUser();
-  const currentId = getCurrentUserId();
-
-  if (!currentId || String(id) !== currentId) {
-    return [];
-  }
-
-  return splitRoles(currentUser?.role);
 };
 
 const getMultipartAuthHeaders = () => {
@@ -290,15 +236,10 @@ const extractRoleKeys = (item = {}) => {
     ...splitRoles(item.roleName),
   ]);
 
-  const cachedRoles = readRoleCache()[String(item.id)]?.roleKeys || [];
-  const currentUserRoles = getCurrentUserRoles(item.id);
-
   return unique([
     ...fromRoleIds,
     ...fromRolesField,
     ...fromStringFields,
-    ...cachedRoles,
-    ...currentUserRoles,
   ]);
 };
 
@@ -499,10 +440,6 @@ async function fetchAdminUserDetail(id) {
   const response = parseApiPayload(rawResponse);
   const normalizedUser = normalizeAdminUser(response?.data ?? response);
 
-  if (normalizedUser?.id != null && normalizedUser.roleKeys.length) {
-    rememberUserRoles(normalizedUser.id, normalizedUser.roleKeys);
-  }
-
   return normalizedUser;
 }
 
@@ -558,7 +495,6 @@ const AdminUserService = {
     let normalizedUser = normalizeAdminUser(response?.data ?? response);
 
     if (normalizedUser?.id != null) {
-      rememberUserRoles(normalizedUser.id, [roleMeta.key]);
       return normalizedUser;
     }
 
@@ -569,10 +505,6 @@ const AdminUserService = {
     normalizedUser = refreshedUsers.data.find(
       (user) => String(user.userName).toLowerCase() === createPayload.userName.toLowerCase()
     ) || normalizedUser;
-
-    if (normalizedUser?.id != null) {
-      rememberUserRoles(normalizedUser.id, [roleMeta.key]);
-    }
 
     return normalizedUser;
   },
@@ -640,9 +572,6 @@ const AdminUserService = {
     }
 
     const normalizedUser = normalizeAdminUser(json?.data ?? json);
-    if (normalizedUser?.id != null && normalizedUser.roleKeys.length) {
-      rememberUserRoles(normalizedUser.id, normalizedUser.roleKeys);
-    }
     syncCurrentUserSnapshot(normalizedUser);
 
     return normalizedUser;
@@ -657,7 +586,6 @@ const AdminUserService = {
       roleIds: normalizedRoleIds,
     });
 
-    rememberUserRoles(id, roleKeys);
     syncCurrentUserRoles(id, roleKeys);
     return parseApiPayload(rawResponse);
   },

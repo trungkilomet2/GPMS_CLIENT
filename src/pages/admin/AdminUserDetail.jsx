@@ -169,13 +169,13 @@ export default function AdminUserDetail() {
           </div>
 
           {notice ? (
-            <AdminBanner title={notice} description="Phần log và permission preview bên dưới vẫn đang dùng dữ liệu demo." tone={noticeTone} />
+            <AdminBanner title={notice} description="Phần log bên dưới hiện vẫn là dữ liệu mẫu." tone={noticeTone} />
           ) : null}
 
           {!loading && !error && user ? (
           <AdminBanner
               title="Hồ sơ user đang đọc từ endpoint admin detail."
-              description="Thông tin liên hệ, avatar, status, role và chuyên môn thợ hiện được lấy trực tiếp từ backend; riêng log hệ thống vẫn đang là dữ liệu demo."
+              description="Thông tin liên hệ, avatar, trạng thái, role và chuyên môn thợ đang lấy trực tiếp từ backend."
               tone="info"
             />
           ) : null}
@@ -295,15 +295,15 @@ export default function AdminUserDetail() {
               <div className="flex flex-col gap-6">
                 <section className="admin-card">
                   <div className="admin-card__header">
-                    <div>
-                      <h2 className="admin-card__title">Access & permission</h2>
-                      <p className="admin-card__subtitle">Role hiện tại và phần preview permission đang có trên web admin.</p>
-                    </div>
+                  <div>
+                    <h2 className="admin-card__title">Access & permission</h2>
+                    <p className="admin-card__subtitle">Role hiện tại và phần web đang hiển thị theo role đó.</p>
                   </div>
+                </div>
 
                   <div className="admin-note-box">
                     <strong>{permissionProfile?.label || "Chưa đồng bộ role"}</strong>
-                    <p>{permissionProfile?.description || "API hiện chưa trả role cho user này, nên web chưa thể dựng đầy đủ permission preview."}</p>
+                    <p>{permissionProfile?.description || "Backend hiện chưa trả role cho user này, nên web chưa thể hiển thị phần quyền tương ứng."}</p>
                   </div>
 
                   <div className="mt-4 admin-info-list">
@@ -313,8 +313,8 @@ export default function AdminUserDetail() {
                       </div>
                       <div className="admin-info-list__value">
                         {user.hasKnownRole
-                          ? `${user.grantedPermissionCount} quyền đang được preview theo role hiện tại.`
-                          : "Chưa có dữ liệu role để preview permission."}
+                          ? `${user.grantedPermissionCount} quyền đang được hiển thị theo role hiện tại.`
+                          : "Chưa có role từ backend để hiển thị phần quyền."}
                       </div>
                     </div>
                     <div className="admin-info-list__item">
@@ -340,7 +340,7 @@ export default function AdminUserDetail() {
                   <div className="admin-card__header">
                     <div>
                       <h2 className="admin-card__title">Recent system activity</h2>
-                      <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất trong dataset demo liên quan trực tiếp tới user này, nếu có.</p>
+                      <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất liên quan tới user này, nếu có.</p>
                     </div>
                     <Link to={`/admin/logs?relatedTo=${user.id}`} className="admin-link-btn admin-link-btn--secondary">
                       View System Log
@@ -350,7 +350,7 @@ export default function AdminUserDetail() {
                   {relatedLogs.length === 0 ? (
                     <div className="admin-note-box">
                       <strong>Chưa có log liên quan</strong>
-                      <p>Hiện chưa ghi nhận hoạt động mới cho user này trong dataset log demo hoặc log chưa khớp với id backend.</p>
+                      <p>Hiện chưa ghi nhận hoạt động mới cho user này hoặc log chưa khớp với id backend.</p>
                     </div>
                   ) : (
                     <div className="admin-timeline">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BriefcaseBusiness,
   CircleAlert,
@@ -103,6 +103,7 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 }
 
 export default function EmployeeList() {
+  const location = useLocation();
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -111,6 +112,11 @@ export default function EmployeeList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadSeed, setReloadSeed] = useState(0);
+  const viewMode = location.pathname.includes("/employees/management")
+    ? "management"
+    : location.pathname.includes("/employees/workers")
+      ? "workers"
+      : "all";
 
   useEffect(() => {
     let mounted = true;
@@ -155,10 +161,24 @@ export default function EmployeeList() {
     setStatusFilter("all");
   };
 
+  const scopedEmployees = useMemo(() => {
+    if (viewMode === "management") {
+      return employees.filter((employee) =>
+        employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
+      );
+    }
+
+    if (viewMode === "workers") {
+      return employees.filter((employee) => employee.roles.includes("Worker"));
+    }
+
+    return employees;
+  }, [employees, viewMode]);
+
   const filteredEmployees = useMemo(() => {
     const keyword = normalizeSearchText(search);
 
-    return employees.filter((employee) => {
+    return scopedEmployees.filter((employee) => {
       const searchableText = normalizeSearchText(
         [
           employee.fullName,
@@ -183,23 +203,23 @@ export default function EmployeeList() {
 
       return matchSearch && matchRole && matchSpecialty && matchStatus;
     });
-  }, [employees, roleFilter, search, specialtyFilter, statusFilter]);
+  }, [roleFilter, scopedEmployees, search, specialtyFilter, statusFilter]);
 
   const stats = useMemo(() => {
-    const total = employees.length;
-    const active = employees.filter((employee) => employee.status === "active").length;
-    const management = employees.filter((employee) =>
+    const total = scopedEmployees.length;
+    const active = scopedEmployees.filter((employee) => employee.status === "active").length;
+    const management = scopedEmployees.filter((employee) =>
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
-    const skilled = employees.filter((employee) => Boolean(employee.workerSkill)).length;
+    const skilled = scopedEmployees.filter((employee) => Boolean(employee.workerSkill)).length;
 
     return { total, active, management, skilled };
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const roleOptions = useMemo(() => {
     const optionsMap = new Map();
 
-    employees.forEach((employee) => {
+    scopedEmployees.forEach((employee) => {
       employee.roles.forEach((role, index) => {
         if (!optionsMap.has(role)) {
           optionsMap.set(role, employee.roleLabels?.[index] || role);
@@ -213,12 +233,12 @@ export default function EmployeeList() {
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const specialtyOptions = useMemo(() => {
     const optionsMap = new Map();
 
-    employees.forEach((employee) => {
+    scopedEmployees.forEach((employee) => {
       if (employee.workerSkill) {
         optionsMap.set(employee.workerSkill, employee.workerSkillLabel || employee.workerSkill);
       }
@@ -230,14 +250,38 @@ export default function EmployeeList() {
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
     roleFilter !== "all" ||
     specialtyFilter !== "all" ||
     statusFilter !== "all";
-  const hasAnyEmployee = employees.length > 0;
+  const hasAnyEmployee = scopedEmployees.length > 0;
+  const pageTitle =
+    viewMode === "management"
+      ? "Danh sách quản lý"
+      : viewMode === "workers"
+        ? "Danh sách nhân viên"
+        : "Danh sách nhân viên";
+  const pageSubtitle =
+    viewMode === "management"
+      ? "Theo dõi riêng nhóm Owner, PM, Admin và Team Leader trong hệ thống."
+      : viewMode === "workers"
+        ? "Theo dõi riêng nhóm worker và chuyên môn thợ trong hệ thống."
+        : "Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Team Lead, Worker và chuyên môn thợ.";
+  const tableTitle =
+    viewMode === "management"
+      ? "Nhóm quản lý"
+      : viewMode === "workers"
+        ? "Nhân viên sản xuất"
+        : "Nhân sự trong xưởng";
+  const tableSubtitle =
+    viewMode === "management"
+      ? "Danh sách các tài khoản quản lý và vai trò điều hành hiện có."
+      : viewMode === "workers"
+        ? "Danh sách worker, chuyên môn thợ và tuyến quản lý hiện có."
+        : "Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.";
 
   return (
     <DashboardLayout>
@@ -245,10 +289,8 @@ export default function EmployeeList() {
         <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-hero">
             <div>
-              <h1 className="employee-hero__title">Danh sách nhân viên</h1>
-              <p className="employee-hero__subtitle">
-                Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Team Lead, Worker và chuyên môn thợ.
-              </p>
+              <h1 className="employee-hero__title">{pageTitle}</h1>
+              <p className="employee-hero__subtitle">{pageSubtitle}</p>
             </div>
 
             <Link to="/employees/create" className="employee-hero__action">
@@ -358,8 +400,8 @@ export default function EmployeeList() {
           <div className="employee-table-card">
             <div className="employee-table-card__header">
               <div>
-                <h2 className="employee-table-card__title">Nhân sự trong xưởng</h2>
-                <p className="employee-table-card__subtitle">Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.</p>
+                <h2 className="employee-table-card__title">{tableTitle}</h2>
+                <p className="employee-table-card__subtitle">{tableSubtitle}</p>
               </div>
             </div>
 

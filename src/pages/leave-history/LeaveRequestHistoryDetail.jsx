@@ -172,6 +172,16 @@ export default function LeaveRequestHistoryDetail() {
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
                     <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
+                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
+                    <div className="mt-2 text-lg font-semibold">{leave.approvedByName || "Chưa cập nhật"}</div>
+                  </div>
+                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4 md:col-span-3">
+                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
+                    <div className="mt-2 text-lg font-semibold">
+                      {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -183,6 +193,9 @@ export default function LeaveRequestHistoryDetail() {
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
                       <DetailItem icon={UserRound} label="Nhân viên gửi đơn" value={leave.userFullName} />
                       <DetailItem icon={CalendarClock} label="Ngày tạo đơn" value={formatLeaveDateTime(leave.dateCreate)} />
+                      <DetailItem icon={UserRound} label="Người phê duyệt" value={leave.approvedByName} />
+                      <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
+                      <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">

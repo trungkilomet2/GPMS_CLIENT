@@ -222,14 +222,14 @@ export default function AdminUserList() {
 
           <AdminBanner
             title="Danh sách user đang lấy từ API admin thật."
-            description="Role hiển thị ưu tiên từ backend; nếu endpoint chưa trả role, web sẽ giữ role vừa gán gần nhất để Admin vẫn review được flow."
+            description="Role hiển thị theo dữ liệu backend hiện tại. User nào chưa có role từ API sẽ được đánh dấu để Admin rà soát."
             tone="info"
           />
 
           {notice ? (
             <AdminBanner
               title={notice}
-              description="Các màn permission và system log vẫn đang dùng dữ liệu demo cho tới khi có endpoint tương ứng."
+              description="Một số phần admin như permission và log vẫn đang phụ thuộc vào dữ liệu backend còn thiếu."
               tone={noticeTone}
             />
           ) : null}
@@ -238,7 +238,7 @@ export default function AdminUserList() {
             <AdminStatCard icon={Users} label="Tổng user" value={stats.total} meta="Tất cả account đang lấy từ user-list" tone="primary" />
             <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Account vẫn có thể đăng nhập" tone="success" />
             <AdminStatCard icon={KeyRound} label="Role đặc quyền" value={stats.privileged} meta="Admin và Owner hiện có trong hệ thống" tone="warning" />
-            <AdminStatCard icon={ShieldAlert} label="Cần rà soát" value={stats.needsReview} meta={`${stats.missingRole} user chưa có role từ API`} tone="danger" />
+            <AdminStatCard icon={ShieldAlert} label="Cần rà soát" value={stats.needsReview} meta={`${stats.missingRole} user chưa được backend trả role`} tone="danger" />
           </div>
 
           <div className="admin-filter-card">
@@ -389,7 +389,7 @@ export default function AdminUserList() {
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
                             <span className="admin-badge admin-badge--tone-info">
-                              {user.hasKnownRole ? `${user.grantedPermissionCount} quyền preview` : "API chưa trả role"}
+                              {user.hasKnownRole ? `${user.grantedPermissionCount} quyền đang hiển thị` : "Chưa có role từ backend"}
                             </span>
                           </div>
                           <div className="admin-table__secondary">{user.roleDescription}</div>

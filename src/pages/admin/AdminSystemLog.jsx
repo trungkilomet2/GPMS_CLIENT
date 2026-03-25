@@ -109,24 +109,23 @@ export default function AdminSystemLog() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">View System Log Screen</h1>
               <p className="admin-hero__subtitle">
-                Thiết kế lại màn log cho Admin dựa trên schema {ADMIN_DB_SCHEMA_VERSION}. Vì database hiện chưa có bảng
-                `SYSTEM_LOG` riêng, màn này tổng hợp các bảng log và workflow thật đang tồn tại trong DB để Admin review
-                trước luồng audit API.
+                Màn này tổng hợp các nguồn log hiện có trong hệ thống để Admin theo dõi nhanh. Hiện backend chưa có
+                bảng log tổng như `SYSTEM_LOG`, nên web đang gom từ các bảng nghiệp vụ đang có.
               </p>
             </div>
           </div>
 
           <AdminBanner
-            title="Schema hiện chưa có security log hoặc IP audit riêng."
-            description="Không có `SYSTEM_LOG`, `LOGIN_AUDIT` hay `IP_TRACKING` trong V1.1.sql. Vì vậy màn này tập trung vào các nguồn log nghiệp vụ như reject reason, work log và history update."
+            title="Backend chưa có log bảo mật riêng."
+            description="Hiện chưa có `SYSTEM_LOG`, `LOGIN_AUDIT` hay `IP_TRACKING`, nên màn này đang hiển thị log từ các bảng nghiệp vụ như reject reason, work log và history update."
             tone="warning"
           />
 
           <div className="admin-stats-grid">
-            <AdminStatCard icon={ClipboardList} label="Nguồn log khả dụng" value={stats.sources} meta="Bảng log/workflow có thể dùng để dựng màn audit" tone="primary" />
-            <AdminStatCard icon={Users} label="Có USER_ID actor" value={stats.actorBound} meta="Nguồn có thể lần ngược user trực tiếp từ schema" tone="success" />
-            <AdminStatCard icon={ShieldCheck} label="Có cờ state" value={stats.paymentAware} meta="Nguồn lưu IS_PAYMENT hoặc IS_READ_ONLY" tone="info" />
-            <AdminStatCard icon={ShieldAlert} label="Security gaps" value={stats.securityGaps} meta="Khoảng trống cần backend bổ sung nếu muốn có audit chuẩn" tone="danger" />
+            <AdminStatCard icon={ClipboardList} label="Nguồn log hiện có" value={stats.sources} meta="Các bảng log và workflow đang dùng được" tone="primary" />
+            <AdminStatCard icon={Users} label="Có USER_ID" value={stats.actorBound} meta="Nguồn có thể lần ra user trực tiếp" tone="success" />
+            <AdminStatCard icon={ShieldCheck} label="Có trạng thái" value={stats.paymentAware} meta="Nguồn lưu IS_PAYMENT hoặc IS_READ_ONLY" tone="info" />
+            <AdminStatCard icon={ShieldAlert} label="Phần còn thiếu" value={stats.securityGaps} meta="Các phần backend cần bổ sung nếu muốn log đầy đủ hơn" tone="danger" />
           </div>
 
           <div className="admin-filter-card">
@@ -193,7 +192,7 @@ export default function AdminSystemLog() {
               <div>
                 <h2 className="admin-card__title">Operational log feed</h2>
                 <p className="admin-card__subtitle">
-                  Feed dưới đây là mẫu tổng hợp theo những cột có thật trong schema, không phải dataset audit bảo mật hoàn chỉnh.
+                  Danh sách bên dưới là dữ liệu tổng hợp từ các bảng đang có, chưa phải hệ thống audit đầy đủ.
                 </p>
               </div>
             </div>
@@ -203,7 +202,7 @@ export default function AdminSystemLog() {
                 <div className="admin-state">
                   <div className="admin-state__content">
                     <strong>Không có sự kiện phù hợp với bộ lọc hiện tại</strong>
-                    <span>Thử đổi source table hoặc actor trace để xem đầy đủ các bảng log khả dụng trong schema.</span>
+                    <span>Thử đổi bộ lọc để xem thêm các nguồn log hiện có trong hệ thống.</span>
                   </div>
                 </div>
               ) : (
@@ -214,8 +213,8 @@ export default function AdminSystemLog() {
                       <th>Nguồn</th>
                       <th>Action</th>
                       <th>Entity</th>
-                      <th>Actor mapping</th>
-                      <th>Schema note</th>
+                      <th>Người thực hiện</th>
+                      <th>Ghi chú</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -233,7 +232,7 @@ export default function AdminSystemLog() {
                             <div className="admin-table__primary">{log.sourceTable}</div>
                             <div className="admin-table__secondary">{log.moduleLabel}</div>
                             <div className="admin-chips mt-2">
-                              <AdminRoleBadge tone={source?.tone || "primary"}>{source?.actorLabel || "Schema source"}</AdminRoleBadge>
+                              <AdminRoleBadge tone={source?.tone || "primary"}>{source?.actorLabel || "Nguồn log"}</AdminRoleBadge>
                             </div>
                           </td>
                           <td>
@@ -277,8 +276,8 @@ export default function AdminSystemLog() {
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Các bảng log có trong schema</h2>
-                  <p className="admin-card__subtitle">Mỗi card bên dưới thể hiện chính xác bảng nào trong DB đang có thể dùng để dựng audit feed.</p>
+                  <h2 className="admin-card__title">Các bảng log đang dùng</h2>
+                  <p className="admin-card__subtitle">Mỗi card bên dưới là một nguồn log hoặc workflow mà web đang có thể đọc.</p>
                 </div>
               </div>
 
@@ -306,8 +305,8 @@ export default function AdminSystemLog() {
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Khoảng trống audit</h2>
-                  <p className="admin-card__subtitle">Những phần DB hiện chưa có nên web chưa thể hiện đúng security log chuẩn.</p>
+                  <h2 className="admin-card__title">Những phần còn thiếu</h2>
+                  <p className="admin-card__subtitle">Những phần backend hiện chưa có nên web chưa thể hiện log đầy đủ hơn.</p>
                 </div>
               </div>
 

@@ -23,6 +23,12 @@ const ProductionService = {
   rejectProduction(productionId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT(productionId), payload);
   },
+  getProductionIssues(productionId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES(productionId));
+  },
+  getProductionIssueSummary(productionId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES_SUMMARY(productionId));
+  },
 };
 
 export default ProductionService;
