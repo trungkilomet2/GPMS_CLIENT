@@ -247,7 +247,7 @@ export default function ProductionPlanList() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm mã kế hoạch, production, đơn hàng, sản phẩm..."
+                  placeholder="Tìm mã kế hoạch, đơn sản xuất, đơn hàng, sản phẩm..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
@@ -290,7 +290,7 @@ export default function ProductionPlanList() {
               <table className="w-full divide-y divide-slate-200 table-auto">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Production</th>
+                    <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Đơn sản xuất</th>
                     <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Đơn hàng</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Tên đơn</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Tên quản lý</th>

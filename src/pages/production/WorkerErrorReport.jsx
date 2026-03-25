@@ -381,7 +381,7 @@ export default function WorkerErrorReport() {
     const title = String(form.title || "").trim();
 
     if (!productionId) {
-      setSubmitError("Vui lòng chọn production.");
+      setSubmitError("Vui lòng chọn đơn sản xuất.");
       return;
     }
     if (!partId) {
@@ -491,14 +491,14 @@ export default function WorkerErrorReport() {
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Production</label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Đơn sản xuất</label>
                   <select
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
-                    <option value="">Chọn production...</option>
+                    <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
                       <option key={item.productionId} value={item.productionId}>
                         {`#PR-${item.productionId}${item.orderName ? ` - ${item.orderName}` : ""}`}
@@ -506,7 +506,7 @@ export default function WorkerErrorReport() {
                     ))}
                   </select>
                   {loadingProductions && (
-                    <div className="mt-1 text-xs text-slate-400">Đang tải production...</div>
+                    <div className="mt-1 text-xs text-slate-400">Đang tải đơn sản xuất...</div>
                   )}
                 </div>
 
@@ -692,14 +692,14 @@ export default function WorkerErrorReport() {
                 {selectedPart ? (
                   <div className="space-y-2 text-sm text-slate-700">
                     <InfoItem label="Part ID" value={selectedPart.id} />
-                    <InfoItem label="Production" value={`#PR-${selectedPart.productionId}`} />
+                    <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
                     <InfoItem label="Bắt đầu" value={selectedPart.startDate || "-"} />
                     <InfoItem label="Kết thúc" value={selectedPart.endDate || "-"} />
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-500">Chọn production và công đoạn để xem thông tin.</div>
+                  <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>
                 )}
               </div>
 

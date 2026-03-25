@@ -47,9 +47,30 @@ const PRODUCTION_LABELS = {
   denied: "Từ Chối",
 };
 
+const PRODUCTION_STATUS_BY_ID = {
+  1: PRODUCTION_LABELS["cho xet duyet"],
+  2: PRODUCTION_LABELS["tu choi"],
+  3: PRODUCTION_LABELS["can cap nhat"],
+  4: PRODUCTION_LABELS["chap nhan"],
+  5: PRODUCTION_LABELS["cho xet duyet ke hoach"],
+  6: PRODUCTION_LABELS["can chinh sua ke hoach"],
+  7: PRODUCTION_LABELS["dang san xuat"],
+  8: PRODUCTION_LABELS["hoan thanh"],
+};
+
 export function getProductionStatusLabel(status) {
+  if (typeof status === "number" && PRODUCTION_STATUS_BY_ID[status]) {
+    return PRODUCTION_STATUS_BY_ID[status];
+  }
+
   const raw = String(status ?? "").trim();
   if (!raw) return "-";
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && PRODUCTION_STATUS_BY_ID[numeric]) {
+    return PRODUCTION_STATUS_BY_ID[numeric];
+  }
+
   const normalized = raw.toLowerCase();
   return PRODUCTION_LABELS[normalized] || raw;
 }

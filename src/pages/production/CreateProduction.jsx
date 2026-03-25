@@ -373,7 +373,7 @@ export default function CreateProduction() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAccepted) {
-      alert("Chỉ được tạo production cho đơn hàng Đã Chấp Nhận.");
+      alert("Chỉ được tạo đơn sản xuất cho đơn hàng Đã Chấp Nhận.");
       return;
     }
     if (!validate()) return;
@@ -409,7 +409,7 @@ export default function CreateProduction() {
       setShowSuccess(true);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
-      alert("Không thể tạo production. Vui lòng thử lại.");
+      alert("Không thể tạo đơn sản xuất. Vui lòng thử lại.");
     } finally {
       setIsSubmitting(false);
     }
@@ -442,9 +442,9 @@ export default function CreateProduction() {
         {showSuccess && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
             <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-              <h3 className="text-lg font-bold text-slate-900">Tạo production thành công</h3>
+              <h3 className="text-lg font-bold text-slate-900">Tạo đơn sản xuất thành công</h3>
               <p className="mt-2 text-sm text-slate-600">
-                Production đã được tạo thành công. Bạn có muốn chuyển về danh sách sản xuất không?
+                Đơn sản xuất đã được tạo thành công. Bạn có muốn chuyển về danh sách sản xuất không?
               </p>
               <div className="mt-6 flex justify-end gap-3">
                 <button
@@ -469,9 +469,9 @@ export default function CreateProduction() {
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Tạo Production cho đơn hàng #{order?.id ?? "--"}
+                  Tạo đơn sản xuất cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý cho production.</p>
+                <p className="text-slate-600">Thiết lập PM quản lý cho đơn sản xuất.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -484,12 +484,12 @@ export default function CreateProduction() {
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-600 mb-4">
                   <UserCheck size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin Production</h2>
+                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin đơn sản xuất</h2>
                 </div>
 
                 {!isAccepted && order?.id && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                    Chỉ được tạo production cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
+                    Chỉ được tạo đơn sản xuất cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
                   </div>
                 )}
 
@@ -559,13 +559,13 @@ export default function CreateProduction() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú Production</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú đơn sản xuất</label>
                     <textarea
                       name="productionNote"
                       rows={3}
                       value={form.productionNote}
                       onChange={handleChange}
-                      placeholder="Nhập ghi chú cho production..."
+                      placeholder="Nhập ghi chú cho đơn sản xuất..."
                       className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                     />
                   </div>
@@ -583,7 +583,7 @@ export default function CreateProduction() {
                       disabled={isSubmitting || !isAccepted}
                       className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
                     >
-                      {isSubmitting ? "Đang tạo..." : "Tạo Production"}
+                      {isSubmitting ? "Đang tạo..." : "Tạo đơn sản xuất"}
                     </button>
                   </div>
                 </form>

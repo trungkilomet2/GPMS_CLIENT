@@ -68,7 +68,7 @@ export default function ProductionAssignment() {
         },
       });
     }).catch(() => {
-      setWorkerError("Không thể tải thông tin production.");
+      setWorkerError("Không thể tải thông tin đơn sản xuất.");
     });
     return () => { active = false; };
   }, [selectedProductionId, incoming]);
@@ -180,7 +180,7 @@ export default function ProductionAssignment() {
     const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
       || selectedProduction?.product?.endDate || "2026-12-31";
     if (!pmId) {
-      setWorkerError("Không tìm thấy thông tin PM quản lý production này.");
+      setWorkerError("Không tìm thấy thông tin PM quản lý đơn sản xuất này.");
       return;
     }
     ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
@@ -422,7 +422,7 @@ export default function ProductionAssignment() {
           {incoming?.production && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
-                <InfoItem label="Production" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
+                <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
                 <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
                 <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />

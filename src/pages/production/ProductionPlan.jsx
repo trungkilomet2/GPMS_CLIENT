@@ -320,7 +320,7 @@ export default function ProductionPlan() {
             : []
         );
       } catch (err) {
-        console.error("Lỗi tải ds production:", err);
+        console.error("Lỗi tải danh sách đơn sản xuất:", err);
       }
     };
     fetchList();
@@ -360,7 +360,7 @@ export default function ProductionPlan() {
           }
         });
       } catch (err) {
-        console.error("Lỗi chi tiết production:", err);
+        console.error("Lỗi chi tiết đơn sản xuất:", err);
       }
     };
     fetchDetail();
@@ -595,7 +595,7 @@ export default function ProductionPlan() {
   const handleSaveStep = () => {
     const name = form.partName.trim();
     if (!selectedProductionId) {
-      setFormError("Vui lòng chọn production trước.");
+      setFormError("Vui lòng chọn đơn sản xuất trước.");
       return;
     }
     if (!name) {
@@ -712,13 +712,13 @@ export default function ProductionPlan() {
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn production</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn đơn sản xuất</div>
               <select
                 value={selectedProductionId}
                 onChange={(event) => setSelectedProductionId(event.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
               >
-                <option value="">Chọn production...</option>
+                <option value="">Chọn đơn sản xuất...</option>
                 {productionList.map((item) => (
                   <option key={item.productionId} value={item.productionId}>
                     {`#PR-${item.productionId} - ${item.orderName}`}
@@ -735,7 +735,7 @@ export default function ProductionPlan() {
               className="w-full flex items-center justify-between mb-4 text-left"
             >
               <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin production</div>
+                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin đơn sản xuất</div>
                 <div className="text-lg font-semibold text-slate-900">
                   {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
                 </div>

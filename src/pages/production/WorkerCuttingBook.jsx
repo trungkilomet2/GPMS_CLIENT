@@ -420,7 +420,7 @@ export default function WorkerCuttingBook() {
         setProductions(allItems);
       } catch (_err) {
         if (!active) return;
-        setProductionError("Không thể tải danh sách production.");
+        setProductionError("Không thể tải danh sách đơn sản xuất.");
         setProductions([]);
       } finally {
         if (active) setProductionLoading(false);
@@ -786,11 +786,11 @@ export default function WorkerCuttingBook() {
       (isCreateOnlyMode ? locationProductionId : newBook.productionId) || ""
     ).trim();
     if (!productionKey) {
-      setCreateError("Vui lòng chọn một production có sẵn.");
+      setCreateError("Vui lòng chọn một đơn sản xuất có sẵn.");
       return;
     }
     if (!isCreateOnlyMode && !productionMap.has(productionKey)) {
-      setCreateError("Production không tồn tại trong hệ thống. Vui lòng chọn lại.");
+      setCreateError("Đơn sản xuất không tồn tại trong hệ thống. Vui lòng chọn lại.");
       return;
     }
 
@@ -961,14 +961,14 @@ export default function WorkerCuttingBook() {
                   <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr_1fr]">
                     {isCreateOnlyMode ? (
                       <Field
-                        label="Mã kế hoạch/production"
+                        label="Mã kế hoạch/đơn sản xuất"
                         value={locationProductionId}
                         onChange={() => { }}
                         disabled
                       />
                     ) : (
                       <SuggestSelect
-                        label="Mã kế hoạch/production"
+                        label="Mã kế hoạch/đơn sản xuất"
                         value={newBook.productionId}
                         onChange={(v) => updateNewBook("productionId", v)}
                         options={productions.map((item) => ({
@@ -980,7 +980,7 @@ export default function WorkerCuttingBook() {
                     )}
                     {productionLoading && !productionError && (
                       <div className="lg:col-span-3 text-xs text-slate-400">
-                        Đang tải danh sách production...
+                        Đang tải danh sách đơn sản xuất...
                       </div>
                     )}
                     {productionError && (
@@ -1013,7 +1013,7 @@ export default function WorkerCuttingBook() {
                         <Save size={16} /> {creatingBook ? "Đang tạo..." : "Tạo sổ cắt"}
                       </button>
                       <div className="text-xs text-slate-400">
-                        Bắt buộc nhập Mã kế hoạch/production để tạo sổ cắt.
+                        Bắt buộc nhập Mã kế hoạch/đơn sản xuất để tạo sổ cắt.
                       </div>
                     </div>
                   </div>
@@ -1037,7 +1037,7 @@ export default function WorkerCuttingBook() {
                           <thead className="leave-table-head">
                             <tr>
                               <th className="leave-table-th w-14 px-3 py-3 text-center">STT</th>
-                              <th className="leave-table-th w-32 px-3 py-3 text-left">Production</th>
+                              <th className="leave-table-th w-32 px-3 py-3 text-left">Đơn sản xuất</th>
                               <th className="leave-table-th w-48 px-3 py-3 text-left">Đơn hàng</th>
                               <th className="leave-table-th w-28 px-3 py-3 text-center">Dòng đã lưu</th>
                               <th className="leave-table-th w-28 px-3 py-3 text-center">Tổng số lớp</th>
@@ -1122,7 +1122,7 @@ export default function WorkerCuttingBook() {
                 </button>
                 {!collapseMeta && (
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Field compact label="Mã production" value={meta.productionId} onChange={(v) => updateMeta("productionId", v)} disabled={!isEditing} />
+                    <Field compact label="Mã đơn sản xuất" value={meta.productionId} onChange={(v) => updateMeta("productionId", v)} disabled={!isEditing} />
                     <Field compact label="Chiều dài sơ đồ (m)" value={meta.markerLength} onChange={(v) => updateMeta("markerLength", v)} disabled={!isEditing} />
                     <Field compact label="Khổ vải (cm)" value={meta.fabricWidth} onChange={(v) => updateMeta("fabricWidth", v)} disabled={!isEditing} />
                   </div>
