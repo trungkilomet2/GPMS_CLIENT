@@ -83,6 +83,7 @@ export const routes = [
   { path: "/orders/manual-create", element: guardByRoles(["Owner"], <CreateManualOrder />) },
   { path: "/orders/edit/:id", element: guardByRoles(["Customer"], <EditOrder />) },
   { path: "/orders/detail/:id", element: guardByRoles(["Owner", "Customer"], <OrderDetail />) },
+  { path: "/orders/detail/:id", element: guardByRoles(["Owner", "PM"], <OrderDetail />) },
   { path: "/production/create", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production/create/:orderId", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production", element: guardByRoles(["Owner", "PM"], <ProductionList />) },
