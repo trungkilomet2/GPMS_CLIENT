@@ -372,9 +372,8 @@ export default function ProductionPlanDetail() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button
-                onClick={() => navigate(-1)}
-                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+              <button onClick={() => navigate(-1)}
+                className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
               </button>
@@ -388,11 +387,10 @@ export default function ProductionPlanDetail() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+              <button type="button"
                 onClick={handleOpenCuttingBook}
                 disabled={checkingCuttingBook}
-                className="rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                className="cursor-pointer rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
               >
                 {checkingCuttingBook ? "Đang kiểm tra..." : "Sổ cắt"}
               </button>

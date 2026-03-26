@@ -177,7 +177,9 @@ export default function ProductionPlanList() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <button
               type="button"
-              className="group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-slate-200"
+              onClick={() => setStatusFilter("all")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "all" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+                }`}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -192,7 +194,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -200,7 +202,7 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đã lên kế hoạch</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.planned}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-indigo-100 bg-indigo-50 text-indigo-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
@@ -208,7 +210,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Đang Sản Xuất")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -216,7 +218,7 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đang triển khai</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.inProgress}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-violet-100 bg-violet-50 text-violet-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
@@ -224,7 +226,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Hoàn Thành")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">

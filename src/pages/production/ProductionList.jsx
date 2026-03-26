@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
+import { CheckCircle2, Clock3, FileText, Filter, Search, XCircle } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
@@ -52,8 +52,7 @@ export default function ProductionList() {
         String(item.order?.id ?? item.orderId ?? "").includes(q) ||
         String(item.order?.orderName ?? item.orderName ?? "").toLowerCase().includes(q) ||
         String(getPmName(item) || "").toLowerCase().includes(q);
-      const statusLabel = getProductionStatusLabel(item.statusName ?? item.status ?? item.statusId);
-      const statusOk = statusFilter === "all" || statusLabel === statusFilter;
+      const statusOk = statusFilter === "all" || item.statusName === statusFilter;
       return hit && statusOk;
     });
   }, [baseProductions, search, statusFilter]);
@@ -70,10 +69,12 @@ export default function ProductionList() {
 
   const stats = useMemo(() => {
     const total = baseProductions.length;
-    const planned = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Chờ Xét Duyệt Kế Hoạch").length;
-    const inProgress = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Đang Sản Xuất").length;
-    const completed = baseProductions.filter((item) => getProductionStatusLabel(item.status) === "Hoàn Thành").length;
-    return { total, planned, inProgress, completed };
+    const pendingCheck = baseProductions.filter((item) => item.statusId === 1 || item.statusName === "Chờ kiểm tra").length;
+    const pendingPlan = baseProductions.filter((item) => item.statusId === 4 || item.statusName === "Chờ Xét Duyệt Kế Hoạch").length;
+    const rejected = baseProductions.filter((item) => item.statusName === "Từ Chối").length;
+    const inProgress = baseProductions.filter((item) => item.statusName === "Đang Sản Xuất").length;
+    const completed = baseProductions.filter((item) => item.statusName === "Hoàn Thành").length;
+    return { total, pendingCheck, pendingPlan, rejected, inProgress, completed };
   }, [baseProductions]);
 
   const resetFilters = () => {
@@ -87,8 +88,8 @@ export default function ProductionList() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-col gap-2">
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách sản xuất</h1>
-              <p className="text-slate-600">Theo dõi các kế hoạch sản xuất và trạng thái triển khai.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách đơn sản xuất</h1>
+              <p className="text-slate-600">Theo dõi các đơn sản xuất và trạng thái triển khai.</p>
             </div>
             {(!isPm || isOwner) && (
               <Link className="order-create-btn" to="/production/create">
@@ -100,7 +101,9 @@ export default function ProductionList() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <button
               type="button"
-              className="group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-slate-200"
+              onClick={() => setStatusFilter("all")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "all" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+                }`}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -114,16 +117,32 @@ export default function ProductionList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Chờ kiểm tra")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ kiểm tra" ? "border-sky-500 ring-2 ring-sky-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-500">Đã lên kế hoạch</div>
-                  <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.planned}</div>
+                  <div className="text-sm font-semibold text-slate-500">Chờ kiểm tra</div>
+                  <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.pendingCheck}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-sky-100 bg-sky-50 text-sky-700">
+                  <Clock3 size={26} strokeWidth={2.1} />
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
+                }`}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-500">Chờ duyệt KH</div>
+                  <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.pendingPlan}</div>
+                </div>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-indigo-100 bg-indigo-50 text-indigo-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
@@ -131,7 +150,7 @@ export default function ProductionList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Đang Sản Xuất")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -139,24 +158,8 @@ export default function ProductionList() {
                   <div className="text-sm font-semibold text-slate-500">Đang sản xuất</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.inProgress}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-violet-100 bg-violet-50 text-violet-700">
                   <Clock3 size={26} strokeWidth={2.1} />
-                </div>
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter("Hoàn Thành")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
-                }`}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-500">Hoàn tất</div>
-                  <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.completed}</div>
-                </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
-                  <CheckCircle2 size={26} strokeWidth={2.1} />
                 </div>
               </div>
             </button>
@@ -183,9 +186,13 @@ export default function ProductionList() {
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
                   <option value="all">Tất cả trạng thái</option>
+                  <option value="Chờ Xét Duyệt">Chờ Xét Duyệt</option>
+                  <option value="Chấp Nhận">Chấp Nhận</option>
                   <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
+                  <option value="Cần Chỉnh Sửa Kế Hoạch">Cần Chỉnh Sửa Kế Hoạch</option>
                   <option value="Đang Sản Xuất">Đang Sản Xuất</option>
                   <option value="Hoàn Thành">Hoàn Thành</option>
+                  <option value="Từ Chối">Từ Chối</option>
                 </select>
               </label>
               <div className="flex items-center justify-end gap-3">
@@ -258,7 +265,8 @@ export default function ProductionList() {
                         <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.endDate ?? item.pEndDate ?? "-"}</td>
                         <td className="px-3 py-3 text-center">
                           {(() => {
-                            const statusLabel = getProductionStatusLabel(item.statusName ?? item.status ?? item.statusId);
+                            const statusLabel = item.statusName
+                              || getProductionStatusLabel(item.status ?? item.statusId);
                             return (
                               <span className={`inline-block rounded-full border px-3.5 py-1 text-xs font-medium ${STATUS_STYLES[statusLabel] || STATUS_STYLES.default}`}>
                                 {statusLabel}

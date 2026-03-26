@@ -282,9 +282,8 @@ export default function OrderDetail() {
                 <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-start gap-3">
-                            <button
-                                onClick={() => navigate(-1)}
-                                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+                            <button onClick={() => navigate(-1)}
+                                className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
                             >
                                 <ArrowLeft size={18} />
                             </button>
@@ -300,73 +299,67 @@ export default function OrderDetail() {
                                 {order.statusName || order.status}
                             </span>
                             {canCustomerDeny && (
-                                <button
-                                    type="button"
+                                <button type="button"
                                     onClick={() => setShowDenyConfirm(true)}
                                     disabled={isCanceled || !canCancelOrder}
-                                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     Hủy đơn hàng
                                 </button>
                             )}
                             {canModerate && (
-                                <button
-                                    type="button"
+                                <button type="button"
                                     onClick={() => {
                                         if (isRejected) return;
                                         navigate(`/production/create/${order.id}`);
                                     }}
                                     disabled={isRejected || normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
-                                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Tạo production
                                 </button>
                             )}
                             {canModerate && (
                                 <>
-                                    <button
-                                        type="button"
+                                    <button type="button"
                                         disabled={isUpdatingStatus || isRejected || isAccepted || !canAccept}
                                         onClick={() => {
                                             if (isRejected || isAccepted || !canAccept) return;
                                             setIsApproveModalOpen(true);
                                         }}
-                                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Chấp nhận
                                     </button>
-                                    <button
-                                        type="button"
+                                    <button type="button"
                                         disabled={isUpdatingStatus || isRejected || isAccepted}
                                         onClick={() => {
                                             if (isRejected || isAccepted) return;
                                             openReasonModal('Từ chối');
                                         }}
-                                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                                        className="cursor-pointer rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
                                     >
                                         Từ chối
                                     </button>
-                                    <button
-                                        type="button"
+                                    <button type="button"
                                         disabled={isUpdatingStatus || isRejected || isAccepted || !canRequestModification}
                                         onClick={() => {
                                             if (isRejected || isAccepted || !canRequestModification) return;
                                             openReasonModal('Yêu cầu chỉnh sửa');
                                         }}
-                                        className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="cursor-pointer rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         Yêu cầu chỉnh sửa
                                     </button>
                                 </>
                             )}
                             {canEdit && (
-                                <button
-                                    onClick={() => {
+                                <button onClick={() => {
                                         if (!canEditOnlyWhenRequested) return;
                                         navigate(`/orders/edit/${order.id}`, { state: { order } });
                                     }}
                                     disabled={!canEditOnlyWhenRequested}
-                                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="cursor-pointer flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Edit3 size={16} /> Chỉnh sửa
                                 </button>
@@ -520,15 +513,13 @@ export default function OrderDetail() {
                             </div>
 
                             <div className="space-y-3">
-                                <button
-                                    onClick={() => setIsCommentModalOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
+                                <button onClick={() => setIsCommentModalOpen(true)}
+                                    className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
                                 >
                                     <MessageSquare size={16} /> Thảo luận đơn hàng
                                 </button>
-                                <button
-                                    onClick={() => setIsHistoryModalOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                                <button onClick={() => setIsHistoryModalOpen(true)}
+                                    className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
                                 >
                                     <History size={16} /> Lịch sử chỉnh sửa
                                 </button>
@@ -632,19 +623,17 @@ export default function OrderDetail() {
                             Bạn có chắc muốn hủy đơn hàng #{order?.id ?? id} không?
                         </p>
                         <div className="mt-5 flex flex-wrap justify-end gap-3">
-                            <button
-                                type="button"
+                            <button type="button"
                                 onClick={() => setShowDenyConfirm(false)}
                                 disabled={denyLoading}
-                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
+                                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
                             >
                                 Hủy
                             </button>
-                            <button
-                                type="button"
+                            <button type="button"
                                 onClick={handleCustomerDenyOrder}
                                 disabled={denyLoading}
-                                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                                className="cursor-pointer rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
                             >
                                 {denyLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
                             </button>
