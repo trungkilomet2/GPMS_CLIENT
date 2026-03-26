@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ProductionService from "@/services/ProductionService";
+import { getProductionStatusLabel } from "@/utils/statusUtils";
 
 export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50) {
   const [productions, setProductions] = useState([]);
@@ -17,7 +18,7 @@ export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50
         const seenKeys = new Set();
         let pageIndex = 0;
         let recordCount = null;
-        
+
         while (pageIndex < maxPagesConfig) {
           const response = await ProductionService.getProductionList({
             PageIndex: pageIndex,
@@ -26,7 +27,7 @@ export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50
             SortOrder: "ASC",
           });
           if (!active) return;
-          
+
           const payload = response?.data ?? response;
           const list = Array.isArray(payload?.data)
             ? payload.data
@@ -39,7 +40,10 @@ export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50
             const key = item?.productionId ?? item?.id ?? JSON.stringify(item);
             if (seenKeys.has(key)) return;
             seenKeys.add(key);
-            allItems.push(item);
+            const resolvedStatus = getProductionStatusLabel(
+              item.statusName ?? item.status ?? item.statusId
+            );
+            allItems.push({ ...item, statusName: resolvedStatus });
             added += 1;
           });
 
@@ -55,7 +59,7 @@ export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50
           if (added === 0) break;
           if (recordCount != null && allItems.length >= recordCount) break;
           if (list.length < pageSizeFetchConfig) break;
-          
+
           pageIndex += 1;
         }
 
@@ -69,7 +73,7 @@ export function useProductionList(maxPagesConfig = 200, pageSizeFetchConfig = 50
             String(a?.productionId ?? a?.id ?? "")
           );
         });
-        
+
         setProductions(sortedItems);
         setTotalCount(allItems.length);
       } catch (err) {
