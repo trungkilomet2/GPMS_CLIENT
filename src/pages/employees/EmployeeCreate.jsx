@@ -35,6 +35,7 @@ export default function EmployeeCreate() {
     password: "",
     fullName: "",
     role: "PM",
+    pmScopeId: "",
     managerId: "",
   });
 
@@ -76,13 +77,69 @@ export default function EmployeeCreate() {
     [form.role]
   );
 
-  const availableManagers = useMemo(
+  const availablePmScopes = useMemo(
     () =>
-      managerOptions.filter((employee) =>
-        employee.roles.some((role) => allowedManagerRoles.includes(role))
-      ),
-    [allowedManagerRoles, managerOptions]
+      managerOptions.filter((employee) => employee.roles.some((role) => role === "PM")),
+    [managerOptions]
   );
+
+  const availableManagers = useMemo(
+    () => {
+      const scopedManagers = managerOptions.filter((employee) =>
+        employee.roles.some((role) => allowedManagerRoles.includes(role))
+      );
+
+      if (form.role !== "Worker") {
+        return scopedManagers;
+      }
+
+      if (!form.pmScopeId) {
+        return [];
+      }
+
+      return scopedManagers.filter((employee) => {
+        const isPm = employee.roles.includes("PM");
+        const isTeamLeader = employee.roles.includes("Team Leader");
+
+        if (isPm) {
+          return String(employee.id) === String(form.pmScopeId);
+        }
+
+        if (isTeamLeader) {
+          return String(employee.managerId) === String(form.pmScopeId);
+        }
+
+        return false;
+      });
+    },
+    [allowedManagerRoles, form.pmScopeId, form.role, managerOptions]
+  );
+
+  useEffect(() => {
+    if (form.role !== "Worker") {
+      if (!form.pmScopeId) return;
+
+      setForm((prev) => ({
+        ...prev,
+        pmScopeId: "",
+      }));
+      return;
+    }
+
+    if (!form.pmScopeId) return;
+
+    const isValidPmScope = availablePmScopes.some(
+      (pm) => String(pm.id) === String(form.pmScopeId)
+    );
+
+    if (!isValidPmScope) {
+      setForm((prev) => ({
+        ...prev,
+        pmScopeId: "",
+        managerId: "",
+      }));
+    }
+  }, [availablePmScopes, form.pmScopeId, form.role]);
 
   useEffect(() => {
     if (!form.managerId) return;
@@ -122,6 +179,10 @@ export default function EmployeeCreate() {
       password: validatePassword(form.password),
       fullName: validateFullName(normalizedFullName),
       role: SYSTEM_ROLE_IDS[form.role] ? "" : "Vai trò không hợp lệ",
+      pmScopeId:
+        form.role === "Worker" && !String(form.pmScopeId ?? "").trim()
+          ? "Vui lòng chọn PM phụ trách"
+          : "",
       managerId:
         isManagerRequired(form.role) && !String(form.managerId ?? "").trim()
           ? "Vui lòng chọn quản lý trực tiếp"
@@ -237,20 +298,44 @@ export default function EmployeeCreate() {
                 <label className="employee-create-field">
                   <span className="employee-create-field__label">Quản lý trực tiếp</span>
                   <BriefcaseBusiness size={18} className="employee-create-field__icon" />
+                  {form.role === "Worker" ? (
+                    <select
+                      value={form.pmScopeId}
+                      onChange={handleChange("pmScopeId")}
+                      className="employee-create-field__control"
+                      disabled={managerLoading}
+                    >
+                      <option value="">
+                        {managerLoading
+                          ? "Đang tải danh sách PM..."
+                          : availablePmScopes.length
+                            ? "Chọn PM phụ trách"
+                            : "Chưa có PM phù hợp"}
+                      </option>
+                      {availablePmScopes.map((manager) => (
+                        <option key={manager.id} value={manager.id}>
+                          {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+                  {fieldErrors.pmScopeId ? <span className="employee-create-field__error">{fieldErrors.pmScopeId}</span> : null}
                   <select
                     value={form.managerId}
                     onChange={handleChange("managerId")}
                     className="employee-create-field__control"
-                    disabled={form.role === "Owner" || managerLoading}
+                    disabled={form.role === "Owner" || managerLoading || (form.role === "Worker" && !form.pmScopeId)}
                   >
                     <option value="">
                       {form.role === "Owner"
                         ? "Owner không có quản lý trực tiếp"
                         : managerLoading
                           ? "Đang tải danh sách quản lý..."
-                          : availableManagers.length
-                            ? "Chọn quản lý trực tiếp"
-                            : "Chưa có quản lý phù hợp"}
+                          : form.role === "Worker" && !form.pmScopeId
+                            ? "Chọn PM phụ trách trước"
+                            : availableManagers.length
+                              ? "Chọn quản lý trực tiếp"
+                              : "Chưa có quản lý phù hợp"}
                     </option>
                     {availableManagers.map((manager) => (
                       <option key={manager.id} value={manager.id}>
