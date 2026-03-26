@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import { compareLeaveDateDesc, formatLeaveDateTime } from "@/lib/leaveDateTime";
+import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
@@ -162,11 +162,6 @@ export default function LeaveRequests() {
       rejected: items.filter((item) => item.status === "rejected").length,
     }),
     [items, totalCount]
-  );
-
-  const sortedItems = useMemo(
-    () => [...items].sort((left, right) => compareLeaveDateDesc(left?.dateCreate, right?.dateCreate)),
-    [items]
   );
 
   const totalPages = Math.max(1, Math.ceil((totalCount || items.length || 1) / PAGE_SIZE));
@@ -390,7 +385,7 @@ export default function LeaveRequests() {
                             </div>
                           </td>
                         </tr>
-                      ) : sortedItems.length === 0 ? (
+                      ) : items.length === 0 ? (
                         <tr>
                           <td colSpan={5} className="px-6 py-16 text-center">
                             <div className="flex flex-col items-center gap-3 text-slate-500">
@@ -400,7 +395,7 @@ export default function LeaveRequests() {
                           </td>
                         </tr>
                       ) : (
-                        sortedItems.map((item) => (
+                        items.map((item) => (
                           <tr key={item.id} className="leave-table-row hover:bg-slate-50/80">
                             <td className="px-5 py-4 align-top">
                               <div className="max-w-xl text-sm leading-6 text-slate-700">{item.content}</div>

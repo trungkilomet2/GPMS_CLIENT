@@ -85,7 +85,6 @@ export const API_ENDPOINTS = {
 
   PERMISSION: {
     GET_ALL: `${BASE_URL}/api/Permission`,
-    UPDATE: (id) => `${BASE_URL}/api/Permission/${id}`,
   },
 
   LOG: {

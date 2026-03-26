@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -35,7 +35,6 @@ function getInitials(name = "") {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
-  const location = useLocation();
   const currentUser = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const isOwner = primaryRole === "owner";
@@ -54,42 +53,17 @@ export default function EmployeeDetail() {
       setNotFound(false);
 
       try {
-        const directoryResponse = await WorkerService.getAllEmployees();
-        const fromDirectory = (directoryResponse?.data ?? []).find(
-          (item) => String(item.id) === String(id)
-        ) ?? null;
-        const fromDetail = await WorkerService.getEmployeeById(id);
-        const found = fromDirectory
-          ? {
-              ...fromDetail,
-              ...fromDirectory,
-              role: fromDirectory.role || fromDetail?.role,
-              roles: fromDirectory.roles?.length ? fromDirectory.roles : (fromDetail?.roles ?? []),
-              roleLabels: fromDirectory.roleLabels?.length ? fromDirectory.roleLabels : (fromDetail?.roleLabels ?? []),
-              managerId: fromDirectory.managerId ?? fromDetail?.managerId ?? null,
-              managerName: fromDirectory.managerName || fromDetail?.managerName || "",
-              statusId: fromDirectory.statusId ?? fromDetail?.statusId ?? null,
-              status: fromDirectory.status || fromDetail?.status,
-            }
-          : fromDetail;
-        const updatedSnapshot = location.state?.updatedEmployeeSnapshot;
-        const resolvedEmployee =
-          updatedSnapshot && String(updatedSnapshot.id) === String(id)
-            ? {
-                ...found,
-                ...updatedSnapshot,
-              }
-            : found;
+        const found = await WorkerService.getEmployeeById(id);
         if (!mounted) return;
 
-        if (!resolvedEmployee) {
+        if (!found) {
           setNotFound(true);
           setError("Không tìm thấy nhân viên phù hợp.");
           setEmployee(null);
           return;
         }
 
-        setEmployee(resolvedEmployee);
+        setEmployee(found);
       } catch (err) {
         if (!mounted) return;
 
@@ -108,7 +82,7 @@ export default function EmployeeDetail() {
     return () => {
       mounted = false;
     };
-  }, [id, location.state, reloadSeed]);
+  }, [id, reloadSeed]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);

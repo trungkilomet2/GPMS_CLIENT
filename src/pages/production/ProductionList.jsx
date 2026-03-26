@@ -5,7 +5,7 @@ import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import WorkerService from "@/services/WorkerService";
-import { userService } from "@/services/UserService";
+import { userService } from "@/services/userService";
 import { useAuth } from "@/hooks/useAuth";
 import { useProductionList } from "@/hooks/useProductionList";
 import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";

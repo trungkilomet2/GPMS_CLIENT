@@ -4,7 +4,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { authService } from "@/services/authService";
-import { userService } from "@/services/UserService";
+import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import {
@@ -105,16 +105,6 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
-function isRegisteredEmailMessage(value) {
-  const message = String(value ?? "").trim().toLowerCase();
-  if (!message) return false;
-  return (
-    message.includes("email đã được đăng ký") ||
-    message.includes("email da duoc dang ky") ||
-    message.includes("email already registered")
-  );
-}
-
 export default function InternalProfileEdit() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -135,7 +125,6 @@ export default function InternalProfileEdit() {
   const [message, setMessage] = useState(null);
   const [touched, setTouched] = useState({});
   const [serverErrors, setServerErrors] = useState({});
-  const [originalEmail, setOriginalEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [otpStage, setOtpStage] = useState("idle");
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -168,7 +157,6 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
-        setOriginalEmail(String(profile?.email || storedUser?.email || "").trim().toLowerCase());
         setAvatarPreview(profile?.avatarUrl || storedUser?.avatarUrl || "");
       } catch (e) {
         if (!mounted) return;
@@ -220,9 +208,6 @@ export default function InternalProfileEdit() {
   };
 
   const hasErrors = Object.values(effectiveErrors).some(Boolean);
-  const normalizedCurrentEmail = String(form.email || "").trim().toLowerCase();
-  const normalizedOriginalEmail = String(originalEmail || "").trim().toLowerCase();
-  const isEmailChanged = normalizedCurrentEmail !== normalizedOriginalEmail;
 
   const onChange = (name) => (e) => {
     const value = e.target.value;
@@ -279,12 +264,12 @@ export default function InternalProfileEdit() {
       });
     } catch (err) {
       const errData = err?.response?.data;
-      const rawMessage = errData?.message || errData?.title || "";
       setMessage({
         type: "error",
-        text: isRegisteredEmailMessage(rawMessage)
-          ? "Email này đã tồn tại trong hệ thống. Backend hiện chưa hỗ trợ gửi OTP xác thực lại cho email đã đăng ký ở màn cập nhật hồ sơ."
-          : rawMessage || "Không thể gửi mã xác thực. Vui lòng thử lại.",
+        text:
+          errData?.message ||
+          errData?.title ||
+          "Không thể gửi mã xác thực. Vui lòng thử lại.",
       });
     } finally {
       setSendingOtp(false);
@@ -356,11 +341,7 @@ export default function InternalProfileEdit() {
       fd.append("FullName", normalizeSpaces(form.fullName));
       fd.append("PhoneNumber", String(form.phoneNumber || "").trim());
       fd.append("Location", normalizeSpaces(form.location));
-      const normalizedEmail = String(form.email || "").trim();
-      const normalizedOriginalEmail = String(originalEmail || "").trim().toLowerCase();
-      if (normalizedEmail.toLowerCase() !== normalizedOriginalEmail) {
-        fd.append("Email", normalizedEmail);
-      }
+      fd.append("Email", String(form.email || "").trim());
 
       const avatarUpload = await buildAvatarFile(
         avatarFile,
@@ -402,9 +383,7 @@ export default function InternalProfileEdit() {
         setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
         setMessage({
           type: "error",
-          text: isEmailChanged
-            ? "Email mới này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ."
-            : "Backend đang yêu cầu email hiện tại phải được xác thực trước khi cập nhật, dù web không gửi thay đổi email. Nếu bấm gửi OTP vẫn báo email đã được đăng ký thì đây là lỗi luồng xác thực từ backend.",
+          text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
         });
       } else {
         setMessage({ type: "error", text: mapped.message });
@@ -580,9 +559,7 @@ export default function InternalProfileEdit() {
                         </span>
                       </div>
                       <div className="mt-1 text-xs font-semibold text-slate-500">
-                        {isEmailChanged
-                          ? "Bạn đang đổi email. Hệ thống sẽ yêu cầu xác minh email mới bằng mã OTP trước khi cập nhật hồ sơ."
-                          : "Nếu bạn giữ nguyên email hiện tại, web sẽ không gửi field Email khi lưu hồ sơ. Chỉ khi đổi email mới cần xác minh OTP."}
+                        Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
                       </div>
                     </div>
 
@@ -593,7 +570,7 @@ export default function InternalProfileEdit() {
                         disabled={sendingOtp || verifyingOtp}
                         className="whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-extrabold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {sendingOtp ? "Đang gửi..." : (isEmailChanged ? "Gửi mã OTP" : "Thử gửi OTP")}
+                        {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
                       </button>
                     </div>
                   </div>
@@ -619,9 +596,7 @@ export default function InternalProfileEdit() {
 
                   {otpStage === "verified" ? (
                     <div className="mt-3 text-sm font-extrabold text-emerald-700">
-                      {isEmailChanged
-                        ? "Email mới đã được xác minh. Bạn có thể lưu thay đổi hồ sơ."
-                        : "Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ."}
+                      Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
                     </div>
                   ) : null}
                 </div>

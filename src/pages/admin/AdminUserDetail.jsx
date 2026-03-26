@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Pencil, ShieldCheck } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getAdminLogs } from "@/lib/admin/adminMockStore";
 import AdminUserService, { getAdminRoleProfile, getAdminUserErrorMessage } from "@/services/AdminUserService";
 import {
   AdminBanner,
+  AdminOutcomeBadge,
   AdminRoleBadge,
+  AdminSeverityBadge,
   AdminStatusBadge,
   formatAdminDateTime,
   getAdminInitials,
@@ -72,6 +75,14 @@ export default function AdminUserDetail() {
     };
   }, [id, reloadSeed]);
 
+  const relatedLogs = useMemo(() => {
+    if (!user) return [];
+
+    return getAdminLogs()
+      .filter((log) => log.actorUserId === user.id || log.targetId === user.id)
+      .slice(0, 6);
+  }, [user]);
+
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
   };
@@ -125,14 +136,9 @@ export default function AdminUserDetail() {
                 <ArrowLeft size={18} />
                 <span>Quay lại danh sách user</span>
               </Link>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="admin-hero__title">Chi tiết user</h1>
-                {user?.detailAvailable === false ? (
-                  <span className="admin-badge admin-badge--tone-warning">Dữ liệu fallback</span>
-                ) : null}
-              </div>
+              <h1 className="admin-hero__title">View User Detail Screen</h1>
               <p className="admin-hero__subtitle">
-                Màn chi tiết để Admin đọc toàn bộ hồ sơ account, trạng thái bảo mật và phạm vi role hiện tại của từng user.
+                Màn chi tiết để Admin đọc toàn bộ hồ sơ account, trạng thái bảo mật, phạm vi quyền và hoạt động gần nhất của từng user.
               </p>
             </div>
 
@@ -140,12 +146,12 @@ export default function AdminUserDetail() {
               <div className="admin-hero__actions">
                 {user.roleKey ? (
                   <Link to={`/admin/permissions?role=${user.roleKey}`} className="admin-btn admin-btn--secondary">
-                    Quản lý permission
+                    Manage Permission
                   </Link>
                 ) : null}
                 <Link to={`/admin/users/${user.id}/edit`} className="admin-btn admin-btn--primary">
                   <Pencil size={18} />
-                  <span>Cập nhật</span>
+                  <span>Update User</span>
                 </Link>
                 <button
                   type="button"
@@ -155,7 +161,7 @@ export default function AdminUserDetail() {
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
                   <span>
-                    {user.status === "inactive" ? "Đã vô hiệu hóa" : "Khóa user"}
+                    {user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}
                   </span>
                 </button>
               </div>
@@ -166,23 +172,11 @@ export default function AdminUserDetail() {
             <AdminBanner title={notice} description="Phần log bên dưới hiện vẫn là dữ liệu mẫu." tone={noticeTone} />
           ) : null}
 
-          {!loading && !error && user && user.detailAvailable === false ? (
-            <AdminBanner
-              title="Backend chưa trả được hồ sơ detail cho user này."
-              description="Web admin đang hiển thị dữ liệu fallback từ danh sách user, nên một số trường có thể chưa đầy đủ."
-              tone="warning"
-            />
-          ) : null}
-
           {!loading && !error && user ? (
           <AdminBanner
-              title={user.detailAvailable === false ? "Hồ sơ user đang đọc từ user-list." : "Hồ sơ user đang đọc từ endpoint admin detail."}
-              description={
-                user.detailAvailable === false
-                  ? "Thông tin liên hệ, trạng thái và role đang được lấy từ danh sách user hiện có."
-                  : "Thông tin liên hệ, avatar, trạng thái, role và chuyên môn thợ đang lấy trực tiếp từ backend."
-              }
-              tone={user.detailAvailable === false ? "warning" : "info"}
+              title="Hồ sơ user đang đọc từ endpoint admin detail."
+              description="Thông tin liên hệ, avatar, trạng thái, role và chuyên môn thợ đang lấy trực tiếp từ backend."
+              tone="info"
             />
           ) : null}
 
@@ -302,14 +296,14 @@ export default function AdminUserDetail() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Role và truy cập</h2>
-                    <p className="admin-card__subtitle">Role hiện tại và mức độ đồng bộ dữ liệu giữa web admin với backend.</p>
+                    <h2 className="admin-card__title">Access & permission</h2>
+                    <p className="admin-card__subtitle">Role hiện tại và phần web đang hiển thị theo role đó.</p>
                   </div>
                 </div>
 
                   <div className="admin-note-box">
                     <strong>{permissionProfile?.label || "Chưa đồng bộ role"}</strong>
-                    <p>{permissionProfile?.description || "Backend hiện chưa trả role cho user này, nên web chưa thể hiển thị metadata vai trò tương ứng."}</p>
+                    <p>{permissionProfile?.description || "Backend hiện chưa trả role cho user này, nên web chưa thể hiển thị phần quyền tương ứng."}</p>
                   </div>
 
                   <div className="mt-4 admin-info-list">
@@ -319,8 +313,8 @@ export default function AdminUserDetail() {
                       </div>
                       <div className="admin-info-list__value">
                         {user.hasKnownRole
-                          ? "Role đã được backend trả về. Web đang hiển thị metadata theo role này."
-                          : "Chưa có role từ backend để hiển thị đầy đủ phạm vi truy cập."}
+                          ? `${user.grantedPermissionCount} quyền đang được hiển thị theo role hiện tại.`
+                          : "Chưa có role từ backend để hiển thị phần quyền."}
                       </div>
                     </div>
                     <div className="admin-info-list__item">
@@ -336,7 +330,7 @@ export default function AdminUserDetail() {
                     <div className="admin-info-list__item">
                       <div className="admin-info-list__label">Ghi chú</div>
                       <div className="admin-info-list__value">
-                        Chuyên môn thợ hiện đang phản ánh theo endpoint detail. Ma trận permission chi tiết vẫn nên đọc từ màn Permission thay vì suy diễn từ frontend.
+                        Chuyên môn thợ hiện đang phản ánh theo endpoint detail. MFA và audit trail vẫn sẽ cần endpoint riêng nếu muốn hiển thị chuẩn hoàn toàn.
                       </div>
                     </div>
                   </div>
@@ -345,15 +339,38 @@ export default function AdminUserDetail() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Nhật ký liên quan</h2>
-                      <p className="admin-card__subtitle">Phần audit chi tiết chưa được nối backend thật trong web admin hiện tại.</p>
+                      <h2 className="admin-card__title">Recent system activity</h2>
+                      <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất liên quan tới user này, nếu có.</p>
                     </div>
+                    <Link to={`/admin/logs?relatedTo=${user.id}`} className="admin-link-btn admin-link-btn--secondary">
+                      View System Log
+                    </Link>
                   </div>
 
-                  <div className="admin-note-box">
-                    <strong>Chưa có audit log thật cho user này</strong>
-                    <p>Tạm thời màn chi tiết chỉ hiển thị hồ sơ và role. Khi backend có endpoint log chuẩn, phần này nên đọc dữ liệu thật theo `userId`.</p>
-                  </div>
+                  {relatedLogs.length === 0 ? (
+                    <div className="admin-note-box">
+                      <strong>Chưa có log liên quan</strong>
+                      <p>Hiện chưa ghi nhận hoạt động mới cho user này hoặc log chưa khớp với id backend.</p>
+                    </div>
+                  ) : (
+                    <div className="admin-timeline">
+                      {relatedLogs.map((log) => (
+                        <div key={log.id} className="admin-timeline__item">
+                          <div className="admin-timeline__item-top">
+                            <div>
+                              <strong>{log.action}</strong>
+                              <span>{formatAdminDateTime(log.timestamp)}</span>
+                            </div>
+                            <div className="admin-chips">
+                              <AdminSeverityBadge severity={log.severity} />
+                              <AdminOutcomeBadge outcome={log.outcome} />
+                            </div>
+                          </div>
+                          <p>{log.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </section>
               </div>
             </div>

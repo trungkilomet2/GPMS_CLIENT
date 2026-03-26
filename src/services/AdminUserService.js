@@ -1,6 +1,7 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
+import { countGrantedPermissions, getPermissionProfiles } from "@/lib/admin/adminMockStore";
 
 const ROLE_CATALOG = [
   {
@@ -10,14 +11,6 @@ const ROLE_CATALOG = [
     shortLabel: "Toàn quyền hệ thống",
     tone: "danger",
     description: "Quản lý user, phân quyền và cấu hình hệ thống.",
-  },
-  {
-    key: "Customer",
-    roleId: 2,
-    label: "Khách hàng",
-    shortLabel: "Cổng đặt hàng",
-    tone: "info",
-    description: "Tài khoản khách hàng dùng để theo dõi và đặt đơn hàng.",
   },
   {
     key: "Owner",
@@ -146,6 +139,23 @@ const syncCurrentUserRoles = (id, roleKeys = []) => {
   return true;
 };
 
+const getMultipartAuthHeaders = () => {
+  const token = getAuthItem("token");
+  const userId = getAuthItem("userId");
+  const headers = {};
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  if (userId) {
+    headers.UserId = userId;
+    headers["X-User-Id"] = userId;
+  }
+
+  return headers;
+};
+
 const syncCurrentUserSnapshot = (user) => {
   const currentUser = getStoredUser();
   const currentId = String(currentUser?.userId ?? currentUser?.id ?? "");
@@ -176,12 +186,24 @@ const getRoleMeta = (roleKey = "") => {
   const trimmedKey = String(roleKey ?? "").trim();
   if (!trimmedKey) return null;
 
+  const permissionProfile = getPermissionProfiles().find((profile) => profile.key === trimmedKey);
+  if (permissionProfile) {
+    return {
+      key: permissionProfile.key,
+      label: permissionProfile.label,
+      shortLabel: permissionProfile.shortLabel,
+      tone: permissionProfile.tone,
+      description: permissionProfile.description,
+      permissions: permissionProfile.permissions,
+    };
+  }
+
   return ROLE_KEY_MAP[trimmedKey] || {
     key: trimmedKey,
     label: trimmedKey,
     shortLabel: trimmedKey,
     tone: "info",
-    description: "Vai trò này được backend trả về nhưng web admin chưa có metadata riêng.",
+    description: "Vai trò này chưa có hồ sơ permission preview trong web admin.",
   };
 };
 
@@ -296,9 +318,8 @@ const normalizeAdminUser = (item = {}) => {
     roleTone: roleMeta?.tone || "info",
     roleShortLabel: roleMeta?.shortLabel || "Chưa có role",
     roleDescription: roleMeta?.description || "API user-list chưa trả thông tin role cho user này.",
-    grantedPermissionCount: null,
+    grantedPermissionCount: roleMeta?.permissions ? countGrantedPermissions(roleMeta) : 0,
     hasKnownRole: Boolean(primaryRole),
-    detailAvailable: true,
     workerRole: workerRoleNames[0] || "",
     workerRoleLabel: workerRoleNames[0] || "",
     workerSkillNames: workerRoleNames,
@@ -328,27 +349,6 @@ const dedupeUsersById = (users = []) => {
 
   return Array.from(seen.values());
 };
-
-async function enrichUsersWithRoleDetails(users = []) {
-  const missingRoleUsers = users.filter((user) => user?.id != null && !user?.hasKnownRole);
-
-  if (!missingRoleUsers.length) {
-    return users;
-  }
-
-  const detailedUsers = await Promise.allSettled(
-    missingRoleUsers.map((user) => fetchAdminUserDetail(user.id))
-  );
-
-  const detailedById = new Map();
-  detailedUsers.forEach((result) => {
-    if (result.status === "fulfilled" && result.value?.id != null) {
-      detailedById.set(String(result.value.id), result.value);
-    }
-  });
-
-  return users.map((user) => detailedById.get(String(user?.id)) || user);
-}
 
 async function fetchAdminUserPages({
   pageSize = 100,
@@ -420,16 +420,6 @@ export function getAdminUserErrorMessage(error, fallbackMessage) {
   return error?.response?.data?.message || error?.response?.data?.title || fallbackMessage;
 }
 
-function markUserAsListFallback(user, reason = "detail_not_found") {
-  if (!user) return null;
-
-  return {
-    ...user,
-    detailAvailable: false,
-    detailFallbackReason: reason,
-  };
-}
-
 export function getAdminSupportedRoleOptions() {
   return ROLE_CATALOG.map((item) => ({
     key: item.key,
@@ -477,15 +467,13 @@ const AdminUserService = {
       );
 
       if (foundInFilteredResult) {
-        return markUserAsListFallback(foundInFilteredResult);
+        return foundInFilteredResult;
       }
 
       const fullDirectory = await fetchAdminUserPages();
-      const fallbackUser = fullDirectory.data.find(
+      return fullDirectory.data.find(
         (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
       ) || null;
-
-      return markUserAsListFallback(fallbackUser);
     }
   },
 
@@ -517,25 +505,6 @@ const AdminUserService = {
     normalizedUser = refreshedUsers.data.find(
       (user) => String(user.userName).toLowerCase() === createPayload.userName.toLowerCase()
     ) || normalizedUser;
-
-    if (normalizedUser?.id == null) {
-      normalizedUser = {
-        ...normalizedUser,
-        id: null,
-        fullName: createPayload.fullName || normalizedUser?.fullName || "Chưa cập nhật",
-        userName: createPayload.userName || normalizedUser?.userName || "",
-        roleKey: roleMeta.key,
-        roleKeys: [roleMeta.key],
-        roleNames: [roleMeta.label],
-        roleLabel: roleMeta.label,
-        roleTone: roleMeta.tone,
-        roleShortLabel: roleMeta.shortLabel,
-        roleDescription: roleMeta.description,
-        hasKnownRole: true,
-        detailAvailable: false,
-        detailFallbackReason: "created_without_detail",
-      };
-    }
 
     return normalizedUser;
   },
@@ -573,14 +542,36 @@ const AdminUserService = {
       formData.append("AvartarUrl", payload.avatarFile);
     }
 
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_UPDATE_USER(id), formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+    const response = await fetch(API_ENDPOINTS.USER.ADMIN_UPDATE_USER(id), {
+      method: "PUT",
+      credentials: "omit",
+      headers: getMultipartAuthHeaders(),
+      body: formData,
     });
 
-    const response = parseApiPayload(rawResponse);
-    const normalizedUser = normalizeAdminUser(response?.data ?? response);
+    if (response.status === 401) {
+      clearAuthStorage();
+      window.dispatchEvent(new Event("auth-change"));
+
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login?reason=unauthorized";
+      }
+
+      throw { status: 401 };
+    }
+
+    const json = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw {
+        response: {
+          status: response.status,
+          data: json,
+        },
+      };
+    }
+
+    const normalizedUser = normalizeAdminUser(json?.data ?? json);
     syncCurrentUserSnapshot(normalizedUser);
 
     return normalizedUser;

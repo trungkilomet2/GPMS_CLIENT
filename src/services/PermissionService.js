@@ -28,14 +28,6 @@ const PermissionService = {
       data,
     };
   },
-
-  async updatePermission(id, roleAuthorize) {
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.PERMISSION.UPDATE(id), {
-      roleAuthorize: String(roleAuthorize ?? ""),
-    });
-
-    return parseApiPayload(rawResponse);
-  },
 };
 
 export default PermissionService;

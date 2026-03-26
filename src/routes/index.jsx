@@ -39,8 +39,6 @@ const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
-const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
-const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
 const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
 const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
 const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
@@ -83,6 +81,7 @@ export const routes = [
   { path: "/orders/manual-create", element: guardByRoles(["Owner"], <CreateManualOrder />) },
   { path: "/orders/edit/:id", element: guardByRoles(["Customer"], <EditOrder />) },
   { path: "/orders/detail/:id", element: guardByRoles(["Owner", "Customer"], <OrderDetail />) },
+  { path: "/orders/detail/:id", element: guardByRoles(["Owner", "PM"], <OrderDetail />) },
   { path: "/production/create", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production/create/:orderId", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production", element: guardByRoles(["Owner", "PM"], <ProductionList />) },
@@ -112,8 +111,6 @@ export const routes = [
   { path: "/employees/create", element: guardByRoles(["Owner"], <EmployeeCreate />) },
   { path: "/employees/:id/edit", element: guardByRoles(["Owner"], <EmployeeUpdate />) },
   { path: "/employees/:id", element: guardByRoles(["Owner", "PM"], <EmployeeDetail />) },
-  { path: "/salary", element: guardByRoles(["Owner"], <PayrollList />) },
-  { path: "/salary/:employeeId", element: guardByRoles(["Owner"], <PayrollDetail />) },
   { path: "/leave-requests/:id", element: guardByRoles(["Team Leader"], <LeaveRequestDetail />) },
   { path: "/worker-roles", element: guardByRoles(["Owner", "PM"], <WorkerRoleList />) },
   { path: "/worker-roles/create", element: guardByRoles(["Owner"], <WorkerRoleCreate />) },

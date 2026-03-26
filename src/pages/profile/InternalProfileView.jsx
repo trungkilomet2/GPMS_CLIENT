@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
-import { userService } from "@/services/UserService";
+import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";

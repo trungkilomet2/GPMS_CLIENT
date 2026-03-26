@@ -292,12 +292,7 @@ export default function AdminUserUpdate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại chi tiết user</span>
               </Link>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="admin-hero__title">Cập nhật user</h1>
-                {user?.detailAvailable === false ? (
-                  <span className="admin-badge admin-badge--tone-warning">Dữ liệu fallback</span>
-                ) : null}
-              </div>
+              <h1 className="admin-hero__title">Update User Screen</h1>
               <p className="admin-hero__subtitle">
                 Màn chỉnh sửa để Admin cập nhật hồ sơ bằng endpoint `update-user-for-admin` và gán lại role khi cần.
               </p>
@@ -315,7 +310,7 @@ export default function AdminUserUpdate() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}</span>
+                  <span>{isSubmitting ? "Đang lưu..." : "Save Changes"}</span>
                 </button>
                 <button
                   type="button"
@@ -324,19 +319,11 @@ export default function AdminUserUpdate() {
                   disabled={user.status === "inactive" || isDisabling}
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Khóa user"}</span>
+                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}</span>
                 </button>
               </div>
             ) : null}
           </div>
-
-          {!loading && !error && user && user.detailAvailable === false ? (
-            <AdminBanner
-              title="Backend chưa trả được hồ sơ detail cho user này."
-              description="Form đang khởi tạo bằng dữ liệu fallback từ danh sách user. Bạn vẫn có thể cập nhật các trường cơ bản, nhưng một số thông tin có thể chưa đầy đủ."
-              tone="warning"
-            />
-          ) : null}
 
           {loading ? (
             <section className="admin-card">
@@ -486,8 +473,8 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Thông tin role đang chọn</h2>
-                      <p className="admin-card__subtitle">Xem nhanh metadata role trước khi gán lại cho user.</p>
+                      <h2 className="admin-card__title">Quyền theo role đang chọn</h2>
+                      <p className="admin-card__subtitle">Xem nhanh phần quyền web sẽ hiển thị theo role mới.</p>
                     </div>
                   </div>
 

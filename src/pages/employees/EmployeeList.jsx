@@ -109,7 +109,6 @@ export default function EmployeeList() {
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
   const isOwner = primaryRole === "owner";
-  const isPm = primaryRole === "pm";
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -154,7 +153,7 @@ export default function EmployeeList() {
     return () => {
       mounted = false;
     };
-  }, [isPm, reloadSeed, viewMode]);
+  }, [reloadSeed]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
@@ -288,38 +287,6 @@ export default function EmployeeList() {
       : viewMode === "workers"
         ? "Danh sách worker, chuyên môn thợ và tuyến quản lý hiện có."
         : "Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.";
-  const isPmWorkerView = isPm && viewMode === "workers";
-  const summaryCards = isPmWorkerView
-    ? [
-        { icon: Users, label: "Tổng nhân viên", value: stats.total, meta: "Toàn bộ worker trong danh sách", tone: "primary" },
-        { icon: UserRoundCheck, label: "Đang hoạt động", value: stats.active, meta: "Worker đang làm việc", tone: "success" },
-        {
-          icon: Sparkles,
-          label: "Có chuyên môn",
-          value: stats.skilled,
-          meta: stats.total
-            ? `${stats.total - stats.skilled} worker chưa cập nhật chuyên môn`
-            : "Chưa có dữ liệu chuyên môn",
-          tone: "accent",
-        },
-      ]
-    : [
-        { icon: Users, label: "Tổng nhân viên", value: stats.total, meta: "Toàn bộ nhân sự nội bộ", tone: "primary" },
-        { icon: UserRoundCheck, label: "Đang hoạt động", value: stats.active, meta: "Nhân viên đang làm việc", tone: "success" },
-        { icon: BriefcaseBusiness, label: "Nhóm quản lý", value: stats.management, meta: "Chủ xưởng, quản lý và tổ trưởng", tone: "warning" },
-        {
-          icon: Sparkles,
-          label: "Có chuyên môn",
-          value: stats.skilled,
-          meta: stats.total
-            ? `${stats.total - stats.skilled} nhân viên chưa cập nhật chuyên môn`
-            : "Chưa có dữ liệu chuyên môn",
-          tone: "accent",
-        },
-      ];
-  const summaryNote = isPmWorkerView
-    ? "Số liệu tổng quan phía trên được tính trên tập worker đang được phép theo dõi trong màn này."
-    : "Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.";
 
   return (
     <DashboardLayout>
@@ -339,20 +306,26 @@ export default function EmployeeList() {
             ) : null}
           </div>
 
-          <div className={`grid gap-4 md:grid-cols-2 ${summaryCards.length === 4 ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
-            {summaryCards.map(({ icon, label, value, meta, tone }) => (
-              <SummaryCard
-                key={label}
-                icon={icon}
-                label={label}
-                value={value}
-                meta={meta}
-                tone={tone}
-              />
-            ))}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
+            <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
+            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng, quản lý và tổ trưởng" tone="warning" />
+            <SummaryCard
+              icon={Sparkles}
+              label="Có chuyên môn"
+              value={stats.skilled}
+              meta={
+                stats.total
+                  ? `${stats.total - stats.skilled} nhân viên chưa cập nhật chuyên môn`
+                  : "Chưa có dữ liệu chuyên môn"
+              }
+              tone="accent"
+            />
           </div>
 
-          <p className="employee-summary-note">{summaryNote}</p>
+          <p className="employee-summary-note">
+            Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.
+          </p>
 
           <div className="employee-filter-card">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]">
@@ -367,23 +340,21 @@ export default function EmployeeList() {
                 />
               </label>
 
-              {!isPmWorkerView ? (
-                <label className="employee-filter-field">
-                  <span className="employee-filter-field__label">Vai trò hệ thống</span>
-                  <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
-                  <select
-                    value={roleFilter}
-                    onChange={(event) => setRoleFilter(event.target.value)}
-                    className="employee-filter-field__control"
-                  >
-                    {roleOptions.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
+              <label className="employee-filter-field">
+                <span className="employee-filter-field__label">Vai trò hệ thống</span>
+                <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
+                <select
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
+                  className="employee-filter-field__control"
+                >
+                  {roleOptions.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="employee-filter-field">
                 <span className="employee-filter-field__label">Chuyên môn</span>
@@ -451,7 +422,7 @@ export default function EmployeeList() {
                   </div>
                 </div>
               ) : error ? (
-                  <div className="employee-table-state employee-table-state--error">
+                <div className="employee-table-state employee-table-state--error">
                   <CircleAlert size={18} />
                   <div className="employee-table-state__content">
                     <strong>Không tải được danh sách nhân viên</strong>
@@ -498,7 +469,7 @@ export default function EmployeeList() {
                       >
                         Thêm nhân viên
                       </Link>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               ) : (

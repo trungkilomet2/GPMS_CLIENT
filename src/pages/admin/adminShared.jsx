@@ -4,6 +4,7 @@ import {
   ADMIN_LOG_OUTCOME_META,
   ADMIN_LOG_SEVERITY_META,
   ADMIN_STATUS_META,
+  countGrantedPermissions,
 } from "@/lib/admin/adminMockStore";
 
 export function getAdminInitials(name = "") {
@@ -149,5 +150,5 @@ export function AdminRoleBadge({ tone = "primary", children }) {
 
 export function AdminPermissionSummary({ profile }) {
   if (!profile) return "Chưa gán quyền";
-  return profile.shortLabel || profile.label || "Đã có role";
+  return `${countGrantedPermissions(profile)} quyền đang bật`;
 }
