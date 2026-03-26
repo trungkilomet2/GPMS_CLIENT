@@ -9,7 +9,7 @@ const DIRECTORY_ITEMS = [
   {
     to: "/employees/management",
     title: "Nhóm quản lý",
-    description: "Xem riêng Owner, PM, Admin và Team Leader trong hệ thống.",
+    description: "Xem riêng Owner, PM và Admin trong hệ thống.",
     icon: BriefcaseBusiness,
     tone: "warning",
   },

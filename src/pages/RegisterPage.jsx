@@ -373,6 +373,26 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.otp && <p className="error-text">{errors.otp}</p>}
+              <div className="register-row" style={{ justifyContent: "space-between", marginTop: "0.5rem" }}>
+                <span style={{ color: "#5f7a69", fontSize: "0.92rem" }}>
+                  Chưa nhận được mã?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#1e8a47",
+                    fontWeight: 700,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.7 : 1,
+                  }}
+                >
+                  {loading ? "Đang gửi lại..." : "Gửi lại mã OTP"}
+                </button>
+              </div>
             </>
           ) : null}
 

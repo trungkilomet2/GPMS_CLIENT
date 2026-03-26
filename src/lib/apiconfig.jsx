@@ -111,11 +111,13 @@ export const API_ENDPOINTS = {
     GET_MY_HISTORY: `${BASE_URL}/api/LeaveRequest/my-leave-request-history`,
     GET_MY_HISTORY_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/my-leave-request-history/${id}`,
     GET_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/leave-request-detail/${id}`,
-
-
     CREATE: `${BASE_URL}/api/LeaveRequest/create`,
     APPROVE: (id) => `${BASE_URL}/api/LeaveRequest/${id}/approve`,
     DENY: (id) => `${BASE_URL}/api/LeaveRequest/${id}/deny`,
+    CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/cancel`,
+    REQUEST_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/request-cancel`,
+    CONFIRM_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/confirm-cancel`,
+    REJECT_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/reject-cancel`,
   },
 
   // TODO: thêm endpoint thật khi backend có sẵn

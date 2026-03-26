@@ -193,6 +193,7 @@ export const userService = {
       fullName,
       name:        fullName,
       email:       String(email || "").trim(),
+      emailFromServer: Boolean(serverEmail),
       phoneNumber: String(phoneNumber || "").trim(),
       phone:       String(phoneNumber || "").trim(),
       avatarUrl:   String(avatarUrl || "").trim(),

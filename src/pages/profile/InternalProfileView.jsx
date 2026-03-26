@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPostLoginPath } from "@/lib/authRouting";
@@ -45,10 +44,6 @@ export default function InternalProfileView() {
     const primaryRole = getPrimaryWorkspaceRole(storedUser?.role);
 
     if (primaryRole === "worker") return WorkerLayout;
-    if (primaryRole === "teamLeader") {
-      return TeamLeaderLayout;
-    }
-
     return DashboardLayout;
   }, [storedUser]);
 

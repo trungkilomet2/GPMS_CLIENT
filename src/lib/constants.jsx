@@ -107,7 +107,7 @@ export const PRODUCTS = [
 export const FEATURES = [
   { icon: "📦", title: "Quản lý đơn hàng", desc: "Tiếp nhận, phân loại và theo dõi toàn bộ đơn hàng theo thời gian thực." },
   { icon: "🏭", title: "Kế hoạch sản xuất", desc: "Lên kế hoạch và phân công công đoạn cho từng nhóm công nhân." },
-  { icon: "✅", title: "Kiểm soát chất lượng", desc: "KCS kiểm tra từng công đoạn, ghi nhận lỗi và xử lý tức thì." },
+  { icon: "✅", title: "Kiểm soát chất lượng", desc: "Kiểm tra từng công đoạn, ghi nhận lỗi và xử lý tức thì." },
   { icon: "💰", title: "Tính tiền công tự động", desc: "Tự động tính lương theo sản lượng và định mức từng sản phẩm." },
 ];
 
@@ -123,5 +123,5 @@ export const STEPS = [
 export const PROCESS_CARDS = [
   { rng: "01-02", title: "Tư vấn & Báo giá", desc: "Tiếp nhận yêu cầu, tư vấn chi tiết và gửi báo giá minh bạch trong 24h.", icon: "💬" },
   { rng: "03-04", title: "Thiết kế & Sản xuất", desc: "Duyệt mẫu, cắt vải, may thành phẩm theo tiêu chuẩn kỹ thuật đã thỏa thuận.", icon: "✂️" },
-  { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "KCS kiểm tra 100% sản phẩm trước khi đóng gói và giao hàng đúng tiến độ.", icon: "🚚" },
+  { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "Kiểm tra 100% sản phẩm trước khi đóng gói và giao hàng đúng tiến độ.", icon: "🚚" },
 ];

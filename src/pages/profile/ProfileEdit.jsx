@@ -342,7 +342,7 @@ export default function ProfileEdit() {
       Bio: fallback.bio,
       CooperationNotes: fallback.cooperationNotes,
     });
-    setInitialEmail(fallback.email ?? "");
+    setInitialEmail("");
     if (fallback.avatarUrl) {
       setAvatarPreview(fallback.avatarUrl);
     }
@@ -357,7 +357,7 @@ export default function ProfileEdit() {
           Bio:         fallback.bio,
           CooperationNotes: fallback.cooperationNotes,
         });
-        setInitialEmail(data.email ?? data.Email ?? fallback.email ?? "");
+        setInitialEmail(data.emailFromServer ? (data.email ?? data.Email ?? "") : "");
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);

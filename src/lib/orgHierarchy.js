@@ -3,9 +3,7 @@ export const SYSTEM_ROLE_IDS = {
   Customer: 2,
   Owner: 3,
   PM: 4,
-  "Team Leader": 5,
-  Worker: 6,
-  KCS: 7,
+  Worker: 5,
 };
 
 export const USER_STATUS_IDS = {
@@ -18,8 +16,6 @@ export const USER_STATUS_IDS = {
 export const SYSTEM_ROLE_PRIORITY = [
   "Owner",
   "PM",
-  "Team Leader",
-  "KCS",
   "Worker",
   "Admin",
   "Customer",
@@ -30,22 +26,23 @@ export const SYSTEM_ROLE_LABELS = {
   Customer: "Khách hàng",
   Owner: "Chủ xưởng",
   PM: "Quản lý sản xuất",
-  "Team Leader": "Tổ trưởng",
   Worker: "Nhân viên",
-  KCS: "Kiểm soát chất lượng",
 };
 
 export const EMPLOYEE_FORM_ROLE_OPTIONS = [
   { value: "Owner", label: "Chủ xưởng" },
   { value: "PM", label: "Quản lý sản xuất" },
-  { value: "Team Leader", label: "Tổ trưởng" },
   { value: "Worker", label: "Nhân viên" },
-  { value: "KCS", label: "Kiểm soát chất lượng" },
 ];
 
 export const WORKER_SKILL_LABELS = {
-  Tailor: "Thợ may",
-  "Quality Control": "Kiểm tra chất lượng",
+  Cat: "Cắt",
+  Cắt: "Cắt",
+  May: "May",
+  Va: "Vá",
+  Vá: "Vá",
+  "Kiem Hang": "Kiểm Hàng",
+  "Kiểm Hàng": "Kiểm Hàng",
 };
 
 export const INTERNAL_PROJECT_ROLES = new Set([
@@ -53,11 +50,7 @@ export const INTERNAL_PROJECT_ROLES = new Set([
   "customer",
   "owner",
   "pm",
-  "team leader",
-  "teamleader",
-  "tl",
   "worker",
-  "kcs",
 ]);
 
 export function splitRoles(value = "") {
@@ -108,12 +101,8 @@ export function getManagerRoleHint(role = "") {
       return "Không có cấp quản lý trực tiếp trong mô hình 1 xưởng.";
     case "PM":
       return "Báo cáo trực tiếp cho Owner.";
-    case "Team Leader":
-      return "Thuộc phạm vi quản lý của một PM.";
     case "Worker":
-      return "Thuộc team của Team Lead hoặc PM phụ trách line.";
-    case "KCS":
-      return "Thường phối hợp với Owner hoặc PM tùy quy trình xưởng.";
+      return "Báo cáo trực tiếp cho PM phụ trách.";
     default:
       return "Chưa xác định tuyến quản lý trực tiếp.";
   }
@@ -125,12 +114,8 @@ export function getAllowedManagerRoles(role = "") {
       return [];
     case "PM":
       return ["Owner"];
-    case "Team Leader":
-      return ["PM"];
     case "Worker":
-      return ["Team Leader", "PM"];
-    case "KCS":
-      return ["Owner", "PM"];
+      return ["PM"];
     default:
       return [];
   }
@@ -146,12 +131,8 @@ export function getRoleHierarchyTag(role = "") {
       return "Cấp owner";
     case "PM":
       return "Cấp quản lý sản xuất";
-    case "Team Leader":
-      return "Cấp tổ/chuyền";
     case "Worker":
       return "Cấp tác nghiệp";
-    case "KCS":
-      return "Cấp kiểm soát";
     default:
       return "Chưa phân loại";
   }

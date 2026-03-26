@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
@@ -23,8 +22,7 @@ export default function ProductionPlanList() {
   const primaryRole = getPrimaryWorkspaceRole(roleValue);
   const isWorkerRoute = location.pathname.startsWith("/worker/");
   const isWorkerView = primaryRole === "worker";
-  const isTeamLeaderView = primaryRole === "teamLeader";
-  const LayoutComponent = isWorkerView ? WorkerLayout : isTeamLeaderView ? TeamLeaderLayout : PmOwnerLayout;
+  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
   const detailBasePath = isWorkerRoute ? "/worker/production-plan" : "/production-plan";
   const { productions, loading, error } = useProductionList();
   const [search, setSearch] = useState("");

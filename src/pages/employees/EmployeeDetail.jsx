@@ -53,17 +53,57 @@ export default function EmployeeDetail() {
       setNotFound(false);
 
       try {
-        const found = await WorkerService.getEmployeeById(id);
+        const isPm = primaryRole === "pm";
+        const directoryPromise = isPm
+          ? WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
+          : WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] }));
+        const detailPromise = WorkerService.getEmployeeById(id).catch((err) => {
+          if (isPm && err?.response?.status === 403) {
+            return null;
+          }
+          throw err;
+        });
+
+        const [found, directoryResponse] = await Promise.all([
+          detailPromise,
+          directoryPromise,
+        ]);
         if (!mounted) return;
 
-        if (!found) {
+        const directoryEmployees = directoryResponse?.data ?? [];
+        const directoryEmployee = directoryEmployees.find(
+          (item) => String(item.id) === String(id)
+        );
+        const sourceEmployee = found ?? directoryEmployee ?? null;
+
+        if (!sourceEmployee) {
           setNotFound(true);
           setError("Không tìm thấy nhân viên phù hợp.");
           setEmployee(null);
           return;
         }
 
-        setEmployee(found);
+        const resolvedManagerId = sourceEmployee.managerId ?? directoryEmployee?.managerId ?? null;
+        const resolvedManager = directoryEmployees.find(
+          (item) => String(item.id) === String(resolvedManagerId)
+        );
+
+        setEmployee({
+          ...sourceEmployee,
+          managerId: resolvedManagerId,
+          managerName:
+            sourceEmployee.managerName ||
+            directoryEmployee?.managerName ||
+            resolvedManager?.fullName ||
+            "",
+          workerSkill: sourceEmployee.workerSkill || directoryEmployee?.workerSkill || "",
+          workerSkillLabel:
+            sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
+          role: sourceEmployee.role || directoryEmployee?.role || "",
+          roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
+          roleLabels:
+            sourceEmployee.roleLabels?.length ? sourceEmployee.roleLabels : directoryEmployee?.roleLabels ?? [],
+        });
       } catch (err) {
         if (!mounted) return;
 
@@ -82,7 +122,7 @@ export default function EmployeeDetail() {
     return () => {
       mounted = false;
     };
-  }, [id, reloadSeed]);
+  }, [id, primaryRole, reloadSeed]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
@@ -202,10 +242,6 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-info-item">
                     <ShieldCheck size={17} />
                     <span>Trạng thái: {statusConfig.label}</span>
-                  </div>
-                  <div className="employee-detail-info-item">
-                    <BriefcaseBusiness size={17} />
-                    <span>Tuyến quản lý: {employee.managerRoleHint || "Chưa cập nhật"}</span>
                   </div>
                   <div className="employee-detail-info-item">
                     <BriefcaseBusiness size={17} />

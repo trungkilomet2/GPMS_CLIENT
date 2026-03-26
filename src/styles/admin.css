@@ -128,6 +128,26 @@
   line-height: 1.5;
 }
 
+.admin-inline-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.admin-inline-summary__item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.15rem;
+  border: 1px solid #d9e7df;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #355145;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0 0.85rem;
+}
+
 .admin-stats-grid {
   display: grid;
   gap: 1rem;
@@ -298,10 +318,34 @@
   transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 
+.admin-field select.admin-field__control,
+.admin-field input[type="datetime-local"].admin-field__control {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.admin-field input[type="datetime-local"].admin-field__control::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.admin-filter-grid--logs .admin-field__icon {
+  top: 4.15rem;
+  transform: translateY(-50%);
+}
+
 .admin-field__control:focus {
   border-color: #2d9058;
   background: #fff;
   box-shadow: 0 0 0 4px rgba(45, 144, 88, 0.12);
+}
+
+.admin-field--plain .admin-field__control {
+  padding-left: 1rem;
 }
 
 textarea.admin-field__control {
@@ -499,6 +543,10 @@ textarea.admin-field__control {
   margin-top: 0.18rem;
   color: #6a7f74;
   font-size: 0.82rem;
+}
+
+.admin-table__stacked-meta {
+  margin-top: 0.3rem;
 }
 
 .admin-table__actions {
@@ -718,6 +766,19 @@ textarea.admin-field__control {
   line-height: 1.6;
 }
 
+.admin-note-box--danger {
+  border-color: #efd8d3;
+  background: linear-gradient(180deg, #fffaf9 0%, #fff3f1 100%);
+}
+
+.admin-note-box--danger strong {
+  color: #7d3024;
+}
+
+.admin-note-box--danger p {
+  color: #6e4039;
+}
+
 .admin-timeline {
   display: flex;
   flex-direction: column;
@@ -823,6 +884,20 @@ textarea.admin-field__control {
   color: #60756a;
   font-size: 0.86rem;
   line-height: 1.5;
+}
+
+.admin-preview-list__subtext {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem !important;
+  color: #4d675b !important;
+  font-size: 0.8rem !important;
+  font-weight: 700;
+}
+
+.admin-preview-list--compact {
+  gap: 0.75rem;
 }
 
 .admin-log-table td {
@@ -933,6 +1008,131 @@ textarea.admin-field__control {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.admin-sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-grid--logs {
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.9fr);
+}
+
+.admin-filter-grid--logs {
+  grid-template-columns: minmax(0, 1.35fr) 220px 220px 220px auto;
+}
+
+.admin-log-table {
+  min-width: 0;
+}
+
+.admin-log-table__row {
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.admin-log-table__row:hover td {
+  background: #f7fbf8;
+}
+
+.admin-log-table__row.is-selected td {
+  background: #eef7f1;
+}
+
+.admin-table__text-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.admin-log-detail__section {
+  border: 1px solid #e4ece7;
+  border-radius: 1rem;
+  background: #fbfdfa;
+  padding: 0.95rem 1rem;
+}
+
+.admin-log-detail__section strong {
+  display: block;
+  color: #183025;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-log-detail__section span {
+  display: block;
+  margin-top: 0.4rem;
+  color: #5f7469;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-detail__message {
+  margin-top: 0.55rem;
+  color: #173025;
+  font-size: 0.93rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-detail__code {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  border: 1px solid #e5ece7;
+  border-radius: 0.9rem;
+  background: #f4f8f5;
+  color: #4f6459;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  padding: 0.85rem 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-log-detail__code span {
+  margin: 0;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.admin-log-detail__code--scroll {
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.admin-log-detail__exception {
+  margin: 0.55rem 0 0;
+  border: 1px solid #edd9d5;
+  border-radius: 0.9rem;
+  background: rgba(94, 24, 24, 0.04);
+  color: #6e4039;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  padding: 0.85rem 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-state--compact {
+  min-height: 12rem;
+  padding: 1rem;
 }
 
 .admin-table-card__footer {
@@ -1281,7 +1481,8 @@ textarea.admin-field__control {
 
   .admin-grid--detail,
   .admin-grid--form,
-  .admin-grid--permissions {
+  .admin-grid--permissions,
+  .admin-grid--logs {
     grid-template-columns: 1fr;
   }
 
@@ -1310,6 +1511,10 @@ textarea.admin-field__control {
 
   .admin-filter-actions {
     align-self: stretch;
+  }
+
+  .admin-inline-summary {
+    justify-content: flex-start;
   }
 
   .admin-permission-item__top,

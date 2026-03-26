@@ -38,6 +38,18 @@ const STATUS_MAP = {
     badge: "bg-rose-50 text-rose-700 border-rose-200",
     panel: "border-rose-200 bg-rose-50 text-rose-800",
   },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    panel: "border-slate-200 bg-slate-50 text-slate-800",
+  },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+    panel: "border-orange-200 bg-orange-50 text-orange-800",
+  },
 };
 
 function StatusBadge({ status }) {
@@ -146,6 +158,7 @@ export default function LeaveDetail() {
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
   const hasReviewPermission = canManageLeaveRequests(user?.role);
   const canReview = hasReviewPermission && leave?.status === "pending";
+  const canConfirmCancel = hasReviewPermission && leave?.status === "cancel_requested";
 
   const handleApprove = async () => {
     if (!hasReviewPermission) {
@@ -200,6 +213,28 @@ export default function LeaveDetail() {
       setRejectReason("");
     } catch (err) {
       setError(getLeaveErrorMessage(err, "Không thể từ chối đơn nghỉ. Vui lòng thử lại."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!canConfirmCancel) return;
+
+    try {
+      setSubmitting(true);
+      await LeaveService.confirmCancelLeaveRequest(id);
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "cancelled",
+          dateReply: new Date().toISOString(),
+        }
+      );
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể xác nhận hủy đơn nghỉ. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
@@ -292,6 +327,10 @@ export default function LeaveDetail() {
                   <div className="mt-2">
                     {leave.status === "rejected"
                       ? leave.denyContent || "Đơn đã bị từ chối nhưng chưa có nội dung phản hồi."
+                      : leave.status === "cancel_requested"
+                        ? leave.cancelContent || "Nhân viên đã gửi yêu cầu hủy đơn nghỉ."
+                        : leave.status === "cancelled"
+                          ? leave.cancelContent || "Đơn nghỉ đã được hủy."
                       : leave.status === "approved"
                         ? "Đơn đã được phê duyệt và có thể dùng làm căn cứ thông báo cho người gửi."
                         : "Đơn đang chờ người có thẩm quyền xem xét và phản hồi."}
@@ -317,6 +356,20 @@ export default function LeaveDetail() {
                     >
                       <XCircle size={16} />
                       Từ chối đơn
+                    </button>
+                  </div>
+                )}
+
+                {canConfirmCancel && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleConfirmCancel}
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      <CheckCircle2 size={16} />
+                      {submitting ? "Đang xử lý..." : "Xác nhận hủy đơn"}
                     </button>
                   </div>
                 )}

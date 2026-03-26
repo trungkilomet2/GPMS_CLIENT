@@ -2,7 +2,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { ClipboardCheck, Search } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
@@ -217,9 +216,7 @@ export default function OutputHistory() {
   const LayoutComponent =
     primaryRole === "worker"
       ? WorkerLayout
-      : primaryRole === "teamLeader"
-        ? TeamLeaderLayout
-        : PmOwnerLayout;
+      : PmOwnerLayout;
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(() => {

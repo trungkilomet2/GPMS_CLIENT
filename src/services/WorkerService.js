@@ -211,6 +211,45 @@ async function fetchEmployeePages(endpoint, options = {}) {
   return dedupeEmployees(pages);
 }
 
+async function fetchEmployeesByPmPages(options = {}) {
+  const pageSize = Number(options?.pageSize ?? 100);
+  const startPageIndex = Number(options?.pageIndex ?? 0);
+  const sortColumn = options?.sortColumn ?? "Name";
+  const sortOrder = options?.sortOrder ?? "ASC";
+  const filterQuery = String(options?.filterQuery ?? "").trim();
+  const includeHidden = Boolean(options?.includeHidden);
+  const pages = [];
+  let pageIndex = startPageIndex;
+
+  while (pageIndex < startPageIndex + 50) {
+    const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES_BY_PM_ID, {
+      params: {
+        PageIndex: pageIndex,
+        PageSize: pageSize,
+        SortColumn: sortColumn,
+        SortOrder: sortOrder,
+        ...(filterQuery ? { FilterQuery: filterQuery } : {}),
+      },
+    });
+
+    const response = parseApiPayload(rawResponse);
+    const employees = normalizeEmployeeCollection(response, { includeHidden });
+    const { recordCount } = getCollectionMeta(response);
+
+    pages.push(...employees);
+
+    if (employees.length === 0) break;
+
+    const loadedCount = (pageIndex - startPageIndex) * pageSize + employees.length;
+    if (recordCount != null && loadedCount >= recordCount) break;
+    if (employees.length < pageSize) break;
+
+    pageIndex += 1;
+  }
+
+  return dedupeEmployees(pages);
+}
+
 async function fetchEmployeeByWorkerId(id, options = {}) {
   const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_BY_ID(id));
   const response = parseApiPayload(rawResponse);
@@ -256,6 +295,17 @@ const WorkerService = {
     return {
       ...response,
       data: employees,
+    };
+  },
+
+  async getEmployeeDirectoryByPmScope(options = {}) {
+    const employees = await fetchEmployeesByPmPages(options);
+
+    return {
+      data: employees,
+      pageIndex: 0,
+      pageSize: employees.length,
+      recordCount: employees.length,
     };
   },
 

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ClipboardList,
+  FileText,
   RefreshCcw,
-  Search,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
@@ -93,6 +93,7 @@ export default function AdminSystemLog() {
   const [fromTimestamp, setFromTimestamp] = useState("");
   const [toTimestamp, setToTimestamp] = useState("");
   const [logs, setLogs] = useState([]);
+  const [selectedLogId, setSelectedLogId] = useState(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize] = useState(20);
   const [recordCount, setRecordCount] = useState(0);
@@ -124,8 +125,13 @@ export default function AdminSystemLog() {
       const items = Array.isArray(response?.data) ? response.data.map(normalizeLogItem) : [];
       setLogs(items);
       setRecordCount(Number(response?.recordCount ?? items.length ?? 0));
+      setSelectedLogId((current) => {
+        if (items.length === 0) return null;
+        return items.some((item) => item.id === current) ? current : items[0].id;
+      });
     } catch (nextError) {
       setLogs([]);
+      setSelectedLogId(null);
       setRecordCount(0);
       setError(
         nextError?.response?.data?.detail ||
@@ -173,6 +179,11 @@ export default function AdminSystemLog() {
     [filteredLogs, recordCount]
   );
 
+  const selectedLog = useMemo(
+    () => filteredLogs.find((log) => log.id === selectedLogId) || filteredLogs[0] || null,
+    [filteredLogs, selectedLogId]
+  );
+
   const totalPages = Math.max(1, Math.ceil((recordCount || 0) / pageSize));
   const currentPage = pageIndex + 1;
 
@@ -208,7 +219,7 @@ export default function AdminSystemLog() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Theo dõi log thật từ hệ thống để rà soát lỗi, cảnh báo và các request quan trọng trong backend.
+                Dùng log thật từ backend để kiểm tra lỗi vận hành, warning hạ tầng và những phần contract còn thiếu hoặc chưa validate chặt.
               </p>
             </div>
 
@@ -248,10 +259,9 @@ export default function AdminSystemLog() {
           </div>
 
           <div className="admin-filter-card">
-            <div className="admin-filter-grid">
-              <label className="admin-field">
+            <div className="admin-filter-grid admin-filter-grid--logs">
+              <label className="admin-field admin-field--plain">
                 <span className="admin-field__label">Tìm trong log</span>
-                <Search size={18} className="admin-field__icon" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -260,9 +270,8 @@ export default function AdminSystemLog() {
                 />
               </label>
 
-              <label className="admin-field">
+              <label className="admin-field admin-field--plain">
                 <span className="admin-field__label">Mức độ</span>
-                <ShieldCheck size={18} className="admin-field__icon" />
                 <select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)} className="admin-field__control">
                   {levelOptions.map((level) => (
                     <option key={level} value={level}>
@@ -272,9 +281,8 @@ export default function AdminSystemLog() {
                 </select>
               </label>
 
-              <label className="admin-field">
+              <label className="admin-field admin-field--plain">
                 <span className="admin-field__label">Từ thời gian</span>
-                <ClipboardList size={18} className="admin-field__icon" />
                 <input
                   type="datetime-local"
                   value={fromTimestamp}
@@ -283,9 +291,8 @@ export default function AdminSystemLog() {
                 />
               </label>
 
-              <label className="admin-field">
+              <label className="admin-field admin-field--plain">
                 <span className="admin-field__label">Đến thời gian</span>
-                <ClipboardList size={18} className="admin-field__icon" />
                 <input
                   type="datetime-local"
                   value={toTimestamp}
@@ -300,106 +307,190 @@ export default function AdminSystemLog() {
                   <span>{filteredLogs.length} log trong trang</span>
                 </div>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={applyFilters}>
-                  Áp dụng bộ lọc
+                  Áp dụng
                 </button>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={clearFilters}>
-                  Xóa bộ lọc
+                  Xóa
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="admin-table-card">
-            <div className="admin-table-card__header">
-              <div>
-                <h2 className="admin-card__title">Danh sách nhật ký hoạt động</h2>
-                <p className="admin-card__subtitle">Ưu tiên hiển thị rõ request path, nguồn sinh log và nội dung lỗi để rà soát nhanh.</p>
+          <div className="admin-grid admin-grid--logs">
+            <section className="admin-table-card">
+              <div className="admin-table-card__header">
+                <div>
+                  <h2 className="admin-card__title">Danh sách log</h2>
+                  <p className="admin-card__subtitle">Quét nhanh theo thời gian, mức độ và request path.</p>
+                </div>
+                <div className="admin-inline-summary">
+                  <span className="admin-inline-summary__item">{filteredLogs.length} log trong trang</span>
+                  <span className="admin-inline-summary__item">{stats.errors} lỗi</span>
+                </div>
               </div>
-            </div>
 
-            <div className="admin-log-list">
-              {!isLoading && filteredLogs.length === 0 ? (
-                <div className="admin-state">
+              <div className="admin-table-wrap">
+                {!isLoading && filteredLogs.length === 0 ? (
+                  <div className="admin-state">
+                    <div className="admin-state__content">
+                      <strong>Không có log phù hợp</strong>
+                      <span>Thử đổi thời gian, từ khóa hoặc mức độ để xem thêm dữ liệu từ backend.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <table className="admin-table admin-log-table">
+                    <thead>
+                      <tr>
+                        <th>Thời gian</th>
+                        <th>Mức độ</th>
+                        <th>Request path</th>
+                        <th>Nội dung</th>
+                        <th>Nguồn</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLogs.map((log) => {
+                        const isSelected = selectedLog?.id === log.id;
+
+                        return (
+                          <tr
+                            key={log.id}
+                            className={isSelected ? "admin-log-table__row is-selected" : "admin-log-table__row"}
+                            onClick={() => setSelectedLogId(log.id)}
+                          >
+                            <td>
+                              <div className="admin-table__primary">{formatAdminDateTime(log.timestamp)}</div>
+                              <div className="admin-table__secondary">#{log.id}</div>
+                            </td>
+                            <td>
+                              <AdminSeverityBadge severity={String(log.level).toLowerCase()} />
+                            </td>
+                            <td>
+                              <div className="admin-table__primary admin-table__text-wrap">
+                                {log.requestPath || "Chưa có RequestPath"}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="admin-table__primary admin-table__text-wrap">
+                                {log.message || "Không có message"}
+                              </div>
+                            </td>
+                            <td>
+                              <div className="admin-table__secondary admin-table__text-wrap">
+                                {log.sourceContext || "Chưa có SourceContext"}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <div className="admin-table-card__header admin-table-card__footer">
+                <div className="admin-card__subtitle">
+                  Trang {currentPage}/{totalPages} • Tối đa {pageSize} log mỗi trang
+                </div>
+                <div className="admin-table__actions">
+                  <button
+                    type="button"
+                    className="admin-link-btn admin-link-btn--secondary"
+                    disabled={pageIndex === 0 || isLoading}
+                    onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
+                  >
+                    Trang trước
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-link-btn admin-link-btn--primary"
+                    disabled={currentPage >= totalPages || isLoading}
+                    onClick={() => setPageIndex((current) => current + 1)}
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <aside className="admin-card">
+              <div className="admin-card__header">
+                <div>
+                  <h2 className="admin-card__title">Chi tiết log</h2>
+                  <p className="admin-card__subtitle">Chọn một dòng bên trái để xem đầy đủ message, request và exception.</p>
+                </div>
+              </div>
+
+              {!selectedLog ? (
+                <div className="admin-state admin-state--compact">
                   <div className="admin-state__content">
-                    <strong>Không có sự kiện phù hợp với bộ lọc hiện tại</strong>
-                    <span>Thử đổi thời gian, từ khóa hoặc mức độ để xem thêm log từ backend.</span>
+                    <strong>Chưa có log nào được chọn</strong>
+                    <span>Chọn một dòng trong bảng để xem chi tiết tại đây.</span>
                   </div>
                 </div>
               ) : (
-                filteredLogs.map((log) => (
-                  <article
-                    key={log.id}
-                    className={`admin-log-item admin-log-item--${String(log.level).toLowerCase()}`}
-                  >
-                    <div className="admin-log-item__top">
-                      <div>
-                        <div className="admin-table__primary">{formatAdminDateTime(log.timestamp)}</div>
-                        <div className="admin-table__secondary">Log #{log.id}</div>
-                      </div>
+                <div className="admin-log-detail">
+                  <div className="admin-chips">
+                    <AdminSeverityBadge severity={String(selectedLog.level).toLowerCase()} />
+                    <span className="admin-badge admin-badge--tone-info">#{selectedLog.id}</span>
+                  </div>
 
-                      <div className="admin-chips">
-                        <AdminSeverityBadge severity={String(log.level).toLowerCase()} />
-                        {log.requestPath ? (
-                          <AdminRoleBadge tone={getLevelTone(log.level)}>
-                            {log.requestPath}
-                          </AdminRoleBadge>
-                        ) : null}
+                  <div className="admin-log-detail__section">
+                    <strong>Thời gian</strong>
+                    <span>{formatAdminDateTime(selectedLog.timestamp)}</span>
+                  </div>
+
+                  <div className="admin-log-detail__section">
+                    <strong>Request path</strong>
+                    <span>{selectedLog.requestPath || "Chưa có RequestPath"}</span>
+                  </div>
+
+                  <div className="admin-log-detail__section">
+                    <strong>Action</strong>
+                    <span>{selectedLog.actionName || "Chưa có ActionName"}</span>
+                  </div>
+
+                  <div className="admin-log-detail__section">
+                    <strong>Source</strong>
+                    <span>{selectedLog.sourceContext || "Chưa có SourceContext"}</span>
+                  </div>
+
+                  <div className="admin-log-detail__section">
+                    <strong>Request ID</strong>
+                    <span>{selectedLog.requestId || "Chưa có RequestId"}</span>
+                  </div>
+
+                  <div className="admin-log-detail__section">
+                    <strong>Nội dung log</strong>
+                    <div className="admin-log-detail__message">{selectedLog.message || "Không có message."}</div>
+                  </div>
+
+                  {selectedLog.messageTemplate ? (
+                    <div className="admin-log-detail__section">
+                      <strong>Message template</strong>
+                      <div className="admin-log-detail__code">{selectedLog.messageTemplate}</div>
+                    </div>
+                  ) : null}
+
+                  {selectedLog.exception ? (
+                    <div className="admin-log-detail__section">
+                      <strong>Exception</strong>
+                      <pre className="admin-log-detail__exception">{selectedLog.exception}</pre>
+                    </div>
+                  ) : null}
+
+                  {selectedLog.properties ? (
+                    <div className="admin-log-detail__section">
+                      <strong>Properties gốc</strong>
+                      <div className="admin-log-detail__code admin-log-detail__code--scroll">
+                        <FileText size={16} />
+                        <span>{selectedLog.properties}</span>
                       </div>
                     </div>
-
-                    <div className="admin-log-item__message">
-                      {log.message || "Không có nội dung message."}
-                    </div>
-
-                    <div className="admin-log-item__meta">
-                      <div className="admin-log-item__meta-card">
-                        <strong>Action</strong>
-                        <span>{log.actionName || "Chưa có ActionName"}</span>
-                      </div>
-                      <div className="admin-log-item__meta-card">
-                        <strong>Source</strong>
-                        <span>{log.sourceContext || "Chưa có SourceContext"}</span>
-                      </div>
-                      <div className="admin-log-item__meta-card">
-                        <strong>Request ID</strong>
-                        <span>{log.requestId || "Chưa có RequestId"}</span>
-                      </div>
-                    </div>
-
-                    {log.exception ? (
-                      <div className="admin-log-item__exception">
-                        <strong>Exception</strong>
-                        <pre>{log.exception}</pre>
-                      </div>
-                    ) : null}
-                  </article>
-                ))
+                  ) : null}
+                </div>
               )}
-            </div>
-
-            <div className="admin-table-card__header admin-table-card__footer">
-              <div className="admin-card__subtitle">
-                Trang {currentPage}/{totalPages} • Hiển thị tối đa {pageSize} log mỗi trang
-              </div>
-              <div className="admin-table__actions">
-                <button
-                  type="button"
-                  className="admin-link-btn admin-link-btn--secondary"
-                  disabled={pageIndex === 0 || isLoading}
-                  onClick={() => setPageIndex((current) => Math.max(0, current - 1))}
-                >
-                  Trang trước
-                </button>
-                <button
-                  type="button"
-                  className="admin-link-btn admin-link-btn--primary"
-                  disabled={currentPage >= totalPages || isLoading}
-                  onClick={() => setPageIndex((current) => current + 1)}
-                >
-                  Trang sau
-                </button>
-              </div>
-            </div>
+            </aside>
           </div>
         </div>
       </div>

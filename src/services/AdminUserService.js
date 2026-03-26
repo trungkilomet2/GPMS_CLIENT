@@ -29,32 +29,16 @@ const ROLE_CATALOG = [
     description: "Quản lý sản xuất, nhân sự và tiến độ vận hành.",
   },
   {
-    key: "Team Leader",
-    roleId: 5,
-    label: "Tổ trưởng",
-    shortLabel: "Điều phối chuyền",
-    tone: "info",
-    description: "Phụ trách điều phối chuyền may và theo dõi năng suất tổ.",
-  },
-  {
     key: "Worker",
-    roleId: 6,
+    roleId: 5,
     label: "Nhân viên",
     shortLabel: "Nhân sự vận hành",
     tone: "success",
     description: "Tài khoản nhân viên sản xuất và tác nghiệp hằng ngày.",
   },
-  {
-    key: "KCS",
-    roleId: 7,
-    label: "Kiểm soát chất lượng",
-    shortLabel: "Kiểm soát chất lượng",
-    tone: "info",
-    description: "Theo dõi chất lượng và kiểm tra thành phẩm trong xưởng.",
-  },
 ];
 
-const ROLE_PRIORITY = ["Admin", "Owner", "PM", "Team Leader", "KCS", "Worker", "Customer"];
+const ROLE_PRIORITY = ["Admin", "Owner", "PM", "Worker", "Customer"];
 
 const ROLE_KEY_MAP = ROLE_CATALOG.reduce((map, item) => {
   map[item.key] = item;

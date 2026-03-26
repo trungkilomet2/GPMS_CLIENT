@@ -5,6 +5,7 @@ import {
   BriefcaseBusiness,
   CircleAlert,
   LoaderCircle,
+  Sparkles,
   ShieldCheck,
   UserRound,
   UserRoundCog,
@@ -13,6 +14,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_FORM_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
+  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/orgHierarchy";
 import { normalizeSpaces, validateFullName } from "@/lib/validators";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
+import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import "@/styles/employee-create.css";
 
 export default function EmployeeUpdate() {
@@ -34,12 +37,16 @@ export default function EmployeeUpdate() {
   const [managerOptions, setManagerOptions] = useState([]);
   const [managerLoading, setManagerLoading] = useState(true);
   const [managerError, setManagerError] = useState("");
+  const [workerSkillOptions, setWorkerSkillOptions] = useState([]);
+  const [workerSkillLoading, setWorkerSkillLoading] = useState(true);
+  const [workerSkillError, setWorkerSkillError] = useState("");
   const [form, setForm] = useState({
     userName: "",
     fullName: "",
     role: "PM",
-    pmScopeId: "",
+    statusId: USER_STATUS_IDS.Active,
     managerId: "",
+    workerSkillId: "",
   });
 
   useEffect(() => {
@@ -50,13 +57,16 @@ export default function EmployeeUpdate() {
       setManagerLoading(true);
       setError("");
       setManagerError("");
+      setWorkerSkillLoading(true);
+      setWorkerSkillError("");
 
       try {
-        const [employee, managerResponse] = await Promise.all([
+        const [employee, managerResponse, workerRoles] = await Promise.all([
           WorkerService.getEmployeeById(id),
           WorkerService.getEmployeeDirectory({
             pageSize: 100,
           }),
+          WorkerRoleService.getWorkerRoles(),
         ]);
 
         if (!mounted) return;
@@ -65,6 +75,7 @@ export default function EmployeeUpdate() {
           (item) => String(item.id) !== String(id)
         );
         setManagerOptions(managers);
+        setWorkerSkillOptions(workerRoles ?? []);
 
         if (!employee) {
           setError("Không tìm thấy nhân viên phù hợp.");
@@ -75,15 +86,14 @@ export default function EmployeeUpdate() {
           userName: employee.userName || "",
           fullName: employee.fullName || "",
           role: pickPrimarySystemRole(employee.role) || "PM",
-          pmScopeId:
-            employee.roles?.includes("Worker") && employee.managerId != null
+          statusId: employee.statusId ?? USER_STATUS_IDS.Active,
+          managerId: employee.managerId != null ? String(employee.managerId) : "",
+          workerSkillId:
+            workerRoles.find((item) => String(item.name).trim().toLowerCase() === String(employee.workerSkill).trim().toLowerCase())?.id != null
               ? String(
-                  managers.find((item) => String(item.id) === String(employee.managerId))?.roles?.includes("PM")
-                    ? employee.managerId
-                    : managers.find((item) => String(item.id) === String(employee.managerId))?.managerId ?? ""
+                  workerRoles.find((item) => String(item.name).trim().toLowerCase() === String(employee.workerSkill).trim().toLowerCase())?.id
                 )
               : "",
-          managerId: employee.managerId != null ? String(employee.managerId) : "",
         });
       } catch (err) {
         if (!mounted) return;
@@ -93,10 +103,12 @@ export default function EmployeeUpdate() {
         );
         setError(message);
         setManagerError(message);
+        setWorkerSkillError(getWorkerRoleErrorMessage(err, "Không tải được danh mục chuyên môn thợ."));
       } finally {
         if (mounted) {
           setLoading(false);
           setManagerLoading(false);
+          setWorkerSkillLoading(false);
         }
       }
     };
@@ -113,69 +125,23 @@ export default function EmployeeUpdate() {
     [form.role]
   );
 
-  const availablePmScopes = useMemo(
-    () =>
-      managerOptions.filter((employee) => employee.roles.some((role) => role === "PM")),
-    [managerOptions]
-  );
-
   const availableManagers = useMemo(
-    () => {
-      const scopedManagers = managerOptions.filter((employee) =>
+    () =>
+      managerOptions.filter((employee) =>
         employee.roles.some((role) => allowedManagerRoles.includes(role))
-      );
-
-      if (form.role !== "Worker") {
-        return scopedManagers;
-      }
-
-      if (!form.pmScopeId) {
-        return [];
-      }
-
-      return scopedManagers.filter((employee) => {
-        const isPm = employee.roles.includes("PM");
-        const isTeamLeader = employee.roles.includes("Team Leader");
-
-        if (isPm) {
-          return String(employee.id) === String(form.pmScopeId);
-        }
-
-        if (isTeamLeader) {
-          return String(employee.managerId) === String(form.pmScopeId);
-        }
-
-        return false;
-      });
-    },
-    [allowedManagerRoles, form.pmScopeId, form.role, managerOptions]
+      ),
+    [allowedManagerRoles, managerOptions]
   );
 
   useEffect(() => {
-    if (form.role !== "Worker") {
-      if (!form.pmScopeId) return;
+    if (form.role === "Worker") return;
+    if (!form.workerSkillId) return;
 
-      setForm((prev) => ({
-        ...prev,
-        pmScopeId: "",
-      }));
-      return;
-    }
-
-    if (!form.pmScopeId) return;
-
-    const isValidPmScope = availablePmScopes.some(
-      (pm) => String(pm.id) === String(form.pmScopeId)
-    );
-
-    if (!isValidPmScope) {
-      setForm((prev) => ({
-        ...prev,
-        pmScopeId: "",
-        managerId: "",
-      }));
-    }
-  }, [availablePmScopes, form.pmScopeId, form.role]);
+    setForm((prev) => ({
+      ...prev,
+      workerSkillId: "",
+    }));
+  }, [form.role, form.workerSkillId]);
 
   useEffect(() => {
     if (!form.managerId) return;
@@ -211,9 +177,9 @@ export default function EmployeeUpdate() {
     const nextErrors = {
       fullName: validateFullName(normalizedFullName),
       role: SYSTEM_ROLE_IDS[form.role] ? "" : "Vai trò không hợp lệ",
-      pmScopeId:
-        form.role === "Worker" && !String(form.pmScopeId ?? "").trim()
-          ? "Vui lòng chọn PM phụ trách"
+      workerSkillId:
+        form.role === "Worker" && !String(form.workerSkillId ?? "").trim()
+          ? "Vui lòng chọn chuyên môn thợ"
           : "",
       managerId:
         isManagerRequired(form.role) && !String(form.managerId ?? "").trim()
@@ -234,8 +200,10 @@ export default function EmployeeUpdate() {
     try {
       await WorkerService.updateEmployee(id, {
         fullName: normalizedFullName,
+        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
+        workerRoleIds: form.role === "Worker" ? [Number(form.workerSkillId)] : [],
       });
 
       navigate(`/employees/${id}`);
@@ -263,7 +231,7 @@ export default function EmployeeUpdate() {
               </Link>
               <h1 className="employee-create-hero__title">Cập nhật thông tin nhân viên</h1>
               <p className="employee-create-hero__subtitle">
-                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Team Lead / Worker.
+                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Worker.
               </p>
             </div>
 
@@ -336,44 +304,20 @@ export default function EmployeeUpdate() {
                   <label className="employee-create-field">
                     <span className="employee-create-field__label">Quản lý trực tiếp</span>
                     <BriefcaseBusiness size={18} className="employee-create-field__icon" />
-                    {form.role === "Worker" ? (
-                      <select
-                        value={form.pmScopeId}
-                        onChange={handleChange("pmScopeId")}
-                        className="employee-create-field__control"
-                        disabled={managerLoading}
-                      >
-                        <option value="">
-                          {managerLoading
-                            ? "Đang tải danh sách PM..."
-                            : availablePmScopes.length
-                              ? "Chọn PM phụ trách"
-                              : "Chưa có PM phù hợp"}
-                        </option>
-                        {availablePmScopes.map((manager) => (
-                          <option key={manager.id} value={manager.id}>
-                            {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
-                    {fieldErrors.pmScopeId ? <span className="employee-create-field__error">{fieldErrors.pmScopeId}</span> : null}
                     <select
                       value={form.managerId}
                       onChange={handleChange("managerId")}
                       className="employee-create-field__control"
-                      disabled={form.role === "Owner" || managerLoading || (form.role === "Worker" && !form.pmScopeId)}
+                      disabled={form.role === "Owner" || managerLoading}
                     >
                       <option value="">
                         {form.role === "Owner"
                           ? "Owner không có quản lý trực tiếp"
                           : managerLoading
                             ? "Đang tải danh sách quản lý..."
-                            : form.role === "Worker" && !form.pmScopeId
-                              ? "Chọn PM phụ trách trước"
-                              : availableManagers.length
-                                ? "Chọn quản lý trực tiếp"
-                                : "Chưa có quản lý phù hợp"}
+                            : availableManagers.length
+                              ? "Chọn quản lý trực tiếp"
+                              : "Chưa có quản lý phù hợp"}
                       </option>
                       {availableManagers.map((manager) => (
                         <option key={manager.id} value={manager.id}>
@@ -383,6 +327,33 @@ export default function EmployeeUpdate() {
                     </select>
                     {fieldErrors.managerId ? <span className="employee-create-field__error">{fieldErrors.managerId}</span> : null}
                   </label>
+
+                  {form.role === "Worker" ? (
+                    <label className="employee-create-field">
+                      <span className="employee-create-field__label">Chuyên môn thợ</span>
+                      <Sparkles size={18} className="employee-create-field__icon" />
+                      <select
+                        value={form.workerSkillId}
+                        onChange={handleChange("workerSkillId")}
+                        className="employee-create-field__control"
+                        disabled={workerSkillLoading}
+                      >
+                        <option value="">
+                          {workerSkillLoading
+                            ? "Đang tải danh mục chuyên môn..."
+                            : workerSkillOptions.length
+                              ? "Chọn chuyên môn thợ"
+                              : "Chưa có chuyên môn phù hợp"}
+                        </option>
+                        {workerSkillOptions.map((skill) => (
+                          <option key={skill.id} value={skill.id}>
+                            {skill.label || skill.name}
+                          </option>
+                        ))}
+                      </select>
+                      {fieldErrors.workerSkillId ? <span className="employee-create-field__error">{fieldErrors.workerSkillId}</span> : null}
+                    </label>
+                  ) : null}
                 </div>
 
                 <div className="employee-create-banner">
@@ -393,6 +364,13 @@ export default function EmployeeUpdate() {
                   <div className="employee-create-banner employee-create-banner--error">
                     <CircleAlert size={18} />
                     <span>{managerError}</span>
+                  </div>
+                ) : null}
+
+                {workerSkillError ? (
+                  <div className="employee-create-banner employee-create-banner--error">
+                    <CircleAlert size={18} />
+                    <span>{workerSkillError}</span>
                   </div>
                 ) : null}
 

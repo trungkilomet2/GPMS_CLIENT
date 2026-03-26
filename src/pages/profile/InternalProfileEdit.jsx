@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
@@ -113,10 +112,6 @@ export default function InternalProfileEdit() {
     const primaryRole = getPrimaryWorkspaceRole(storedUser?.role);
 
     if (primaryRole === "worker") return WorkerLayout;
-    if (primaryRole === "teamLeader") {
-      return TeamLeaderLayout;
-    }
-
     return DashboardLayout;
   }, [storedUser]);
 
@@ -159,7 +154,7 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
-        setInitialEmail(profile?.email || storedUser?.email || "");
+        setInitialEmail(profile?.emailFromServer ? (profile?.email || "") : "");
         setAvatarPreview(profile?.avatarUrl || storedUser?.avatarUrl || "");
       } catch (e) {
         if (!mounted) return;
