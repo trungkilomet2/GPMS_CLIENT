@@ -61,9 +61,11 @@ export function useProductionList(maxPagesConfig = 20, pageSizeFetchConfig = 50,
             const key = item?.productionId ?? item?.id ?? JSON.stringify(item);
             if (seenKeys.has(key)) return;
             seenKeys.add(key);
-            const resolvedStatus = getProductionStatusLabel(
-              item.statusName ?? item.status ?? item.statusId
-            );
+            // Ưu tiên statusId (số nguyên, đáng tin cậy) để tránh lỗi encoding chuỗi tiếng Việt
+            const rawStatus = (item.statusId != null)
+              ? item.statusId
+              : (item.statusName ?? item.status);
+            const resolvedStatus = getProductionStatusLabel(rawStatus);
             allItems.push({ ...item, statusName: resolvedStatus });
             added += 1;
           });

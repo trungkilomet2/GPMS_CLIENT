@@ -369,6 +369,7 @@ export default function CreateOrder() {
           return {
             materialName: m.materialName ?? '',
             image: imageUrl,
+            color: m.color ?? '',
             value: Number(m.value) || 0,
             note: m.note ?? '',
             uom: m.uom ?? '',

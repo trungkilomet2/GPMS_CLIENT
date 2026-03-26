@@ -324,9 +324,8 @@ export default function ProductionDetail() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button
-                onClick={() => navigate(-1)}
-                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+              <button onClick={() => navigate(-1)}
+                className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
               </button>
@@ -340,17 +339,15 @@ export default function ProductionDetail() {
 
             <div className="flex flex-wrap items-center gap-2">
               {isOwner ? (
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
-                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                 >
                   Chỉnh sửa
                 </button>
               ) : (
                 <>
-                  <button
-                    type="button"
+                  <button type="button"
                     onClick={() => setIsApproveModalOpen(true)}
                     disabled={isActionLocked}
                     className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${isActionLocked
@@ -534,10 +531,9 @@ export default function ProductionDetail() {
                 <p className="text-sm text-rose-800 mb-4">
                   Xem nhanh các lỗi đã báo cáo liên quan đến đơn sản xuất này.
                 </p>
-                <button
-                  type="button"
+                <button type="button"
                   onClick={() => navigate(`/production/${production.productionId}/errors`)}
-                  className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                  className="cursor-pointer w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
                 >
                   Xem tổng hợp lỗi
                 </button>

@@ -41,6 +41,8 @@ export const API_ENDPOINTS = {
     REJECT_REASON: (id) => `${BASE_URL}/api/Production/production/reject-reason/detail/${id}`,
     ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
     ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
+    APPROVE_PLAN: (id) => `${BASE_URL}/api/Production/production/approve/production-plan/${id}`,
+    NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>

@@ -5,8 +5,6 @@ import Pagination from "@/components/Pagination";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
-import ProductionService from "@/services/ProductionService";
-import WorkerService from "@/services/WorkerService";
 import { useAuth } from "@/hooks/useAuth";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useProductionList } from "@/hooks/useProductionList";
@@ -34,31 +32,40 @@ export default function ProductionPlanList() {
 
 
   const plans = useMemo(() => {
-    return productions.map((item) => {
-      const order = item?.order ?? {};
-      const pm = item?.pm ?? {};
-      const orderId = order?.id ?? item?.orderId ?? item?.order?.orderId ?? "-";
-      const orderName = order?.orderName ?? item?.orderName ?? "-";
-      const pmIdRaw = item?.pmInfo?.id ?? item?.pmId ?? pm?.id ?? item?.pmID ?? item?.pm_id ?? null;
-      const pmName =
-        item?.pmInfo?.fullName ??
-        item?.pmName ??
-        pm?.name ??
-        pm?.fullName ??
-        (pmIdRaw ? `PM #${pmIdRaw}` : "-");
-      const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
-      const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
-      const status = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
-      return {
-        productionId: item?.productionId ?? item?.id ?? "-",
-        orderId,
-        orderName,
-        pmName,
-        pStartDate: startDate,
-        pEndDate: endDate,
-        status,
-      };
-    });
+    return productions
+      .filter((item) => {
+        const sid = Number(item?.statusId ?? item?.status ?? 0);
+        const name = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+        // Exclude Chờ Xét Duyệt (1) and Từ Chối (2)
+        if (sid === 1 || sid === 2) return false;
+        if (name === "Chờ Xét Duyệt" || name === "Từ Chối" || name === "Chờ kiểm tra") return false;
+        return true;
+      })
+      .map((item) => {
+        const order = item?.order ?? {};
+        const pm = item?.pm ?? {};
+        const orderId = order?.id ?? item?.orderId ?? item?.order?.orderId ?? "-";
+        const orderName = order?.orderName ?? item?.orderName ?? "-";
+        const pmIdRaw = item?.pmInfo?.id ?? item?.pmId ?? pm?.id ?? item?.pmID ?? item?.pm_id ?? null;
+        const pmName =
+          item?.pmInfo?.fullName ??
+          item?.pmName ??
+          pm?.name ??
+          pm?.fullName ??
+          (pmIdRaw ? `PM #${pmIdRaw}` : "-");
+        const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
+        const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
+        const status = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+        return {
+          productionId: item?.productionId ?? item?.id ?? "-",
+          orderId,
+          orderName,
+          pmName,
+          pStartDate: startDate,
+          pEndDate: endDate,
+          status,
+        };
+      });
   }, [productions]);
 
   const filtered = useMemo(() => {
@@ -113,10 +120,10 @@ export default function ProductionPlanList() {
         pendingIds.map(async (productionId) => {
           try {
             const response = await ProductionPartService.getPartsByProduction(productionId, {
-              pageIndex: 0,
-              pageSize: 10,
-              sortColumn: "Name",
-              sortOrder: "ASC",
+              PageIndex: 0,
+              PageSize: 500,
+              SortColumn: "Name",
+              SortOrder: "ASC",
             }).catch(() => ProductionPartService.getPartsByProduction(productionId));
             const payload = response?.data;
             const list =
@@ -165,17 +172,14 @@ export default function ProductionPlanList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách kế hoạch sản xuất</h1>
               <p className="text-slate-600">Theo dõi kế hoạch sản xuất và tiến độ triển khai theo từng đơn hàng.</p>
             </div>
-            {!isWorker && (
-              <Link className="order-create-btn" to="/production-plan/create">
-                + Tạo kế hoạch
-              </Link>
-            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <button
               type="button"
-              className="group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-slate-200"
+              onClick={() => setStatusFilter("all")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "all" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+                }`}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -190,7 +194,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -198,7 +202,7 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đã lên kế hoạch</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.planned}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-indigo-100 bg-indigo-50 text-indigo-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
@@ -206,7 +210,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Đang Sản Xuất")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -214,7 +218,7 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đang triển khai</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.inProgress}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-violet-100 bg-violet-50 text-violet-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
@@ -222,7 +226,7 @@ export default function ProductionPlanList() {
             <button
               type="button"
               onClick={() => setStatusFilter("Hoàn Thành")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
