@@ -64,6 +64,7 @@ const PRODUCTION_LABELS = {
   denied: "Từ Chối",
 };
 
+// Mapping theo bảng PS_STATUS trong DB (PS_ID → NAME)
 const PRODUCTION_STATUS_BY_ID = {
   1: "Chờ Xét Duyệt",           // PS_ID=1
   2: "Từ Chối",                  // PS_ID=2

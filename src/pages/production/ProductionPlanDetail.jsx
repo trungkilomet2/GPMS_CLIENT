@@ -11,25 +11,11 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
+import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-const STATUS_STYLES = {
-  Planned: "bg-amber-50 text-amber-700 border-amber-200",
-  "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-  "Đang sản xuất": "bg-blue-50 text-blue-700 border-blue-200",
-  Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  default: "bg-gray-50 text-gray-700 border-gray-200",
-};
 
-function getStatusLabel(status) {
-  if (typeof status === "number") {
-    if (status === 1) return "Planned";
-    if (status === 2) return "In Progress";
-    if (status === 3) return "Completed";
-  }
-  return status || "-";
-}
 
 function detectHasCuttingNotebook(detailPayload) {
   const notebook =
@@ -125,7 +111,7 @@ export default function ProductionPlanDetail() {
         const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
         const order = detailPayload?.order ?? {};
         const pm = detailPayload?.pm ?? {};
-        const statusLabel = getStatusLabel(
+        const statusLabel = getProductionStatusLabel(
           detailPayload?.statusName ?? detailPayload?.status ?? detailPayload?.statusId ?? ""
         );
         const hasCuttingNotebook = detectHasCuttingNotebook(detailPayload);
@@ -397,12 +383,6 @@ export default function ProductionPlanDetail() {
                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                     Chi tiết kế hoạch
                   </h1>
-                  <span
-                    className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${STATUS_STYLES[plan.production.status] || STATUS_STYLES.default
-                      }`}
-                  >
-                    {plan.production.status}
-                  </span>
                 </div>
                 <p className="text-slate-600">Theo dõi thông tin kế hoạch và tiến độ thực hiện.</p>
               </div>
@@ -462,9 +442,9 @@ export default function ProductionPlanDetail() {
               </div>
             </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
-              <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
+                <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                   {plan.product.image ? (
                     <img src={plan.product.image} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -584,19 +564,19 @@ export default function ProductionPlanDetail() {
                                 </span>
                               ))}
                             </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatDateTime(row.startDate)}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {formatDateTime(row.endDate)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
-                      </td>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDateTime(row.startDate)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {formatDateTime(row.endDate)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                        </td>
                         <td className="px-4 py-3 text-center">
                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
                             Đang làm
