@@ -13,7 +13,7 @@ export const STATUS_STYLES = {
 
 // Mapping theo bảng PS_STATUS trong DB (PS_ID → NAME)
 const PRODUCTION_STATUS_BY_ID = {
-  1: "Chờ kiểm tra",            // PS_ID=1 (Chờ Xét Duyệt -> Chờ kiểm tra)
+  1: "Chờ Xét Duyệt",            // PS_ID=1 
   2: "Từ Chối",                  // PS_ID=2
   3: "Chấp Nhận",                // PS_ID=3
   4: "Chờ Xét Duyệt Kế Hoạch",  // PS_ID=4
@@ -41,11 +41,11 @@ export function getProductionStatusLabel(status) {
   const normalized = raw.toLowerCase();
 
   // Substring fallback để tránh Unicode encoding mismatch
-  if (normalized.includes("ki\u1ec3m tra")) return "Ch\u1edd ki\u1ec3m tra"; 
+  if (normalized.includes("ki\u1ec3m tra")) return "Ch\u1edd ki\u1ec3m tra";
   if (normalized.includes("kế hoạch") || normalized.includes("k\u1ebf ho\u1ea1ch")) {
-     if (normalized.includes("xét duyệt") || normalized.includes("x\u00e9t duy\u1ec7t")) return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch";
-     if (normalized.includes("chỉnh sửa") || normalized.includes("ch\u1ec9nh s\u1eeda")) return "C\u1ea7n Ch\u1ec9nh S\u1eeda K\u1ebf Ho\u1ea1ch";
-     return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch"; // Default plan status
+    if (normalized.includes("xét duyệt") || normalized.includes("x\u00e9t duy\u1ec7t")) return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch";
+    if (normalized.includes("chỉnh sửa") || normalized.includes("ch\u1ec9nh s\u1eeda")) return "C\u1ea7n Ch\u1ec9nh S\u1eeda K\u1ebf Ho\u1ea1ch";
+    return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch"; // Default plan status
   }
   if (normalized.includes("đang sản xuất") || normalized.includes("\u0111ang s\u1ea3n xu\u1ea5t")) return "\u0110ang S\u1ea3n Xu\u1ea5t";
   if (normalized.includes("hoàn thành") || normalized.includes("ho\u00e0n th\u00e0nh")) return "Ho\u00e0n Th\u00e0nh";

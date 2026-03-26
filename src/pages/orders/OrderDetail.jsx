@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FileText, MessageSquare, History,
@@ -175,25 +175,10 @@ export default function OrderDetail() {
     );
 
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
-    const parseHardCopyQuantity = (template = {}) => {
-        const directQty = Number(template?.quantity ?? template?.Quantity);
-        if (Number.isFinite(directQty) && directQty > 0) return directQty;
-
-        const note = String(template?.note ?? template?.Note ?? '');
-        const match = note.match(/(\d+)/);
-        if (!match) return 0;
-        const parsed = Number(match[1]);
-        return Number.isFinite(parsed) ? parsed : 0;
-    };
     const softTemplates = templates.filter((t) => {
         const type = (t.type ?? '').toString().toLowerCase();
         return type.includes('soft') || !!t.file || !!t.url;
     });
-    const hardTemplates = templates.filter((t) => {
-        const type = (t.type ?? '').toString().toLowerCase();
-        return type.includes('hard');
-    });
-    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + parseHardCopyQuantity(t), 0);
     const orderStatusValue = order?.statusName ?? order?.status;
     const orderOwnerId = getOrderCustomerId(order);
     const currentUserId = user?.userId ?? user?.id ?? null;
@@ -301,7 +286,6 @@ export default function OrderDetail() {
                             {canCustomerDeny && (
                                 <button type="button"
                                     onClick={() => setShowDenyConfirm(true)}
-                                    disabled={isCanceled || !canCancelOrder}
                                     className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     Hủy đơn hàng
@@ -355,9 +339,9 @@ export default function OrderDetail() {
                             )}
                             {canEdit && (
                                 <button onClick={() => {
-                                        if (!canEditOnlyWhenRequested) return;
-                                        navigate(`/orders/edit/${order.id}`, { state: { order } });
-                                    }}
+                                    if (!canEditOnlyWhenRequested) return;
+                                    navigate(`/orders/edit/${order.id}`, { state: { order } });
+                                }}
                                     disabled={!canEditOnlyWhenRequested}
                                     className="cursor-pointer flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
@@ -369,8 +353,8 @@ export default function OrderDetail() {
                         {(denyError || denySuccess) && (
                             <div
                                 className={`lg:col-span-3 rounded-2xl border px-4 py-3 text-sm font-semibold ${denyError
-                                        ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                     }`}
                             >
                                 {denyError || denySuccess}
@@ -471,44 +455,81 @@ export default function OrderDetail() {
                                     rowClassName="flex items-start justify-between gap-3"
                                 />
                             )}
-                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
-                                <div>
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
-                                    <div className="space-y-2">
-                                        {softTemplates.length > 0 ? (
-                                            softTemplates.map((file, idx) => {
-                                                const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
-                                                const fileUrl = file.file ?? file.url ?? '';
-                                                return (
-                                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all">
-                                                        <div className="flex items-center gap-3 overflow-hidden">
-                                                            <FileText size={18} className="text-emerald-600 shrink-0" />
-                                                            <div className="overflow-hidden">
-                                                                <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
-                                                                {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                        File & Thiết kế đính kèm
+                                    </h2>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                                        {softTemplates.length} file
+                                    </span>
+                                </div>
+                                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                                    {softTemplates.length > 0 ? (
+                                        softTemplates.map((file, idx) => {
+                                            const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
+                                            const fileUrl = file.file ?? file.url ?? '';
+                                            const fileNote = file.note ?? file.Note ?? '';
+                                            const isImage = fileUrl && (fileUrl.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)($|\?)/) || (file.type && String(file.type).toLowerCase().includes('image')));
+                                            return (
+                                                <div key={idx} className="flex items-start justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all bg-slate-50/50 group">
+                                                    <div className="flex items-start gap-3 overflow-hidden w-full">
+                                                        {isImage ? (
+                                                            <div 
+                                                                className="w-10 h-10 rounded-lg shrink-0 bg-slate-100 overflow-hidden cursor-zoom-in border border-slate-200 hover:opacity-80 transition-opacity mt-0.5"
+                                                                onClick={() => { setZoomImageUrl(fileUrl); setIsImageModalOpen(true); }}
+                                                                title="Xem ảnh chi tiết"
+                                                            >
+                                                                <img src={fileUrl} alt="thumbnail" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-lg shrink-0 bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 mt-0.5">
+                                                                <FileText size={18} />
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-col min-w-0 flex-1">
+                                                            <p 
+                                                                className={`text-sm font-bold text-slate-700 truncate ${isImage ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''}`} 
+                                                                title={fileName}
+                                                                onClick={() => {
+                                                                    if (isImage) {
+                                                                        setZoomImageUrl(fileUrl);
+                                                                        setIsImageModalOpen(true);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {fileName}
+                                                            </p>
+                                                            {fileNote && (
+                                                                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed" title={fileNote}>
+                                                                    <span className="font-semibold text-slate-400 mr-1">Ghi chú:</span>{fileNote}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {file.size ? (
+                                                                    <span className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-400 font-medium">{isImage ? 'Ảnh đính kèm' : 'File đính kèm'}</span>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        {fileUrl ? (
-                                                            <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
-                                                                <Download size={16} />
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-400">Không có link</span>
-                                                        )}
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="border-t pt-4">
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                                    <div className="text-sm font-semibold text-slate-700">
-                                        Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
-                                    </div>
+                                                    {fileUrl ? (
+                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-slate-200 shadow-sm shrink-0 ml-2 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 mt-0.5" title="Tải xuống">
+                                                            <Download size={14} />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 shrink-0 ml-2 mt-2">Không có link</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                                            <FileText size={24} className="text-slate-300 mb-2" />
+                                            <p className="text-slate-400 text-[11px] font-medium">Không có file thiết kế nào được đính kèm</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

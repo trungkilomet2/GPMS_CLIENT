@@ -32,6 +32,12 @@ const ProductionService = {
   getProductionIssueSummary(productionId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES_SUMMARY(productionId));
   },
+  approveProductionPlan(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.APPROVE_PLAN(id));
+  },
+  requestPlanUpdate(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.NEED_UPDATE_PLAN(id));
+  },
 };
 
 export default ProductionService;

@@ -12,10 +12,9 @@ import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
 import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
+import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-
 
 function detectHasCuttingNotebook(detailPayload) {
   const notebook =
@@ -84,9 +83,12 @@ export default function ProductionPlanDetail() {
   const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
   const isWorker = hasAnyRole(roleValue, ["worker", "sewer", "tailor"]);
 
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize] = useState(10);
+  const [totalParts, setTotalParts] = useState(0);
+
   useEffect(() => {
     let active = true;
-
     const fetchDetail = async () => {
       try {
         setLoading(true);
@@ -96,16 +98,7 @@ export default function ProductionPlanDetail() {
           throw new Error("INVALID_ID");
         }
 
-        const detailPromise = ProductionService.getProductionDetail(productionId);
-        const partsPromise = ProductionPartService.getPartsByProduction(productionId, {
-          pageIndex: 0,
-          pageSize: 200,
-          sortColumn: "Name",
-          sortOrder: "ASC",
-        }).catch(() => ProductionPartService.getPartsByProduction(productionId));
-
-        const [detailRes, partsRes] = await Promise.all([detailPromise, partsPromise]);
-
+        const detailRes = await ProductionService.getProductionDetail(productionId);
         if (!active) return;
 
         const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
@@ -116,37 +109,8 @@ export default function ProductionPlanDetail() {
         );
         const hasCuttingNotebook = detectHasCuttingNotebook(detailPayload);
 
-        const partsPayload = partsRes?.data ?? {};
-        const partList =
-          partsPayload?.data ??
-          partsPayload?.items ??
-          partsPayload?.list ??
-          partsPayload?.results ??
-          (Array.isArray(partsPayload) ? partsPayload : []);
-
-        const steps = Array.isArray(partList)
-          ? partList.map((part) => ({
-            partId: part?.id ?? part?.partId ?? null,
-            partName: part?.name ?? part?.partName ?? part?.title ?? "-",
-            cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
-            startDate: part?.startDate ?? part?.planStartDate ?? "-",
-            endDate: part?.endDate ?? part?.planEndDate ?? "-",
-            assignedWorkers:
-              part?.assignedWorkers ??
-              part?.workers ??
-              part?.workerNames ??
-              (Array.isArray(part?.assignees)
-                ? part.assignees
-                  .map((worker) => worker?.fullName ?? worker?.name ?? worker?.username ?? worker?.id)
-                  .filter(Boolean)
-                : []) ??
-              (Array.isArray(part?.workerList)
-                ? part.workerList.map((worker) => worker?.name ?? worker?.fullName ?? worker?.username).filter(Boolean)
-                : []),
-          }))
-          : [];
-
-        setPlan({
+        setPlan((prev) => ({
+          ...prev,
           planId: productionId,
           production: {
             productionId,
@@ -175,8 +139,8 @@ export default function ProductionPlanDetail() {
               materialName: m?.materialName ?? m?.name,
             }))
             : [],
-          steps,
-        });
+          steps: prev?.steps ?? [],
+        }));
       } catch (_err) {
         if (!active) return;
         setError("Không thể tải chi tiết kế hoạch.");
@@ -191,6 +155,65 @@ export default function ProductionPlanDetail() {
       active = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    let active = true;
+    const fetchParts = async () => {
+      if (!id) return;
+      try {
+        const productionId = Number(id);
+        // Fetch a large enough batch to enable frontend-side pagination
+        const partsRes = await ProductionPartService.getPartsByProduction(productionId, {
+          PageIndex: 0,
+          PageSize: 500, 
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        });
+
+        if (!active) return;
+
+        const partsPayload = partsRes?.data ?? {};
+        const partList =
+          partsPayload?.data ??
+          partsPayload?.items ??
+          partsPayload?.list ??
+          partsPayload?.results ??
+          (Array.isArray(partsPayload) ? partsPayload : []);
+
+        const steps = partList.map((part) => ({
+          partId: part?.id ?? part?.partId ?? null,
+          partName: part?.name ?? part?.partName ?? part?.title ?? "-",
+          cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
+          startDate: part?.startDate ?? part?.planStartDate ?? "-",
+          endDate: part?.endDate ?? part?.planEndDate ?? "-",
+          assignedWorkers:
+            part?.assignedWorkers ??
+            part?.workers ??
+            part?.workerNames ??
+            (Array.isArray(part?.assignees)
+              ? part.assignees.map((w) => w?.fullName ?? w?.name ?? w?.id).filter(Boolean)
+              : []) ??
+            [],
+        }));
+
+        setTotalParts(steps.length);
+        setPlan((prev) => (prev ? { ...prev, steps } : { steps }));
+      } catch (err) {
+        console.error("Lỗi tải danh sách công đoạn:", err);
+      }
+    };
+
+    fetchParts();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const pageData = useMemo(() => {
+    if (!plan?.steps) return [];
+    const start = pageIndex * pageSize;
+    return plan.steps.slice(start, start + pageSize);
+  }, [plan?.steps, pageIndex, pageSize]);
 
   useEffect(() => {
     try {
@@ -220,7 +243,7 @@ export default function ProductionPlanDetail() {
   }, [plan]);
 
   const progressSummary = useMemo(() => {
-    const total = plan?.steps?.length || 0;
+    const total = totalParts || plan?.steps?.length || 0;
     const today = new Date();
     const completed = (plan?.steps || []).filter((row) => {
       const raw = row.endDate;
@@ -230,7 +253,7 @@ export default function ProductionPlanDetail() {
     }).length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { completed, total, percent };
-  }, [plan]);
+  }, [plan, totalParts]);
 
   const resolveHasCuttingNotebook = async (productionId) => {
     if (!Number.isFinite(Number(productionId))) return false;
@@ -244,88 +267,55 @@ export default function ProductionPlanDetail() {
         : Array.isArray(payload)
           ? payload
           : [];
-      if (notebookList.length > 0) {
-        return true;
-      }
-    } catch {
-      // ignore and fallback checks
-    }
+      if (notebookList.length > 0) return true;
+    } catch { /* skip */ }
 
     try {
       const detailRes = await ProductionService.getProductionDetail(productionId);
       const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
-      if (detectHasCuttingNotebook(detailPayload)) {
-        return true;
-      }
-    } catch {
-      // ignore and fallback
-    }
+      if (detectHasCuttingNotebook(detailPayload)) return true;
+    } catch { /* skip */ }
 
     try {
       const pageSize = 100;
       const maxPages = 20;
-      let pageIndex = 0;
-
-      while (pageIndex < maxPages) {
+      let pIdx = 0;
+      while (pIdx < maxPages) {
         const listRes = await ProductionService.getProductionList({
-          PageIndex: pageIndex,
+          PageIndex: pIdx,
           PageSize: pageSize,
           SortColumn: "Name",
           SortOrder: "ASC",
         });
-        const payload = listRes?.data ?? {};
-        const rows = Array.isArray(payload?.data)
-          ? payload.data
-          : Array.isArray(payload)
-            ? payload
-            : [];
+        const rows = listRes?.data?.data ?? listRes?.data ?? [];
         if (rows.length === 0) break;
-
-        const matched = rows.find(
-          (item) =>
-            String(item?.productionId ?? item?.id ?? "") === String(productionId)
-        );
-        if (matched) {
-          return detectHasCuttingNotebook(matched);
-        }
-
+        const matched = rows.find(item => String(item?.productionId ?? item?.id) === String(productionId));
+        if (matched) return detectHasCuttingNotebook(matched);
         if (rows.length < pageSize) break;
-        pageIndex += 1;
+        pIdx++;
       }
-    } catch {
-      // ignore and fallback false
-    }
+    } catch { /* skip */ }
 
     return false;
   };
 
   const handleOpenCuttingBook = async () => {
     if (!plan?.production?.productionId || checkingCuttingBook) return;
-
     setCheckingCuttingBook(true);
     try {
-      const productionId = plan.production.productionId;
-      const hasNotebook = await resolveHasCuttingNotebook(productionId);
-
+      const prodId = plan.production.productionId;
+      const hasNotebook = await resolveHasCuttingNotebook(prodId);
       if (!hasNotebook) {
         toast.info("Chưa có sổ cắt cho kế hoạch này. Hệ thống sẽ chuyển sang trang tạo sổ.");
       } else {
-        setPlan((prev) =>
-          prev
-            ? {
-              ...prev,
-              production: {
-                ...prev.production,
-                hasCuttingNotebook: true,
-              },
-            }
-            : prev
-        );
+        setPlan(prev => prev ? ({
+          ...prev,
+          production: { ...prev.production, hasCuttingNotebook: true }
+        }) : prev);
       }
-
       navigate("/worker/cutting-book", {
         state: {
-          productionId,
+          productionId: prodId,
           production: plan.production,
           product: plan.product,
           openCuttingBookMode: hasNotebook ? "detail" : "create",
@@ -336,20 +326,48 @@ export default function ProductionPlanDetail() {
     }
   };
 
-  if (loading) {
+  const handleApprovePlan = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này?")) return;
+    try {
+      setLoading(true);
+      await ProductionService.approveProductionPlan(id);
+      toast.success("Đã chấp nhận kế hoạch sản xuất.");
+      window.location.reload();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Không thể chấp nhận kế hoạch.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestUpdate = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại kế hoạch này?")) return;
+    try {
+      setLoading(true);
+      await ProductionService.requestPlanUpdate(id);
+      toast.success("Đã gửi yêu cầu chỉnh sửa kế hoạch.");
+      window.location.reload();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Không thể gửi yêu cầu chỉnh sửa.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !plan) {
     return (
       <OwnerLayout>
-        <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
+        <div className="flex items-center justify-center min-h-[400px] text-sm text-slate-600">
           Đang tải chi tiết kế hoạch...
         </div>
       </OwnerLayout>
     );
   }
 
-  if (error) {
+  if (error && !plan) {
     return (
       <OwnerLayout>
-        <div className="flex items-center justify-center min-h-400px text-sm text-red-600">
+        <div className="flex items-center justify-center min-h-[400px] text-sm text-red-600">
           {error}
         </div>
       </OwnerLayout>
@@ -359,7 +377,7 @@ export default function ProductionPlanDetail() {
   if (!plan) {
     return (
       <OwnerLayout>
-        <div className="flex items-center justify-center min-h-400px text-sm text-slate-600">
+        <div className="flex items-center justify-center min-h-[400px] text-sm text-slate-600">
           Không tìm thấy kế hoạch #{id}.
         </div>
       </OwnerLayout>
@@ -372,28 +390,58 @@ export default function ProductionPlanDetail() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button onClick={() => navigate(-1)}
+              <button
+                onClick={() => navigate(-1)}
                 className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
               </button>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                    Chi tiết kế hoạch
-                  </h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Chi tiết kế hoạch</h1>
                 </div>
                 <p className="text-slate-600">Theo dõi thông tin kế hoạch và tiến độ thực hiện.</p>
               </div>
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button"
+              <button
+                type="button"
                 onClick={handleOpenCuttingBook}
                 disabled={checkingCuttingBook}
                 className="cursor-pointer rounded-full border border-emerald-200 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
               >
                 {checkingCuttingBook ? "Đang kiểm tra..." : "Sổ cắt"}
               </button>
+              {!isWorker && (
+                <>
+                  <Link
+                    to="/production-plan/create"
+                    state={{ productionId: plan.production.productionId, steps: plan.steps }}
+                    className="rounded-full border border-emerald-600 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                  >
+                    {totalParts > 0 ? "Chỉnh sửa công đoạn" : "Thiết kế công đoạn"}
+                  </Link>
+
+                  {String(roleValue).toLowerCase() === "owner" &&
+                    plan.production.status === "Chờ Xét Duyệt Kế Hoạch" && (
+                      <>
+                        <button
+                          onClick={handleApprovePlan}
+                          className="rounded-full bg-emerald-100 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-200"
+                        >
+                          Chấp nhận
+                        </button>
+                        <button
+                          onClick={handleRequestUpdate}
+                          className="rounded-full bg-rose-100 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-200"
+                        >
+                          Yêu cầu chỉnh sửa
+                        </button>
+                      </>
+                    )}
+                </>
+              )}
               {isWorker ? (
                 <Link
                   to="/worker/daily-report"
@@ -521,11 +569,13 @@ export default function ProductionPlanDetail() {
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Danh sách công đoạn & nhiệm vụ</div>
+                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Danh sách công đoạn & nhiệm vụ
+                  </div>
                   <div className="text-sm text-slate-500 mt-1">Công đoạn đã lập cho kế hoạch.</div>
                 </div>
                 <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                  Tổng cộng {plan.steps.length} công đoạn
+                  Tổng cộng {totalParts} công đoạn
                 </span>
               </div>
               <div className="overflow-x-auto">
@@ -543,9 +593,11 @@ export default function ProductionPlanDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {plan.steps.map((row, idx) => (
-                      <tr key={`${row.partName}-${idx}`} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3 text-slate-500">{String(idx + 1).padStart(2, "0")}</td>
+                    {pageData.map((row, idx) => (
+                      <tr key={`${row.partId}-${idx}`} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3 text-slate-500">
+                          {String(pageIndex * pageSize + idx + 1).padStart(2, "0")}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-800">{row.partName || "-"}</div>
                           <div className="text-[11px] text-slate-400">Giai đoạn: Rập</div>
@@ -555,7 +607,7 @@ export default function ProductionPlanDetail() {
                             <div className="flex flex-wrap gap-1">
                               {row.assignedWorkers.map((worker) => (
                                 <span
-                                  key={`${row.partName}-${worker}`}
+                                  key={`${row.partId}-${worker}`}
                                   className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
                                 >
                                   {worker}
@@ -566,12 +618,8 @@ export default function ProductionPlanDetail() {
                             <span className="text-slate-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatDateTime(row.startDate)}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatDateTime(row.endDate)}
-                        </td>
+                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.startDate)}</td>
+                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.endDate)}</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-700">
                           {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                         </td>
@@ -600,7 +648,7 @@ export default function ProductionPlanDetail() {
                         </td>
                       </tr>
                     ))}
-                    {plan.steps.length === 0 && (
+                    {pageData.length === 0 && (
                       <tr>
                         <td colSpan={8} className="py-10 text-center text-slate-500">
                           Chưa có công đoạn.
@@ -610,6 +658,17 @@ export default function ProductionPlanDetail() {
                   </tbody>
                 </table>
               </div>
+              {totalParts > pageSize && (
+                <div className="border-t border-slate-100 p-4">
+                  <Pagination
+                    currentPage={pageIndex + 1}
+                    totalPages={Math.ceil(totalParts / pageSize)}
+                    onPageChange={(p) => setPageIndex(p - 1)}
+                    totalCount={totalParts}
+                    pageSize={pageSize}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

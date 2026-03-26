@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
@@ -235,18 +235,30 @@ const normalizeText = (value = "") =>
 
 export default function ProductionPlan() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const currentUser = useMemo(() => getStoredUser() || {}, []);
   const [productionList, setProductionList] = useState([]);
   const [selectedProduction, setSelectedProduction] = useState(null);
-  const [selectedProductionId, setSelectedProductionId] = useState(() => (id ? String(id) : ""));
-  const [rows, setRows] = useState(() =>
-    DEFAULT_ROWS.map((row, index) => ({
-      ...row,
-      ppId: 2000 + index,
-      productionId: id ? Number(id) : null,
-    }))
-  );
+
+  const stateProductionId = location.state?.productionId;
+  const initialProductionId = stateProductionId ? String(stateProductionId) : (id ? String(id) : "");
+  const [selectedProductionId, setSelectedProductionId] = useState(() => initialProductionId);
+
+  const [rows, setRows] = useState(() => {
+    if (location.state?.steps && Array.isArray(location.state.steps) && location.state.steps.length > 0) {
+      return location.state.steps.map((s, idx) => ({
+        ppId: 2000 + idx,
+        productionId: Number(initialProductionId),
+        partName: s.partName,
+        cpu: String(s.cpu || ""),
+        startDate: s.startDate || "",
+        endDate: s.endDate || "",
+        ppsId: s.partId || ""
+      }));
+    }
+    return [];
+  });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -710,23 +722,7 @@ export default function ProductionPlan() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn đơn sản xuất</div>
-              <select
-                value={selectedProductionId}
-                onChange={(event) => setSelectedProductionId(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-              >
-                <option value="">Chọn đơn sản xuất...</option>
-                {productionList.map((item) => (
-                  <option key={item.productionId} value={item.productionId}>
-                    {`#PR-${item.productionId} - ${item.orderName}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <button
@@ -950,14 +946,7 @@ export default function ProductionPlan() {
                 <p className="leave-table-card__subtitle">Quản lý công đoạn theo tổ trưởng và giá/sp.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={saveSteps}
-                  disabled={!selectedProductionId || !rows.length || savingParts}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:text-emerald-300"
-                >
-                  {savingParts ? "Đang lưu..." : "Lưu công đoạn"}
-                </button>
+
                 <button
                   onClick={openAddModal}
                   disabled={!selectedProductionId}

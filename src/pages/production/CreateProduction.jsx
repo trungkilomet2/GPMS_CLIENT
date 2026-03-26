@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
@@ -14,6 +14,7 @@ import { getOrderCustomerId } from "@/lib/orders/customerInfo";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
+import { getProductionStatusLabel } from "@/utils/statusUtils";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -111,21 +112,42 @@ export default function CreateProduction() {
     const fetchPMs = async () => {
       try {
         setLoadingPM(true);
-        let response;
-        try {
-          response = await WorkerService.getAllEmployees({
-            PageIndex: 0,
-            PageSize: 10,
-            SortColumn: "Name",
-            SortOrder: "ASC",
-            FilterQuery: "PM",
-          });
-        } catch (_err) {
-          response = await WorkerService.getAllEmployees();
+
+        // Fetch all employees via pagination to ensure we capture all workers and PMs
+        let allEmployees = [];
+        let pageIdx = 1;
+        const pageSizeFetch = 10;
+        const maxPages = 50;
+
+        while (pageIdx <= maxPages) {
+          try {
+            const pageRes = await WorkerService.getAllEmployees({
+              PageIndex: pageIdx,
+              PageSize: pageSizeFetch,
+            });
+            const items = pageRes?.data ?? [];
+            allEmployees = [...allEmployees, ...items];
+            if (items.length < pageSizeFetch) break;
+            pageIdx++;
+          } catch (_err) {
+            // Fallback if pagination fails (e.g., limits reached on server)
+            if (pageIdx === 1) {
+              try {
+                const fallback = await WorkerService.getAllEmployees();
+                allEmployees = fallback?.data ?? [];
+              } catch { }
+            }
+            break;
+          }
         }
-        const items = response?.data ?? [];
+
+        // Collect IDs of people who are set as managerId for at least one person (converting to string for safe comparison)
+        const managedBySet = new Set(
+          allEmployees.map(emp => emp.managerId != null ? String(emp.managerId) : null).filter(Boolean)
+        );
+
         const pmRoles = ["PM"];
-        const pms = items.filter((item) => {
+        let pms = allEmployees.filter((item) => {
           if (pmRoles.includes(item?.primaryRole)) return true;
           if (getPrimaryWorkspaceRole(item?.role ?? item?.roles ?? "") === "pm") return true;
           if (Array.isArray(item?.roles)) {
@@ -134,6 +156,10 @@ export default function CreateProduction() {
           const rawRole = String(item?.role ?? "").split(",").map((r) => r.trim());
           return rawRole.some((role) => pmRoles.includes(role));
         });
+
+        // Filter out PMs that don't manage any workers (comparing stringified IDs)
+        pms = pms.filter((pm) => managedBySet.has(String(pm.id)));
+
         if (!active) return;
         setPmUsers(pms);
         setPmError(null);
@@ -176,7 +202,13 @@ export default function CreateProduction() {
 
             list.forEach((item) => {
               const oid = item?.order?.id ?? item?.orderId ?? item?.orderID ?? item?.order_id;
-              if (oid != null) assigned.add(String(oid));
+              const statusName = item?.statusName || item?.status;
+              const normalizedProductionStatus = getProductionStatusLabel(statusName);
+
+              // Only mark order as "assigned" if its current production is NOT rejected
+              if (oid != null && normalizedProductionStatus !== "Từ Chối") {
+                assigned.add(String(oid));
+              }
             });
 
             if (list.length < pageSizeFetch) break;
@@ -556,18 +588,6 @@ export default function CreateProduction() {
                     {errors.pmId && (
                       <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
                     )}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Ghi chú đơn sản xuất</label>
-                    <textarea
-                      name="productionNote"
-                      rows={3}
-                      value={form.productionNote}
-                      onChange={handleChange}
-                      placeholder="Nhập ghi chú cho đơn sản xuất..."
-                      className="block w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                    />
                   </div>
 
                   <div className="md:col-span-2 flex flex-wrap justify-end gap-3 pt-2">

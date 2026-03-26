@@ -69,7 +69,7 @@ export default function ProductionList() {
 
   const stats = useMemo(() => {
     const total = baseProductions.length;
-    const pendingCheck = baseProductions.filter((item) => item.statusId === 1 || item.statusName === "Chờ kiểm tra").length;
+    const pendingCheck = baseProductions.filter((item) => item.statusId === 1 || item.statusName === "Chờ Xét Duyệt").length;
     const pendingPlan = baseProductions.filter((item) => item.statusId === 4 || item.statusName === "Chờ Xét Duyệt Kế Hoạch").length;
     const rejected = baseProductions.filter((item) => item.statusName === "Từ Chối").length;
     const inProgress = baseProductions.filter((item) => item.statusName === "Đang Sản Xuất").length;
@@ -123,7 +123,7 @@ export default function ProductionList() {
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-500">Chờ kiểm tra</div>
+                  <div className="text-sm font-semibold text-slate-500">Chờ Xét Duyệt</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.pendingCheck}</div>
                 </div>
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-sky-100 bg-sky-50 text-sky-700">
