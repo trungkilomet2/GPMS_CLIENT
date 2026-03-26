@@ -53,7 +53,9 @@ export default function EmployeeUpdate() {
       try {
         const [employee, managerResponse] = await Promise.all([
           WorkerService.getEmployeeById(id),
-          WorkerService.getAllEmployees(),
+          WorkerService.getEmployeeDirectory({
+            pageSize: 100,
+          }),
         ]);
 
         if (!mounted) return;

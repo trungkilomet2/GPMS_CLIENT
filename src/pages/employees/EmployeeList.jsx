@@ -469,7 +469,7 @@ export default function EmployeeList() {
                       >
                         Thêm nhân viên
                       </Link>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : (

@@ -309,6 +309,8 @@ export default function ProfileEdit() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
+  const [backendRequiresEmailVerification, setBackendRequiresEmailVerification] = useState(false);
 
   const validateField = (name, value) => {
     if (name === "FullName") return validateFullName(value);
@@ -317,6 +319,14 @@ export default function ProfileEdit() {
     if (name === "Location") return validateLocation(value);
     return "";
   };
+
+  const normalizedCurrentEmail = String(form.Email || "").trim().toLowerCase();
+  const normalizedInitialEmail = String(initialEmail || "").trim().toLowerCase();
+  const normalizedVerifiedEmail = String(verifiedEmail || "").trim().toLowerCase();
+  const emailChanged = normalizedCurrentEmail !== normalizedInitialEmail;
+  const isCurrentEmailVerified =
+    !!normalizedCurrentEmail && normalizedCurrentEmail === normalizedVerifiedEmail;
+  const emailVerificationRequired = backendRequiresEmailVerification || emailChanged;
 
   /* ── Load profile ── */
   useEffect(() => {
@@ -332,6 +342,7 @@ export default function ProfileEdit() {
       Bio: fallback.bio,
       CooperationNotes: fallback.cooperationNotes,
     });
+    setInitialEmail(fallback.email ?? "");
     if (fallback.avatarUrl) {
       setAvatarPreview(fallback.avatarUrl);
     }
@@ -346,6 +357,7 @@ export default function ProfileEdit() {
           Bio:         fallback.bio,
           CooperationNotes: fallback.cooperationNotes,
         });
+        setInitialEmail(data.email ?? data.Email ?? fallback.email ?? "");
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);
@@ -373,6 +385,7 @@ export default function ProfileEdit() {
         setOtpStage("idle");
         setOtpCode("");
       }
+      setBackendRequiresEmailVerification(normalizedEmail !== normalizedInitialEmail);
     }
   };
 
@@ -412,7 +425,9 @@ export default function ProfileEdit() {
       setMsg(null);
       await authService.sendRegisterOtp({ email: String(form.Email || "").trim() });
       setOtpStage("sent");
+      setOtpCode("");
       setVerifiedEmail("");
+      setBackendRequiresEmailVerification(true);
       setMsg({
         type: "success",
         text: "Mã xác thực đã được gửi tới email. Nhập OTP rồi bấm Xác minh email.",
@@ -446,6 +461,7 @@ export default function ProfileEdit() {
       });
       setOtpStage("verified");
       setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
+      setBackendRequiresEmailVerification(false);
       setMsg({
         type: "success",
         text: "Email đã được xác thực. Bạn có thể lưu thay đổi hồ sơ.",
@@ -485,6 +501,15 @@ export default function ProfileEdit() {
       return;
     }
 
+    if (emailVerificationRequired && !isCurrentEmailVerified) {
+      setOtpStage((prev) => (prev === "idle" ? "sent" : prev));
+      setMsg({
+        type: "error",
+        text: "Vui lòng xác minh email hiện tại bằng mã OTP trước khi lưu hồ sơ.",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       setMsg(null);
@@ -504,6 +529,8 @@ export default function ProfileEdit() {
       const updateResult = await userService.updateProfile(user.userId ?? user.id, fd);
 
       if (updateResult?.otpRequired) {
+        setBackendRequiresEmailVerification(true);
+        setOtpStage("sent");
         setMsg({
           type: "success",
           text: updateResult?.message || "Hệ thống đã gửi OTP về email. Vui lòng xác nhận để hoàn tất cập nhật hồ sơ.",
@@ -522,6 +549,9 @@ export default function ProfileEdit() {
           .map((item) => item.trim())
           .filter(Boolean),
       });
+      setInitialEmail(String(form.Email || "").trim());
+      setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
+      setBackendRequiresEmailVerification(false);
       window.dispatchEvent(new Event("auth-change"));
 
       setMsg({ type: "success", text: "Lưu hồ sơ thành công!" });
@@ -540,6 +570,7 @@ export default function ProfileEdit() {
 
       console.error("update-profile error:", errData);
       if (shouldPromptVerify) {
+        setBackendRequiresEmailVerification(true);
         setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
         setMsg({
           type: "error",
@@ -664,7 +695,7 @@ export default function ProfileEdit() {
                   <div style={{ minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: ".5rem", flexWrap: "wrap" }}>
                         <div style={{ fontSize: ".82rem", fontWeight: 800, color: T.text }}>
-                        Xác minh email để lưu hồ sơ
+                        {emailVerificationRequired ? "Cần xác minh email để lưu hồ sơ" : "Xác minh email"}
                         </div>
                         <span style={{
                           display: "inline-flex",
@@ -681,7 +712,9 @@ export default function ProfileEdit() {
                       </span>
                     </div>
                     <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
-                      Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                      {emailVerificationRequired
+                        ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
+                        : "Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
                     </div>
                   </div>
                   <button
@@ -706,11 +739,11 @@ export default function ProfileEdit() {
                       opacity: sendingOtp || verifyingOtp ? .7 : 1,
                     }}
                   >
-                    {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                    {sendingOtp ? "Đang gửi..." : otpStage === "idle" ? "Gửi mã OTP" : "Gửi lại OTP"}
                   </button>
                 </div>
 
-                {otpStage !== "idle" && (
+                {(otpStage !== "idle" || emailVerificationRequired) && (
                   <div style={{ display: "flex", gap: ".6rem", alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ flex: 1, minWidth: 220 }}>
                       <Input

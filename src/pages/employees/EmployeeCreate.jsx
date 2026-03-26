@@ -46,7 +46,9 @@ export default function EmployeeCreate() {
       setManagerError("");
 
       try {
-        const response = await WorkerService.getAllEmployees();
+        const response = await WorkerService.getEmployeeDirectory({
+          pageSize: 100,
+        });
         if (!mounted) return;
         setManagerOptions(response?.data ?? []);
       } catch (error) {
