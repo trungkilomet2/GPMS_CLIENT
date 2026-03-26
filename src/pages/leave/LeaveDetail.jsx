@@ -38,6 +38,18 @@ const STATUS_MAP = {
     badge: "bg-rose-50 text-rose-700 border-rose-200",
     panel: "border-rose-200 bg-rose-50 text-rose-800",
   },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    panel: "border-slate-200 bg-slate-50 text-slate-800",
+  },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+    panel: "border-orange-200 bg-orange-50 text-orange-800",
+  },
 };
 
 function StatusBadge({ status }) {
@@ -104,6 +116,8 @@ export default function LeaveDetail() {
   const [error, setError] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [cancelRejectOpen, setCancelRejectOpen] = useState(false);
+  const [cancelRejectReason, setCancelRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -146,6 +160,7 @@ export default function LeaveDetail() {
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
   const hasReviewPermission = canManageLeaveRequests(user?.role);
   const canReview = hasReviewPermission && leave?.status === "pending";
+  const canConfirmCancel = hasReviewPermission && leave?.status === "cancel_requested";
 
   const handleApprove = async () => {
     if (!hasReviewPermission) {
@@ -200,6 +215,55 @@ export default function LeaveDetail() {
       setRejectReason("");
     } catch (err) {
       setError(getLeaveErrorMessage(err, "Không thể từ chối đơn nghỉ. Vui lòng thử lại."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!canConfirmCancel) return;
+
+    try {
+      setSubmitting(true);
+      await LeaveService.confirmCancelLeaveRequest(id);
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "cancelled",
+          dateReply: new Date().toISOString(),
+        }
+      );
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể xác nhận hủy đơn nghỉ. Vui lòng thử lại."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectCancel = async () => {
+    if (!canConfirmCancel || !cancelRejectReason.trim()) return;
+
+    try {
+      setSubmitting(true);
+      await LeaveService.rejectCancelLeaveRequest(id, {
+        rejectCancelContent: cancelRejectReason.trim(),
+      });
+
+      const refreshed = await LeaveService.getLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: "approved",
+          dateReply: new Date().toISOString(),
+          rejectCancelContent: cancelRejectReason.trim(),
+        }
+      );
+      setCancelRejectOpen(false);
+      setCancelRejectReason("");
+    } catch (err) {
+      setError(getLeaveErrorMessage(err, "Không thể từ chối yêu cầu hủy đơn nghỉ. Vui lòng thử lại."));
     } finally {
       setSubmitting(false);
     }
@@ -292,6 +356,10 @@ export default function LeaveDetail() {
                   <div className="mt-2">
                     {leave.status === "rejected"
                       ? leave.denyContent || "Đơn đã bị từ chối nhưng chưa có nội dung phản hồi."
+                      : leave.status === "cancel_requested"
+                        ? leave.cancelContent || "Nhân viên đã gửi yêu cầu hủy đơn nghỉ."
+                        : leave.status === "cancelled"
+                          ? leave.cancelContent || "Đơn nghỉ đã được hủy."
                       : leave.status === "approved"
                         ? "Đơn đã được phê duyệt và có thể dùng làm căn cứ thông báo cho người gửi."
                         : "Đơn đang chờ người có thẩm quyền xem xét và phản hồi."}
@@ -321,6 +389,29 @@ export default function LeaveDetail() {
                   </div>
                 )}
 
+                {canConfirmCancel && (
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={handleConfirmCancel}
+                      className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      <CheckCircle2 size={16} />
+                      {submitting ? "Đang xử lý..." : "Xác nhận hủy đơn"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => setCancelRejectOpen((prev) => !prev)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                    >
+                      <XCircle size={16} />
+                      Từ chối yêu cầu hủy
+                    </button>
+                  </div>
+                )}
+
                 {canReview && rejectOpen && (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <label className="mb-2 block text-sm font-semibold text-slate-700">Lý do từ chối</label>
@@ -339,6 +430,29 @@ export default function LeaveDetail() {
                         className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Xác nhận từ chối
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {canConfirmCancel && cancelRejectOpen && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">Lý do từ chối yêu cầu hủy</label>
+                    <textarea
+                      rows={4}
+                      value={cancelRejectReason}
+                      onChange={(e) => setCancelRejectReason(e.target.value)}
+                      placeholder="Nhập lý do từ chối yêu cầu hủy đơn nghỉ (bắt buộc)"
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
+                    />
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        disabled={submitting || !cancelRejectReason.trim()}
+                        onClick={handleRejectCancel}
+                        className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Xác nhận từ chối yêu cầu hủy
                       </button>
                     </div>
                   </div>

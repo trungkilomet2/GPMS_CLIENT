@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { compareLeaveDateDesc, formatLeaveDateTime } from "@/lib/leaveDateTime";
-import LeaveService from "@/services/LeaveService";
+import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
 const PAGE_SIZE = 10;
@@ -41,6 +41,20 @@ const STATUS_MAP = {
     bg: "bg-rose-50",
     text: "text-rose-700",
     border: "border-rose-200",
+  },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    border: "border-slate-200",
   },
 };
 
@@ -139,14 +153,14 @@ export default function LeaveList() {
         setItems(response.data ?? []);
         setTotalCount(response.recordCount ?? response.RecordCount ?? (response.data ?? []).length);
         if (!silent) setError("");
-      } catch {
+      } catch (err) {
         if (!active) return;
 
         // Silent refresh shouldn't wipe UI; keep current list and only surface error on next hard refresh.
         if (!silent) {
           setItems([]);
           setTotalCount(0);
-          setError("Không thể tải danh sách đơn nghỉ. Vui lòng thử lại.");
+          setError(getLeaveErrorMessage(err, "Không thể tải danh sách đơn nghỉ. Vui lòng thử lại."));
         }
       } finally {
         if (active && !silent) setLoading(false);

@@ -441,7 +441,7 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
     label: "Quản lý sản xuất",
     shortLabel: "Điều phối production",
     tone: "primary",
-    description: "Role có dấu vết trực tiếp nhất ở bảng PRODUCTION và tuyến quản lý team lead, worker qua MANAGER_ID.",
+    description: "Role có dấu vết trực tiếp nhất ở bảng PRODUCTION và tuyến quản lý worker qua MANAGER_ID.",
     joinPath: "[ROLE] -> USER_ROLE -> [USER] -> PRODUCTION.PM_ID",
     touchpoints: [
       {
@@ -456,7 +456,7 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         tone: "info",
         table: "[USER]",
         columns: "USER_ID, MANAGER_ID",
-        relation: "PM quản lý team lead và worker của line mình trong flow Owner -> PM -> Team Lead / Worker.",
+        relation: "PM quản lý worker của line mình trong flow Owner -> PM -> Worker.",
       },
       {
         scope: "Workflow",
@@ -486,76 +486,6 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
     ],
   },
   {
-    key: "KCS",
-    label: "Kiểm soát chất lượng",
-    shortLabel: "Decision và reject flow",
-    tone: "success",
-    description: "Role KCS hiện đi qua các bảng reject reason hơn là có bảng QC riêng.",
-    joinPath: "[ROLE] -> USER_ROLE -> [USER]",
-    touchpoints: [
-      {
-        scope: "Direct",
-        tone: "warning",
-        table: "ORDER_REJECT_REASON",
-        columns: "ORDER_ID, USER_ID, REASON",
-        relation: "Có thể lần ngược user đưa ra quyết định từ chối order.",
-      },
-      {
-        scope: "Direct",
-        tone: "warning",
-        table: "PRODUCTION_REJECT_REASON",
-        columns: "PRODUCTION_ID, USER_ID, REASON",
-        relation: "Có thể lần ngược user đưa ra quyết định từ chối production.",
-      },
-      {
-        scope: "Inferred",
-        tone: "primary",
-        table: "O_HISTORY_UPDATE",
-        columns: "FIELD_NAME, OLD_VALUE, NEW_VALUE, CHANGE_AT",
-        relation: "KCS có thể cần review thay đổi, nhưng bảng này chưa lưu actor.",
-      },
-    ],
-    gaps: [
-      "Schema chưa có bảng inspection detail hoặc QC checklist riêng.",
-      "Không có log riêng cho quyết định pass/fail ngoài reject reason.",
-    ],
-  },
-  {
-    key: "Team Leader",
-    label: "Tổ trưởng",
-    shortLabel: "Điều phối chuyền",
-    tone: "info",
-    description: "Role vận hành vẫn tồn tại ở tầng nghiệp vụ; mỗi team lead thuộc một PM nhưng schema V2.1 chưa có cột riêng để neo trực tiếp trên part.",
-    joinPath: "[ROLE] -> USER_ROLE -> [USER] -> MANAGER_ID / P_PART_ASSIGNEE",
-    touchpoints: [
-      {
-        scope: "Inferred",
-        tone: "info",
-        table: "[USER]",
-        columns: "USER_ID, MANAGER_ID",
-        relation: "Team lead có thể thuộc một PM qua MANAGER_ID, nhưng không có TEAM_LEADER_ID riêng trên bảng nghiệp vụ.",
-      },
-      {
-        scope: "Workflow",
-        tone: "success",
-        table: "P_PART_ASSIGNEE",
-        columns: "PP_ID, USER_ID",
-        relation: "Tổ trưởng thường theo dõi danh sách worker được phân công vào từng part.",
-      },
-      {
-        scope: "Workflow",
-        tone: "success",
-        table: "PART_WORK_LOG",
-        columns: "PP_ID, USER_ID, QUANTITY, CREATE_DATE",
-        relation: "Theo dõi sản lượng công đoạn của worker theo ngày ghi nhận.",
-      },
-    ],
-    gaps: [
-      "Chưa có TEAM_LEADER_ID trực tiếp trên P_PART như bản mô hình cũ.",
-      "Chưa có audit riêng cho việc đổi line lead hoặc điều chuyển worker.",
-    ],
-  },
-  {
     key: "Worker",
     label: "Nhân viên",
     shortLabel: "Tác nghiệp sản xuất",
@@ -575,7 +505,7 @@ export const ADMIN_DB_ROLE_BLUEPRINTS = [
         tone: "info",
         table: "[USER]",
         columns: "USER_ID, MANAGER_ID",
-        relation: "Worker đi theo tuyến quản lý của team lead hoặc PM tùy cách tổ chức MANAGER_ID.",
+        relation: "Worker đi theo tuyến quản lý của PM qua MANAGER_ID.",
       },
       {
         scope: "Direct",

@@ -3,20 +3,12 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
-import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const WORKER_NAV_ITEMS = [
   { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
   { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
   { to: "/worker/error-report", label: "Báo lỗi", icon: AlertTriangle },
-  { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
-];
-
-const KCS_NAV_ITEMS = [
-  { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
-  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
-  { to: "/worker/error-report", label: "Kiểm lỗi KCS", icon: AlertTriangle },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
 
@@ -42,11 +34,10 @@ export default function WorkerSidebar() {
   });
 
   const user = getStoredUser();
-  const isKcsUser = hasAnyRole(user?.role, ["kcs", "quality control", "qc"]);
-  const navItems = isKcsUser ? KCS_NAV_ITEMS : WORKER_NAV_ITEMS;
-  const brandSubtitle = isKcsUser ? "KCS" : "Nhân viên";
-  const defaultName = isKcsUser ? "KCS" : "Nhân viên";
-  const roleLabel = isKcsUser ? "Worker / KCS" : "Worker";
+  const navItems = WORKER_NAV_ITEMS;
+  const brandSubtitle = "Nhân viên";
+  const defaultName = "Nhân viên";
+  const roleLabel = "Worker";
 
   useEffect(() => {
     try {

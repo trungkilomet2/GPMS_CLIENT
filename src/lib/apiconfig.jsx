@@ -97,8 +97,13 @@ export const API_ENDPOINTS = {
     GET_ALL: `${BASE_URL}/api/Permission`,
   },
 
+  LOG: {
+    GET_ALL: `${BASE_URL}/api/Log/get-all-log-events`,
+  },
+
   WORKER: {
     GET_ALL_EMPLOYEES: `${BASE_URL}/api/Worker/get-all-employees`,
+    GET_ALL_EMPLOYEES_BY_PM_ID: `${BASE_URL}/api/Worker/get-all-employees-by-pm-id`,
     GET_BY_ID: (userId) => `${BASE_URL}/api/Worker/get-employee-by-id/${userId}`,
     CREATE: `${BASE_URL}/api/Worker/create-employee`,
     UPDATE: (userId) => `${BASE_URL}/api/Worker/update-employee/${userId}`,
@@ -114,11 +119,13 @@ export const API_ENDPOINTS = {
     GET_MY_HISTORY: `${BASE_URL}/api/LeaveRequest/my-leave-request-history`,
     GET_MY_HISTORY_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/my-leave-request-history/${id}`,
     GET_DETAIL: (id) => `${BASE_URL}/api/LeaveRequest/leave-request-detail/${id}`,
-
-
     CREATE: `${BASE_URL}/api/LeaveRequest/create`,
     APPROVE: (id) => `${BASE_URL}/api/LeaveRequest/${id}/approve`,
     DENY: (id) => `${BASE_URL}/api/LeaveRequest/${id}/deny`,
+    CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/cancel`,
+    REQUEST_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/request-cancel`,
+    CONFIRM_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/confirm-cancel`,
+    REJECT_CANCEL: (id) => `${BASE_URL}/api/LeaveRequest/${id}/reject-cancel`,
   },
 
   // TODO: thêm endpoint thật khi backend có sẵn

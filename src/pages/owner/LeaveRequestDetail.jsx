@@ -7,6 +7,7 @@ import {
   Clock3,
   FileText,
   Loader2,
+  MessageSquareQuote,
   UserRound,
   XCircle,
 } from "lucide-react";
@@ -31,6 +32,16 @@ const STATUS_MAP = {
     label: "Từ chối",
     icon: XCircle,
     badge: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
   },
 };
 
@@ -68,6 +79,9 @@ export default function LeaveRequestDetail() {
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -105,6 +119,8 @@ export default function LeaveRequestDetail() {
   const timelineItems = useMemo(() => {
     const isApproved = leave?.status === "approved";
     const isRejected = leave?.status === "rejected";
+    const isCancelRequested = leave?.status === "cancel_requested";
+    const isCancelled = leave?.status === "cancelled";
 
     return [
       {
@@ -112,19 +128,70 @@ export default function LeaveRequestDetail() {
         value: formatLeaveDateTime(leave?.dateCreate),
       },
       {
-        title: leave?.status === "pending" ? "Đang chờ xét duyệt" : "Đã có phản hồi",
-        value: leave?.status === "pending" ? "Đơn đang chờ xử lý." : formatLeaveDateTime(leave?.dateReply),
+        title: leave?.status === "pending" ? "Đang chờ xét duyệt" : isCancelRequested ? "Đang chờ duyệt hủy" : "Đã có phản hồi",
+        value: leave?.status === "pending"
+          ? "Đơn đang chờ xử lý."
+          : isCancelRequested
+            ? leave?.cancelContent || "Yêu cầu hủy đang chờ được xác nhận."
+            : formatLeaveDateTime(leave?.dateReply),
       },
       {
-        title: isApproved ? "Đã duyệt" : isRejected ? "Bị từ chối" : "Kết quả xử lý",
+        title: isApproved ? "Đã duyệt" : isRejected ? "Bị từ chối" : isCancelled ? "Đã hủy đơn" : "Kết quả xử lý",
         value: isApproved
           ? "Đơn nghỉ đã được phê duyệt."
           : isRejected
             ? leave?.denyContent || "Đơn nghỉ đã bị từ chối."
+            : isCancelled
+              ? leave?.cancelContent || "Đơn nghỉ đã được hủy."
             : "Chưa có phản hồi cuối cùng.",
       },
     ];
   }, [leave]);
+
+  const canCancelPending = leave?.status === "pending";
+  const canRequestCancel = leave?.status === "approved";
+
+  const handleCancelAction = async () => {
+    if (!(canCancelPending || canRequestCancel) || !cancelReason.trim()) return;
+
+    try {
+      setSubmitting(true);
+
+      if (canCancelPending) {
+        await LeaveService.cancelLeaveRequest(id, {
+          cancelContent: cancelReason.trim(),
+        });
+      } else {
+        await LeaveService.requestCancelLeaveRequest(id, {
+          cancelContent: cancelReason.trim(),
+        });
+      }
+
+      const refreshed = await LeaveService.getMyLeaveRequestById(id);
+      setLeave(
+        refreshed ?? {
+          ...leave,
+          status: canCancelPending ? "cancelled" : "cancel_requested",
+          cancelContent: cancelReason.trim(),
+          dateReply: canCancelPending ? new Date().toISOString() : leave?.dateReply,
+        }
+      );
+      setCancelOpen(false);
+      setCancelReason("");
+      setError("");
+    } catch (err) {
+      setError(
+        getLeaveErrorMessage(
+          err,
+          canCancelPending
+            ? "Không thể hủy đơn nghỉ. Vui lòng thử lại."
+            : "Không thể gửi yêu cầu hủy đơn nghỉ. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <LayoutComponent>
@@ -206,10 +273,73 @@ export default function LeaveRequestDetail() {
                     <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700">
                       {leave.status === "rejected"
                         ? leave.denyContent || "Đơn đã bị từ chối nhưng chưa có nội dung phản hồi."
+                        : leave.status === "cancel_requested"
+                          ? leave.cancelContent || "Bạn đã gửi yêu cầu hủy và đang chờ phản hồi."
+                          : leave.status === "cancelled"
+                            ? leave.cancelContent || "Đơn nghỉ của bạn đã được hủy."
                         : leave.status === "approved"
                           ? "Đơn nghỉ của bạn đã được phê duyệt."
                           : "Đơn nghỉ đang chờ người có thẩm quyền xem xét."}
                     </div>
+
+                    {(canCancelPending || canRequestCancel) ? (
+                      <div className="mt-5">
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => setCancelOpen((prev) => !prev)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                          >
+                            <XCircle size={16} />
+                            {canCancelPending ? "Hủy đơn nghỉ" : "Gửi yêu cầu hủy"}
+                          </button>
+                        </div>
+
+                        {cancelOpen ? (
+                          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <label className="mb-2 block text-sm font-semibold text-slate-700">
+                              {canCancelPending ? "Lý do hủy đơn" : "Lý do yêu cầu hủy"}
+                            </label>
+                            <textarea
+                              rows={4}
+                              value={cancelReason}
+                              onChange={(event) => setCancelReason(event.target.value)}
+                              placeholder={
+                                canCancelPending
+                                  ? "Nhập lý do hủy đơn nghỉ (bắt buộc)"
+                                  : "Nhập lý do yêu cầu hủy đơn nghỉ (bắt buộc)"
+                              }
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
+                            />
+                            <div className="mt-3 flex justify-end">
+                              <button
+                                type="button"
+                                disabled={submitting || !cancelReason.trim()}
+                                onClick={handleCancelAction}
+                                className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {submitting
+                                  ? "Đang xử lý..."
+                                  : canCancelPending
+                                    ? "Xác nhận hủy đơn"
+                                    : "Xác nhận gửi yêu cầu hủy"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {leave.rejectCancelContent ? (
+                      <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-800">
+                        <div className="mb-2 flex items-center gap-2 font-semibold">
+                          <MessageSquareQuote size={16} />
+                          Lý do từ chối yêu cầu hủy
+                        </div>
+                        {leave.rejectCancelContent}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

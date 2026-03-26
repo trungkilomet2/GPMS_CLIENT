@@ -13,6 +13,8 @@ import {
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-detail.css";
 
@@ -33,6 +35,9 @@ function getInitials(name = "") {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
+  const currentUser = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
+  const isOwner = primaryRole === "owner";
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,17 +53,65 @@ export default function EmployeeDetail() {
       setNotFound(false);
 
       try {
-        const found = await WorkerService.getEmployeeById(id);
+        const isPm = primaryRole === "pm";
+        const directoryResponse = isPm
+          ? await WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
+          : await WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] }));
         if (!mounted) return;
 
-        if (!found) {
+        const directoryEmployees = directoryResponse?.data ?? [];
+        const directoryEmployee = directoryEmployees.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        // PM detail access must stay inside their scoped directory; avoid trusting a broader detail endpoint.
+        if (isPm && !directoryEmployee) {
+          setNotFound(true);
+          setError("Bạn không có quyền xem nhân viên này hoặc nhân viên không thuộc phạm vi quản lý.");
+          setEmployee(null);
+          return;
+        }
+
+        const found = directoryEmployee
+          ? await WorkerService.getEmployeeById(id).catch((err) => {
+              if (isPm && err?.response?.status === 403) {
+                return null;
+              }
+              throw err;
+            })
+          : null;
+        if (!mounted) return;
+
+        const sourceEmployee = found ?? directoryEmployee ?? null;
+
+        if (!sourceEmployee) {
           setNotFound(true);
           setError("Không tìm thấy nhân viên phù hợp.");
           setEmployee(null);
           return;
         }
 
-        setEmployee(found);
+        const resolvedManagerId = sourceEmployee.managerId ?? directoryEmployee?.managerId ?? null;
+        const resolvedManager = directoryEmployees.find(
+          (item) => String(item.id) === String(resolvedManagerId)
+        );
+
+        setEmployee({
+          ...sourceEmployee,
+          managerId: resolvedManagerId,
+          managerName:
+            sourceEmployee.managerName ||
+            directoryEmployee?.managerName ||
+            resolvedManager?.fullName ||
+            "",
+          workerSkill: sourceEmployee.workerSkill || directoryEmployee?.workerSkill || "",
+          workerSkillLabel:
+            sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
+          role: sourceEmployee.role || directoryEmployee?.role || "",
+          roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
+          roleLabels:
+            sourceEmployee.roleLabels?.length ? sourceEmployee.roleLabels : directoryEmployee?.roleLabels ?? [],
+        });
       } catch (err) {
         if (!mounted) return;
 
@@ -77,7 +130,7 @@ export default function EmployeeDetail() {
     return () => {
       mounted = false;
     };
-  }, [id, reloadSeed]);
+  }, [id, primaryRole, reloadSeed]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
@@ -100,10 +153,12 @@ export default function EmployeeDetail() {
               <p className="employee-detail-hero__subtitle">Thông tin tài khoản, vai trò hệ thống, chuyên môn và tuyến quản lý của nhân viên trong hệ thống.</p>
             </div>
 
-            <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
-              <Pencil size={18} />
-              <span>Sửa hồ sơ</span>
-            </Link>
+            {isOwner ? (
+              <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
+                <Pencil size={18} />
+                <span>Sửa hồ sơ</span>
+              </Link>
+            ) : null}
           </div>
 
           {loading ? (
@@ -195,10 +250,6 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-info-item">
                     <ShieldCheck size={17} />
                     <span>Trạng thái: {statusConfig.label}</span>
-                  </div>
-                  <div className="employee-detail-info-item">
-                    <BriefcaseBusiness size={17} />
-                    <span>Tuyến quản lý: {employee.managerRoleHint || "Chưa cập nhật"}</span>
                   </div>
                   <div className="employee-detail-info-item">
                     <BriefcaseBusiness size={17} />

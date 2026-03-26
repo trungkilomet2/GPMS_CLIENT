@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, BriefcaseBusiness, Sparkles, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import "@/styles/employees.css";
 
 const DIRECTORY_ITEMS = [
   {
     to: "/employees/management",
     title: "Nhóm quản lý",
-    description: "Xem riêng Owner, PM, Admin và Team Leader trong hệ thống.",
+    description: "Xem riêng Owner, PM và Admin trong hệ thống.",
     icon: BriefcaseBusiness,
     tone: "warning",
   },
@@ -28,6 +30,12 @@ const DIRECTORY_ITEMS = [
 ];
 
 export default function EmployeeDirectory() {
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const visibleItems = primaryRole === "pm"
+    ? DIRECTORY_ITEMS.filter((item) => item.to === "/employees/workers" || item.to === "/worker-roles")
+    : DIRECTORY_ITEMS;
+
   return (
     <DashboardLayout>
       <div className="employee-page">
@@ -43,7 +51,7 @@ export default function EmployeeDirectory() {
           </div>
 
           <div className="employee-directory-grid">
-            {DIRECTORY_ITEMS.map(({ to, title, description, icon: Icon, tone }) => (
+            {visibleItems.map(({ to, title, description, icon: Icon, tone }) => (
               <Link key={to} to={to} className={`employee-directory-card employee-directory-card--${tone}`}>
                 <div className="employee-directory-card__icon">
                   <Icon size={24} />

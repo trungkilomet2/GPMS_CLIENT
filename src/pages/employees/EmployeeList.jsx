@@ -12,6 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
@@ -27,7 +29,7 @@ const STATUS_MAP = {
 };
 
 const ROLE_GROUPS = {
-  management: ["Owner", "PM", "Admin", "Team Leader"],
+  management: ["Owner", "PM", "Admin"],
 };
 
 function getInitials(name = "") {
@@ -104,6 +106,9 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 
 export default function EmployeeList() {
   const location = useLocation();
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isOwner = primaryRole === "owner";
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -126,7 +131,16 @@ export default function EmployeeList() {
       setError("");
 
       try {
-        const response = await WorkerService.getAllEmployees();
+        const shouldUsePmWorkerScope =
+          primaryRole === "pm" && viewMode === "workers";
+
+        const response = shouldUsePmWorkerScope
+          ? await WorkerService.getEmployeeDirectoryByPmScope({
+              pageSize: 100,
+            })
+          : await WorkerService.getEmployeeDirectory({
+              pageSize: 100,
+            });
         if (!mounted) return;
 
         setEmployees(response?.data ?? []);
@@ -266,10 +280,10 @@ export default function EmployeeList() {
         : "Danh sách nhân viên";
   const pageSubtitle =
     viewMode === "management"
-      ? "Theo dõi riêng nhóm Owner, PM, Admin và Team Leader trong hệ thống."
+      ? "Theo dõi riêng nhóm Owner, PM và Admin trong hệ thống."
       : viewMode === "workers"
         ? "Theo dõi riêng nhóm worker và chuyên môn thợ trong hệ thống."
-        : "Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Team Lead, Worker và chuyên môn thợ.";
+        : "Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Worker và chuyên môn thợ.";
   const tableTitle =
     viewMode === "management"
       ? "Nhóm quản lý"
@@ -293,16 +307,18 @@ export default function EmployeeList() {
               <p className="employee-hero__subtitle">{pageSubtitle}</p>
             </div>
 
-            <Link to="/employees/create" className="employee-hero__action">
-              <Plus size={18} />
-              <span>Thêm nhân viên</span>
-            </Link>
+            {isOwner ? (
+              <Link to="/employees/create" className="employee-hero__action">
+                <Plus size={18} />
+                <span>Thêm nhân viên</span>
+              </Link>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
             <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
-            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng, quản lý và tổ trưởng" tone="warning" />
+            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng và quản lý sản xuất" tone="warning" />
             <SummaryCard
               icon={Sparkles}
               label="Có chuyên môn"
@@ -455,14 +471,14 @@ export default function EmployeeList() {
                       >
                         Xóa bộ lọc
                       </button>
-                    ) : (
+                    ) : isOwner ? (
                       <Link
                         to="/employees/create"
                         className="employee-state-btn employee-state-btn--primary"
                       >
                         Thêm nhân viên
                       </Link>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : (

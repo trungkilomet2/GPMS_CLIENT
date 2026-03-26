@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeDollarSign,
   BriefcaseBusiness,
   ChartPie,
   ClipboardCheck,
@@ -30,7 +29,6 @@ const OPERATION_NAV_ITEMS = [
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
-  { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, allowedRoles: ["Owner"] },
 ];
 
 function hasRequiredRole(user, allowedRoles) {
