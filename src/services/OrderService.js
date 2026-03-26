@@ -83,6 +83,9 @@ const OrderService = {
             }
         }
     },
+    getOrderRejectById: (id) => {
+        return axiosClient.get(API_ENDPOINTS.ORDER_REJECT.GET_BY_ID(id));
+    },
 };
 
 export default OrderService;

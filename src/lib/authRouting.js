@@ -18,9 +18,9 @@ export function getPostLoginPath(roleValue) {
     case "pm":
       return "/production";
     case "teamLeader":
-      return "/production-plan/assign";
+      return "/production-plan/production-plan";
     case "worker":
-      return "/worker/assignments";
+      return "/worker/production-plan";
     default:
       return hasAnyRole(roles, ["customer"]) ? "/home" : "/home";
   }

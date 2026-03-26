@@ -22,6 +22,30 @@ import OwnerLayout from '@/layouts/OwnerLayout';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
+function extractRejectReasonFromResponse(response) {
+    const root = response?.data?.data ?? response?.data ?? response;
+    const payload = Array.isArray(root) ? root[0] : root;
+    if (!payload || typeof payload !== 'object') return '';
+
+    const candidateKeys = [
+        'reason',
+        'rejectReason',
+        'statusReason',
+        'note',
+        'description',
+        'content',
+        'message',
+    ];
+
+    for (const key of candidateKeys) {
+        const value = payload?.[key];
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+        }
+    }
+    return '';
+}
+
 export default function OrderDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -42,6 +66,9 @@ export default function OrderDetail() {
     const [denyLoading, setDenyLoading] = useState(false);
     const [denyError, setDenyError] = useState(null);
     const [denySuccess, setDenySuccess] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectReasonLoading, setRejectReasonLoading] = useState(false);
+    const [rejectReasonError, setRejectReasonError] = useState(null);
     const user = getStoredUser();
     const roles = splitRoles(user?.role);
     const isOwner = hasAnyRole(roles, ['owner']);
@@ -90,6 +117,47 @@ export default function OrderDetail() {
         };
     }, [order, canModerate]);
 
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRejectReason = async () => {
+            const orderId = order?.id ?? id;
+            const normalized = normalizeOrderStatus(order?.statusName ?? order?.status);
+            const isRejectedOrder = normalized === 'Đã từ chối';
+
+            if (!orderId || !isRejectedOrder) {
+                if (isMounted) {
+                    setRejectReason('');
+                    setRejectReasonError(null);
+                    setRejectReasonLoading(false);
+                }
+                return;
+            }
+
+            try {
+                setRejectReasonLoading(true);
+                const response = await OrderService.getOrderRejectById(orderId);
+                const reason = extractRejectReasonFromResponse(response);
+                if (!isMounted) return;
+                setRejectReason(reason);
+                setRejectReasonError(null);
+            } catch (err) {
+                if (!isMounted) return;
+                setRejectReason('');
+                setRejectReasonError('Không thể tải lý do từ chối.');
+                console.error('Không thể tải lý do từ chối đơn hàng:', err);
+            } finally {
+                if (isMounted) setRejectReasonLoading(false);
+            }
+        };
+
+        loadRejectReason();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [order?.id, order?.status, id]);
+
     if (loading) return (
         <OwnerLayout>
             <div className="flex flex-col items-center justify-center min-h-400px">
@@ -107,6 +175,16 @@ export default function OrderDetail() {
     );
 
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
+    const parseHardCopyQuantity = (template = {}) => {
+        const directQty = Number(template?.quantity ?? template?.Quantity);
+        if (Number.isFinite(directQty) && directQty > 0) return directQty;
+
+        const note = String(template?.note ?? template?.Note ?? '');
+        const match = note.match(/(\d+)/);
+        if (!match) return 0;
+        const parsed = Number(match[1]);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
     const softTemplates = templates.filter((t) => {
         const type = (t.type ?? '').toString().toLowerCase();
         return type.includes('soft') || !!t.file || !!t.url;
@@ -115,12 +193,13 @@ export default function OrderDetail() {
         const type = (t.type ?? '').toString().toLowerCase();
         return type.includes('hard');
     });
-    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + parseHardCopyQuantity(t), 0);
+    const orderStatusValue = order?.statusName ?? order?.status;
     const orderOwnerId = getOrderCustomerId(order);
     const currentUserId = user?.userId ?? user?.id ?? null;
     const canEdit =
         orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId);
-    const normalizedStatus = normalizeOrderStatus(order?.status);
+    const normalizedStatus = normalizeOrderStatus(orderStatusValue);
     const canRequestModification = normalizedStatus === 'Chờ xét duyệt';
     const canEditOnlyWhenRequested = normalizedStatus === 'Yêu cầu chỉnh sửa';
     const isRejected = normalizedStatus === 'Đã từ chối';
@@ -217,7 +296,7 @@ export default function OrderDetail() {
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status, 'detail')}`}>
+                            <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(orderStatusValue, 'detail')}`}>
                                 {order.statusName || order.status}
                             </span>
                             {canCustomerDeny && (
@@ -454,6 +533,17 @@ export default function OrderDetail() {
                                     <History size={16} /> Lịch sử chỉnh sửa
                                 </button>
                             </div>
+
+                            {isRejected && (
+                                <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm">
+                                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-2">Lý do từ chối</p>
+                                    <p className="text-sm text-rose-800 leading-relaxed">
+                                        {rejectReasonLoading
+                                            ? 'Đang tải lý do từ chối...'
+                                            : rejectReason || rejectReasonError || 'Không có lý do từ chối.'}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -493,6 +583,8 @@ export default function OrderDetail() {
                                 userId: user?.userId ?? user?.id ?? null,
                             });
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
+                            setRejectReason(reason?.trim() || '');
+                            setRejectReasonError(null);
                         } catch (err) {
                             console.error('Lỗi từ chối đơn hàng:', err);
                             alert('Không thể từ chối đơn hàng.');

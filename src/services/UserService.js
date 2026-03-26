@@ -280,7 +280,7 @@ export const userService = {
       };
     }
 
-    if (lastError) throw lastError;
+    // All endpoints failed with 403/404 (permission or not found) — return null silently
     return null;
   },
 

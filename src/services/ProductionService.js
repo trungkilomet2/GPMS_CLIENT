@@ -23,6 +23,9 @@ const ProductionService = {
   rejectProduction(productionId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT(productionId), payload);
   },
+  getProductionRejectReason(productionId) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT_REASON(productionId));
+  },
   getProductionIssues(productionId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES(productionId));
   },

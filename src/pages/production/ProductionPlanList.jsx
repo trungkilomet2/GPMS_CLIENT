@@ -11,7 +11,7 @@ import WorkerService from "@/services/WorkerService";
 import { useAuth } from "@/hooks/useAuth";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useProductionList } from "@/hooks/useProductionList";
-import { STATUS_STYLES, getPlanStatusLabel } from "@/utils/statusUtils";
+import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -50,7 +50,7 @@ export default function ProductionPlanList() {
         (pmIdRaw ? `PM #${pmIdRaw}` : "-");
       const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
       const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
-      const status = getPlanStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+      const status = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
       return {
         productionId: item?.productionId ?? item?.id ?? "-",
         orderId,
@@ -89,9 +89,9 @@ export default function ProductionPlanList() {
 
   const stats = useMemo(() => {
     const total = plans.length;
-    const planned = plans.filter((item) => item.status === "Planned").length;
-    const inProgress = plans.filter((item) => item.status === "In Progress").length;
-    const completed = plans.filter((item) => item.status === "Completed").length;
+    const planned = plans.filter((item) => item.status === "Chờ Xét Duyệt Kế Hoạch").length;
+    const inProgress = plans.filter((item) => item.status === "Đang Sản Xuất").length;
+    const completed = plans.filter((item) => item.status === "Hoàn Thành").length;
     return { total, planned, inProgress, completed };
   }, [plans]);
 
@@ -191,8 +191,8 @@ export default function ProductionPlanList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Planned")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Planned" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -207,8 +207,8 @@ export default function ProductionPlanList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("In Progress")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "In Progress" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Đang Sản Xuất")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -223,8 +223,8 @@ export default function ProductionPlanList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Completed")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Completed" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Hoàn Thành")}
+              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -260,9 +260,13 @@ export default function ProductionPlanList() {
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="Planned">Planned</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Chờ Xét Duyệt">Chờ Xét Duyệt</option>
+                  <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
+                  <option value="Chấp Nhận">Chấp Nhận</option>
+                  <option value="Cần Chỉnh Sửa Kế Hoạch">Cần Chỉnh Sửa Kế Hoạch</option>
+                  <option value="Đang Sản Xuất">Đang Sản Xuất</option>
+                  <option value="Hoàn Thành">Hoàn Thành</option>
+                  <option value="Từ Chối">Từ Chối</option>
                 </select>
               </label>
               <div className="flex items-center justify-end gap-3">

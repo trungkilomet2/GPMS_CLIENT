@@ -51,6 +51,17 @@ export default function EditOrder() {
     const [existingTemplates, setExistingTemplates] = useState([]);
     const [hardCopyQty, setHardCopyQty] = useState('');
 
+    const parseHardCopyQuantity = (template = {}) => {
+        const directQty = Number(template?.quantity ?? template?.Quantity);
+        if (Number.isFinite(directQty) && directQty > 0) return directQty;
+
+        const note = String(template?.note ?? template?.Note ?? '');
+        const match = note.match(/(\d+)/);
+        if (!match) return 0;
+        const parsed = Number(match[1]);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
     const normalizeMaterial = (material = {}) => ({
         ...material,
         materialName: material.materialName ?? material.name ?? '',
@@ -83,7 +94,6 @@ export default function EditOrder() {
                 templateName: t.templateName ?? t.name ?? t.TemplateName ?? 'Bản mềm',
                 type: 'SOFT',
                 file: t.file ?? t.File ?? '',
-                quantity: null,
                 note: t.note ?? t.Note ?? '',
             }))
             .filter((t) => t.file);
@@ -93,7 +103,7 @@ export default function EditOrder() {
             const type = (t.type ?? t.Type ?? '').toString().toLowerCase();
             return type.startsWith('hard');
         });
-        const hardQty = hardTemplate?.quantity ?? hardTemplate?.Quantity ?? '';
+        const hardQty = hardTemplate ? parseHardCopyQuantity(hardTemplate) : '';
         setHardCopyQty(hardQty ? String(hardQty) : '');
     };
 
@@ -250,7 +260,7 @@ export default function EditOrder() {
         setOrderImagePreview(previewUrl);
     };
 
-    const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx'];
+    const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx', '.png', '.jpg', '.jpeg'];
     const MAX_TEMPLATE_SIZE = 10 * 1024 * 1024;
 
     const handleTemplateFileChange = (e) => {
@@ -341,7 +351,6 @@ export default function EditOrder() {
                         templateName: templateFiles[idx]?.name || 'Bản mềm',
                         type: 'SOFT',
                         file: url,
-                        quantity: null,
                         note: '',
                     });
                 });
@@ -350,9 +359,8 @@ export default function EditOrder() {
                 templatesPayload.push({
                     templateName: 'Bản cứng',
                     type: 'HARD',
-                    file: null,
-                    quantity: Number(hardCopyQty),
-                    note: '',
+                    file: '',
+                    note: `Số lượng bản cứng: ${Number(hardCopyQty)}`,
                 });
             }
 
@@ -447,13 +455,13 @@ export default function EditOrder() {
                                         <input
                                             type="file"
                                             multiple
-                                            accept=".dxf,.iba,.mdl,.plt,.pdf,.docx,.xlsx"
+                                            accept=".dxf,.iba,.mdl,.plt,.pdf,.docx,.xlsx,.png,.jpg,.jpeg"
                                             onChange={handleTemplateFileChange}
                                             className="hidden"
                                         />
                                     </label>
                                 </div>
-                                <p className="text-[11px] text-gray-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx — tối đa 10MB/file</p>
+                                <p className="text-[11px] text-gray-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx, .png, .jpg, .jpeg — tối đa 10MB/file</p>
                                 {(existingTemplates.length > 0 || templateFiles.length > 0) && (
                                     <ul className="mt-3 space-y-2">
                                         {existingTemplates.map((tpl, idx) => (

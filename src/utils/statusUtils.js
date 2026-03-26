@@ -14,32 +14,49 @@ export const STATUS_STYLES = {
 };
 
 const PRODUCTION_LABELS = {
+  // Cần Cập Nhật
   "cần cập nhật": "Cần Cập Nhật",
   "can cap nhat": "Cần Cập Nhật",
   "need update": "Cần Cập Nhật",
   "update required": "Cần Cập Nhật",
+  // Cần Chỉnh Sửa Kế Hoạch
   "cần chỉnh sửa kế hoạch": "Cần Chỉnh Sửa Kế Hoạch",
   "can chinh sua ke hoach": "Cần Chỉnh Sửa Kế Hoạch",
   "need plan update": "Cần Chỉnh Sửa Kế Hoạch",
+  "plan update required": "Cần Chỉnh Sửa Kế Hoạch",
+  // Chấp Nhận
   "chấp nhận": "Chấp Nhận",
   "chap nhan": "Chấp Nhận",
   approved: "Chấp Nhận",
   accepted: "Chấp Nhận",
+  // Chờ Xét Duyệt (status 1)
   "chờ xét duyệt": "Chờ Xét Duyệt",
   "cho xet duyet": "Chờ Xét Duyệt",
   pending: "Chờ Xét Duyệt",
   waiting: "Chờ Xét Duyệt",
+  // Chờ kiểm tra — alias thực tế từ API list (map về Chờ Xét Duyệt)
+  "chờ kiểm tra": "Chờ Xét Duyệt",
+  "cho kiem tra": "Chờ Xét Duyệt",
+  "waiting for check": "Chờ Xét Duyệt",
+  "wait for check": "Chờ Xét Duyệt",
+  check: "Chờ Xét Duyệt",
+  // Chờ Xét Duyệt Kế Hoạch (status 5)
   "chờ xét duyệt kế hoạch": "Chờ Xét Duyệt Kế Hoạch",
   "cho xet duyet ke hoach": "Chờ Xét Duyệt Kế Hoạch",
   planned: "Chờ Xét Duyệt Kế Hoạch",
+  "waiting for plan": "Chờ Xét Duyệt Kế Hoạch",
+  "plan pending": "Chờ Xét Duyệt Kế Hoạch",
+  // Đang Sản Xuất (status 7)
   "đang sản xuất": "Đang Sản Xuất",
   "dang san xuat": "Đang Sản Xuất",
   "in progress": "Đang Sản Xuất",
   production: "Đang Sản Xuất",
+  // Hoàn Thành (status 8)
   "hoàn thành": "Hoàn Thành",
   "hoan thanh": "Hoàn Thành",
   completed: "Hoàn Thành",
   done: "Hoàn Thành",
+  // Từ Chối (status 2)
   "từ chối": "Từ Chối",
   "tu choi": "Từ Chối",
   rejected: "Từ Chối",
@@ -47,15 +64,15 @@ const PRODUCTION_LABELS = {
   denied: "Từ Chối",
 };
 
+// Mapping theo bảng PS_STATUS trong DB (PS_ID → NAME)
 const PRODUCTION_STATUS_BY_ID = {
-  1: PRODUCTION_LABELS["cho xet duyet"],
-  2: PRODUCTION_LABELS["tu choi"],
-  3: PRODUCTION_LABELS["can cap nhat"],
-  4: PRODUCTION_LABELS["chap nhan"],
-  5: PRODUCTION_LABELS["cho xet duyet ke hoach"],
-  6: PRODUCTION_LABELS["can chinh sua ke hoach"],
-  7: PRODUCTION_LABELS["dang san xuat"],
-  8: PRODUCTION_LABELS["hoan thanh"],
+  1: "Chờ Xét Duyệt",           // PS_ID=1
+  2: "Từ Chối",                  // PS_ID=2
+  3: "Chấp Nhận",                // PS_ID=3
+  4: "Chờ Xét Duyệt Kế Hoạch",  // PS_ID=4
+  5: "Cần Chỉnh Sửa Kế Hoạch",  // PS_ID=5
+  6: "Đang Sản Xuất",            // PS_ID=6
+  7: "Hoàn Thành",               // PS_ID=7
 };
 
 export function getProductionStatusLabel(status) {
