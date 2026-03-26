@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, CalendarDays } from "lucide-react";
+import { ArrowLeft, CalendarDays, BookOpen, ChevronRight, X } from "lucide-react";
 import WorkerLayout from "@/layouts/WorkerLayout";
+import CuttingNotebookService from "@/services/CuttingNotebookService";
+import { toast } from "react-toastify";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
@@ -140,8 +142,6 @@ export default function WorkerDailyReport() {
   );
   const filteredPlanSteps = (() => {
     if (planSteps.length === 0) return [];
-    const hasAssignmentData = planSteps.some((step) => hasWorkerAssignmentMetadata(step));
-    if (!hasAssignmentData) return planSteps;
     return planSteps.filter((step) =>
       isStepAssignedToCurrentWorker(step, currentWorkerIdSet, currentWorkerNameSet)
     );
@@ -158,6 +158,7 @@ export default function WorkerDailyReport() {
       logReadOnly: false,
       assignedWorkers: step?.assignedWorkers ?? step?.workerNames ?? step?.workers ?? step?.workerList ?? step?.assignees ?? [],
       assignedWorkerIds: step?.assignedWorkerIds ?? step?.workerIds ?? step?.assigneeIds ?? [],
+      isCuttingStep: step?.isCuttingStep ?? false,
     }))
     : (assignment
       ? [assignment].filter((item) =>
@@ -179,6 +180,46 @@ export default function WorkerDailyReport() {
       ? initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
       : null
   );
+
+  const [showLogSelector, setShowLogSelector] = useState(false);
+  const [currentNotebookLogs, setCurrentNotebookLogs] = useState([]);
+  const [activeRowId, setActiveRowId] = useState(null);
+
+  const fetchNotebookLogs = async (row) => {
+    if (!row?.productionId) return;
+
+    try {
+      setIsLoadingLogs(true);
+      setActiveRowId(row.id);
+      
+      const nbRes = await CuttingNotebookService.getByProduction(row.productionId);
+      const nbData = nbRes?.data?.data || nbRes?.data || nbRes;
+      
+      const notebook = Array.isArray(nbData) ? nbData[0] : nbData;
+      if (!notebook || !notebook.id) {
+        toast.info("Không tìm thấy sổ cắt cho đơn sản xuất này.");
+        return;
+      }
+
+      const logsRes = await CuttingNotebookService.getListLogs(notebook.id);
+      const logs = logsRes?.data?.data || logsRes?.data || logsRes;
+      
+      setCurrentNotebookLogs(Array.isArray(logs) ? logs : []);
+      setShowLogSelector(true);
+    } catch (err) {
+      console.error(err);
+      toast.error("Lỗi khi tải dữ liệu sổ cắt.");
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
+  const handleSelectLog = (log) => {
+    const qty = log.productQty || log.quantity || 0;
+    handleChange(activeRowId, "quantity", qty);
+    toast.success(`Đã lấy sản lượng (${qty}) từ sổ cắt.`);
+    setShowLogSelector(false);
+  };
 
   const totalAmount = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.cpu) || 0), 0),
@@ -485,13 +526,25 @@ export default function WorkerDailyReport() {
                       </td>
                       <td className="px-3 py-2">
                         {canEdit && !row.logReadOnly ? (
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.quantity}
-                            onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
-                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={row.quantity}
+                              onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
+                              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                            />
+                            {row.isCuttingStep && (
+                              <button
+                                type="button"
+                                onClick={() => fetchNotebookLogs(row)}
+                                title="Lấy dữ liệu từ sổ cắt"
+                                className="flex h-9 w-10 min-w-[40px] items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                              >
+                                <BookOpen size={16} />
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <div className="text-center text-slate-700 font-medium">
                             {row.quantity === "" ? "-" : row.quantity}
@@ -519,6 +572,70 @@ export default function WorkerDailyReport() {
           </div>
         </div>
       </div>
+      {/* Cutting Log Selector Modal */}
+      {showLogSelector && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 leading-none">Chọn từ Sổ cắt</h3>
+                  <p className="text-xs text-slate-500 mt-1">Lấy sản lượng đã cắt vào báo cáo</p>
+                </div>
+              </div>
+              <button onClick={() => setShowLogSelector(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="max-h-[350px] overflow-y-auto rounded-2xl border border-slate-100">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50 text-[10px] font-bold uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Màu</th>
+                    <th className="px-4 py-3 text-center">Số lớp</th>
+                    <th className="px-4 py-3 text-center">Sản lượng</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentNotebookLogs.length > 0 ? (
+                    currentNotebookLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/50">
+                        <td className="px-4 py-3 font-semibold text-slate-700">{log.color || "-"}</td>
+                        <td className="px-3 py-3 text-center italic">{log.layer || 0}</td>
+                        <td className="px-3 py-3 text-center font-bold text-emerald-700">
+                          {log.productQty || log.quantity || 0}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleSelectLog(log)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                          >
+                            Chọn <ChevronRight size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-10 text-center text-slate-400">Không tìm thấy log.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button onClick={() => setShowLogSelector(false)} className="rounded-xl border border-slate-200 px-5 py-2 text-sm font-bold text-slate-600">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </WorkerLayout>
   );
 }

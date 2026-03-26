@@ -255,7 +255,8 @@ export default function ProductionPlan() {
         cpu: String(s.cpu || ""),
         startDate: s.startDate || "",
         endDate: s.endDate || "",
-        ppsId: s.partId || ""
+        ppsId: s.partId || "",
+        isCuttingStep: s.isCuttingStep || false
       }));
     }
     return [];
@@ -281,6 +282,7 @@ export default function ProductionPlan() {
     startDate: "",
     endDate: "",
     cpu: "",
+    isCuttingStep: false,
   });
 
   const currentUserKey = useMemo(() => {
@@ -565,7 +567,8 @@ export default function ProductionPlan() {
           partName: row?.partName || "",
           startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
           endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
-          cpu: Number(row?.cpu) || 0
+          cpu: Number(row?.cpu) || 0,
+          isCuttingStep: row?.isCuttingStep || false
         })),
       };
 
@@ -621,7 +624,7 @@ export default function ProductionPlan() {
 
   const openAddModal = () => {
     setEditingIndex(null);
-    setForm({ partName: "", startDate: "", endDate: "", cpu: "" });
+    setForm({ partName: "", startDate: "", endDate: "", cpu: "", isCuttingStep: false });
     setFormError("");
     setIsModalOpen(true);
   };
@@ -635,6 +638,7 @@ export default function ProductionPlan() {
       startDate: target.startDate || "",
       endDate: target.endDate || "",
       cpu: target.cpu || "",
+      isCuttingStep: target.isCuttingStep || false,
     });
     setFormError("");
     setIsModalOpen(true);
@@ -689,6 +693,7 @@ export default function ProductionPlan() {
             startDate: form.startDate,
             endDate: form.endDate,
             ppsId: "",
+            isCuttingStep: form.isCuttingStep,
           },
         ];
         setSelectedIndex(next.length - 1);
@@ -702,6 +707,7 @@ export default function ProductionPlan() {
         productionId: Number(selectedProductionId),
         startDate: form.startDate,
         endDate: form.endDate,
+        isCuttingStep: form.isCuttingStep,
       };
       return next;
     });
@@ -729,6 +735,7 @@ export default function ProductionPlan() {
       startDate: baseStart,
       endDate: baseEnd,
       ppsId: "",
+      isCuttingStep: String(step.partName).toLowerCase().includes("cat") || false
     }));
     setRows(next);
     setSelectedIndex(0);
@@ -1159,6 +1166,18 @@ export default function ProductionPlan() {
                   placeholder="Ví dụ: 200"
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-center outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
+              </div>
+              <div className="flex items-center gap-3 py-1">
+                <input
+                  type="checkbox"
+                  id="isCuttingStep"
+                  checked={form.isCuttingStep}
+                  onChange={(event) => handleFormChange("isCuttingStep", event.target.checked)}
+                  className="h-5 w-5 rounded-lg border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
+                />
+                <label htmlFor="isCuttingStep" className="text-sm font-bold text-slate-700 cursor-pointer select-none">
+                  Công đoạn cắt (Sử dụng dữ liệu từ Sổ cắt)
+                </label>
               </div>
             </div>
             <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-3">

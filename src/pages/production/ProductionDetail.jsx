@@ -671,10 +671,6 @@ export default function ProductionDetail() {
                   <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
                       <h2 className="text-xs font-bold uppercase tracking-widest text-slate-600">Danh sách công đoạn & nhiệm vụ</h2>
-                      <div className="flex gap-2">
-                        <button onClick={handleApprovePlan} className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full hover:bg-emerald-200 transition">Duyệt KH</button>
-                        <button onClick={handleRequestPlanUpdate} className="px-3 py-1 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full hover:bg-rose-200 transition">Sửa KH</button>
-                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm divide-y divide-slate-100">
