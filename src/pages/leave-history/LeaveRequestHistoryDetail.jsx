@@ -25,6 +25,18 @@ const STATUS_MAP = {
     badge: "bg-rose-50 text-rose-700 border-rose-200",
     panel: "border-rose-200 bg-rose-50 text-rose-800",
   },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+    panel: "border-orange-200 bg-orange-50 text-orange-800",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    panel: "border-slate-200 bg-slate-50 text-slate-800",
+  },
 };
 
 function StatusBadge({ status }) {
@@ -55,6 +67,8 @@ function getTimelineItems(leave) {
   const isApproved = leave?.status === "approved";
   const isRejected = leave?.status === "rejected";
   const isPending = leave?.status === "pending";
+  const isCancelRequested = leave?.status === "cancel_requested";
+  const isCancelled = leave?.status === "cancelled";
 
   return [
     {
@@ -63,16 +77,22 @@ function getTimelineItems(leave) {
       tone: "done",
     },
     {
-      title: isPending ? "Đang chờ xử lý" : "Đã phản hồi",
-      value: isPending ? "Đơn hiện vẫn đang ở trạng thái chờ duyệt." : formatLeaveDateTime(leave?.dateReply),
-      tone: isPending ? "current" : "done",
+      title: isPending ? "Đang chờ xử lý" : isCancelRequested ? "Đang chờ duyệt hủy" : "Đã phản hồi",
+      value: isPending
+        ? "Đơn hiện vẫn đang ở trạng thái chờ duyệt."
+        : isCancelRequested
+          ? leave?.cancelContent || "Yêu cầu hủy đang chờ được phản hồi."
+          : formatLeaveDateTime(leave?.dateReply),
+      tone: isPending || isCancelRequested ? "current" : "done",
     },
     {
-      title: isApproved ? "Kết quả duyệt" : isRejected ? "Kết quả từ chối" : "Kết quả cuối cùng",
+      title: isApproved ? "Kết quả duyệt" : isRejected ? "Kết quả từ chối" : isCancelled ? "Kết quả hủy đơn" : "Kết quả cuối cùng",
       value: isApproved
         ? "Đơn nghỉ đã được phê duyệt."
         : isRejected
           ? leave?.denyContent || "Đơn nghỉ đã bị từ chối."
+          : isCancelled
+            ? leave?.cancelContent || "Đơn nghỉ đã được hủy."
           : "Chưa có kết quả xử lý cuối cùng.",
       tone: isApproved ? "done" : isRejected ? "rejected" : "upcoming",
     },
@@ -211,6 +231,10 @@ export default function LeaveRequestHistoryDetail() {
                       <div className="mt-2">
                         {leave.status === "rejected"
                           ? leave.denyContent || "Đơn bị từ chối nhưng chưa có nội dung phản hồi chi tiết."
+                          : leave.status === "cancel_requested"
+                            ? leave.cancelContent || "Đã có yêu cầu hủy và đang chờ phản hồi."
+                            : leave.status === "cancelled"
+                              ? leave.cancelContent || "Đơn nghỉ đã được hủy."
                           : leave.status === "approved"
                             ? "Đơn nghỉ đã được chấp nhận."
                             : "Đơn nghỉ hiện đang chờ phản hồi từ người phụ trách."}
@@ -229,6 +253,16 @@ export default function LeaveRequestHistoryDetail() {
                           Lý do từ chối
                         </div>
                         {leave.denyContent}
+                      </div>
+                    ) : null}
+
+                    {leave.rejectCancelContent ? (
+                      <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-800">
+                        <div className="mb-2 flex items-center gap-2 font-semibold">
+                          <MessageSquareQuote size={16} />
+                          Lý do từ chối yêu cầu hủy
+                        </div>
+                        {leave.rejectCancelContent}
                       </div>
                     ) : null}
                   </div>

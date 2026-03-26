@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  EMPLOYEE_FORM_ROLE_OPTIONS,
+  EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
   USER_STATUS_IDS,
   getAllowedManagerRoles,
@@ -252,7 +252,7 @@ export default function EmployeeCreate() {
                   <span className="employee-create-field__label">Vai trò hệ thống</span>
                   <ShieldCheck size={18} className="employee-create-field__icon" />
                   <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                    {EMPLOYEE_FORM_ROLE_OPTIONS.map((roleOption) => (
+                    {EMPLOYEE_CREATE_ROLE_OPTIONS.map((roleOption) => (
                       <option key={roleOption.value} value={roleOption.value}>
                         {roleOption.label}
                       </option>

@@ -116,7 +116,9 @@ const WorkerRoleService = {
 
     let employees = [];
     try {
-      const employeeResponse = await WorkerService.getAllEmployees();
+      const employeeResponse = await WorkerService.getEmployeeDirectory({
+        pageSize: 100,
+      });
       employees = employeeResponse?.data ?? [];
     } catch {
       employees = [];

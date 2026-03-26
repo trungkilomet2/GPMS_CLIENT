@@ -54,26 +54,34 @@ export default function EmployeeDetail() {
 
       try {
         const isPm = primaryRole === "pm";
-        const directoryPromise = isPm
-          ? WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
-          : WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] }));
-        const detailPromise = WorkerService.getEmployeeById(id).catch((err) => {
-          if (isPm && err?.response?.status === 403) {
-            return null;
-          }
-          throw err;
-        });
-
-        const [found, directoryResponse] = await Promise.all([
-          detailPromise,
-          directoryPromise,
-        ]);
+        const directoryResponse = isPm
+          ? await WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
+          : await WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] }));
         if (!mounted) return;
 
         const directoryEmployees = directoryResponse?.data ?? [];
         const directoryEmployee = directoryEmployees.find(
           (item) => String(item.id) === String(id)
         );
+
+        // PM detail access must stay inside their scoped directory; avoid trusting a broader detail endpoint.
+        if (isPm && !directoryEmployee) {
+          setNotFound(true);
+          setError("Bạn không có quyền xem nhân viên này hoặc nhân viên không thuộc phạm vi quản lý.");
+          setEmployee(null);
+          return;
+        }
+
+        const found = directoryEmployee
+          ? await WorkerService.getEmployeeById(id).catch((err) => {
+              if (isPm && err?.response?.status === 403) {
+                return null;
+              }
+              throw err;
+            })
+          : null;
+        if (!mounted) return;
+
         const sourceEmployee = found ?? directoryEmployee ?? null;
 
         if (!sourceEmployee) {

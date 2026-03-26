@@ -35,6 +35,10 @@ export const EMPLOYEE_FORM_ROLE_OPTIONS = [
   { value: "Worker", label: "Nhân viên" },
 ];
 
+export const EMPLOYEE_CREATE_ROLE_OPTIONS = EMPLOYEE_FORM_ROLE_OPTIONS.filter(
+  (roleOption) => roleOption.value !== "Owner"
+);
+
 export const WORKER_SKILL_LABELS = {
   Cat: "Cắt",
   Cắt: "Cắt",

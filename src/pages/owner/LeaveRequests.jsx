@@ -43,6 +43,20 @@ const STATUS_MAP = {
     text: "text-rose-700",
     border: "border-rose-200",
   },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    border: "border-slate-200",
+  },
 };
 
 function StatusBadge({ status }) {
@@ -160,6 +174,8 @@ export default function LeaveRequests() {
       pending: items.filter((item) => item.status === "pending").length,
       approved: items.filter((item) => item.status === "approved").length,
       rejected: items.filter((item) => item.status === "rejected").length,
+      cancelRequested: items.filter((item) => item.status === "cancel_requested").length,
+      cancelled: items.filter((item) => item.status === "cancelled").length,
     }),
     [items, totalCount]
   );
@@ -320,12 +336,14 @@ export default function LeaveRequests() {
                     }}
                     className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   >
-                    <option value="all">Tất cả</option>
-                    <option value="pending">Chờ duyệt</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="rejected">Từ chối</option>
-                  </select>
-                </label>
+                  <option value="all">Tất cả</option>
+                  <option value="pending">Chờ duyệt</option>
+                  <option value="approved">Đã duyệt</option>
+                  <option value="rejected">Từ chối</option>
+                  <option value="cancel_requested">Chờ hủy</option>
+                  <option value="cancelled">Đã hủy</option>
+                </select>
+              </label>
 
                 <label className="relative block">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Từ ngày</span>
@@ -403,6 +421,7 @@ export default function LeaveRequests() {
                                 Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
                               </div>
                               {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
+                              {item.cancelContent ? <div className="mt-1 text-xs text-slate-500">Lý do hủy: {item.cancelContent}</div> : null}
                             </td>
                             <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
                             <td className="px-5 py-4 align-top text-sm text-slate-700">

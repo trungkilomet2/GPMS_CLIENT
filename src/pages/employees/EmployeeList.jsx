@@ -138,7 +138,9 @@ export default function EmployeeList() {
           ? await WorkerService.getEmployeeDirectoryByPmScope({
               pageSize: 100,
             })
-          : await WorkerService.getAllEmployees();
+          : await WorkerService.getEmployeeDirectory({
+              pageSize: 100,
+            });
         if (!mounted) return;
 
         setEmployees(response?.data ?? []);
