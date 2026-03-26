@@ -186,7 +186,7 @@ export function OrderFormSections({
           <p className="text-[11px] text-slate-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx, .png, .jpg, .jpeg - tối đa 10MB/file</p>
 
           {templateItems.length > 0 ? (
-            <div className="mt-3 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
+            <div className="mt-3 max-h-112 space-y-3 overflow-y-auto pr-1">
               {templateItems.map((item, idx) => (
                 <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                   <div className="mb-3 flex items-center justify-between gap-3">
@@ -283,11 +283,28 @@ export function OrderFormSections({
           <textarea
             name="note"
             rows={3}
+            maxLength={255}
             value={orderData.note}
             onChange={onOrderChange}
             placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
-            className="block w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-slate-50/30 transition-all outline-none"
+            className={`block w-full border rounded-xl px-4 py-3 focus:ring-2 bg-slate-50/30 transition-all outline-none
+              ${errors.note
+                ? 'border-red-500 focus:ring-red-100'
+                : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
+              }`}
           />
+          <div className="flex justify-between items-center mt-1">
+            {errors.note ? (
+              <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                <AlertCircle size={12} /> {errors.note}
+              </div>
+            ) : (
+              <span />
+            )}
+            <span className={`text-[11px] ${(orderData.note?.length ?? 0) > 240 ? 'text-amber-500 font-semibold' : 'text-slate-400'}`}>
+              {orderData.note?.length ?? 0}/255
+            </span>
+          </div>
         </div>
 
         <div className="flex gap-4 justify-end pt-6 border-t border-slate-100">

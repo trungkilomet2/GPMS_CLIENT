@@ -1,6 +1,6 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Info, Package, FileText, Download } from "lucide-react";
+import { ArrowLeft, Info, Package, FileText, Download, AlertTriangle } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
@@ -104,6 +104,7 @@ export default function ProductionDetail() {
 
   const [production, setProduction] = useState(null);
   const [customerProfile, setCustomerProfile] = useState(null);
+  const [rejectReason, setRejectReason] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -202,6 +203,36 @@ export default function ProductionDetail() {
     };
   }, [customerId]);
 
+  useEffect(() => {
+    let active = true;
+
+    const fetchRejectReason = async () => {
+      if (!production?.productionId) return;
+      const rejLabel = getProductionStatusLabel(2); // "Từ Chối"
+      const isRejected =
+        String(production.status ?? "").trim().toLowerCase() ===
+        String(rejLabel).trim().toLowerCase();
+      console.debug("[rejectReason] status:", production.status, "isRejected:", isRejected);
+      if (!isRejected) {
+        if (active) setRejectReason(null);
+        return;
+      }
+      try {
+        const res = await ProductionService.getProductionRejectReason(production.productionId);
+        // axiosClient interceptor already returns response.data, so res = API body = {data: {...}}
+        const data = res?.data ?? null;
+        console.debug("[rejectReason] data:", data);
+        if (active) setRejectReason(data);
+      } catch (err) {
+        console.error("[rejectReason] fetch error:", err);
+        if (active) setRejectReason(null);
+      }
+    };
+
+    fetchRejectReason();
+    return () => { active = false; };
+  }, [production?.productionId, production?.status]);
+
   if (loading) {
     return (
       <OwnerLayout>
@@ -233,13 +264,13 @@ export default function ProductionDetail() {
     return type.includes("hard");
   });
   const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
-  const approvedStatusLabel = getProductionStatusLabel(4);
-  const rejectedStatusLabel = getProductionStatusLabel(2);
+  const approvedStatusLabel = getProductionStatusLabel(4); // "Chấp Nhận"
+  const rejectedStatusLabel = getProductionStatusLabel(2); // "Từ Chối"
   const isApprovedProduction =
-    String(getProductionStatusLabel(production.status)).trim().toLowerCase() ===
+    String(production.status ?? "").trim().toLowerCase() ===
     String(approvedStatusLabel).trim().toLowerCase();
   const isRejectedProduction =
-    String(getProductionStatusLabel(production.status)).trim().toLowerCase() ===
+    String(production.status ?? "").trim().toLowerCase() ===
     String(rejectedStatusLabel).trim().toLowerCase();
   const isActionLocked = isApprovedProduction || isRejectedProduction;
   const productionStartDateText = formatOrderDate(production.pStartDate);
@@ -322,11 +353,10 @@ export default function ProductionDetail() {
                     type="button"
                     onClick={() => setIsApproveModalOpen(true)}
                     disabled={isActionLocked}
-                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
-                      isActionLocked
-                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    }`}
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${isActionLocked
+                      ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      }`}
                   >
                     Chấp nhận
                   </button>
@@ -334,11 +364,10 @@ export default function ProductionDetail() {
                     type="button"
                     onClick={() => setIsReasonModalOpen(true)}
                     disabled={isActionLocked}
-                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${
-                      isActionLocked
-                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                        : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                    }`}
+                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${isActionLocked
+                      ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                      : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                      }`}
                   >
                     Từ chối
                   </button>
@@ -366,6 +395,29 @@ export default function ProductionDetail() {
               </p>
             </div>
           </div>
+
+          {isRejectedProduction && rejectReason && (
+            <div className="rounded-2xl border border-red-200 bg-red-50/80 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-red-100 bg-red-100/60 flex items-center gap-2 text-red-700">
+                <AlertTriangle size={16} />
+                <h2 className="text-xs font-bold uppercase tracking-widest">Lý do từ chối</h2>
+              </div>
+              <div className="p-5">
+                <p className="text-sm text-red-800 leading-relaxed italic">
+                  {rejectReason.reason || "Không có lý do được ghi nhận."}
+                </p>
+                {rejectReason.createdAt && (
+                  <p className="mt-3 text-[11px] text-red-400 font-medium">
+                    Thời gian từ chối:{" "}
+                    {new Date(rejectReason.createdAt).toLocaleString("vi-VN", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
