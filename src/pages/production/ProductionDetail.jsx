@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download, AlertTriangle } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -11,7 +11,12 @@ import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import SuccessModal from "@/components/SuccessModal";
 import ProductionService from "@/services/ProductionService";
 import { STATUS_STYLES as PRODUCTION_STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
+import ProductionPartService from "@/services/ProductionPartService";
+import CuttingNotebookService from "@/services/CuttingNotebookService";
+import { toast } from "react-toastify";
+import Pagination from "@/components/Pagination";
+import { Link } from "react-router-dom";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
 import "@/styles/homepage.css";
@@ -107,10 +112,18 @@ export default function ProductionDetail() {
   const [rejectReason, setRejectReason] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [steps, setSteps] = useState([]);
+  const [totalParts, setTotalParts] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageSize = 10;
+  const [reportedErrorCount, setReportedErrorCount] = useState(0);
+  const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
 
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
-  const isOwner = hasAnyRole(roleValue, ["owner"]);
+  const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+  const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
+  const isWorker = hasAnyRole(roleValue, ["worker", "kcs", "team leader"]);
   const customerId = getOrderCustomerId(production?.order);
 
   useEffect(() => {
@@ -233,6 +246,64 @@ export default function ProductionDetail() {
     return () => { active = false; };
   }, [production?.productionId, production?.status]);
 
+  useEffect(() => {
+    let active = true;
+    const fetchParts = async () => {
+      if (!production?.productionId) return;
+      try {
+        const res = await ProductionPartService.getPartsByProduction(production.productionId, {
+          PageIndex: 0,
+          PageSize: 50,
+          SortColumn: "Name",
+          SortOrder: "ASC",
+        });
+        if (!active) return;
+        const list = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+        setSteps(list);
+        setTotalParts(list.length);
+      } catch (err) { console.error("Lỗi tải công đoạn:", err); }
+    };
+    fetchParts();
+    return () => { active = false; };
+  }, [production?.productionId]);
+
+  useEffect(() => {
+    if (!production?.productionId) return;
+    try {
+      const raw = localStorage.getItem("gpms-error-reports");
+      if (!raw) return setReportedErrorCount(0);
+      const list = JSON.parse(raw);
+      const count = (Array.isArray(list) ? list : []).filter(i => String(i?.productionId) === String(production.productionId)).length;
+      setReportedErrorCount(count);
+    } catch { setReportedErrorCount(0); }
+  }, [production?.productionId]);
+
+  const pageData = useMemo(() => {
+    const start = pageIndex * pageSize;
+    return steps.slice(start, start + pageSize);
+  }, [steps, pageIndex]);
+
+  const totalCpu = steps.reduce((sum, s) => sum + (Number(s.cpu) || 0), 0);
+  const progressSummary = useMemo(() => {
+    const total = totalParts || steps?.length || 0;
+    const today = new Date();
+    const completedCount = steps.filter((row) => {
+      if (row.status === "Hoàn thành") return true;
+      const raw = row.endDate;
+      if (!raw || raw === "-") return false;
+      const parsed = new Date(raw);
+      return Number.isFinite(parsed.getTime()) && parsed <= today;
+    }).length;
+    const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+    return { completed: completedCount, total, percent };
+  }, [steps, totalParts]);
+
+  const order = production?.order || {};
+  const isApprovedProduction = production?.status && !["Chờ Xét Duyệt", "Từ Chối", "-"].includes(production.status);
+  const softTemplates = Array.isArray(order.templates) ? order.templates.filter(t => t.type !== "HARD") : [];
+  const hardCopyTotal = Array.isArray(order.templates) ? order.templates.filter(t => t.type === "HARD").length : 0;
+  const progressPercent = steps.length > 0 ? Math.round((steps.filter(s => s.status === "Hoàn thành").length / steps.length) * 100) : 0;
+
   if (loading) {
     return (
       <OwnerLayout>
@@ -253,26 +324,10 @@ export default function ProductionDetail() {
     );
   }
 
-  const order = production.order || {};
-  const templates = order.templates ?? order.template ?? order.files ?? [];
-  const softTemplates = templates.filter((t) => {
-    const type = (t.type ?? "").toString().toLowerCase();
-    return type.includes("soft") || !!t.file || !!t.url;
-  });
-  const hardTemplates = templates.filter((t) => {
-    const type = (t.type ?? "").toString().toLowerCase();
-    return type.includes("hard");
-  });
-  const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
-  const approvedStatusLabel = getProductionStatusLabel(4); // "Chấp Nhận"
   const rejectedStatusLabel = getProductionStatusLabel(2); // "Từ Chối"
-  const isApprovedProduction =
-    String(production.status ?? "").trim().toLowerCase() ===
-    String(approvedStatusLabel).trim().toLowerCase();
-  const isRejectedProduction =
-    String(production.status ?? "").trim().toLowerCase() ===
-    String(rejectedStatusLabel).trim().toLowerCase();
+  const isRejectedProduction = String(production?.status ?? "").trim().toLowerCase() === String(rejectedStatusLabel).trim().toLowerCase();
   const isActionLocked = isApprovedProduction || isRejectedProduction;
+
   const productionStartDateText = formatOrderDate(production.pStartDate);
   const productionEndDateText = formatOrderDate(production.pEndDate);
   const productionDateRangeText =
@@ -318,6 +373,62 @@ export default function ProductionDetail() {
     }
   };
 
+  const handleOpenCuttingBook = async () => {
+    if (!production?.productionId || checkingCuttingBook) return;
+    setCheckingCuttingBook(true);
+    try {
+      navigate("/worker/cutting-book", {
+        state: {
+          productionId: production.productionId,
+          production,
+          product: { ...production.order, productName: production.order.orderName },
+          openCuttingBookMode: "list", // Default to list view
+          filterByProduction: true,
+        },
+      });
+    } finally { setCheckingCuttingBook(false); }
+  };
+
+  const handleApprovePlan = async () => {
+    if (!window.confirm("Chấp nhận kế hoạch này?")) return;
+    try {
+      await ProductionService.approveProductionPlan(production.productionId);
+      toast.success("Đã duyệt kế hoạch");
+      window.location.reload();
+    } catch (err) { toast.error("Không thể duyệt kế hoạch"); }
+  };
+
+  const handleRequestPlanUpdate = async () => {
+    if (!window.confirm("Yêu cầu sửa lại kế hoạch?")) return;
+    try {
+      await ProductionService.requestPlanUpdate(production.productionId);
+      toast.success("Đã gửi yêu cầu sửa");
+      window.location.reload();
+    } catch (err) { toast.error("Không thể gửi yêu cầu"); }
+  };
+
+  const handleSubmitPlan = async () => {
+    if (steps.length === 0) {
+      toast.warn("Vui lòng tạo ít nhất một công đoạn trước khi gửi duyệt.");
+      return;
+    }
+    if (!window.confirm("Gửi kế hoạch này cho Owner duyệt?")) return;
+    try {
+      await ProductionService.submitProductionPlan(production.productionId);
+      toast.success("Đã gửi duyệt kế hoạch.");
+      window.location.reload();
+    } catch (err) {
+      toast.error("Không thể gửi duyệt kế hoạch.");
+    }
+  };
+
+  const statusName = String(production?.status ?? "").trim();
+  const isPendingApproval = statusName === "Chờ Xét Duyệt";
+  const isAccepted = statusName === "Chấp Nhận";
+  const isPendingPlanApproval = statusName === "Chờ Xét Duyệt Kế Hoạch";
+  const isNeedUpdatePlan = statusName === "Cần Chỉnh Sửa Kế Hoạch";
+  const isInProduction = statusName === "Đang Sản Xuất";
+
   return (
     <OwnerLayout>
       <div className="leave-page leave-list-page">
@@ -338,37 +449,95 @@ export default function ProductionDetail() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {isOwner ? (
-                <button type="button"
-                  onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
-                  className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
-                >
-                  Chỉnh sửa
-                </button>
-              ) : (
+              {/* Nút cho Owner duyệt ĐƠN sản xuất ban đầu */}
+              {isPM && isPendingApproval && (
                 <>
                   <button type="button"
                     onClick={() => setIsApproveModalOpen(true)}
-                    disabled={isActionLocked}
-                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${isActionLocked
-                      ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      }`}
+                    className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
                   >
-                    Chấp nhận
+                    Chấp nhận đơn
                   </button>
-                  <button
-                    type="button"
+                  <button type="button"
                     onClick={() => setIsReasonModalOpen(true)}
-                    disabled={isActionLocked}
-                    className={`rounded-xl border px-4 py-2 text-xs font-bold transition ${isActionLocked
-                      ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                      : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                      }`}
+                    className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
                   >
-                    Từ chối
+                    Từ chối đơn
                   </button>
                 </>
+              )}
+
+              {/* Nút cho Owner duyệt KẾ HOẠCH sau khi PM gửi */}
+              {isOwner && isPendingPlanApproval && (
+                <>
+                  <button type="button"
+                    onClick={handleApprovePlan}
+                    className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-sm"
+                  >
+                    Duyệt KH
+                  </button>
+                  <button type="button"
+                    onClick={handleRequestPlanUpdate}
+                    className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Yêu cầu sửa KH
+                  </button>
+                </>
+              )}
+
+              {/* Nút cho PM lập kế hoạch và gửi duyệt */}
+              {(isPM || isOwner) && (isAccepted || isNeedUpdatePlan) && (
+                <>
+                  <Link
+                    to="/production-plan/create"
+                    state={{ productionId: production.productionId, steps }}
+                    className="rounded-xl border border-emerald-600 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                  >
+                    {steps.length > 0 ? "Chỉnh sửa công đoạn" : "Thiết kế công đoạn"}
+                  </Link>
+                  {steps.length > 0 && (
+                    <button type="button"
+                      onClick={handleSubmitPlan}
+                      className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-md"
+                    >
+                      Gửi duyệt kế hoạch
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* Các nút khi đã duyệt kế hoạch hoặc đang sản xuất */}
+              {(isPM || isOwner || isWorker) && (isInProduction || isPendingPlanApproval || isAccepted) && (
+                <button type="button"
+                  onClick={handleOpenCuttingBook}
+                  disabled={checkingCuttingBook}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {checkingCuttingBook ? "Đang kiểm tra..." : "Sổ cắt"}
+                </button>
+              )}
+
+              {(isPM || isOwner) && (isInProduction || isPendingPlanApproval) && (
+                <Link
+                  to={`/production-plan/assign/${production.productionId}`}
+                  state={{ production, product: { ...order, productName: order.orderName }, steps }}
+                  className="rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-900"
+                >
+                  {steps.some(s => Array.isArray(s.assignees) && s.assignees.length > 0)
+                    ? "Chỉnh sửa phân công"
+                    : "Phân công lao động"}
+                </Link>
+              )}
+
+              {/* Nút Sửa chung cho Owner */}
+              {isOwner && (
+                <button type="button"
+                  onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-slate-50"
+                  title="Chỉnh sửa thông tin chung"
+                >
+                  <FileText size={18} />
+                </button>
               )}
             </div>
           </div>
@@ -471,6 +640,101 @@ export default function ProductionDetail() {
                   emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
                 />
               </div>
+
+              {isApprovedProduction && (
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
+                    <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-4">
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                        <div className="text-[10px] font-bold uppercase text-slate-400">Lỗi báo cáo</div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
+                          <Link to={`/production/${production.productionId}/errors`} className="text-[10px] font-bold text-emerald-700 hover:underline">Chi tiết</Link>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                        <div className="text-[10px] font-bold uppercase text-slate-400">Hiệu suất</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                        <div className="text-[10px] font-bold uppercase text-slate-400">Hoàn thành</div>
+                        <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.completed}/{progressSummary.total}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                        <div className="text-[10px] font-bold uppercase text-slate-400">Lương công đoạn</div>
+                        <div className="mt-1 text-lg font-bold text-emerald-700">{totalCpu.toLocaleString("vi-VN")} đ</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                      <h2 className="text-xs font-bold uppercase tracking-widest text-slate-600">Danh sách công đoạn & nhiệm vụ</h2>
+                      <div className="flex gap-2">
+                        <button onClick={handleApprovePlan} className="px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-full hover:bg-emerald-200 transition">Duyệt KH</button>
+                        <button onClick={handleRequestPlanUpdate} className="px-3 py-1 bg-rose-100 text-rose-700 text-[10px] font-bold rounded-full hover:bg-rose-200 transition">Sửa KH</button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm divide-y divide-slate-100">
+                        <thead className="bg-slate-50/50">
+                          <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <th className="px-4 py-3 text-left">STT</th>
+                            <th className="px-4 py-3 text-left">Tên công đoạn</th>
+                            <th className="px-4 py-3 text-left">Thợ được giao</th>
+                            <th className="px-4 py-3 text-left">Bắt đầu</th>
+                            <th className="px-4 py-3 text-left">Kết thúc</th>
+                            <th className="px-4 py-3 text-right">Giá/SP</th>
+                            <th className="px-4 py-3 text-center">Trạng thái</th>
+                            <th className="px-4 py-3 text-center">Thao tác</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {pageData.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 text-slate-400">{(pageIndex * pageSize + idx + 1).toString().padStart(2, '0')}</td>
+                              <td className="px-4 py-3 font-semibold text-slate-900">{row.partName || row.name}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {Array.isArray(row.assignees) && row.assignees.length > 0 ? (
+                                    row.assignees.map((w, wIdx) => (
+                                      <span key={wIdx} className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-100">
+                                        {w.fullName || w.name || w.id}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-300 italic text-[11px]">Chưa giao</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-slate-600">{formatOrderDate(row.startDate)}</td>
+                              <td className="px-4 py-3 text-slate-600">{formatOrderDate(row.endDate)}</td>
+                              <td className="px-4 py-3 text-right font-bold text-slate-900">{Number(row.cpu).toLocaleString('vi-VN')} đ</td>
+                              <td className="px-4 py-3 text-center text-[10px] font-bold uppercase">
+                                <span className={`px-2 py-1 rounded-full ${row.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                  {row.status || 'Đang chờ'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <Link to="/worker/error-report" state={{ assignment: { ...row, productionId: production.productionId, orderName: order.orderName } }} className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline">Báo lỗi</Link>
+                              </td>
+                            </tr>
+                          ))}
+                          {steps.length === 0 && (
+                            <tr><td colSpan="8" className="py-10 text-center text-slate-400 italic">Chưa lập kế hoạch công đoạn</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {totalParts > pageSize && (
+                      <div className="p-4 border-t border-slate-100">
+                        <Pagination currentPage={pageIndex + 1} totalPages={Math.ceil(totalParts / pageSize)} onPageChange={(p) => setPageIndex(p - 1)} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-6">

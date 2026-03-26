@@ -204,34 +204,64 @@ export function OrderFormSections({
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-600">
-                        Tên mẫu thiết kế
+                      <label className="mb-1 block text-xs font-bold text-slate-700">
+                        Tên mẫu thiết kế <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
+                        maxLength={100}
                         value={item.templateName ?? ''}
                         onChange={(e) => onTemplateMetaChange(idx, 'templateName', e.target.value)}
                         placeholder="Tên mẫu thiết kế"
-                        className="w-full border rounded-lg px-3 py-2 text-sm outline-none border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition
+                          ${errors.templates?.[idx]?.templateName
+                            ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+                          }`}
                       />
-                      <p className="mt-1 text-[11px] text-slate-500">{TEMPLATE_NAME_HINT}</p>
+                      <div className="mt-1 flex justify-between items-center">
+                        <p className="text-[11px] text-slate-500">Ví dụ: Rập thân trước, Bảng size...</p>
+                        <span className={`text-[10px] ${(item.templateName?.length ?? 0) > 90 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                          {item.templateName?.length ?? 0}/100
+                        </span>
+                      </div>
+                      {errors.templates?.[idx]?.templateName && (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                          <AlertCircle size={12} /> {errors.templates[idx].templateName}
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-slate-600">
+                      <label className="mb-1 block text-xs font-bold text-slate-700">
                         Ghi chú
                       </label>
                       <input
                         type="text"
+                        maxLength={100}
                         value={item.note ?? ''}
                         onChange={(e) => onTemplateMetaChange(idx, 'note', e.target.value)}
-                        placeholder="Ví dụ: Khổ A4, in 2 màu, phiên bản V2, ưu tiên đường may cổ..."
-                        className="w-full border rounded-lg px-3 py-2 text-sm outline-none border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                        placeholder="Khổ A4, in 2 màu..."
+                        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition
+                          ${errors.templates?.[idx]?.note
+                            ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+                          }`}
                       />
-                      <p className="mt-1 text-[11px] text-slate-500">{TEMPLATE_NOTE_HINT}</p>
+                      <div className="mt-1 flex justify-between items-center">
+                        <p className="text-[11px] text-slate-500">Bổ sung yêu cầu kỹ thuật.</p>
+                        <span className={`text-[10px] ${(item.note?.length ?? 0) > 90 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                          {item.note?.length ?? 0}/100
+                        </span>
+                      </div>
+                      {errors.templates?.[idx]?.note && (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                          <AlertCircle size={12} /> {errors.templates[idx].note}
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    Loại tự nhận diện: <span className="font-semibold text-slate-700">{item.type === 'IMAGE' ? 'Ảnh' : 'File'}</span>
+                  <div className="mt-2 text-[10px] text-slate-400 italic">
+                    Loại file: <span className="font-semibold text-slate-500">{item.type === 'IMAGE' ? 'Hình ảnh' : 'Tài liệu'}</span>
                   </div>
                 </div>
               ))}
@@ -272,6 +302,7 @@ export function OrderFormSections({
               emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
               onEdit={onEditMaterial}
               onDelete={onDeleteMaterial}
+              errors={errors.materialsList}
             />
           </div>
         </div>

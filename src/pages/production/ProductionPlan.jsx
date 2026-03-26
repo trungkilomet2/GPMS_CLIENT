@@ -6,6 +6,7 @@ import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import { getStoredUser } from "@/lib/authStorage";
 import SuccessModal from "@/components/SuccessModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -272,6 +273,8 @@ export default function ProductionPlan() {
   const [savedPlanAt, setSavedPlanAt] = useState("");
   const [savingParts, setSavingParts] = useState(false);
   const [savePartsMessage, setSavePartsMessage] = useState({ type: "", text: "" });
+  const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
+  const [hasExistingParts, setHasExistingParts] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState({
     partName: "",
@@ -338,6 +341,40 @@ export default function ProductionPlan() {
     fetchList();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (selectedProductionId) {
+      const fetchParts = async () => {
+        try {
+          const res = await ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 });
+          if (active && res.data && Array.isArray(res.data) && res.data.length > 0) {
+            setHasExistingParts(true);
+            setRows(prev => {
+              if (prev.length === 0) {
+                return res.data.map((s, idx) => ({
+                  ppId: 2000 + idx,
+                  productionId: Number(selectedProductionId),
+                  partName: s.partName,
+                  cpu: String(s.cpu || ""),
+                  startDate: s.startDate || "",
+                  endDate: s.endDate || "",
+                  ppsId: s.id || s.partId || ""
+                }));
+              }
+              return prev;
+            });
+          } else if (active) {
+            setHasExistingParts(false);
+          }
+        } catch (err) {
+          console.error("Error fetching existing parts:", err);
+        }
+      };
+      fetchParts();
+    }
+    return () => { active = false; };
+  }, [selectedProductionId]);
 
   useEffect(() => {
     let active = true;
@@ -509,10 +546,18 @@ export default function ProductionPlan() {
     setSavedPlanAt(new Date().toLocaleString("vi-VN"));
   };
 
-  const saveSteps = async () => {
+  const saveSteps = async (force = false) => {
     if (!selectedProductionId || !rows.length || savingParts) return;
+
+    // Show warning if parts exist and it's NOT a forced save
+    if (hasExistingParts && !force) {
+      setIsConfirmSaveOpen(true);
+      return;
+    }
+
     try {
       setSavingParts(true);
+      setIsConfirmSaveOpen(false);
       setSavePartsMessage({ type: "", text: "" });
       const productionId = Number(selectedProductionId);
       const payload = {
@@ -525,6 +570,7 @@ export default function ProductionPlan() {
       };
 
       await ProductionPartService.createParts(productionId, payload);
+      setHasExistingParts(true);
       setSavePartsMessage({ type: "success", text: "Đã lưu công đoạn." });
       setIsSuccessModalOpen(true);
       savePlan();
@@ -1137,6 +1183,13 @@ export default function ProductionPlan() {
         title="Lưu thành công"
         description="Kế hoạch sản xuất đã được lưu vào hệ thống."
         primaryLabel="OK"
+      />
+      <ConfirmModal
+        isOpen={isConfirmSaveOpen}
+        title="Xác nhận lưu lại kế hoạch"
+        description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại có thể tạo thêm các bản ghi trùng lặp (không ghi đè). Bạn có chắc chắn muốn tiếp tục lưu không?"
+        onConfirm={() => saveSteps(true)}
+        onClose={() => setIsConfirmSaveOpen(false)}
       />
     </OwnerLayout>
   );

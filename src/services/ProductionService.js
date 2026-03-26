@@ -38,6 +38,9 @@ const ProductionService = {
   requestPlanUpdate(id) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.NEED_UPDATE_PLAN(id));
   },
+  submitProductionPlan(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.SUBMIT_PLAN(id));
+  },
 };
 
 export default ProductionService;

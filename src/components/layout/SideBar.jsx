@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -27,8 +27,7 @@ const ADMIN_NAV_ITEMS = [
 const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
-  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false, allowedRoles: ["Owner", "PM"] },
+  { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, allowedRoles: ["Owner"] },
@@ -85,6 +84,7 @@ export default function Sidebar() {
     return true;
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
+  const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
 
   useEffect(() => {
     try {
@@ -142,7 +142,7 @@ export default function Sidebar() {
               to={to}
               title={label}
               className={({ isActive }) => {
-                const isForcedActive = to === "/orders/owner" && isOrdersSection;
+                const isForcedActive = (to === "/orders/owner" && isOrdersSection) || (to === "/production" && isProductionSection);
                 const active = isActive || isForcedActive;
                 return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
               }}

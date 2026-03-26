@@ -43,9 +43,8 @@ function SummaryCard({ label, value, icon, active, onClick, theme = 'emerald' })
     <button
       type="button"
       onClick={onClick}
-      className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-        active ? themeStyles.wrapper : 'border-slate-200'
-      }`}
+      className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${active ? themeStyles.wrapper : 'border-slate-200'
+        }`}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
@@ -445,6 +444,7 @@ export default function Orders({
             />
           )}
         </div>
+        <script src="https://messenger.svc.chative.io/static/v1.0/channels/s90b3b96e-842b-47ac-9482-1335b0ea5141/messenger.js?mode=livechat" defer="defer"></script>
       </div>
     </OwnerLayout>
   );

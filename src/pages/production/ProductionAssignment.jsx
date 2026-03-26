@@ -8,6 +8,7 @@ import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import { toast } from "react-toastify";
+import ConfirmModal from "@/components/ConfirmModal";
 
 export default function ProductionAssignment() {
   const { id } = useParams();
@@ -30,6 +31,8 @@ export default function ProductionAssignment() {
   const [isSaving, setIsSaving] = useState(false);
   const [fetchedProduction, setFetchedProduction] = useState(null);
   const [backendParts, setBackendParts] = useState([]); // Real parts with real IDs from backend
+  const [initialAssignments, setInitialAssignments] = useState({}); // To track changes
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const loadingWorkers = workers.length === 0 && !workerError;
 
   // Fetch production detail from API when pmId is missing (from incoming state or directly by URL)
@@ -102,7 +105,7 @@ export default function ProductionAssignment() {
     let active = true;
     const fetchParts = async () => {
       try {
-        const res = await ProductionPartService.getPartsByProduction(selectedProductionId);
+        const res = await ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 });
         if (!active) return;
         const payload = res?.data?.data ?? res?.data ?? [];
         const list = Array.isArray(payload) ? payload : [];
@@ -119,9 +122,26 @@ export default function ProductionAssignment() {
     const sourceSteps = Array.isArray(incoming?.steps) && incoming.steps.length > 0
       ? incoming.steps
       : PLAN_STEPS;
+      
+    // Create a pool of backend parts to track which ones have been matched
+    const availableBackendParts = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
+
     return sourceSteps.map((row, index) => {
-      // Try to match with a real backend part by name or index
-      const realPart = backendParts[index] || backendParts.find(p => p.partName === row.partName || p.name === row.partName);
+      // 1. Try to match by exact name first
+      let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
+      
+      // 2. If no name match, fallback to the same index (assuming order is preserved)
+      if (matchIdx === -1) {
+         matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
+      }
+
+      let realPart = null;
+      if (matchIdx !== -1) {
+        realPart = availableBackendParts[matchIdx];
+        // Remove the matched part so it can't be matched twice
+        availableBackendParts.splice(matchIdx, 1);
+      }
+
       return {
         ...row,
         ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
@@ -216,18 +236,44 @@ export default function ProductionAssignment() {
   useEffect(() => {
     setAssignments((prev) => {
       const next = { ...prev };
+      const base = { ...initialAssignments };
+      let initialized = false;
+
+      // Create a pool of backend parts to ensure 1-to-1 matching
+      const pool = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
+
       rows.forEach((row, index) => {
         const existing = next[row.ppId]?.workerIds || [];
         if (existing.length > 0) return;
-        const realPart =
-          backendParts.find((p) => p?.id === row.realPartId) ||
-          backendParts[index] ||
-          backendParts.find((p) => p?.partName === row.partName || p?.name === row.partName);
+        
+        // 1. Match by realPartId
+        let matchIdx = pool.findIndex(p => p.id === row.realPartId);
+        
+        // 2. Match by exact name
+        if (matchIdx === -1) {
+            matchIdx = pool.findIndex(p => p.partName === row.partName || p.name === row.partName);
+        }
+        
+        // 3. Match by original preserved index
+        if (matchIdx === -1) {
+            matchIdx = pool.findIndex(p => p.originalIndex === index);
+        }
+
+        let realPart = null;
+        if (matchIdx !== -1) {
+            realPart = pool[matchIdx];
+            pool.splice(matchIdx, 1);
+        }
+
         const initialIds = extractAssignedWorkerIds(realPart, workers);
-        next[row.ppId] = {
-          workerIds: initialIds,
-        };
+        next[row.ppId] = { workerIds: initialIds };
+        base[row.ppId] = { workerIds: [...initialIds] };
+        initialized = true;
       });
+
+      if (initialized) {
+        setInitialAssignments(base);
+      }
       return next;
     });
     if (!activeRowId && rows.length > 0) {
@@ -349,43 +395,83 @@ export default function ProductionAssignment() {
     return day >= from && day <= to;
   };
 
-  const handleToggleEdit = async () => {
+  const handleToggleEdit = () => {
     if (isSaving) return;
     if (isEditing) {
-      // User clicked Save Edit
-      try {
-        const rowsWithRealId = rows.filter(row => row.realPartId != null);
-        if (rowsWithRealId.length === 0) {
-          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
-          return;
-        }
-        setIsSaving(true);
-        const results = await Promise.allSettled(
-          rowsWithRealId.map((row) => {
-            const selectedWorkerIds = (assignments[row.ppId]?.workerIds || []).map(Number);
-            return ProductionPartService.updateAssignWorker(row.realPartId, { workerIds: selectedWorkerIds });
-          })
-        );
-        const failed = results
-          .map((res, idx) => ({ res, row: rowsWithRealId[idx] }))
-          .filter((item) => item.res.status === "rejected");
-        if (failed.length > 0) {
-          const first = failed[0]?.row;
-          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
-          return;
-        }
-        toast.success("Lưu dữ liệu phân công thành công!");
-        setIsEditing(false);
-      } catch (err) {
-        console.error(err);
-        setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi khi lưu phân công thợ.");
-        toast.error(err?.response?.data?.detail || err?.response?.data?.message || "Phát sinh lỗi khi lưu phân công.");
-      } finally {
-        setIsSaving(false);
-      }
+      // User clicked Save Edit -> show confirm modal
+      setIsConfirmOpen(true);
     } else {
       setIsEditing(true);
       setWorkerError(null);
+    }
+  };
+
+  const handleSaveAssignments = async () => {
+    setIsConfirmOpen(false);
+    setIsSaving(true);
+    try {
+      // 1. Identify rows that have real IDs and have CHANGED (Dirty check)
+      console.log("=== START SAVE ===");
+      console.log("Total rows checking:", rows.length);
+      const dirtyRows = rows.filter(row => {
+        if (row.realPartId == null) {
+          console.warn("Row skipped because realPartId is null:", row.partName);
+          return false;
+        }
+        
+        const currentIds = [...(assignments[row.ppId]?.workerIds || [])].sort().join(',');
+        const originalIds = [...(initialAssignments[row.ppId]?.workerIds || [])].sort().join(',');
+        
+        const isDirty = currentIds !== originalIds;
+        console.log(`Row: ${row.partName} | realPartId: ${row.realPartId} | Current: [${currentIds}] | Original: [${originalIds}] | isDirty: ${isDirty}`);
+        
+        return isDirty;
+      });
+
+      console.log("Dirty rows to save:", dirtyRows.map(r => r.partName));
+
+      if (dirtyRows.length === 0) {
+        setIsEditing(false);
+        toast.success("Dữ liệu phân công đã được cập nhật."); // Give a positive feedback even if no API call was needed
+        return;
+      }
+
+
+      // 2. Save only dirty rows
+      const results = await Promise.allSettled(
+        dirtyRows.map((row) => {
+          const selectedWorkerIds = (assignments[row.ppId]?.workerIds || []).map(Number);
+          // Remove duplicates if any
+          const uniqueIds = Array.from(new Set(selectedWorkerIds));
+          return ProductionPartService.updateAssignWorker(row.realPartId, { workerIds: uniqueIds });
+        })
+      );
+
+      const failed = results
+        .map((res, idx) => ({ res, row: dirtyRows[idx] }))
+        .filter((item) => item.res.status === "rejected");
+
+      if (failed.length > 0) {
+        const first = failed[0]?.row;
+        toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
+        return;
+      }
+
+      toast.success("Lưu dữ liệu phân công thành công!");
+      
+      // Update initial state to match current assignments
+      const updatedBase = {};
+      Object.keys(assignments).forEach(key => {
+        updatedBase[key] = { workerIds: [...(assignments[key]?.workerIds || [])] };
+      });
+      setInitialAssignments(updatedBase);
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi khi lưu phân công thợ.");
+      toast.error("Phát sinh lỗi khi lưu phân công.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -402,7 +488,11 @@ export default function ProductionAssignment() {
                 <ArrowLeft size={18} />
               </button>
               <div className="flex flex-col gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Giao việc cho thợ</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {Object.values(initialAssignments).some(v => v.workerIds.length > 0) 
+                    ? "Chỉnh sửa phân công" 
+                    : "Phân công lao động"}
+                </h1>
                 <p className="text-slate-600">Phân công theo công đoạn đã lập trong kế hoạch sản xuất.</p>
               </div>
             </div>
@@ -415,7 +505,9 @@ export default function ProductionAssignment() {
                 : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
             >
-              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : "Chỉnh sửa")}
+              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
+                Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
+              ))}
             </button>
           </div>
 
@@ -729,6 +821,13 @@ export default function ProductionAssignment() {
         </div>
       </div>
 
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Xác nhận lưu phân công"
+        description="Bạn có chắc chắn muốn lưu các thay đổi phân công lao động cho đơn sản xuất này không?"
+        onConfirm={handleSaveAssignments}
+        onClose={() => setIsConfirmOpen(false)}
+      />
     </OwnerLayout>
   );
 }

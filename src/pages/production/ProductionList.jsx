@@ -9,6 +9,7 @@ import { userService } from "@/services/userService";
 import { useAuth } from "@/hooks/useAuth";
 import { useProductionList } from "@/hooks/useProductionList";
 import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
+import ProductionPartService from "@/services/ProductionPartService";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 function getPmId(item) {
@@ -32,6 +33,7 @@ export default function ProductionList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [partCounts, setPartCounts] = useState({});
   const pageSize = 10;
 
 
@@ -81,6 +83,36 @@ export default function ProductionList() {
     setSearch("");
     setStatusFilter("all");
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPartCounts = async () => {
+      const productionIds = [...new Set(pageData.map((item) => item.productionId).filter(Boolean))];
+      const pendingIds = productionIds.filter((id) => partCounts[id] === undefined);
+      if (pendingIds.length === 0) return;
+
+      const results = await Promise.all(
+        pendingIds.map(async (id) => {
+          try {
+            const res = await ProductionPartService.getPartsByProduction(id, { PageIndex: 0, PageSize: 1 });
+            const total = res?.data?.recordCount ?? res?.data?.data?.length ?? 0;
+            return [id, total];
+          } catch {
+            return [id, 0];
+          }
+        })
+      );
+      if (isMounted) {
+        setPartCounts((prev) => {
+          const next = { ...prev };
+          results.forEach(([id, total]) => { next[id] = total; });
+          return next;
+        });
+      }
+    };
+    if (pageData.length > 0) fetchPartCounts();
+    return () => { isMounted = false; };
+  }, [pageData, partCounts]);
 
   return (
     <OwnerLayout>
@@ -224,6 +256,7 @@ export default function ProductionList() {
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn hàng</th>
                     <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên đơn</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">PM quản lý</th>
+                    <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Công đoạn</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>
                     <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
@@ -260,6 +293,9 @@ export default function ProductionList() {
                           title={getPmName(item)}
                         >
                           {getPmName(item)}
+                        </td>
+                        <td className="px-3 py-3 text-sm text-center text-slate-700 font-medium">
+                          {partCounts[item.productionId] ?? "--"}
                         </td>
                         <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.startDate ?? item.pStartDate ?? "-"}</td>
                         <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.endDate ?? item.pEndDate ?? "-"}</td>

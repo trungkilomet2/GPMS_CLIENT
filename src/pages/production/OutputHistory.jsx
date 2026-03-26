@@ -1,6 +1,6 @@
-﻿import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ClipboardCheck, Search } from "lucide-react";
+import { ClipboardCheck, Search, TrendingUp, Wallet, Package, Calendar } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
@@ -234,20 +234,34 @@ export default function OutputHistory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
 
+  const currentUserId = String(user?.id || user?.userId || "");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return MOCK_OUTPUTS.filter((item) => {
+      // Logic for Worker: Only show own records
+      if (primaryRole === "worker") {
+        const itemUserId = String(item.userId || "");
+        if (currentUserId && itemUserId !== currentUserId) return false;
+      }
+
       const matchQuery =
         !q ||
         String(item.productionId).includes(q) ||
-        String(item.workerName || "").toLowerCase().includes(q) ||
+        (primaryRole !== "worker" && String(item.workerName || "").toLowerCase().includes(q)) ||
         String(item.orderName || "").toLowerCase().includes(q) ||
         String(item.partName || "").toLowerCase().includes(q) ||
         String(item.reportDate || "").toLowerCase().includes(q);
       const matchDate = allDates || !dateFilter || item.reportDate === dateFilter;
       return matchQuery && matchDate;
     });
-  }, [query, dateFilter, allDates]);
+  }, [query, dateFilter, allDates, primaryRole, currentUserId]);
+
+  const stats = useMemo(() => {
+    const totalQty = filtered.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+    const totalVND = filtered.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.cpu) || 0), 0);
+    return { totalQty, totalVND };
+  }, [filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
@@ -279,13 +293,59 @@ export default function OutputHistory() {
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="flex flex-col gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Lịch sử sản lượng</h1>
-                <p className="text-slate-600">Xem lịch sử submit sản lượng của toàn bộ thợ.</p>
+            <div className="flex items-start gap-4">
+              <div className="hidden sm:flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-sm">
+                <TrendingUp size={24} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {primaryRole === "worker" ? "Sản lượng của tôi" : "Lịch sử sản lượng"}
+                </h1>
+                <p className="text-slate-600 text-sm">
+                  {primaryRole === "worker"
+                    ? "Theo dõi tiến độ hoàn thành và thu nhập dự kiến của bạn."
+                    : "Xem lịch sử submit sản lượng của toàn bộ thợ trong xưởng."}
+                </p>
               </div>
             </div>
           </div>
+
+          {/* Stats Section for Worker */}
+          {primaryRole === "worker" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-50/50 transition-transform group-hover:scale-110" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-100">
+                    <Package size={22} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Tổng sản lượng</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-slate-900">{stats.totalQty.toLocaleString("vi-VN")}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase">Cái</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative overflow-hidden rounded-3xl border border-orange-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-orange-50/50 transition-transform group-hover:scale-110" />
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg shadow-orange-100">
+                    <Wallet size={22} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Thu nhập dự kiến</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-slate-900">{stats.totalVND.toLocaleString("vi-VN")}</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase">VND</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid items-end gap-3 lg:grid-cols-[1.3fr_260px_auto]">
@@ -295,7 +355,7 @@ export default function OutputHistory() {
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Tìm tên thợ, mã đơn sản xuất, công đoạn..."
+                  placeholder={primaryRole === "worker" ? "Tìm mã đơn, tên hàng, công đoạn..." : "Tìm tên thợ, mã đơn, công đoạn..."}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
@@ -345,40 +405,64 @@ export default function OutputHistory() {
                 <span className="text-xs font-semibold uppercase">Tổng: {filtered.length}</span>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full divide-y divide-slate-200 table-fixed text-sm">
-                <thead className="leave-table-head">
-                  <tr>
-                    <th className="leave-table-th w-14 px-3 py-3 text-center">STT</th>
-                    <th className="leave-table-th w-28 px-3 py-3 text-left">Đơn sản xuất</th>
-                    <th className="leave-table-th w-48 px-3 py-3 text-left">Đơn hàng</th>
-                    <th className="leave-table-th w-40 px-3 py-3 text-left">Công đoạn</th>
-                    <th className="leave-table-th w-32 px-3 py-3 text-left">Thợ</th>
-                    <th className="leave-table-th w-20 px-3 py-3 text-center">SL</th>
-                    <th className="leave-table-th w-28 px-3 py-3 text-center">Ngày</th>
+            <div className="overflow-x-auto scrollbar-hide">
+              <table className="w-full min-w-[800px] border-separate border-spacing-0 text-sm">
+                <thead>
+                  <tr className="bg-emerald-50/50">
+                    <th className="border-y border-emerald-100 px-4 py-4 text-center font-bold uppercase tracking-wider text-emerald-800 rounded-tl-2xl">STT</th>
+                    <th className="border-y border-emerald-100 px-4 py-4 text-left font-bold uppercase tracking-wider text-emerald-800">Đơn sản xuất</th>
+                    <th className="border-y border-emerald-100 px-4 py-4 text-left font-bold uppercase tracking-wider text-emerald-800">Sản phẩm / Đơn hàng</th>
+                    <th className="border-y border-emerald-100 px-4 py-4 text-left font-bold uppercase tracking-wider text-emerald-800">Công đoạn thực hiện</th>
+                    {primaryRole !== "worker" && <th className="border-y border-emerald-100 px-4 py-4 text-left font-bold uppercase tracking-wider text-emerald-800">Thợ</th>}
+                    <th className="border-y border-emerald-100 px-4 py-4 text-center font-bold uppercase tracking-wider text-emerald-800">SL</th>
+                    <th className="border-y border-emerald-100 px-4 py-4 text-center font-bold uppercase tracking-wider text-emerald-800 rounded-tr-2xl">Ngày ghi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-14 text-center text-slate-600">
-                        Không có dữ liệu phù hợp
+                      <td colSpan={primaryRole === "worker" ? 6 : 7} className="py-24 text-center">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
+                            <ClipboardCheck size={32} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">Không có dữ liệu phù hợp</p>
+                            <p className="text-xs text-slate-400 mt-1">Hãy thử thay đổi bộ lọc hoặc tìm kiếm theo từ khóa khác.</p>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     pageItems.map((item, index) => (
-                      <tr key={item.id} className="leave-table-row hover:bg-slate-50/80">
-                        <td className="px-3 py-2 text-center">{(currentPage - 1) * pageSize + index + 1}</td>
-                        <td className="px-3 py-2 text-slate-700">#PR-{item.productionId}</td>
-                        <td className="px-3 py-2 text-slate-700">{item.orderName}</td>
-                        <td className="px-3 py-2 text-slate-700">{item.partName}</td>
-                        <td className="px-3 py-2">
-                          <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                            {item.workerName}
+                      <tr key={item.id} className="group hover:bg-emerald-50/30 transition-all duration-200">
+                        <td className="border-b border-slate-100 px-4 py-4 text-center text-slate-400 font-bold tracking-tighter italic">{(currentPage - 1) * pageSize + index + 1}</td>
+                        <td className="border-b border-slate-100 px-4 py-4">
+                          <span className="font-black text-emerald-800 tracking-tight">#PR-{item.productionId}</span>
+                        </td>
+                        <td className="border-b border-slate-100 px-4 py-4">
+                          <div className="font-extrabold text-slate-900 line-clamp-1">{item.orderName}</div>
+                          {item.orderId && <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-0.5">ORD-{item.orderId}</div>}
+                        </td>
+                        <td className="border-b border-slate-100 px-4 py-4 text-slate-700 font-bold">{item.partName}</td>
+                        {primaryRole !== "worker" && (
+                          <td className="border-b border-slate-100 px-4 py-4">
+                            <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700 uppercase tracking-wider">
+                              {item.workerName}
+                            </span>
+                          </td>
+                        )}
+                        <td className="border-b border-slate-100 px-4 py-4 text-center">
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 font-black text-slate-900 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-200 transition-all duration-300 transform group-hover:scale-110">
+                            {item.quantity}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-center font-semibold text-slate-700">{item.quantity}</td>
-                        <td className="px-3 py-2 text-center text-slate-600">{item.reportDate}</td>
+                        <td className="border-b border-slate-100 px-4 py-4 text-center text-slate-500 font-bold">
+                          <div className="flex items-center justify-center gap-2 text-xs">
+                            <Calendar size={14} className="text-slate-300" />
+                            {item.reportDate}
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}

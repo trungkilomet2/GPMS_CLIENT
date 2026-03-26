@@ -135,8 +135,8 @@ export default function CreateOrder() {
       newErrors.cpu = 'Giá / sản phẩm không được để trống';
     } else if (cpu < 0) {
       newErrors.cpu = 'Giá / sản phẩm không được âm';
-    } else if (cpu < 1000) {
-      newErrors.cpu = 'Giá / sản phẩm phải từ 1000 VND trở lên';
+    } else if (cpu < 1000 || cpu > 1000000000) {
+      newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 1.000.000.000 VND';
     }
 
     // NOTE: NVARCHAR(255) — nullable, chỉ check độ dài
@@ -163,6 +163,71 @@ export default function CreateOrder() {
       newErrors.endDate = 'Vui lòng chọn ngày kết thúc';
     } else if (orderData.startDate && new Date(orderData.startDate) > new Date(orderData.endDate)) {
       newErrors.endDate = 'Ngày kết thúc không được trước ngày bắt đầu';
+    }
+
+    // TEMPLATES VALIDATION (O_TEMPLATE)
+    if (templateItems.length > 0) {
+      const templateErrors = [];
+      templateItems.forEach((item, idx) => {
+        const itemErrs = {};
+        if (!item.templateName?.trim()) {
+          itemErrs.templateName = 'Tên mẫu thiết kế là bắt buộc';
+        } else if (item.templateName.trim().length > 100) {
+          itemErrs.templateName = 'Tên mẫu không được quá 100 ký tự';
+        }
+        if (item.note && item.note.length > 100) {
+          itemErrs.note = 'Ghi chú không được quá 100 ký tự';
+        }
+        if (Object.keys(itemErrs).length > 0) {
+          templateErrors[idx] = itemErrs;
+        }
+      });
+      if (templateErrors.length > 0) {
+        newErrors.templates = templateErrors;
+      }
+    }
+
+    // MATERIALS VALIDATION (O_MATERIAL)
+    if (materials.length > 0) {
+      const materialErrors = [];
+      materials.forEach((m, idx) => {
+        const mErrs = {};
+        if (!m.image) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
+        if (!m.materialName?.trim()) {
+          mErrs.materialName = 'Tên vật liệu là bắt buộc';
+        } else if (m.materialName.trim().length > 150) {
+          mErrs.materialName = 'Tên vật liệu không được quá 150 ký tự';
+        }
+
+        if (m.color && m.color.length > 30) {
+          mErrs.color = 'Màu sắc không được quá 30 ký tự';
+        } else if (!m.color?.trim()) {
+          mErrs.color = 'Màu sắc không được để trống';
+        }
+
+        if (!m.value || isNaN(m.value) || Number(m.value) <= 0) {
+          mErrs.value = 'Số lượng phải lớn hơn 0';
+        } else if (Number(m.value) > 99999) {
+          mErrs.value = 'Số lượng tối đa là 99.999';
+        }
+
+        if (!m.uom?.trim()) {
+          mErrs.uom = 'Đơn vị tính là bắt buộc';
+        } else if (m.uom.trim().length > 50) {
+          mErrs.uom = 'Đơn vị tính không được quá 50 ký tự';
+        }
+
+        if (m.note && m.note.length > 100) {
+          mErrs.note = 'Ghi chú không được quá 100 ký tự';
+        }
+
+        if (Object.keys(mErrs).length > 0) {
+          materialErrors[idx] = mErrs;
+        }
+      });
+      if (materialErrors.length > 0) {
+        newErrors.materialsList = materialErrors;
+      }
     }
 
     setErrors(newErrors);
@@ -387,7 +452,7 @@ export default function CreateOrder() {
           if (!url) return;
           const item = templateItems[idx];
           templatesPayload.push({
-            templateName: item?.templateName?.trim() || getTemplateNameFromFile(item?.fileName || '') || 'Template',
+            templateName: item?.templateName?.trim() || 'Template',
             type: item?.type || detectTemplateType(item?.file),
             file: url,
             note: item?.note?.trim() || '',

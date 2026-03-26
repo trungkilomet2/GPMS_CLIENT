@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import WorkerLayout from "@/layouts/WorkerLayout";
@@ -239,7 +239,7 @@ export default function WorkerDailyReport() {
         plan?.production?.productionId || rows.find((row) => row.productionId)?.productionId;
       if (missingPart.length > 0 && productionId) {
         try {
-          const res = await ProductionPartService.getPartsByProduction(productionId);
+          const res = await ProductionPartService.getPartsByProduction(productionId, { PageSize: 100 });
           const payload = res?.data?.data ?? res?.data ?? [];
           const partList = Array.isArray(payload) ? payload : [];
           const nameToId = new Map(
@@ -328,6 +328,7 @@ export default function WorkerDailyReport() {
       ? new Date(reportDate).toISOString()
       : new Date().toISOString();
     return {
+      partId: Number(row.partId),
       userId: Number(storedUserId) || 1,
       quantity: Number(row.quantity || 0),
       workDate,

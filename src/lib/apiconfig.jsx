@@ -43,6 +43,7 @@ export const API_ENDPOINTS = {
     ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
     APPROVE_PLAN: (id) => `${BASE_URL}/api/Production/production/approve/production-plan/${id}`,
     NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
+    SUBMIT_PLAN: (id) => `${BASE_URL}/api/Production/production/submit/production-plan/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>
@@ -52,12 +53,17 @@ export const API_ENDPOINTS = {
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
     UPDATE_ASSIGN_WORKERS: (id) =>
       `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
+    CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
+    UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
+    GET_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
+    CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/${partId}/issue`,
   },
-  
+
   CUTTING_NOTEBOOK: {
     CREATE: `${BASE_URL}/api/CuttingNotebook/notebook/create`,
     GET_BY_PRODUCTION: (productionId) => `${BASE_URL}/api/CuttingNotebook/notebook/production/${productionId}`,
     GET_BY_ID: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/${notebookId}`,
+    UPDATE: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/update/${notebookId}`,
     CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
     GET_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
   },

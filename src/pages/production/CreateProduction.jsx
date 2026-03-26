@@ -115,11 +115,11 @@ export default function CreateProduction() {
 
         // Fetch all employees via pagination to ensure we capture all workers and PMs
         let allEmployees = [];
-        let pageIdx = 1;
-        const pageSizeFetch = 10;
-        const maxPages = 50;
+        let pageIdx = 0; // Backend uses 0-based indexing
+        const pageSizeFetch = 50; // Increased page size to minimize loop iterations
+        const maxPages = 20;
 
-        while (pageIdx <= maxPages) {
+        while (pageIdx < maxPages) {
           try {
             const pageRes = await WorkerService.getAllEmployees({
               PageIndex: pageIdx,
@@ -130,8 +130,7 @@ export default function CreateProduction() {
             if (items.length < pageSizeFetch) break;
             pageIdx++;
           } catch (_err) {
-            // Fallback if pagination fails (e.g., limits reached on server)
-            if (pageIdx === 1) {
+            if (pageIdx === 0) {
               try {
                 const fallback = await WorkerService.getAllEmployees();
                 allEmployees = fallback?.data ?? [];
@@ -141,27 +140,32 @@ export default function CreateProduction() {
           }
         }
 
-        // Collect IDs of people who are set as managerId for at least one person (converting to string for safe comparison)
+        // Collect IDs of people who are set as managerId for at least one person
         const managedBySet = new Set(
           allEmployees.map(emp => emp.managerId != null ? String(emp.managerId) : null).filter(Boolean)
         );
 
-        const pmRoles = ["PM"];
+        const pmRoles = ["PM", "Manager", "Owner"];
         let pms = allEmployees.filter((item) => {
+          // If they manage somebody, they are likely a valid PM candidate
+          if (managedBySet.has(String(item.id))) return true;
+
+          // Check explicit roles
           if (pmRoles.includes(item?.primaryRole)) return true;
-          if (getPrimaryWorkspaceRole(item?.role ?? item?.roles ?? "") === "pm") return true;
+          const normalizedRole = getPrimaryWorkspaceRole(item?.role ?? item?.roles ?? "").toLowerCase();
+          if (normalizedRole === "pm" || normalizedRole === "owner" || normalizedRole === "manager") return true;
+
           if (Array.isArray(item?.roles)) {
             return item.roles.some((role) => pmRoles.includes(role));
           }
-          const rawRole = String(item?.role ?? "").split(",").map((r) => r.trim());
-          return rawRole.some((role) => pmRoles.includes(role));
+          const rawRoles = String(item?.role ?? "").split(",").map((r) => r.trim());
+          return rawRoles.some((role) => pmRoles.includes(role));
         });
 
-        // Filter out PMs that don't manage any workers (comparing stringified IDs)
-        pms = pms.filter((pm) => managedBySet.has(String(pm.id)));
-
         if (!active) return;
-        setPmUsers(pms);
+        const currentUserId = String(currentUser?.userId ?? currentUser?.id ?? "");
+        const finalPms = pms.filter((pm) => String(pm.id) !== currentUserId);
+        setPmUsers(finalPms);
         setPmError(null);
       } catch (_err) {
         if (!active) return;

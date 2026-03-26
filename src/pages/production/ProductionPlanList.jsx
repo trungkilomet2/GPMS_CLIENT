@@ -123,10 +123,10 @@ export default function ProductionPlanList() {
           try {
             const response = await ProductionPartService.getPartsByProduction(productionId, {
               PageIndex: 0,
-              PageSize: 500,
+              PageSize: 100,
               SortColumn: "Name",
               SortOrder: "ASC",
-            }).catch(() => ProductionPartService.getPartsByProduction(productionId));
+            }).catch(() => ProductionPartService.getPartsByProduction(productionId, { PageSize: 500 }));
             const payload = response?.data;
             const list =
               payload?.data ??

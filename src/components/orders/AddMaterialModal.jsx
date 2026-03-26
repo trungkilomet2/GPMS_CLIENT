@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ImagePlus } from 'lucide-react';
 
 const UNIT_OPTIONS = ['Mét', 'Cái', 'Cuộn', 'Bộ', 'Kg', 'Tấm', 'Yards', 'Hộp', 'Cặp'];
@@ -55,10 +55,25 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
 
     if (!formData.materialName?.trim()) {
       newErrors.materialName = 'Tên vật liệu không được để trống';
+    } else if (formData.materialName.trim().length > 150) {
+      newErrors.materialName = 'Tên vật liệu không được quá 150 ký tự';
     }
+
+    if (formData.color && formData.color.length > 30) {
+      newErrors.color = 'Màu sắc không được quá 30 ký tự';
+    } else if (!formData.color?.trim()) {
+      newErrors.color = 'Màu sắc không được để trống';
+    }
+
+    if (formData.note && formData.note.length > 100) {
+      newErrors.note = 'Ghi chú không được quá 100 ký tự';
+    }
+
     const parsedValue = normalizeNumber(formData.value);
     if (!formData.value || Number.isNaN(parsedValue) || parsedValue <= 0) {
       newErrors.value = 'Số lượng phải lớn hơn 0';
+    } else if (parsedValue > 99999) {
+      newErrors.value = 'Số lượng tối đa là 99.999';
     } else if (!isDecimalUom(formData.uom) && !Number.isInteger(parsedValue)) {
       newErrors.value = 'Đơn vị này chỉ cho phép số nguyên';
     }
@@ -84,8 +99,8 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/30 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-slate-100 p-6 pb-3">
           <h3 className="text-lg font-bold text-slate-900">
             {editingIndex === null ? 'Thêm vật liệu mới' : 'Chỉnh sửa vật liệu'}
           </h3>
@@ -98,7 +113,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
           </button>
         </div>
 
-        <div className="mt-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 pt-5 space-y-5 custom-scrollbar">
           <div>
             <label className="mb-2 block text-sm font-bold text-slate-700">Ảnh vật liệu</label>
             <div className="flex items-center gap-4">
@@ -138,28 +153,45 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
               <input
                 type="text"
                 name="materialName"
+                maxLength={150}
                 value={formData.materialName || ''}
                 onChange={handleInputChange}
                 className={`w-full rounded-xl border px-4 py-2.5 text-sm transition-all outline-none ${errors.materialName ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100' : 'border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'}`}
                 placeholder="Ví dụ: Vải cotton, Chỉ tơ..."
               />
-              {errors.materialName && (
-                <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-600">
-                  <AlertCircle size={12} /> {errors.materialName}
-                </div>
-              )}
+              <div className="flex justify-between items-center mt-1 px-1">
+                {errors.materialName ? (
+                  <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={12} /> {errors.materialName}
+                  </div>
+                ) : <span />}
+                <span className={`text-[10px] ${(formData.materialName?.length ?? 0) > 140 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                  {formData.materialName?.length ?? 0}/150
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-bold text-slate-700">Màu sắc</label>
+              <label className="text-sm font-bold text-slate-700">Màu sắc <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 name="color"
+                maxLength={30}
                 value={formData.color || ''}
                 onChange={handleInputChange}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm transition-all outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm transition-all outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white ${errors.color ? 'border-red-500 bg-red-50/30' : 'border-slate-200'}`}
                 placeholder="Ví dụ: Trắng, #FFFFFF"
               />
+              <div className="flex justify-between items-center mt-1 px-1">
+                {errors.color ? (
+                  <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={12} /> {errors.color}
+                  </div>
+                ) : <span />}
+                <span className={`text-[10px] ${(formData.color?.length ?? 0) > 25 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                  {formData.color?.length ?? 0}/30
+                </span>
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
@@ -169,6 +201,8 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
                 name="value"
                 value={formData.value || ''}
                 onChange={handleInputChange}
+                min="0"
+                max="99999"
                 step={isDecimalUom(formData.uom) ? '0.01' : '1'}
                 className={`w-full rounded-xl border px-4 py-2.5 text-sm transition-all outline-none ${errors.value ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100' : 'border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white'}`}
               />
@@ -204,16 +238,27 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
               <textarea
                 name="note"
                 rows={2}
+                maxLength={100}
                 value={formData.note || ''}
                 onChange={handleInputChange}
-                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm transition-all outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white"
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm transition-all outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 bg-white ${errors.note ? 'border-red-500 bg-red-50/30' : 'border-slate-200'}`}
                 placeholder="Ví dụ: cắt dư 2%, ưu tiên lô màu #A1B2..."
               />
+              <div className="flex justify-between items-center mt-1 px-1">
+                {errors.note ? (
+                  <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-600 animate-in fade-in slide-in-from-top-1">
+                    <AlertCircle size={12} /> {errors.note}
+                  </div>
+                ) : <span />}
+                <span className={`text-[10px] ${(formData.note?.length ?? 0) > 90 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                  {formData.note?.length ?? 0}/100
+                </span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3 justify-end border-t border-slate-100 pt-4">
+        <div className="flex gap-3 justify-end border-t border-slate-100 p-6 pt-4">
           <button
             type="button"
             onClick={onClose}

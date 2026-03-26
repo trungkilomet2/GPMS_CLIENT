@@ -165,7 +165,7 @@ export default function ProductionPlanDetail() {
         // Fetch a large enough batch to enable frontend-side pagination
         const partsRes = await ProductionPartService.getPartsByProduction(productionId, {
           PageIndex: 0,
-          PageSize: 500, 
+          PageSize: 100,
           SortColumn: "Name",
           SortOrder: "ASC",
         });
@@ -304,21 +304,11 @@ export default function ProductionPlanDetail() {
     setCheckingCuttingBook(true);
     try {
       const prodId = plan.production.productionId;
-      const hasNotebook = await resolveHasCuttingNotebook(prodId);
-      if (!hasNotebook) {
-        toast.info("Chưa có sổ cắt cho kế hoạch này. Hệ thống sẽ chuyển sang trang tạo sổ.");
-      } else {
-        setPlan(prev => prev ? ({
-          ...prev,
-          production: { ...prev.production, hasCuttingNotebook: true }
-        }) : prev);
-      }
       navigate("/worker/cutting-book", {
         state: {
           productionId: prodId,
           production: plan.production,
           product: plan.product,
-          openCuttingBookMode: hasNotebook ? "detail" : "create",
         },
       });
     } finally {
