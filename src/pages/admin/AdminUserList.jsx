@@ -19,7 +19,6 @@ import {
   AdminRoleBadge,
   AdminStatCard,
   AdminStatusBadge,
-  formatAdminDateTime,
   getAdminInitials,
 } from "@/pages/admin/adminShared";
 
@@ -102,10 +101,6 @@ export default function AdminUserList() {
         .map(([value, label]) => ({ value, label })),
     ];
 
-    if (users.some((user) => !user.hasKnownRole)) {
-      nextOptions.push({ value: "unknown", label: "Chưa đồng bộ role" });
-    }
-
     return nextOptions;
   }, [users]);
 
@@ -127,9 +122,7 @@ export default function AdminUserList() {
       );
 
       const matchesSearch = !keyword || searchableText.includes(keyword);
-      const matchesRole =
-        roleFilter === "all" ||
-        (roleFilter === "unknown" ? !user.hasKnownRole : user.roleKey === roleFilter);
+      const matchesRole = roleFilter === "all" || user.roleKey === roleFilter;
       const matchesStatus = statusFilter === "all" || user.status === statusFilter;
 
       return matchesSearch && matchesRole && matchesStatus;
@@ -140,27 +133,11 @@ export default function AdminUserList() {
     const total = users.length;
     const active = users.filter((user) => user.status === "active").length;
     const privileged = users.filter((user) => ["Admin", "Owner"].includes(user.roleKey)).length;
-    const missingRole = users.filter((user) => !user.hasKnownRole).length;
-    const needsReview = users.filter((user) => user.status !== "active" || !user.hasKnownRole).length;
+    const inactive = users.filter((user) => user.status !== "active").length;
+    const workers = users.filter((user) => user.roleKey === "Worker").length;
 
-    return { total, active, privileged, missingRole, needsReview };
+    return { total, active, privileged, inactive, workers };
   }, [users]);
-
-  const latestSyncAt = useMemo(() => {
-    const timestamps = users
-      .map((user) => user.updatedAt || user.createdAt || user.lastLogin)
-      .filter(Boolean)
-      .map((value) => new Date(value))
-      .filter((value) => !Number.isNaN(value.getTime()))
-      .sort((left, right) => right.getTime() - left.getTime());
-
-    return timestamps[0] ? formatAdminDateTime(timestamps[0].toISOString()) : "Chưa có dữ liệu";
-  }, [users]);
-
-  const fallbackCount = useMemo(
-    () => users.filter((user) => user.detailAvailable === false).length,
-    [users]
-  );
 
   const hasActiveFilters = Boolean(search.trim()) || roleFilter !== "all" || statusFilter !== "all";
 
@@ -244,19 +221,11 @@ export default function AdminUserList() {
             />
           ) : null}
 
-          {fallbackCount > 0 ? (
-            <AdminBanner
-              title={`${fallbackCount} tài khoản đang hiển thị từ dữ liệu danh sách`}
-              description="Backend chưa trả được detail đầy đủ cho một số user, nên web đang fallback từ user-list. Đây là dấu hiệu nên bổ sung hoặc sửa ổn định endpoint detail."
-              tone="warning"
-            />
-          ) : null}
-
           <div className="admin-stats-grid">
-            <AdminStatCard icon={Users} label="Tổng tài khoản" value={stats.total} meta={`Đồng bộ gần nhất: ${latestSyncAt}`} tone="primary" />
+            <AdminStatCard icon={Users} label="Tổng tài khoản" value={stats.total} meta="Danh sách backend trả về" tone="primary" />
             <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Có thể đăng nhập và sử dụng hệ thống" tone="success" />
             <AdminStatCard icon={KeyRound} label="Vai trò nhạy cảm" value={stats.privileged} meta="Admin và Owner cần được rà soát định kỳ" tone="warning" />
-            <AdminStatCard icon={ShieldAlert} label="Cần kiểm tra" value={stats.needsReview} meta={`${stats.missingRole} thiếu role, ${fallbackCount} thiếu detail`} tone="danger" />
+            <AdminStatCard icon={ShieldAlert} label="Tài khoản bị khóa" value={stats.inactive} meta={`${stats.workers} tài khoản worker`} tone="danger" />
           </div>
 
           <div className="admin-filter-card">
@@ -404,12 +373,9 @@ export default function AdminUserList() {
                         <td>
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
-                            {!user.hasKnownRole ? (
-                              <span className="admin-badge admin-badge--tone-warning">Chưa đồng bộ</span>
-                            ) : null}
                           </div>
                           <div className="admin-table__secondary">
-                            {user.roleDescription || "Chưa có mô tả vai trò từ backend."}
+                            {user.roleNames?.join(", ") || user.roleLabel}
                           </div>
                         </td>
                         <td>
@@ -418,9 +384,9 @@ export default function AdminUserList() {
                           </div>
                         </td>
                         <td>
-                          <div className="admin-table__primary">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</div>
+                          <div className="admin-table__primary">ID: {user.id ?? "Chưa có"}</div>
                           <div className="admin-table__secondary">
-                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `ID: ${user.id ?? "Chưa có"}`}
+                            {user.statusName || (user.status === "active" ? "Active" : "Inactive")}
                           </div>
                           <div className="admin-table__secondary admin-table__stacked-meta">
                             {[user.phoneNumber, user.location].filter(Boolean).join(" · ") || "Chưa có số điện thoại hoặc địa điểm"}

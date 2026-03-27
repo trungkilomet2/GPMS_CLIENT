@@ -53,9 +53,11 @@ function normalizeSearchText(value = "") {
 }
 
 function getEmployeeSpecialty(employee) {
-  if (employee.workerSkill) {
+  const labels = Array.isArray(employee.workerSkillLabels) ? employee.workerSkillLabels : [];
+
+  if (labels.length) {
     return {
-      label: employee.workerSkillLabel,
+      label: labels.length > 2 ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}` : labels.join(", "),
       className: "employee-status employee-status--new",
     };
   }
@@ -200,7 +202,7 @@ export default function EmployeeList() {
           employee.phoneNumber,
           employee.email,
           ...(employee.roleLabels ?? []),
-          employee.workerSkillLabel,
+          ...(employee.workerSkillLabels ?? []),
           employee.managerName,
           employee.managerRoleHint,
           employee.hierarchyTag,
@@ -212,7 +214,7 @@ export default function EmployeeList() {
         !keyword || searchableText.includes(keyword);
       const matchRole = roleFilter === "all" || employee.roles.includes(roleFilter);
       const matchSpecialty =
-        specialtyFilter === "all" || employee.workerSkill === specialtyFilter;
+        specialtyFilter === "all" || (Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.includes(specialtyFilter));
       const matchStatus = statusFilter === "all" || employee.status === statusFilter;
 
       return matchSearch && matchRole && matchSpecialty && matchStatus;
@@ -225,7 +227,7 @@ export default function EmployeeList() {
     const management = scopedEmployees.filter((employee) =>
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
-    const skilled = scopedEmployees.filter((employee) => Boolean(employee.workerSkill)).length;
+    const skilled = scopedEmployees.filter((employee) => Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.length > 0).length;
 
     return { total, active, management, skilled };
   }, [scopedEmployees]);
@@ -253,9 +255,9 @@ export default function EmployeeList() {
     const optionsMap = new Map();
 
     scopedEmployees.forEach((employee) => {
-      if (employee.workerSkill) {
-        optionsMap.set(employee.workerSkill, employee.workerSkillLabel || employee.workerSkill);
-      }
+      (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : []).forEach((skillName, index) => {
+        optionsMap.set(skillName, employee.workerSkillLabels?.[index] || skillName);
+      });
     });
 
     return [

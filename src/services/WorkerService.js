@@ -6,6 +6,7 @@ import {
   getRoleHierarchyTag,
   getSystemRoleLabel,
   getWorkerSkillLabel,
+  normalizeSystemRoleName,
   pickPrimarySystemRole,
   splitRoles,
 } from "@/lib/orgHierarchy";
@@ -61,12 +62,14 @@ const shouldHideFromEmployeeDirectory = (employee = {}) => {
 };
 
 const normalizeEmployee = (item = {}) => {
-  const roles = splitRoles(item.role ?? item.roles ?? item.roleName ?? item.roleNames ?? "");
+  const roles = splitRoles(item.role ?? item.roles ?? item.roleName ?? item.roleNames ?? "")
+    .map(normalizeSystemRoleName);
   const role = roles.join(", ");
   const workerSkillCandidates = splitRoles(
     item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
   );
-  const workerRole = workerSkillCandidates[0] ?? "";
+  const workerSkillNames = Array.from(new Set(workerSkillCandidates.filter(Boolean)));
+  const workerRole = workerSkillNames[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);
   const managerIdRaw = item.managerId ?? item.manager?.id ?? item.parentId ?? null;
@@ -98,6 +101,8 @@ const normalizeEmployee = (item = {}) => {
     role,
     roles,
     roleLabels: roles.map(getSystemRoleLabel),
+    workerSkillNames,
+    workerSkillLabels: workerSkillNames.map(getWorkerSkillLabel),
     workerRole,
     workerRoleLabel: workerRole ? getWorkerSkillLabel(workerRole) : "",
     workerSkill: workerRole,
