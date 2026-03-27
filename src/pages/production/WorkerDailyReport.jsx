@@ -131,7 +131,7 @@ export default function WorkerDailyReport() {
   const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
   const currentUser = getStoredUser() || {};
   const currentWorkerIdSet = new Set(
-    [currentUser?.id, currentUser?.userId, currentUser?.accountId, localStorage.getItem("userId")]
+    [currentUser?.id, currentUser?.userId, currentUser?.accountId]
       .filter((value) => value != null && String(value).trim() !== "")
       .map((value) => String(value).trim())
   );
@@ -191,10 +191,10 @@ export default function WorkerDailyReport() {
     try {
       setIsLoadingLogs(true);
       setActiveRowId(row.id);
-      
+
       const nbRes = await CuttingNotebookService.getByProduction(row.productionId);
       const nbData = nbRes?.data?.data || nbRes?.data || nbRes;
-      
+
       const notebook = Array.isArray(nbData) ? nbData[0] : nbData;
       if (!notebook || !notebook.id) {
         toast.info("Không tìm thấy sổ cắt cho đơn sản xuất này.");
@@ -203,7 +203,7 @@ export default function WorkerDailyReport() {
 
       const logsRes = await CuttingNotebookService.getListLogs(notebook.id);
       const logs = logsRes?.data?.data || logsRes?.data || logsRes;
-      
+
       setCurrentNotebookLogs(Array.isArray(logs) ? logs : []);
       setShowLogSelector(true);
     } catch (err) {
@@ -364,17 +364,20 @@ export default function WorkerDailyReport() {
   };
 
   const buildPayload = (row) => {
-    const storedUserId = localStorage.getItem("userId");
+    const currentId = currentUser?.userId || currentUser?.id;
     const workDate = reportDate
       ? new Date(reportDate).toISOString()
       : new Date().toISOString();
+
     return {
       partId: Number(row.partId),
-      userId: Number(storedUserId) || 1,
+      userId: Number(currentId) || 1,
       quantity: Number(row.quantity || 0),
       workDate,
     };
   };
+
+  console.log(buildPayload(rows[0]));
 
   const saveAll = async () => {
     if (!canEdit || isSavingAll) return;

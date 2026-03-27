@@ -713,7 +713,22 @@ export default function ProductionDetail() {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-center">
-                                <Link to="/worker/error-report" state={{ assignment: { ...row, productionId: production.productionId, orderName: order.orderName } }} className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline">Báo lỗi</Link>
+                                <div className="flex flex-col items-center gap-1">
+                                  <Link
+                                    to="/worker/error-report"
+                                    state={{ assignment: { ...row, productionId: production.productionId, orderName: order.orderName } }}
+                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
+                                  >
+                                    Báo lỗi
+                                  </Link>
+                                  <Link
+                                    to={`/production/part/${row.id}/history`}
+                                    state={{ part: row, production }}
+                                    className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline"
+                                  >
+                                    Lịch sử
+                                  </Link>
+                                </div>
                               </td>
                             </tr>
                           ))}

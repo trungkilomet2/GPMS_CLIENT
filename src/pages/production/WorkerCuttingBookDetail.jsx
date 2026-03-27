@@ -176,9 +176,9 @@ export default function WorkerCuttingBookDetail() {
     if (!validateRecord()) return false;
     try {
       setIsSavingRecord(true);
-      const storedUserId = localStorage.getItem("userId") || user?.id || user?.userId || 1;
+      const currentId = user?.userId || user?.id || localStorage.getItem("userId") || 1;
       const payload = {
-        userId: Number(storedUserId),
+        userId: Number(currentId),
         color: record.color,
         meterPerKg: Number(record.meterPerKg),
         layer: Number(record.layer),
@@ -187,6 +187,7 @@ export default function WorkerCuttingBookDetail() {
         note: record.note,
       };
 
+      console.log(payload);
       const res = await CuttingNotebookService.createLog(notebookId, payload);
       const newLog = res?.data?.data ?? res?.data ?? res;
       setRecords((prev) => [mapNotebookLogToRecord(newLog), ...prev]);

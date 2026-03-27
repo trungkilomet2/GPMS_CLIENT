@@ -5,6 +5,7 @@ import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
+import { getStoredUser } from "@/lib/authStorage";
 
 export default function WorkerDailyReportEdit() {
   const navigate = useNavigate();
@@ -53,12 +54,13 @@ export default function WorkerDailyReportEdit() {
   };
 
   const buildPayload = (row) => {
-    const storedUserId = localStorage.getItem("userId");
+    const currentUser = getStoredUser();
+    const currentId = currentUser?.userId || currentUser?.id;
     const workDate = row.reportDate
       ? new Date(row.reportDate).toISOString()
       : new Date().toISOString();
     return {
-      userId: Number(row.userId) || Number(storedUserId) || 1,
+      userId: Number(currentId) || Number(row.userId) || 1,
       quantity: Number(row.quantity || 0),
       workDate,
     };

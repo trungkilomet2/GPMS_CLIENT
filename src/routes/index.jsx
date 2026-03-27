@@ -25,6 +25,7 @@ const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
+const ProductionPartHistory = lazy(() => import("@/pages/production/ProductionPartHistory"));
 const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
@@ -89,6 +90,7 @@ export const routes = [
   { path: "/production", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
   { path: "/production/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionDetail />) },
   { path: "/production/:id/edit", element: guardByRoles(["Owner", "PM"], <UpdateProduction />) },
+  { path: "/production/part/:partId/history", element: guardByRoles(["Owner", "PM"], <ProductionPartHistory />) },
   { path: "/production/:id/errors", element: guardByRoles(["Owner", "PM"], <ProductionErrorSummary />) },
   { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
   { path: "/production-plan/create", element: guardByRoles(["Owner", "PM"], <ProductionPlan />) },
