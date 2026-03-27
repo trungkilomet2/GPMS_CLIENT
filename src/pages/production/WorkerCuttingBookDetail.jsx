@@ -233,7 +233,19 @@ export default function WorkerCuttingBookDetail() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                const pId = notebook?.productionId || meta.productionId;
+                if (pId) {
+                  navigate("/worker/cutting-book", { 
+                    state: { 
+                      productionId: pId,
+                      productionName: meta.productionName 
+                    } 
+                  });
+                } else {
+                  navigate("/worker/cutting-book");
+                }
+              }}
               className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
             >
               <ArrowLeft size={18} />

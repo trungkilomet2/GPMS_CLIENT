@@ -176,7 +176,15 @@ export default function WorkerCuttingBook() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
+                const isOwner = hasAnyRole(roleValue, ["Owner", "PM", "Team Leader"]);
+                if (isOwner && locationProductionId) {
+                  navigate(`/production/${locationProductionId}`);
+                } else {
+                  navigate(isOwner ? "/production" : "/worker/production-plan");
+                }
+              }}
               className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
             >
               <ArrowLeft size={18} />

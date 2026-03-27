@@ -8,6 +8,7 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 
 const MOCK_TASKS = [
   {
@@ -434,7 +435,11 @@ export default function WorkerDailyReport() {
             <div className="flex items-start gap-3">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
+                  const isWorker = hasAnyRole(roleValue, ["Worker", "KCS"]);
+                  navigate(isWorker ? "/worker/production-plan" : "/production");
+                }}
                 className="rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
                 aria-label="Quay lại"
               >

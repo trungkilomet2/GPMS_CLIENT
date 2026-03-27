@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Plus, ArrowLeft, FileText, Loader2, AlertCircle, Save } from 'lucide-react';
 import AddMaterialModal from '@/components/orders/AddMaterialModal';
@@ -397,7 +397,7 @@ export default function EditOrder() {
         <OwnerLayout>
             <div className="max-w-5xl mx-auto py-8 px-4 font-sans">
                 <div className="flex items-center gap-3 mb-6">
-                    <button onClick={() => navigate(-1)} className="p-2 rounded hover:bg-gray-100 transition-colors">
+                    <button onClick={() => navigate('/orders')} className="p-2 rounded hover:bg-gray-100 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                     <h1 className="text-2xl font-bold text-gray-900">Chỉnh sửa đơn hàng #{id}</h1>
@@ -575,7 +575,7 @@ export default function EditOrder() {
                     <div className="flex gap-4 justify-end pt-6 border-t">
                         <button
                             type="button"
-                            onClick={() => navigate(-1)}
+                            onClick={() => navigate('/orders')}
                             disabled={isSubmitting}
                             className="px-8 py-2.5 text-gray-500 font-bold hover:text-gray-700 disabled:opacity-50"
                         >

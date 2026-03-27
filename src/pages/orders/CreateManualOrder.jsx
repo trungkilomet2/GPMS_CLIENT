@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import CloudinaryService from '@/services/CloudinaryService';
@@ -355,7 +355,7 @@ export default function CreateManualOrder() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate('/orders/owner')}
               className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50"
             >
               <ArrowLeft size={20} />
@@ -433,7 +433,7 @@ export default function CreateManualOrder() {
               onRemoveTemplateItem={removeTemplateItem}
               totalCost={totalCost}
               isSubmitting={isSubmitting}
-              onCancel={() => navigate(-1)}
+              onCancel={() => navigate('/orders/owner')}
               materialModalProps={{
                 isOpen: isModalOpen,
                 onClose: () => setIsModalOpen(false),
