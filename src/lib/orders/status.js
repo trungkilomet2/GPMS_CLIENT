@@ -1,4 +1,4 @@
-﻿// Order status labels and styles
+// Order status labels and styles
 export const ORDER_STATUS_LABELS = {
   "Chờ xét duyệt": "Chờ Xét Duyệt",
   "Yêu cầu chỉnh sửa": "Yêu Cầu Chỉnh Sửa",
@@ -56,6 +56,12 @@ const ORDER_STATUS_NORMALIZE_MAP = {
   completed: "Đã chấp nhận",
   done: "Đã chấp nhận",
   success: "Đã chấp nhận",
+
+  "đang sản xuất": "Đang sản xuất",
+  "dang san xuat": "Đang sản xuất",
+  "in production": "Đang sản xuất",
+  production: "Đang sản xuất",
+  "in progress": "Đang sản xuất",
 };
 
 export function normalizeOrderStatus(status) {
@@ -70,6 +76,7 @@ export const ORDER_STATUS_STYLES_LIST = {
   "Đã chấp nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
   "Đã từ chối": "bg-red-50 text-red-700 border-red-200",
   "Đã hủy": "bg-gray-50 text-gray-700 border-gray-200",
+  "Đang sản xuất": "bg-purple-50 text-purple-700 border-purple-200",
   default: "bg-gray-50 text-gray-700 border-gray-200",
 };
 
@@ -79,6 +86,7 @@ export const ORDER_STATUS_STYLES_DETAIL = {
   "Đã từ chối": "bg-red-100 text-red-800 border border-red-200",
   "Đã hủy": "bg-gray-100 text-gray-700 border border-gray-200",
   "Đã chấp nhận": "bg-emerald-600 text-white",
+  "Đang sản xuất": "bg-purple-600 text-white",
   default: "bg-gray-100 text-gray-700",
 };
 

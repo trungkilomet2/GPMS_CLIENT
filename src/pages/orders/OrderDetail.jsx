@@ -218,9 +218,10 @@ export default function OrderDetail() {
     const isRejected = normalizedStatus === 'Đã từ chối';
     const isAccepted = normalizedStatus === 'Đã chấp nhận';
     const isCanceled = normalizedStatus === 'Đã hủy';
+    const isProcessing = normalizedStatus === 'Đang sản xuất';
     const canCancelOrder = normalizedStatus === 'Chờ xét duyệt';
     const canAccept = normalizedStatus === 'Chờ xét duyệt';
-    const canCustomerDeny = isCustomer && canEdit;
+    const canCustomerDeny = isCustomer && canEdit && !isAccepted && !isRejected && !isCanceled && !isProcessing;
 
     const updateOrderStatus = async (nextStatus, reason = '') => {
         if (!order?.id) return;
@@ -321,14 +322,13 @@ export default function OrderDetail() {
                                     Hủy đơn hàng
                                 </button>
                             )}
-                            {canModerate && (
+                            {canModerate && !isRejected && normalizeOrderStatus(order.status) === 'Đã chấp nhận' && !hasProduction && (
                                 <button type="button"
                                     onClick={() => {
-                                        if (isRejected || hasProduction) return;
+                                        if (isCheckingProduction) return;
                                         navigate(`/production/create/${order.id}`);
                                     }}
-                                    disabled={isRejected || normalizeOrderStatus(order.status) !== 'Đã chấp nhận' || hasProduction || isCheckingProduction}
-                                    title={hasProduction ? "Đơn hàng này đã có đơn sản xuất" : ""}
+                                    disabled={isCheckingProduction}
                                     className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isCheckingProduction ? "Đang kiểm tra..." : "Tạo production"}
@@ -336,44 +336,48 @@ export default function OrderDetail() {
                             )}
                             {canModerate && (
                                 <>
-                                    <button type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted || !canAccept}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted || !canAccept) return;
-                                            setIsApproveModalOpen(true);
-                                        }}
-                                        className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Chấp nhận
-                                    </button>
-                                    <button type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted) return;
-                                            openReasonModal('Từ chối');
-                                        }}
-                                        className="cursor-pointer rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                                    >
-                                        Từ chối
-                                    </button>
-                                    <button type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted || !canRequestModification}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted || !canRequestModification) return;
-                                            openReasonModal('Yêu cầu chỉnh sửa');
-                                        }}
-                                        className="cursor-pointer rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Yêu cầu chỉnh sửa
-                                    </button>
+                                    {!isRejected && !isAccepted && !isProcessing && canAccept && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                setIsApproveModalOpen(true);
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Chấp nhận
+                                        </button>
+                                    )}
+                                    {!isRejected && !isAccepted && !isProcessing && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                openReasonModal('Từ chối');
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                                        >
+                                            Từ chối
+                                        </button>
+                                    )}
+                                    {!isRejected && !isAccepted && !isProcessing && canRequestModification && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                openReasonModal('Yêu cầu chỉnh sửa');
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Yêu cầu chỉnh sửa
+                                        </button>
+                                    )}
                                 </>
                             )}
-                            {canEdit && (
+                            {canEdit && canEditOnlyWhenRequested && (
                                 <button onClick={() => {
-                                    if (!canEditOnlyWhenRequested) return;
                                     navigate(`/orders/edit/${order.id}`, { state: { order } });
                                 }}
-                                    disabled={!canEditOnlyWhenRequested}
                                     className="cursor-pointer flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Edit3 size={16} /> Chỉnh sửa
