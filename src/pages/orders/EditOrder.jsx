@@ -85,10 +85,15 @@ export default function EditOrder() {
     const applyOrderData = (data = {}) => {
         const formattedData = {
             ...data,
+            orderName: data.orderName || data.OrderName || '',
+            type: data.type || data.Type || '',
+            size: String(data.size || data.Size || '').trim().toUpperCase(),
+            color: data.color || data.Color || '',
+            note: data.note || data.Note || '',
             startDate: data.startDate ? String(data.startDate).split('T')[0] : '',
             endDate: data.endDate ? String(data.endDate).split('T')[0] : '',
-            quantity: data.quantity ?? '',
-            cpu: data.cpu ?? '',
+            quantity: data.quantity ?? data.Quantity ?? '',
+            cpu: data.cpu ?? data.Cpu ?? data.CPU ?? '',
         };
 
         setOrderData((prev) => ({ ...prev, ...formattedData }));
