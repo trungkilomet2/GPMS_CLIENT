@@ -301,7 +301,6 @@ export default function ProductionDetail() {
   const order = production?.order || {};
   const isApprovedProduction = production?.status && !["Chờ Xét Duyệt", "Từ Chối", "-"].includes(production.status);
   const softTemplates = Array.isArray(order.templates) ? order.templates.filter(t => t.type !== "HARD") : [];
-  const hardCopyTotal = Array.isArray(order.templates) ? order.templates.filter(t => t.type === "HARD").length : 0;
   const progressPercent = steps.length > 0 ? Math.round((steps.filter(s => s.status === "Hoàn thành").length / steps.length) * 100) : 0;
 
   if (loading) {
@@ -760,7 +759,7 @@ export default function ProductionDetail() {
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế</h2>
                   <div className="space-y-2">
                     {softTemplates.length > 0 ? (
                       softTemplates.map((file, idx) => {
@@ -788,13 +787,6 @@ export default function ProductionDetail() {
                     ) : (
                       <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
                     )}
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-4">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                  <div className="text-sm font-semibold text-slate-700">
-                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
                   </div>
                 </div>
               </div>

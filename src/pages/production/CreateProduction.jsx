@@ -379,11 +379,6 @@ export default function CreateProduction() {
     const type = (t.type ?? "").toString().toLowerCase();
     return type.includes("soft") || !!t.file || !!t.url;
   });
-  const hardTemplates = templates.filter((t) => {
-    const type = (t.type ?? "").toString().toLowerCase();
-    return type.includes("hard");
-  });
-  const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
   const normalizedStatus = normalizeOrderStatus(order?.status);
   const isAccepted = getOrderStatusLabel(normalizedStatus) === "Đã Chấp Nhận";
 
@@ -671,7 +666,7 @@ export default function CreateProduction() {
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
+                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế</h2>
                   <div className="space-y-2">
                     {softTemplates.length > 0 ? (
                       softTemplates.map((file, idx) => {
@@ -699,13 +694,6 @@ export default function CreateProduction() {
                     ) : (
                       <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
                     )}
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-100 pt-4">
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                  <div className="text-sm font-semibold text-slate-700">
-                    Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
                   </div>
                 </div>
               </div>
