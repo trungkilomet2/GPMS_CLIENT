@@ -94,18 +94,20 @@ export default function ProductionList() {
       const results = await Promise.all(
         pendingIds.map(async (id) => {
           try {
-            const res = await ProductionPartService.getPartsByProduction(id, { PageIndex: 0, PageSize: 1 });
-            const total = res?.data?.recordCount ?? res?.data?.data?.length ?? 0;
-            return [id, total];
+            const res = await ProductionPartService.getPartsByProduction(id, { PageIndex: 0, PageSize: 100 });
+            const list = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+            const total = list.length;
+            const completed = list.filter(p => p.status === 'Hoàn thành').length;
+            return [id, total > 0 ? `${completed} / ${total}` : "0"];
           } catch {
-            return [id, 0];
+            return [id, "0"];
           }
         })
       );
       if (isMounted) {
         setPartCounts((prev) => {
           const next = { ...prev };
-          results.forEach(([id, total]) => { next[id] = total; });
+          results.forEach(([id, display]) => { next[id] = display; });
           return next;
         });
       }
