@@ -1,17 +1,15 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ClipboardCheck, Search, TrendingUp, Wallet, Package, Calendar } from "lucide-react";
+import { ClipboardCheck, Search, TrendingUp, Wallet, Package, Calendar, Loader2 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import Pagination from "@/components/Pagination";
+import ProductionService from "@/services/ProductionService";
+import ProductionPartService from "@/services/ProductionPartService";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-import { MOCK_PAYROLL_LOGS } from "@/utils/payrollUtils";
-
-const MOCK_OUTPUTS = MOCK_PAYROLL_LOGS;
 
 export default function OutputHistory() {
   const location = useLocation();
@@ -24,6 +22,10 @@ export default function OutputHistory() {
       ? WorkerLayout
       : PmOwnerLayout;
 
+  const [outputs, setOutputs] = useState([]);
+  const [workLogPartMap, setWorkLogPartMap] = useState({}); // Map: workLogId -> partName
+  const [productions, setProductions] = useState([]); // Lookup for order names
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState(() => {
     const today = new Date();
@@ -32,33 +34,120 @@ export default function OutputHistory() {
     const dd = String(today.getDate()).padStart(2, "0");
     return `${yyyy}-${mm}-${dd}`;
   });
-  const [allDates, setAllDates] = useState(false);
+  const [allDates, setAllDates] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
 
-  const currentUserId = String(user?.id || user?.userId || "");
+  const userIdFromStorage = localStorage.getItem("userId");
+  const currentUserId = String(user?.id || user?.userId || userIdFromStorage || "");
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Fetch History
+      let historyRes;
+      if (primaryRole === "worker") {
+        historyRes = await ProductionService.getWorkerOutputHistory(currentUserId);
+      } else {
+        historyRes = await ProductionService.getOutputHistory();
+      }
+      
+      const rawHistory = historyRes?.data?.data ?? historyRes?.data ?? [];
+      
+      // Fetch Productions for lookup
+      const prodRes = await ProductionService.getProductionList({ PageSize: 100 });
+      const prodList = prodRes?.data?.data ?? prodRes?.data ?? [];
+      setProductions(prodList);
+
+      // Deep fetch to map workLogId (sourceId) back to partName
+      const uniqueProdIds = [
+        ...new Set(rawHistory.filter(h => h.productionId).map(h => h.productionId))
+      ];
+      
+      const logMap = {};
+      
+      await Promise.all(
+        uniqueProdIds.map(async (pId) => {
+          try {
+            const partsRes = await ProductionPartService.getPartsByProduction(pId, { PageSize: 100 });
+            const partsList = partsRes?.data?.data ?? partsRes?.data ?? [];
+            
+            // For each part, fetch its logs to build the reverse map
+            await Promise.all(
+              partsList.map(async (part) => {
+                try {
+                  const logsRes = await ProductionPartService.getWorkLogs(part.id);
+                  const logs = logsRes?.data?.data ?? logsRes?.data ?? [];
+                  logs.forEach(log => {
+                    const logId = log.id || log.workLogId || log.wlId;
+                    if (logId) {
+                      logMap[String(logId)] = part.partName || part.name;
+                    }
+                  });
+                } catch (e) {
+                  // Ignore per-part log fetch errors
+                }
+              })
+            );
+          } catch (e) {
+             console.error(`Failed to fetch parts for production ${pId}`, e);
+          }
+        })
+      );
+
+      setWorkLogPartMap(logMap);
+      setOutputs(Array.isArray(rawHistory) ? rawHistory : []);
+    } catch (err) {
+      console.error("Failed to fetch output history:", err);
+      setOutputs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [primaryRole, currentUserId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOCK_OUTPUTS.filter((item) => {
-      // Logic for Worker: Only show own records
-      if (primaryRole === "worker") {
-        const itemUserId = String(item.userId || "");
-        if (currentUserId && itemUserId !== currentUserId) return false;
-      }
+    
+    // Map raw outputs to UI format with lookups
+    const mapped = outputs.map(item => {
+      const prodId = item.productionId;
+      const logId = String(item.sourceId || "");
+      const prodMatch = productions.find(p => (p.productionId || p.id) === prodId);
+      
+      // Standardize date to YYYY-MM-DD for comparison
+      const subAt = item.submittedAt || item.reportDate || "";
+      const datePart = subAt.split("T")[0];
 
+      return {
+        ...item,
+        id: item.sourceId || item.id || Math.random(),
+        productionId: prodId,
+        orderName: prodMatch?.order?.orderName || prodMatch?.orderName || "-",
+        orderId: prodMatch?.order?.id || prodMatch?.orderId || null,
+        partName: workLogPartMap[logId] || item.note || `Công đoạn #${logId}`,
+        reportDate: datePart,
+        quantity: item.quantity || 0,
+        cpu: item.cpu || 0,
+      };
+    });
+
+    return mapped.filter((item) => {
       const matchQuery =
         !q ||
         String(item.productionId).includes(q) ||
-        (primaryRole !== "worker" && String(item.workerName || "").toLowerCase().includes(q)) ||
+        String(item.workerName || "").toLowerCase().includes(q) ||
         String(item.orderName || "").toLowerCase().includes(q) ||
-        String(item.partName || "").toLowerCase().includes(q) ||
-        String(item.reportDate || "").toLowerCase().includes(q);
+        String(item.partName || "").toLowerCase().includes(q);
+        
       const matchDate = allDates || !dateFilter || item.reportDate === dateFilter;
       return matchQuery && matchDate;
     });
-  }, [query, dateFilter, allDates, primaryRole, currentUserId]);
+  }, [outputs, productions, query, dateFilter, allDates]);
 
   const stats = useMemo(() => {
     const totalQty = filtered.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -84,7 +173,7 @@ export default function OutputHistory() {
   if (isCustomer) {
     return (
       <LayoutComponent>
-        <div className="flex flex-col items-center justify-center min-h-400px text-sm text-slate-600">
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-sm text-slate-600">
           Bạn không có quyền truy cập trang này.
         </div>
       </LayoutComponent>
@@ -113,8 +202,21 @@ export default function OutputHistory() {
             </div>
           </div>
 
-          {/* Stats Section for Worker */}
-          {primaryRole === "worker" && (
+          <div className="relative min-h-[500px]">
+            {loading && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl bg-white/60 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-emerald-100 text-center">
+                  <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                  <div>
+                    <p className="text-base font-bold text-slate-900">Đang tải lịch sử sản lượng...</p>
+                    <p className="text-xs text-slate-500 mt-1">Hệ thống đang đối soát dữ liệu báo cáo và công đoạn</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Stats Section for Worker */}
+            {primaryRole === "worker" && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
                 <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald-50/50 transition-transform group-hover:scale-110" />
@@ -172,7 +274,7 @@ export default function OutputHistory() {
                     disabled={allDates}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 px-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 whitespace-nowrap">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 whitespace-nowrap cursor-pointer">
                     <input
                       type="checkbox"
                       checked={allDates}
@@ -184,15 +286,13 @@ export default function OutputHistory() {
                 </div>
               </label>
               <div className="flex items-center justify-end gap-3">
-                {(query) && (
-                  <button
-                    type="button"
-                    onClick={() => { setQuery(""); }}
-                    className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-                  >
-                    Xóa lọc
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={fetchData}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                >
+                  Làm mới
+                </button>
               </div>
             </div>
           </div>
@@ -222,7 +322,16 @@ export default function OutputHistory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {filtered.length === 0 ? (
+                  {loading ? (
+                    <tr>
+                      <td colSpan={primaryRole === "worker" ? 6 : 7} className="py-24 text-center">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+                          <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filtered.length === 0 ? (
                     <tr>
                       <td colSpan={primaryRole === "worker" ? 6 : 7} className="py-24 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
@@ -281,6 +390,7 @@ export default function OutputHistory() {
                 pageSize={pageSize}
               />
             )}
+          </div>
           </div>
         </div>
       </div>

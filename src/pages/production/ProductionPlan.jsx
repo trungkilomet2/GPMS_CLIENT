@@ -820,7 +820,7 @@ export default function ProductionPlan() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/production/${selectedProductionId}`)}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -1155,7 +1155,7 @@ export default function ProductionPlan() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/production/${selectedProductionId}`)}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 Hủy

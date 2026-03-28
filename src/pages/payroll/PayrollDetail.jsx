@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import { useParams, useSearchParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
@@ -11,10 +11,10 @@ export default function PayrollDetail() {
   const location = useLocation();
   const { employeeId } = useParams();
   const [searchParams] = useSearchParams();
-  
+
   const initialMonth = Number(searchParams.get("month")) || location.state?.month || new Date().getMonth() + 1;
   const initialYear = Number(searchParams.get("year")) || location.state?.year || new Date().getFullYear();
-  
+
   const [month] = useState(initialMonth);
   const [year] = useState(initialYear);
   const [logs, setLogs] = useState(location.state?.logs || []);
@@ -132,10 +132,10 @@ export default function PayrollDetail() {
             <div className="leave-table-card__header">
               <div className="flex items-center gap-2">
                 <Info size={16} className="text-slate-400" />
-                <h2 className="leave-table-card__title">Breakdown công đoạn</h2>
+                <h2 className="leave-table-card__title">Danh sách công đoạn đã làm trong tháng</h2>
               </div>
             </div>
-            
+
             <div className="overflow-x-auto">
               {loading && (
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 backdrop-blur-[2px] py-20">
@@ -177,8 +177,15 @@ export default function PayrollDetail() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-bold text-slate-900 line-clamp-1">{log.orderName}</div>
-                            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">#PR-{log.productionId}</div>
+                            <div className="font-bold text-slate-900 line-clamp-1 italic">{log.orderName}</div>
+                            <Link 
+                               to={`/production/${log.productionId}`}
+                               state={{ from: location.pathname }}
+                               className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1"
+                            >
+                               #PR-{log.productionId}
+                               <ArrowLeft size={10} className="rotate-180" />
+                            </Link>
                           </td>
                           <td className="px-6 py-4 font-semibold text-slate-700">{log.partName}</td>
                           <td className="px-6 py-4 text-center text-slate-600 font-bold">

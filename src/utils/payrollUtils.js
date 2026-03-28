@@ -13,43 +13,96 @@ export const MOCK_PAYROLL_LOGS = [
  * 3. Fetch all work logs for each part
  * 4. Filter by month/year and aggregate
  */
-export const fetchAggregatedPayroll = async (month, year) => {
+const payrollCache = new Map();
+
+/**
+ * Checks if a given month/year is within the start and end dates.
+ * Handle open-ended ranges or nulls.
+ */
+const isDateInMonth = (dateStr, month, year) => {
+  if (!dateStr || dateStr === "-") return false;
+  const d = new Date(dateStr);
+  return d.getMonth() + 1 === month && d.getFullYear() === year;
+};
+
+const overlapsMonth = (startStr, endStr, month, year) => {
+  const targetStart = new Date(year, month - 1, 1);
+  const targetEnd = new Date(year, month, 0); // Last day of month
+
+  const start = startStr && startStr !== "-" ? new Date(startStr) : null;
+  const end = endStr && endStr !== "-" ? new Date(endStr) : null;
+
+  // If no start date, we can't be sure, but let's assume it's relevant if end exists
+  if (!start && !end) return true; // Fallback to include if totally unknown
+  
+  if (start && start > targetEnd) return false;
+  if (end && end < targetStart) return false;
+
+  return true;
+};
+
+/**
+ * Aggregates data from multiple APIs to build a payroll view.
+ * 1. Fetch all productions
+ * 2. Filter productions active in this month/year
+ * 3. Fetch parts for active productions
+ * 4. Fetch work logs for active parts
+ * 5. Aggregate by worker
+ */
+export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) => {
+  const cacheKey = `${month}-${year}`;
+  if (!forceRefresh && payrollCache.has(cacheKey)) {
+    console.debug(`[Payroll] Returning cached data for ${cacheKey}`);
+    return payrollCache.get(cacheKey);
+  }
+
   try {
     // 1. Fetch Productions (large batch)
     const prodRes = await ProductionService.getProductionList({ PageIndex: 0, PageSize: 100 });
-    const productions = prodRes?.data?.data || prodRes?.data || [];
-    if (!Array.isArray(productions)) return [];
+    const rawProductions = prodRes?.data?.data || prodRes?.data || [];
+    if (!Array.isArray(rawProductions)) return [];
 
-    // 2. Fetch all parts for all productions in parallel
+    // Filter relevant productions to reduce part/log requests
+    const productions = rawProductions.filter(p => 
+      overlapsMonth(p.startDate || p.pStartDate, p.endDate || p.pEndDate, month, year)
+    );
+
+    console.debug(`[Payroll] Processing ${productions.length}/${rawProductions.length} productions for ${month}/${year}`);
+
+    // 2. Fetch all parts for relevant productions in parallel
     const partsResults = await Promise.all(
       productions.map(p => ProductionPartService.getPartsByProduction(p.productionId || p.id, { PageSize: 100 }))
     );
 
-    const allParts = [];
+    const relevantParts = [];
     partsResults.forEach((res, idx) => {
       const parts = res?.data?.data || res?.data || [];
       const prod = productions[idx];
       if (Array.isArray(parts)) {
         parts.forEach(part => {
-          allParts.push({
-            ...part,
-            productionId: prod.productionId || prod.id,
-            orderName: prod.order?.orderName || prod.orderName || "-",
-            orderId: prod.order?.id || prod.orderId || null,
-          });
+          // Only fetch logs if the part schedule overlaps with the month
+          if (overlapsMonth(part.startDate || part.planStartDate, part.endDate || part.planEndDate, month, year)) {
+            relevantParts.push({
+              ...part,
+              productionId: prod.productionId || prod.id,
+              orderName: prod.order?.orderName || prod.orderName || "-",
+              orderId: prod.order?.id || prod.orderId || null,
+            });
+          }
         });
       }
     });
 
-    // 3. Fetch all work logs for all parts in parallel
-    // WARNING: This could be many requests. 
+    console.debug(`[Payroll] Processing ${relevantParts.length} parts for ${month}/${year}`);
+
+    // 3. Fetch all work logs for relevant parts in parallel
     const logsResults = await Promise.all(
-      allParts.map(part => ProductionPartService.getWorkLogs(part.id))
+      relevantParts.map(part => ProductionPartService.getWorkLogs(part.id))
     );
 
     const allLogs = [];
     logsResults.forEach((res, idx) => {
-      const part = allParts[idx];
+      const part = relevantParts[idx];
       const rawLogs = res?.data?.data || res?.data || [];
       if (Array.isArray(rawLogs)) {
         rawLogs.forEach(log => {
@@ -95,7 +148,9 @@ export const fetchAggregatedPayroll = async (month, year) => {
       stats.logs.push(log);
     });
 
-    return Array.from(workerMap.values());
+    const result = Array.from(workerMap.values());
+    payrollCache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.error("Payroll aggregation error:", err);
     throw err;

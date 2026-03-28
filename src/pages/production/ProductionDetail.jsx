@@ -1,16 +1,16 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { ArrowLeft, Info, Package, FileText, Download, AlertTriangle } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
-import { formatOrderDate } from "@/lib/orders/formatters";
+import { formatOrderDate, formatDateTime } from "@/lib/orders/formatters";
 import { getOrderCustomerId } from "@/lib/orders/customerInfo";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import SuccessModal from "@/components/SuccessModal";
 import ProductionService from "@/services/ProductionService";
-import { STATUS_STYLES as PRODUCTION_STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
+import { STATUS_STYLES as PRODUCTION_STATUS_STYLES, getProductionStatusLabel, getPlanStatusLabel, STATUS_STYLES } from "@/utils/statusUtils";
 import { userService } from "@/services/UserService";
 import ProductionPartService from "@/services/ProductionPartService";
 import CuttingNotebookService from "@/services/CuttingNotebookService";
@@ -101,6 +101,7 @@ function getProductionDurationText(startDate, endDate) {
 export default function ProductionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
@@ -436,7 +437,7 @@ export default function ProductionDetail() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button onClick={() => navigate('/production')}
+              <button onClick={() => navigate(location.state?.from || '/production')}
                 className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -705,13 +706,25 @@ export default function ProductionDetail() {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-slate-600">{formatOrderDate(row.startDate)}</td>
-                              <td className="px-4 py-3 text-slate-600">{formatOrderDate(row.endDate)}</td>
-                              <td className="px-4 py-3 text-right font-bold text-slate-900">{Number(row.cpu).toLocaleString('vi-VN')} đ</td>
-                              <td className="px-4 py-3 text-center text-[10px] font-bold uppercase">
-                                <span className={`px-2 py-1 rounded-full ${row.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                  {row.status || 'Đang chờ'}
-                                </span>
+                               <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
+                                {formatDateTime(row.startDate)}
+                               </td>
+                               <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
+                                {formatDateTime(row.endDate)}
+                               </td>
+                               <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
+                                {Number(row.cpu).toLocaleString('vi-VN')} đ
+                               </td>
+                              <td className="px-4 py-3 text-center">
+                                {(() => {
+                                  const label = getPlanStatusLabel(row.statusName || row.statusId || row.status);
+                                  const style = STATUS_STYLES[label] || STATUS_STYLES.default;
+                                  return (
+                                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border whitespace-nowrap shadow-sm ${style}`}>
+                                      {label}
+                                    </span>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex flex-col items-center gap-1">

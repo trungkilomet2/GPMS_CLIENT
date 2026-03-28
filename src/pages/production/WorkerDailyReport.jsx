@@ -371,14 +371,12 @@ export default function WorkerDailyReport() {
       : new Date().toISOString();
 
     return {
-      partId: Number(row.partId),
+      partId: row?.partId ? Number(row.partId) : 0,
       userId: Number(currentId) || 1,
-      quantity: Number(row.quantity || 0),
+      quantity: Number(row?.quantity || 0),
       workDate,
     };
   };
-
-  console.log(buildPayload(rows[0]));
 
   const saveAll = async () => {
     if (!canEdit || isSavingAll) return;
@@ -436,9 +434,15 @@ export default function WorkerDailyReport() {
               <button
                 type="button"
                 onClick={() => {
-                  const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
-                  const isWorker = hasAnyRole(roleValue, ["Worker", "KCS"]);
-                  navigate(isWorker ? "/worker/production-plan" : "/production");
+                  const prodId = plan?.production?.productionId ?? assignment?.productionId;
+                  if (prodId) {
+                    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+                    const isWorkerRole = hasAnyRole(roleValue, ["Worker", "KCS"]);
+                    const target = isWorkerRole ? `/worker/production-plan/${prodId}` : `/production/${prodId}`;
+                    navigate(target);
+                  } else {
+                    navigate(-1);
+                  }
                 }}
                 className="rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
                 aria-label="Quay lại"
@@ -523,57 +527,64 @@ export default function WorkerDailyReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {displayedRows.map((row, index) => (
-                    <tr key={row.id} className="leave-table-row hover:bg-slate-50/80">
-                      <td className="px-3 py-2 text-center">{index + 1}</td>
-                      <td className="px-3 py-2 text-slate-700">#PR-{row.productionId}</td>
-                      <td className="px-3 py-2 text-slate-700">{row.orderName}</td>
-                      <td className="px-3 py-2 font-medium text-slate-800">{row.partName}</td>
-                      <td className="px-3 py-2 text-center font-semibold text-slate-700">
-                        {row.cpu ? `${row.cpu.toLocaleString("vi-VN")} VND` : "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {canEdit && !row.logReadOnly ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={row.quantity}
-                              onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
-                              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                            />
-                            {row.isCuttingStep && (
-                              <button
-                                type="button"
-                                onClick={() => fetchNotebookLogs(row)}
-                                title="Lấy dữ liệu từ sổ cắt"
-                                className="flex h-9 w-10 min-w-[40px] items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                              >
-                                <BookOpen size={16} />
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="text-center text-slate-700 font-medium">
-                            {row.quantity === "" ? "-" : row.quantity}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {displayedRows.length === 0 && (
+                  {displayedRows.length > 0 ? (
+                    displayedRows.map((row, index) => (
+                      <tr key={row.id} className="leave-table-row hover:bg-slate-50/80">
+                        <td className="px-3 py-2 text-center">{index + 1}</td>
+                        <td className="px-3 py-2 text-slate-700">#PR-{row.productionId}</td>
+                        <td className="px-3 py-2 text-slate-700">{row.orderName}</td>
+                        <td className="px-3 py-2 font-medium text-slate-800">{row.partName}</td>
+                        <td className="px-3 py-2 text-center font-semibold text-slate-700">
+                          {row.cpu ? `${row.cpu.toLocaleString("vi-VN")} VND` : "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {canEdit && !row.logReadOnly ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.quantity}
+                                onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
+                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                              />
+                              {row.isCuttingStep && (
+                                <button
+                                  type="button"
+                                  onClick={() => fetchNotebookLogs(row)}
+                                  title="Lấy dữ liệu từ sổ cắt"
+                                  className="flex h-9 w-10 min-w-[40px] items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                >
+                                  <BookOpen size={16} />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-center text-slate-700 font-medium">
+                              {row.quantity === "" ? "-" : row.quantity}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
-                        Không có công đoạn nào được giao cho tài khoản hiện tại.
+                      <td colSpan={6} className="px-3 py-10 text-center">
+                        <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
+                          <BookOpen size={48} className="text-slate-200 mb-2" />
+                          <p className="font-semibold text-slate-600">Bạn chưa có công việc được giao</p>
+                          <p className="text-xs">Vui lòng liên hệ quản lý hoặc chờ kế hoạch sản xuất mới.</p>
+                        </div>
                       </td>
                     </tr>
                   )}
-                  <tr className="bg-slate-50">
-                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">TOTAL</td>
-                    <td className="px-3 py-3 text-center font-semibold text-slate-700">
-                      {totalAmount.toLocaleString("vi-VN")} VND
-                    </td>
-                  </tr>
+                  {displayedRows.length > 0 && (
+                    <tr className="bg-slate-50/50">
+                      <td colSpan={5} className="px-3 py-4 font-bold text-slate-700 text-right">TỔNG CỘNG:</td>
+                      <td className="px-3 py-4 text-center font-bold text-emerald-700 text-lg">
+                        {totalAmount.toLocaleString("vi-VN")} đ
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

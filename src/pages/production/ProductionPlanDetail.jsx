@@ -11,7 +11,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
-import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
+import { STATUS_STYLES, getProductionStatusLabel, getPlanStatusLabel } from "@/utils/statusUtils";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
@@ -186,6 +186,7 @@ export default function ProductionPlanDetail() {
           cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
           startDate: part?.startDate ?? part?.planStartDate ?? "-",
           endDate: part?.endDate ?? part?.planEndDate ?? "-",
+          status: part?.statusId ?? part?.statusName ?? part?.status ?? 1,
           assignedWorkers:
             part?.assignedWorkers ??
             part?.workers ??
@@ -381,7 +382,9 @@ export default function ProductionPlanDetail() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  navigate(isWorker ? "/worker/production-plan" : "/production-plan");
+                }}
                 className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -407,14 +410,14 @@ export default function ProductionPlanDetail() {
                 <>
                   <Link
                     to="/production-plan/create"
-                    state={{ productionId: plan.production.productionId, steps: plan.steps }}
+                    state={{ productionId: plan?.production?.productionId, steps: plan.steps }}
                     className="rounded-full border border-emerald-600 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
                   >
                     {totalParts > 0 ? "Chỉnh sửa công đoạn" : "Thiết kế công đoạn"}
                   </Link>
 
                   {String(roleValue).toLowerCase() === "owner" &&
-                    plan.production.status === "Chờ Xét Duyệt Kế Hoạch" && (
+                    plan?.production?.status === "Chờ Xét Duyệt Kế Hoạch" && (
                       <>
                         <button
                           onClick={handleApprovePlan}
@@ -433,22 +436,29 @@ export default function ProductionPlanDetail() {
                 </>
               )}
               {isWorker ? (
-                <Link
-                  to="/worker/daily-report"
-                  state={{ plan: { production: plan.production, steps: plan.steps } }}
-                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
-                >
-                  Báo cáo sản lượng
-                </Link>
+                (() => {
+                  const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
+                  const canReport = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
+                  
+                  return canReport ? (
+                    <Link
+                      to="/worker/daily-report"
+                      state={{ plan: { production: plan.production, steps: plan.steps } }}
+                      className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                    >
+                      Báo cáo sản lượng
+                    </Link>
+                  ) : null;
+                })()
               ) : (
                 (() => {
-                  const rawStatus = String(plan.production.status || "").toLowerCase().normalize("NFC");
+                  const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
                   const isApproved = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
                   const hasEnoughParts = totalParts >= 3;
                   
                   const canAssign = isApproved && hasEnoughParts;
-                  const assignmentLink = `/production-plan/assign/${plan.production.productionId}`;
-                  const state = { production: plan.production, product: plan.product, steps: plan.steps };
+                  const assignmentLink = `/production-plan/assign/${plan?.production?.productionId}`;
+                  const state = { production: plan?.production, product: plan?.product, steps: plan?.steps };
 
                   if (canAssign) {
                     return (
@@ -471,12 +481,12 @@ export default function ProductionPlanDetail() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-4">Thông tin sản xuất</div>
               <div className="grid grid-cols-2 gap-4 text-sm text-slate-700 md:grid-cols-4">
-                <InfoBadge label="Mã sản xuất" value={`#PR-${plan.production.productionId}`} />
-                <InfoBadge label="Mã đơn hàng" value={`#ĐH-${plan.production.orderId}`} />
-                <InfoBadge label="Tên đơn hàng" value={plan.production.orderName} />
-                <InfoBadge label="Quản lý dự án" value={plan.production.pmName} />
-                <InfoBadge label="Thời gian" value={`${plan.production.pStartDate} - ${plan.production.pEndDate}`} />
-                <InfoBadge label="Trạng thái" value={plan.production.status} isStatus />
+                <InfoBadge label="Mã sản xuất" value={`#PR-${plan?.production?.productionId || ""}`} />
+                <InfoBadge label="Mã đơn hàng" value={`#ĐH-${plan?.production?.orderId || ""}`} />
+                <InfoBadge label="Tên đơn hàng" value={plan?.production?.orderName} />
+                <InfoBadge label="Quản lý dự án" value={plan?.production?.pmName} />
+                <InfoBadge label="Thời gian" value={`${plan?.production?.pStartDate || ""} - ${plan?.production?.pEndDate || ""}`} />
+                <InfoBadge label="Trạng thái" value={plan?.production?.status} isStatus />
               </div>
             </div>
 
@@ -488,7 +498,7 @@ export default function ProductionPlanDetail() {
                   <span className="text-lg font-bold">{totalCpu.toLocaleString("vi-VN")} VND</span>
                 </div>
                 <div className="mt-3 space-y-2 text-xs text-emerald-700">
-                  <div>Người quản lý: {plan.production.pmName}</div>
+                  <div>Người quản lý: {plan?.production?.pmName}</div>
                 </div>
               </div>
             </div>
@@ -496,7 +506,7 @@ export default function ProductionPlanDetail() {
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[160px_1fr]">
                 <div className="h-40 w-40 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
-                  {plan.product.image ? (
+                  {plan?.product?.image ? (
                     <img src={plan.product.image} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-[11px] text-slate-400">Chưa có ảnh</span>
@@ -504,13 +514,13 @@ export default function ProductionPlanDetail() {
                 </div>
                 <div>
                   <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Thông tin sản phẩm</div>
-                  <div className="mt-2 text-lg font-semibold text-slate-900">{plan.product.productName}</div>
-                  <div className="text-xs text-slate-500 uppercase mt-1">SKU: {plan.product.productCode}</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{plan?.product?.productName}</div>
+                  <div className="text-xs text-slate-500 uppercase mt-1">SKU: {plan?.product?.productCode}</div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-700">
-                    <InfoBadge label="Loại" value={plan.product.type} />
-                    <InfoBadge label="Số lượng" value={`${plan.product.quantity} cái`} />
-                    <InfoBadge label="Màu sắc / Kích thước" value={`${plan.product.color} / ${plan.product.size}`} />
-                    <InfoBadge label="Giá/SP" value={`${plan.product.cpu?.toLocaleString("vi-VN") ?? "-"} VND`} />
+                    <InfoBadge label="Loại" value={plan?.product?.type} />
+                    <InfoBadge label="Số lượng" value={plan?.product?.quantity ? `${plan.product.quantity} cái` : "-"} />
+                    <InfoBadge label="Màu sắc / Kích thước" value={plan?.product ? `${plan.product.color} / ${plan.product.size}` : "-"} />
+                    <InfoBadge label="Giá/SP" value={plan?.product?.cpu ? `${plan.product.cpu.toLocaleString("vi-VN")} VND` : "-"} />
                   </div>
                 </div>
               </div>
@@ -536,7 +546,7 @@ export default function ProductionPlanDetail() {
                   <div className="mt-1 flex items-center justify-between">
                     <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
                     <Link
-                      to={`/production/${plan.production.productionId}/errors`}
+                      to={`/production/${plan?.production?.productionId}/errors`}
                       className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
                     >
                       Xem chi tiết
@@ -561,7 +571,7 @@ export default function ProductionPlanDetail() {
                   <div className="mt-1">
                     <Link
                       to="/worker/daily-report"
-                      state={{ plan: { production: plan.production, steps: plan.steps } }}
+                      state={{ plan: { production: plan?.production, steps: plan?.steps } }}
                       className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
                     >
                       Xem chi tiết sản lượng nhân viên
@@ -629,9 +639,15 @@ export default function ProductionPlanDetail() {
                           {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                            Đang làm
-                          </span>
+                          {(() => {
+                            const label = getPlanStatusLabel(row.statusName || row.statusId || row.status);
+                            const style = STATUS_STYLES[label] || STATUS_STYLES.default;
+                            return (
+                              <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase whitespace-nowrap shadow-sm ${style}`}>
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <Link
@@ -639,8 +655,8 @@ export default function ProductionPlanDetail() {
                             state={{
                               assignment: {
                                 partId: row.partId,
-                                productionId: plan.production.productionId,
-                                orderName: plan.production.orderName,
+                                productionId: plan?.production?.productionId,
+                                orderName: plan?.production?.orderName,
                                 partName: row.partName,
                                 startDate: row.startDate,
                                 endDate: row.endDate,

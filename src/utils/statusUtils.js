@@ -1,14 +1,16 @@
 export const STATUS_STYLES = {
-  "Cần Cập Nhật": "bg-slate-50 text-slate-700 border-slate-200",
-  "Cần Chỉnh Sửa Kế Hoạch": "bg-orange-50 text-orange-700 border-orange-200",
-  "Chấp Nhận": "bg-teal-50 text-teal-700 border-teal-200",
-  "Chờ kiểm tra": "bg-sky-50 text-sky-700 border-sky-200",
-  "Chờ Xét Duyệt": "bg-sky-50 text-sky-700 border-sky-200", // Fallback
-  "Chờ Xét Duyệt Kế Hoạch": "bg-indigo-50 text-indigo-700 border-indigo-200",
-  "Đang Sản Xuất": "bg-violet-50 text-violet-700 border-violet-200",
-  "Hoàn Thành": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Từ Chối": "bg-rose-50 text-rose-700 border-rose-200",
-  default: "bg-gray-50 text-gray-700 border-gray-200",
+  "Cần Cập Nhật": "bg-slate-100 text-slate-700 border-slate-200 shadow-sm",
+  "Cần Chỉnh Sửa Kế Hoạch": "bg-amber-100/50 text-amber-700 border-amber-200 shadow-sm",
+  "Chấp Nhận": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
+  "Chờ Duyệt KH": "bg-indigo-100/50 text-indigo-700 border-indigo-200 shadow-sm",
+  "Chờ kiểm tra": "bg-sky-100/50 text-sky-700 border-sky-200 shadow-sm",
+  "Chờ Xét Duyệt": "bg-sky-100/50 text-sky-700 border-sky-200 shadow-sm",
+  "Chờ Xét Duyệt Kế Hoạch": "bg-indigo-100/50 text-indigo-700 border-indigo-200 shadow-sm",
+  "Đang Sản Xuất": "bg-blue-100/50 text-blue-700 border-blue-200 shadow-sm",
+  "Đã Hoàn Thành": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
+  "Hoàn Thành": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
+  "Chưa Thực Hiện": "bg-slate-100/80 text-slate-500 border-slate-200 shadow-sm",
+  default: "bg-gray-100 text-gray-600 border-gray-200 shadow-sm",
 };
 
 // Mapping theo bảng PS_STATUS trong DB (PS_ID → NAME)
@@ -76,9 +78,9 @@ const PLAN_LABELS = {
 
 export function getPlanStatusLabel(status) {
   if (typeof status === "number") {
-    if (status === 1) return "Chờ Duyệt KH";
+    if (status === 1) return "Chưa Thực Hiện";
     if (status === 2) return "Đang Sản Xuất";
-    if (status === 3) return "Hoàn Thành";
+    if (status === 3) return "Đã Hoàn Thành";
   }
 
   let raw = String(status ?? "").trim();

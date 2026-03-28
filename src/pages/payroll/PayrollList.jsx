@@ -7,7 +7,8 @@ import {
   ChevronRight, 
   Download,
   AlertCircle,
-  Loader2
+  Loader2,
+  RefreshCcw
 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll } from "@/utils/payrollUtils";
@@ -21,33 +22,27 @@ export default function PayrollList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    let active = true;
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchAggregatedPayroll(selectedMonth, selectedYear);
-        if (active) {
-          setWorkerSummary(data);
-        }
-      } catch (err) {
-        if (active) {
-          setError("Không thể tải dữ liệu bảng lương. Vui lòng thử lại sau.");
-          console.error(err);
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
+  const loadData = async (isRefresh = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchAggregatedPayroll(selectedMonth, selectedYear, isRefresh);
+      setWorkerSummary(data || []);
+    } catch (err) {
+      setError("Không thể tải dữ liệu bảng lương. Vui lòng thử lại sau.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadData();
-    return () => { active = false; };
   }, [selectedMonth, selectedYear]);
 
   const stats = useMemo(() => {
-    const totalBudget = workerSummary.reduce((sum, w) => sum + w.totalSalary, 0);
-    const activeWorkers = workerSummary.length;
+    const totalBudget = (workerSummary || []).reduce((sum, w) => sum + (w.totalSalary || 0), 0);
+    const activeWorkers = (workerSummary || []).length;
     return { totalBudget, activeWorkers };
   }, [workerSummary]);
 
@@ -79,85 +74,99 @@ export default function PayrollList() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-100">
-                  <Wallet size={22} />
+          <div className="relative">
+            {loading && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-3xl bg-white/60 backdrop-blur-sm min-h-[400px]">
+                <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-emerald-100">
+                  <Loader2 className="h-12 w-12 animate-spin text-emerald-600" />
+                  <div className="text-center">
+                    <p className="text-base font-bold text-slate-900">Đang tổng hợp dữ liệu bảng lương...</p>
+                    <p className="text-xs text-slate-500 mt-1">Hệ thống đang quét dữ liệu từ các đơn hàng và công đoạn</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng quỹ lương tháng</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-slate-900">
-                      {stats.totalBudget.toLocaleString("vi-VN")}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">VND</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-100">
+                    <Wallet size={22} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng quỹ lương tháng</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-slate-900">
+                        {stats.totalBudget.toLocaleString("vi-VN")}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">VND</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="group relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-100">
+                    <Users size={22} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Thợ có sản lượng</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-black text-slate-900">{stats.activeWorkers}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Người</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-100">
-                  <Users size={22} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Thợ có sản lượng</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black text-slate-900">{stats.activeWorkers}</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Người</span>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm mt-6">
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <CalendarDays size={20} className="text-slate-400" />
+                  <div className="flex items-center gap-2">
+                    <select 
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none transition focus:border-emerald-500 focus:bg-white"
+                    >
+                      {months.map(m => (
+                        <option key={m} value={m}>Tháng {m}</option>
+                      ))}
+                    </select>
+                    <select 
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(Number(e.target.value))}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none transition focus:border-emerald-500 focus:bg-white"
+                    >
+                      {years.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => loadData(true)}
+                      disabled={loading}
+                      className="ml-2 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-emerald-600 shadow-sm disabled:opacity-50"
+                      title="Cập nhật dữ liệu mới nhất"
+                    >
+                      <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+                    </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex flex-wrap items-center gap-6">
-              <div className="flex items-center gap-3">
-                <CalendarDays size={20} className="text-slate-400" />
-                <div className="flex items-center gap-2">
-                  <select 
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none transition focus:border-emerald-500 focus:bg-white"
-                  >
-                    {months.map(m => (
-                      <option key={m} value={m}>Tháng {m}</option>
-                    ))}
-                  </select>
-                  <select 
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(Number(e.target.value))}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium outline-none transition focus:border-emerald-500 focus:bg-white"
-                  >
-                    {years.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                <div className="text-xs text-slate-400 italic">
+                  * Dữ liệu được tổng hợp tự động từ báo cáo sản lượng của tất cả công đoạn.
                 </div>
               </div>
-              <div className="text-xs text-slate-400 italic">
-                * Dữ liệu được tổng hợp tự động từ báo cáo sản lượng của tất cả công đoạn.
+            </div>
+
+            <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[400px] mt-6 relative">
+              <div className="leave-table-card__header">
+                <h2 className="leave-table-card__title">Chi tiết thu nhập thợ</h2>
+                <p className="leave-table-card__subtitle">Thống kê theo lượt báo cáo của nhân viên.</p>
               </div>
-            </div>
-          </div>
 
-          <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[400px] relative">
-            <div className="leave-table-card__header">
-              <h2 className="leave-table-card__title">Chi tiết thu nhập thợ</h2>
-              <p className="leave-table-card__subtitle">Thống kê theo lượt báo cáo của nhân viên.</p>
-            </div>
-
-            <div className="overflow-x-auto relative">
-              {loading && (
-                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 backdrop-blur-[2px] py-20">
-                  <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mb-2" />
-                  <p className="text-sm font-bold text-slate-600">Đang tổng hợp dữ liệu từ hệ thống...</p>
-                  <p className="text-xs text-slate-400">Quá trình này có thể mất vài giây</p>
-                </div>
-              )}
+              <div className="overflow-x-auto relative">
 
               {error && (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -230,6 +239,7 @@ export default function PayrollList() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </PmOwnerLayout>
   );

@@ -44,6 +44,8 @@ export const API_ENDPOINTS = {
     APPROVE_PLAN: (id) => `${BASE_URL}/api/Production/production/approve/production-plan/${id}`,
     NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
     SUBMIT_PLAN: (id) => `${BASE_URL}/api/Production/production/submit/production-plan/${id}`,
+    OUTPUT_HISTORY_WORKER: (workerId) => `${BASE_URL}/api/Production/production/output/history/worker/${workerId}`,
+    OUTPUT_HISTORY_ALL: `${BASE_URL}/api/Production/production/output/history`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>

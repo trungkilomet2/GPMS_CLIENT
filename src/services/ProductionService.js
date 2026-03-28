@@ -41,6 +41,12 @@ const ProductionService = {
   submitProductionPlan(id) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.SUBMIT_PLAN(id));
   },
+  getWorkerOutputHistory(workerId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.OUTPUT_HISTORY_WORKER(workerId));
+  },
+  getOutputHistory() {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.OUTPUT_HISTORY_ALL);
+  },
 };
 
 export default ProductionService;
