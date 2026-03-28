@@ -27,6 +27,8 @@ export function OrderFormSections({
   isSubmitting,
   onCancel,
   materialModalProps,
+  submitLabel = 'Xác nhận tạo đơn',
+  submitIcon = <Plus size={20} />,
 }) {
   return (
     <>
@@ -352,8 +354,8 @@ export function OrderFormSections({
             disabled={isSubmitting}
             className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
           >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
+            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : submitIcon}
+            {isSubmitting ? 'Đang xử lý...' : submitLabel}
           </button>
         </div>
       </div>

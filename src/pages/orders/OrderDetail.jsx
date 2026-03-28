@@ -4,6 +4,7 @@ import {
     ArrowLeft, FileText, MessageSquare, History,
     Loader2, Edit3, Download, Package, Info
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import OrderCommentModal from '@/components/orders/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
@@ -19,6 +20,8 @@ import { hasAnyRole, splitRoles } from '@/lib/authRouting';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
 import OwnerLayout from '@/layouts/OwnerLayout';
+import ProductionService from '@/services/ProductionService';
+import { getProductionStatusLabel } from '@/utils/statusUtils';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
@@ -66,9 +69,9 @@ export default function OrderDetail() {
     const [denyLoading, setDenyLoading] = useState(false);
     const [denyError, setDenyError] = useState(null);
     const [denySuccess, setDenySuccess] = useState(null);
-    const [rejectReason, setRejectReason] = useState('');
-    const [rejectReasonLoading, setRejectReasonLoading] = useState(false);
     const [rejectReasonError, setRejectReasonError] = useState(null);
+    const [hasProduction, setHasProduction] = useState(false);
+    const [isCheckingProduction, setIsCheckingProduction] = useState(false);
     const user = getStoredUser();
     const roles = splitRoles(user?.role);
     const isOwner = hasAnyRole(roles, ['owner']);
@@ -152,11 +155,36 @@ export default function OrderDetail() {
         };
 
         loadRejectReason();
-
-        return () => {
-            isMounted = false;
-        };
+        return () => { isMounted = false; };
     }, [order?.id, order?.status, id]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const checkExistingProduction = async () => {
+            const orderId = order?.id ?? id;
+            if (!orderId) return;
+            try {
+                setIsCheckingProduction(true);
+                const response = await ProductionService.getProductionList({ PageIndex: 0, PageSize: 50 });
+                const list = response?.data?.data ?? response?.data ?? [];
+                
+                const exists = list.some((item) => {
+                    const oid = item?.order?.id ?? item?.orderId ?? item?.orderID ?? item?.order_id;
+                    const statusVal = item?.statusName ?? item?.status;
+                    const normalizedProdStatus = getProductionStatusLabel(statusVal);
+                    return String(oid) === String(orderId) && normalizedProdStatus !== 'Từ Chối';
+                });
+
+                if (isMounted) setHasProduction(exists);
+            } catch (err) {
+                console.error('Error checking existing production:', err);
+            } finally {
+                if (isMounted) setIsCheckingProduction(false);
+            }
+        };
+        checkExistingProduction();
+        return () => { isMounted = false; };
+    }, [order?.id, id]);
 
     if (loading) return (
         <OwnerLayout>
@@ -209,7 +237,8 @@ export default function OrderDetail() {
             setOrder((prev) => ({ ...prev, status: nextStatus }));
         } catch (err) {
             console.error('Lỗi cập nhật trạng thái:', err);
-            alert('Không thể cập nhật trạng thái đơn hàng.');
+            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể cập nhật trạng thái đơn hàng.';
+            toast.error(msg);
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -223,7 +252,8 @@ export default function OrderDetail() {
             setOrder((prev) => (prev ? { ...prev, status: 'Đã chấp nhận' } : prev));
         } catch (err) {
             console.error('Lỗi chấp nhận đơn hàng:', err);
-            alert('Không thể chấp nhận đơn hàng.');
+            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể chấp nhận đơn hàng.';
+            toast.error(msg);
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -294,13 +324,14 @@ export default function OrderDetail() {
                             {canModerate && (
                                 <button type="button"
                                     onClick={() => {
-                                        if (isRejected) return;
+                                        if (isRejected || hasProduction) return;
                                         navigate(`/production/create/${order.id}`);
                                     }}
-                                    disabled={isRejected || normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
+                                    disabled={isRejected || normalizeOrderStatus(order.status) !== 'Đã chấp nhận' || hasProduction || isCheckingProduction}
+                                    title={hasProduction ? "Đơn hàng này đã có đơn sản xuất" : ""}
                                     className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Tạo production
+                                    {isCheckingProduction ? "Đang kiểm tra..." : "Tạo production"}
                                 </button>
                             )}
                             {canModerate && (
@@ -579,7 +610,8 @@ export default function OrderDetail() {
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
                         } catch (err) {
                             console.error('Lỗi yêu cầu chỉnh sửa:', err);
-                            alert('Không thể gửi yêu cầu chỉnh sửa.');
+                            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể gửi yêu cầu chỉnh sửa.';
+                            toast.error(msg);
                         } finally {
                             setIsUpdatingStatus(false);
                         }
@@ -599,7 +631,8 @@ export default function OrderDetail() {
                             setRejectReasonError(null);
                         } catch (err) {
                             console.error('Lỗi từ chối đơn hàng:', err);
-                            alert('Không thể từ chối đơn hàng.');
+                            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể từ chối đơn hàng.';
+                            toast.error(msg);
                         } finally {
                             setIsUpdatingStatus(false);
                         }

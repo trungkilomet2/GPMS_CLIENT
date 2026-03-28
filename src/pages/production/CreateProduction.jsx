@@ -4,6 +4,7 @@ import { hasAnyRole } from "@/lib/roleAccess";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
+import { toast } from 'react-toastify';
 import OrderService from "@/services/OrderService";
 import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
@@ -409,7 +410,7 @@ export default function CreateProduction() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAccepted) {
-      alert("Chỉ được tạo đơn sản xuất cho đơn hàng Đã Chấp Nhận.");
+      toast.error("Chỉ được tạo đơn sản xuất cho đơn hàng Đã Chấp Nhận.");
       return;
     }
     if (!validate()) return;
@@ -445,7 +446,8 @@ export default function CreateProduction() {
       setShowSuccess(true);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
-      alert("Không thể tạo đơn sản xuất. Vui lòng thử lại.");
+      const errorMessage = err?.response?.data?.message || err?.response?.data?.title || "Không thể tạo đơn sản xuất. Vui lòng thử lại.";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
