@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Search, Users, Check } from "lucide-react";
+import { ArrowLeft, Search, Users, Check, AlertTriangle, Info } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
@@ -397,6 +397,11 @@ export default function ProductionAssignment() {
 
   const handleToggleEdit = () => {
     if (isSaving) return;
+    const canAssign = selectedProduction?.status !== "Chờ Xét Duyệt Kế Hoạch" && selectedProduction?.status !== "Cần Chỉnh Sửa Kế Hoạch";
+    if (!canAssign) {
+      toast.warning("Kế hoạch sản xuất cần được duyệt trước khi phân công lao động.");
+      return;
+    }
     if (isEditing) {
       // User clicked Save Edit -> show confirm modal
       setIsConfirmOpen(true);
@@ -499,11 +504,11 @@ export default function ProductionAssignment() {
             <button
               type="button"
               onClick={handleToggleEdit}
-              disabled={isSaving}
+              disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
                 ? "bg-emerald-600 text-white hover:bg-emerald-700"
                 : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
+                } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
             >
               {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
                 Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
@@ -523,8 +528,19 @@ export default function ProductionAssignment() {
           )}
 
           {!incoming?.production && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-              Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800 shadow-sm flex items-center gap-3">
+              <Info size={18} />
+              <span>Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.</span>
+            </div>
+          )}
+
+          {(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 shadow-sm flex items-center gap-3">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Kế hoạch sản xuất hiện tại chưa được duyệt.</strong>
+                <p className="mt-1">Bạn chỉ có thể thực hiện phân công lao động sau khi chủ xưởng đã duyệt thành công bước lập kế hoạch.</p>
+              </div>
             </div>
           )}
 

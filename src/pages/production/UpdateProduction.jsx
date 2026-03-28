@@ -136,9 +136,10 @@ export default function UpdateProduction() {
     return {
       productionId: payload.productionId ?? payload.id ?? null,
       status: payload.statusName || payload.status || "",
-      pStartDate: payload.startDate || payload.pStartDate || "",
-      pEndDate: payload.endDate || payload.pEndDate || "",
+      pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
+      pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
       pmId: payload.pm?.id ?? payload.pmId ?? null,
+      pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
       note: payload.note ?? payload.productionNote ?? "",
       order: {
         ...order,

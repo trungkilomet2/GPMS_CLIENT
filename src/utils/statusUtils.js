@@ -51,32 +51,34 @@ export function getProductionStatusLabel(status) {
   if (normalized.includes("hoàn thành") || normalized.includes("ho\u00e0n th\u00e0nh")) return "Ho\u00e0n Th\u00e0nh";
   if (normalized.includes("từ chối") || normalized.includes("t\u1eeb ch\u1ed1i")) return "T\u1eeb Ch\u1ed1i";
   if (normalized.includes("chấp nhận") || normalized.includes("ch\u1ea5p nh\u1eadn")) return "Ch\u1ea5p Nh\u1eadn";
-  if (normalized.includes("chờ xét duyệt") || normalized.includes("ch\u1edd x\u00e9t duy\u1ec7t")) return "Ch\u1edd ki\u1ec3m tra";
+  if (normalized.includes("chờ xét duyệt") || normalized.includes("ch\u1edd x\u00e9t duy\u1ec7t") || normalized.includes("pending") || normalized.includes("planned")) return "Ch\u1edd ki\u1ec3m tra";
+  if (normalized.includes("in progress")) return "\u0110ang S\u1ea3n Xu\u1ea5t";
+  if (normalized.includes("completed") || normalized.includes("done")) return "Ho\u00e0n Th\u00e0nh";
 
   return raw;
 }
 
 const PLAN_LABELS = {
-  "chờ xét duyệt kế hoạch": "Planned",
-  "cho xet duyet ke hoach": "Planned",
-  planned: "Planned",
-  "chờ xét duyệt": "Planned",
-  "cho xet duyet": "Planned",
-  pending: "Planned",
-  "đang sản xuất": "In Progress",
-  "dang san xuat": "In Progress",
-  "in progress": "In Progress",
-  "hoàn thành": "Completed",
-  "hoan thanh": "Completed",
-  completed: "Completed",
-  done: "Completed",
+  "chờ xét duyệt kế hoạch": "Chờ Duyệt KH",
+  "cho xet duyet ke hoach": "Chờ Duyệt KH",
+  planned: "Chờ Duyệt KH",
+  "chờ xét duyệt": "Chờ Duyệt KH",
+  "cho xet duyet": "Chờ Duyệt KH",
+  pending: "Chờ Duyệt KH",
+  "đang sản xuất": "Đang Sản Xuất",
+  "dang san xuat": "Đang Sản Xuất",
+  "in progress": "Đang Sản Xuất",
+  "hoàn thành": "Hoàn Thành",
+  "hoan thanh": "Hoàn Thành",
+  completed: "Hoàn Thành",
+  done: "Hoàn Thành",
 };
 
 export function getPlanStatusLabel(status) {
   if (typeof status === "number") {
-    if (status === 1) return "Planned";
-    if (status === 2) return "In Progress";
-    if (status === 3) return "Completed";
+    if (status === 1) return "Chờ Duyệt KH";
+    if (status === 2) return "Đang Sản Xuất";
+    if (status === 3) return "Hoàn Thành";
   }
 
   let raw = String(status ?? "").trim();

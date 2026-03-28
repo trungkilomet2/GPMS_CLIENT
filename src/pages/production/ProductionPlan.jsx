@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/roleAccess";
+import { getProductionStatusLabel } from "@/utils/statusUtils";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import "@/styles/homepage.css";
@@ -239,6 +242,10 @@ export default function ProductionPlan() {
   const location = useLocation();
   const navigate = useNavigate();
   const currentUser = useMemo(() => getStoredUser() || {}, []);
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+  const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
+
   const [productionList, setProductionList] = useState([]);
   const [selectedProduction, setSelectedProduction] = useState(null);
 
@@ -256,7 +263,6 @@ export default function ProductionPlan() {
         startDate: s.startDate || "",
         endDate: s.endDate || "",
         ppsId: s.partId || "",
-        isCuttingStep: s.isCuttingStep || false
       }));
     }
     return [];
@@ -282,7 +288,6 @@ export default function ProductionPlan() {
     startDate: "",
     endDate: "",
     cpu: "",
-    isCuttingStep: false,
   });
 
   const currentUserKey = useMemo(() => {
@@ -305,6 +310,11 @@ export default function ProductionPlan() {
     [userStepLabels]
   );
 
+  const isAssignedPM = useMemo(() => {
+    if (!selectedProduction?.pmId) return false;
+    return isPM && String(currentUser?.userId ?? currentUser?.id) === String(selectedProduction.pmId);
+  }, [isPM, currentUser, selectedProduction]);
+
   const totalCpu = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0),
     [rows]
@@ -313,6 +323,24 @@ export default function ProductionPlan() {
   const formatDateTime = (value = "") => {
     if (!value) return "-";
     return String(value).replace("T", " ");
+  };
+
+  const getDurationText = (start, end) => {
+    if (!start || !end) return "-";
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return "-";
+    const diffMs = e - s;
+    if (diffMs <= 0) return "0 giờ";
+
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const remainingHours = totalHours % 24;
+
+    let result = "";
+    if (days > 0) result += `${days} ngày `;
+    if (remainingHours > 0 || days === 0) result += `${remainingHours} giờ`;
+    return result.trim();
   };
 
   const formatDateOnly = (value = "") => {
@@ -395,12 +423,13 @@ export default function ProductionPlan() {
           productionId: payload.productionId ?? payload.id,
           orderId: order.id,
           orderName: order.orderName,
-          pStartDate: payload.startDate || payload.pStartDate,
-          pEndDate: payload.endDate || payload.pEndDate,
-          status: payload.statusName || payload.status || "Planned",
-          pmName: payload.pm?.name ?? payload.pmName,
+          pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
+          pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
+          status: getProductionStatusLabel(payload.statusName || payload.status || "Chờ Xét Duyệt"),
+          pmId: payload.pm?.id ?? payload.pmId,
+          pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
           product: {
-            productCode: order.id ? `PRD-${order.id}` : "PRD-UNKNOWN",
+            productCode: order.id ? `MSP-${order.id}` : "MÃ-SP-KXD",
             productName: order.orderName,
             type: order.type,
             size: typeof order.size === "string" ? order.size.trim() : order.size,
@@ -550,6 +579,15 @@ export default function ProductionPlan() {
 
   const saveSteps = async (force = false) => {
     if (!selectedProductionId || !rows.length || savingParts) return;
+    if (!isAssignedPM) {
+      toast.error("Bạn không phải PM được giao phụ trách đơn này. Không thể lưu kế hoạch.");
+      return;
+    }
+
+    if (rows.length < 3) {
+      toast.error("Số lượng công đoạn phải từ 3 trở lên mới có thể lưu.");
+      return;
+    }
 
     // Show warning if parts exist and it's NOT a forced save
     if (hasExistingParts && !force) {
@@ -562,32 +600,40 @@ export default function ProductionPlan() {
       setIsConfirmSaveOpen(false);
       setSavePartsMessage({ type: "", text: "" });
       const productionId = Number(selectedProductionId);
-      const payload = {
-        parts: rows.map((row) => ({
-          partName: row?.partName || "",
-          startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
-          endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
-          cpu: Number(row?.cpu) || 0,
-          isCuttingStep: row?.isCuttingStep || false
-        })),
-      };
+      const payload = rows.map((row) => ({
+        productionId: productionId,
+        partName: row?.partName || "",
+        startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
+        endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
+        cpu: Number(row?.cpu || 0),
+      }));
 
-      await ProductionPartService.createParts(productionId, payload);
+      // Debug: Log payload to see what's being sent
+      console.log("Saving Production Parts:", { parts: payload });
+
+      await ProductionPartService.createParts(productionId, { parts: payload });
       setHasExistingParts(true);
-      setSavePartsMessage({ type: "success", text: "Đã lưu công đoạn." });
+      toast.success("Đã lưu kế hoạch sản xuất thành công!");
       setIsSuccessModalOpen(true);
       savePlan();
     } catch (error) {
-      console.error(error);
+      console.error("Save Error:", error);
+      console.log("Error Response:", error?.response?.data);
+      
       let errMsg = "Lưu công đoạn thất bại.";
       const data = error?.response?.data;
       if (data?.errors) {
         errMsg = Object.values(data.errors).flat().join(" | ");
       } else if (data?.message) {
         errMsg = data.message;
+      } else if (data?.detail) {
+        errMsg = data.detail;
+      } else if (data?.title) {
       } else if (typeof data === 'string' && data) {
         errMsg = data;
       }
+      
+      toast.error(errMsg);
       setSavePartsMessage({ type: "error", text: `Chi tiết lỗi: ${errMsg}` });
     } finally {
       setSavingParts(false);
@@ -624,7 +670,7 @@ export default function ProductionPlan() {
 
   const openAddModal = () => {
     setEditingIndex(null);
-    setForm({ partName: "", startDate: "", endDate: "", cpu: "", isCuttingStep: false });
+    setForm({ partName: "", startDate: "", endDate: "", cpu: "" });
     setFormError("");
     setIsModalOpen(true);
   };
@@ -638,7 +684,6 @@ export default function ProductionPlan() {
       startDate: target.startDate || "",
       endDate: target.endDate || "",
       cpu: target.cpu || "",
-      isCuttingStep: target.isCuttingStep || false,
     });
     setFormError("");
     setIsModalOpen(true);
@@ -664,8 +709,19 @@ export default function ProductionPlan() {
       setFormError("Tên công đoạn không được để trống.");
       return;
     }
+    if (name.length > 100) {
+      setFormError("Tên công đoạn không được dài quá 100 ký tự.");
+      return;
+    }
     if (!form.startDate) {
       setFormError("Vui lòng chọn ngày bắt đầu.");
+      return;
+    }
+    const now = new Date();
+    // Cho phép sai lệch 1 phút để tránh lỗi khi người dùng nhập liệu lâu
+    const graceNow = new Date(now.getTime() - 60000); 
+    if (new Date(form.startDate) < graceNow) {
+      setFormError("Ngày bắt đầu không được nhỏ hơn ngày giờ hiện tại.");
       return;
     }
     if (!form.endDate) {
@@ -678,6 +734,10 @@ export default function ProductionPlan() {
     }
     if (form.cpu === "" || Number(form.cpu) < 0 || isNaN(Number(form.cpu))) {
       setFormError("Giá/SP phải là số hợp lệ lớn hơn hoặc bằng 0.");
+      return;
+    }
+    if (Number(form.cpu) > 100000000) {
+      setFormError("Giá/SP không được vượt quá 100.000.000 VNĐ.");
       return;
     }
     setFormError("");
@@ -693,7 +753,6 @@ export default function ProductionPlan() {
             startDate: form.startDate,
             endDate: form.endDate,
             ppsId: "",
-            isCuttingStep: form.isCuttingStep,
           },
         ];
         setSelectedIndex(next.length - 1);
@@ -707,7 +766,6 @@ export default function ProductionPlan() {
         productionId: Number(selectedProductionId),
         startDate: form.startDate,
         endDate: form.endDate,
-        isCuttingStep: form.isCuttingStep,
       };
       return next;
     });
@@ -735,7 +793,6 @@ export default function ProductionPlan() {
       startDate: baseStart,
       endDate: baseEnd,
       ppsId: "",
-      isCuttingStep: String(step.partName).toLowerCase().includes("cat") || false
     }));
     setRows(next);
     setSelectedIndex(0);
@@ -789,17 +846,14 @@ export default function ProductionPlan() {
                   {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
                 </div>
               </div>
-              <span className="inline-block rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-700">
-                {selectedProduction?.status || "Chưa chọn"}
-              </span>
             </button>
             {showProductionInfo && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-700">
                 <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
                 <InfoItem label="Tên đơn" value={selectedProduction?.orderName || "-"} />
                 <InfoItem label="PM quản lý" value={selectedProduction?.pmName || "-"} />
-                <InfoItem label="Ngày bắt đầu" value={selectedProduction?.pStartDate || "-"} />
-                <InfoItem label="Ngày kết thúc" value={selectedProduction?.pEndDate || "-"} />
+                <InfoItem label="Ngày bắt đầu" value={formatDateOnly(selectedProduction?.pStartDate) || "-"} />
+                <InfoItem label="Ngày kết thúc" value={formatDateOnly(selectedProduction?.pEndDate) || "-"} />
               </div>
             )}
           </div>
@@ -1002,8 +1056,8 @@ export default function ProductionPlan() {
 
                 <button
                   onClick={openAddModal}
-                  disabled={!selectedProductionId}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  disabled={!selectedProductionId || !isAssignedPM}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus size={16} /> Thêm công đoạn
                 </button>
@@ -1025,6 +1079,7 @@ export default function ProductionPlan() {
                     <th className="leave-table-th px-3 py-3 text-left">Tên công đoạn</th>
                     <th className="leave-table-th px-3 py-3 text-center">Bắt đầu</th>
                     <th className="leave-table-th px-3 py-3 text-center">Kết thúc</th>
+                    <th className="leave-table-th px-3 py-3 text-center">Thời gian</th>
                     <th className="leave-table-th px-3 py-3 text-center">Giá/SP</th>
                     <th className="leave-table-th px-3 py-3 text-center">Thao tác</th>
                   </tr>
@@ -1040,17 +1095,22 @@ export default function ProductionPlan() {
                       <td className="px-3 py-2 font-medium text-slate-700">{row.partName || "-"}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.startDate)}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.endDate)}</td>
+                      <td className="px-3 py-2 text-center text-slate-500 font-medium">
+                        {getDurationText(row.startDate, row.endDate)}
+                      </td>
                       <td className="px-3 py-2 text-center font-semibold text-slate-700">
-                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VNĐ` : "-"}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
+                              if (!isAssignedPM) return;
                               openEditModal(idx);
                             }}
-                            className="text-slate-500 hover:text-slate-700"
+                            disabled={!isAssignedPM}
+                            className={`text-slate-500 hover:text-slate-700 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
                             aria-label="Sửa công đoạn"
                           >
                             <Pencil size={16} />
@@ -1058,9 +1118,11 @@ export default function ProductionPlan() {
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
+                              if (!isAssignedPM) return;
                               removeRow(idx);
                             }}
-                            className="text-rose-500 hover:text-rose-600"
+                            disabled={!isAssignedPM}
+                            className={`text-rose-500 hover:text-rose-600 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
                             aria-label="Xóa công đoạn"
                           >
                             <Trash2 size={16} />
@@ -1069,10 +1131,10 @@ export default function ProductionPlan() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-50">
-                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">TOTAL</td>
-                    <td className="px-3 py-3 text-center font-semibold text-slate-700">
-                      {`${totalCpu.toLocaleString("vi-VN")} VND`}
+                  <tr className="bg-slate-50 border-t-2 border-slate-100">
+                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700 text-right">TỔNG CỘNG</td>
+                    <td className="px-3 py-3 text-center font-bold text-emerald-600">
+                      {`${totalCpu.toLocaleString("vi-VN")} VNĐ`}
                     </td>
                     <td></td>
                   </tr>
@@ -1101,8 +1163,8 @@ export default function ProductionPlan() {
               <button
                 type="button"
                 onClick={saveSteps}
-                disabled={!selectedProductionId || !rows.length}
-                className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400"
+                disabled={!selectedProductionId || !rows.length || !isAssignedPM}
+                className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400 disabled:cursor-not-allowed"
               >
                 Lưu kế hoạch
               </button>
@@ -1166,18 +1228,6 @@ export default function ProductionPlan() {
                   placeholder="Ví dụ: 200"
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-center outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
-              </div>
-              <div className="flex items-center gap-3 py-1">
-                <input
-                  type="checkbox"
-                  id="isCuttingStep"
-                  checked={form.isCuttingStep}
-                  onChange={(event) => handleFormChange("isCuttingStep", event.target.checked)}
-                  className="h-5 w-5 rounded-lg border-slate-200 text-emerald-600 focus:ring-emerald-500 transition-all cursor-pointer"
-                />
-                <label htmlFor="isCuttingStep" className="text-sm font-bold text-slate-700 cursor-pointer select-none">
-                  Công đoạn cắt (Sử dụng dữ liệu từ Sổ cắt)
-                </label>
               </div>
             </div>
             <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-3">

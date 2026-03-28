@@ -124,6 +124,8 @@ export default function ProductionDetail() {
   const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
   const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
   const isWorker = hasAnyRole(roleValue, ["worker", "kcs", "team leader"]);
+  const currentUserId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+  const isAssignedPM = isPM && String(currentUserId) === String(production?.pmId);
   const customerId = getOrderCustomerId(production?.order);
 
   useEffect(() => {
@@ -140,10 +142,10 @@ export default function ProductionDetail() {
       return {
         productionId: payload.productionId ?? payload.id ?? null,
         status: resolvedStatus === "-" ? getProductionStatusLabel(1) : resolvedStatus,
-        pStartDate: payload.startDate || payload.pStartDate || "",
-        pEndDate: payload.endDate || payload.pEndDate || "",
+        pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
+        pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
         pmId: payload.pm?.id ?? payload.pmId ?? null,
-        pmName: payload.pm?.name ?? payload.pmName ?? "",
+        pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
         note: payload.note ?? payload.productionNote ?? "",
         order: {
           ...order,
@@ -485,7 +487,7 @@ export default function ProductionDetail() {
               )}
 
               {/* Nút cho PM lập kế hoạch và gửi duyệt */}
-              {(isPM || isOwner) && (isAccepted || isNeedUpdatePlan) && (
+              {isAssignedPM && (isAccepted || isNeedUpdatePlan) && (
                 <>
                   <Link
                     to="/production-plan/create"
@@ -516,7 +518,7 @@ export default function ProductionDetail() {
                 </button>
               )}
 
-              {(isPM || isOwner) && (isInProduction || isPendingPlanApproval) && (
+              {(isPM || isOwner) && isInProduction && (
                 <Link
                   to={`/production-plan/assign/${production.productionId}`}
                   state={{ production, product: { ...order, productName: order.orderName }, steps }}

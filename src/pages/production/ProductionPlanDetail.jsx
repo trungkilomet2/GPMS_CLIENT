@@ -441,13 +441,28 @@ export default function ProductionPlanDetail() {
                   Báo cáo sản lượng
                 </Link>
               ) : (
-                <Link
-                  to={`/production-plan/assign/${plan.production.productionId}`}
-                  state={{ production: plan.production, product: plan.product, steps: plan.steps }}
-                  className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
-                >
-                  Phân công
-                </Link>
+                (() => {
+                  const rawStatus = String(plan.production.status || "").toLowerCase().normalize("NFC");
+                  const isApproved = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
+                  const hasEnoughParts = totalParts >= 3;
+                  
+                  const canAssign = isApproved && hasEnoughParts;
+                  const assignmentLink = `/production-plan/assign/${plan.production.productionId}`;
+                  const state = { production: plan.production, product: plan.product, steps: plan.steps };
+
+                  if (canAssign) {
+                    return (
+                      <Link
+                        to={assignmentLink}
+                        state={state}
+                        className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
+                      >
+                        Phân công lao động
+                      </Link>
+                    );
+                  }
+                  return null;
+                })()
               )}
             </div>
           </div>
