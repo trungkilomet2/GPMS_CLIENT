@@ -69,6 +69,8 @@ export default function OrderDetail() {
     const [denyLoading, setDenyLoading] = useState(false);
     const [denyError, setDenyError] = useState(null);
     const [denySuccess, setDenySuccess] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectReasonLoading, setRejectReasonLoading] = useState(false);
     const [rejectReasonError, setRejectReasonError] = useState(null);
     const [hasProduction, setHasProduction] = useState(false);
     const [isCheckingProduction, setIsCheckingProduction] = useState(false);
