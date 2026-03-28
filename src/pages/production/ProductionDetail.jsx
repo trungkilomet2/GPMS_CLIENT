@@ -196,7 +196,7 @@ export default function ProductionDetail() {
     let active = true;
 
     const loadCustomerProfile = async () => {
-      if (!customerId) {
+      if (!customerId || !isOwner) {
         if (active) setCustomerProfile(null);
         return;
       }
@@ -748,14 +748,16 @@ export default function ProductionDetail() {
             </div>
 
             <div className="space-y-6">
-              <CustomerInfoCard
-                order={order}
-                profile={customerProfile}
-                title="Thông tin khách hàng"
-                nameLabel="Họ tên"
-                phoneLabel="SĐT"
-                addressLabel="Địa chỉ"
-              />
+              {isOwner && (
+                <CustomerInfoCard
+                  order={order}
+                  profile={customerProfile}
+                  title="Thông tin khách hàng"
+                  nameLabel="Họ tên"
+                  phoneLabel="SĐT"
+                  addressLabel="Địa chỉ"
+                />
+              )}
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>

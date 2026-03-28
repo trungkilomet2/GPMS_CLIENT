@@ -7,7 +7,10 @@ import { formatOrderDate } from "@/lib/orders/formatters";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import { userService } from "@/services/UserService";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/roleAccess";
+import { getOrderCustomerId } from "@/lib/orders/customerInfo";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -95,6 +98,13 @@ export default function UpdateProduction() {
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customerProfile, setCustomerProfile] = useState(null);
+
+  const currentUser = getStoredUser();
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+  const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
+  const customerId = getOrderCustomerId(production?.order);
 
   useEffect(() => {
     let active = true;
@@ -194,6 +204,25 @@ export default function UpdateProduction() {
       productionNote: production?.note ?? "",
     });
   }, [production]);
+
+  useEffect(() => {
+    let active = true;
+    const loadCustomerProfile = async () => {
+      if (!customerId || !isOwner) {
+        if (active) setCustomerProfile(null);
+        return;
+      }
+      try {
+        const profile = await userService.getProfileById(customerId);
+        if (active) setCustomerProfile(profile || null);
+      } catch (err) {
+        if (active) setCustomerProfile(null);
+        console.error("Không thể tải hồ sơ khách hàng:", err);
+      }
+    };
+    loadCustomerProfile();
+    return () => { active = false; };
+  }, [customerId, isOwner, isPM]);
 
   const order = useMemo(() => production?.order || {}, [production]);
   const orderSummaryRows = useMemo(() => ([
@@ -401,13 +430,16 @@ export default function UpdateProduction() {
             </div>
 
             <div className="space-y-6">
-              <CustomerInfoCard
-                order={order}
-                title="Thông tin bổ sung"
-                nameLabel="Khách hàng"
-                phoneLabel="SĐT"
-                addressLabel="Địa chỉ"
-              />
+              {isOwner && (
+                <CustomerInfoCard
+                  order={order}
+                  profile={customerProfile}
+                  title="Thông tin bổ sung"
+                  nameLabel="Khách hàng"
+                  phoneLabel="SĐT"
+                  addressLabel="Địa chỉ"
+                />
+              )}
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>

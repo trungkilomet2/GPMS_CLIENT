@@ -30,6 +30,9 @@ export default function CreateProduction() {
   const [orderError, setOrderError] = useState(null);
 
   const currentUser = getStoredUser();
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+  const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
   const [pmUsers, setPmUsers] = useState([]);
   const [loadingPM, setLoadingPM] = useState(true);
   const [pmError, setPmError] = useState(null);
@@ -344,7 +347,7 @@ export default function CreateProduction() {
   useEffect(() => {
     let active = true;
     const loadCustomerProfile = async () => {
-      if (!customerId) {
+      if (!customerId || !isOwner) {
         if (active) setCustomerProfile(null);
         return;
       }
@@ -655,14 +658,16 @@ export default function CreateProduction() {
             </div>
 
             <div className="space-y-6">
-              <CustomerInfoCard
-                order={order}
-                profile={customerProfile}
-                title="Thông tin bổ sung"
-                nameLabel="Khách hàng"
-                phoneLabel="SĐT"
-                addressLabel="Địa chỉ"
-              />
+              {isOwner && (
+                <CustomerInfoCard
+                  order={order}
+                  profile={customerProfile}
+                  title="Thông tin bổ sung"
+                  nameLabel="Khách hàng"
+                  phoneLabel="SĐT"
+                  addressLabel="Địa chỉ"
+                />
+              )}
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
                 <div>
