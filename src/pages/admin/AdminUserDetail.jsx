@@ -136,9 +136,9 @@ export default function AdminUserDetail() {
                 <ArrowLeft size={18} />
                 <span>Quay lại danh sách user</span>
               </Link>
-              <h1 className="admin-hero__title">View User Detail Screen</h1>
+              <h1 className="admin-hero__title">Chi tiết tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Màn chi tiết để Admin đọc toàn bộ hồ sơ account, trạng thái bảo mật, phạm vi quyền và hoạt động gần nhất của từng user.
+                Xem đầy đủ hồ sơ tài khoản, trạng thái bảo mật, phạm vi quyền và hoạt động gần nhất của từng người dùng.
               </p>
             </div>
 
@@ -146,12 +146,12 @@ export default function AdminUserDetail() {
               <div className="admin-hero__actions">
                 {user.roleKey ? (
                   <Link to={`/admin/permissions?role=${user.roleKey}`} className="admin-btn admin-btn--secondary">
-                    Manage Permission
+                    Quản lý quyền
                   </Link>
                 ) : null}
                 <Link to={`/admin/users/${user.id}/edit`} className="admin-btn admin-btn--primary">
                   <Pencil size={18} />
-                  <span>Update User</span>
+                  <span>Cập nhật tài khoản</span>
                 </Link>
                 <button
                   type="button"
@@ -161,7 +161,7 @@ export default function AdminUserDetail() {
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
                   <span>
-                    {user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}
+                    {user.status === "inactive" ? "Đã vô hiệu hóa" : "Vô hiệu hóa tài khoản"}
                   </span>
                 </button>
               </div>
@@ -296,8 +296,8 @@ export default function AdminUserDetail() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Access & permission</h2>
-                    <p className="admin-card__subtitle">Role hiện tại và phần web đang hiển thị theo role đó.</p>
+                    <h2 className="admin-card__title">Quyền truy cập và phân quyền</h2>
+                    <p className="admin-card__subtitle">Vai trò hiện tại và phạm vi chức năng hệ thống đang hiển thị theo vai trò đó.</p>
                   </div>
                 </div>
 
@@ -339,11 +339,11 @@ export default function AdminUserDetail() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Recent system activity</h2>
-                      <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất liên quan tới user này, nếu có.</p>
+                    <h2 className="admin-card__title">Hoạt động hệ thống gần đây</h2>
+                    <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất liên quan tới tài khoản này, nếu có.</p>
                     </div>
                     <Link to={`/admin/logs?relatedTo=${user.id}`} className="admin-link-btn admin-link-btn--secondary">
-                      View System Log
+                      Xem nhật ký hệ thống
                     </Link>
                   </div>
 

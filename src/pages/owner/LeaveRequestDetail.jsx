@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
@@ -69,13 +71,19 @@ function DetailItem({ icon: Icon, label, value }) {
   );
 }
 
+function shouldShowApprover(leave) {
+  return Boolean(leave?.approvedByName) && leave?.status !== "pending";
+}
+
 export default function LeaveRequestDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
-  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
-  const backPath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
-  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
+  const user = getStoredUser();
+  const isWorkerRoute = location.pathname.startsWith("/worker/leave-requests");
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const backPath = isWorkerRoute ? "/worker/leave-requests" : "/leave-requests";
+  const LayoutComponent = primaryRole === "worker" || primaryRole === "kcs" ? WorkerLayout : PmOwnerLayout;
   const [leave, setLeave] = useState(location.state?.leave ?? null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -210,13 +218,13 @@ export default function LeaveRequestDetail() {
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-4 rounded-3xl bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-6 text-white shadow-lg">
+              <div className="flex flex-col gap-3.5 rounded-[2rem] bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-5 text-white shadow-lg">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => navigate(backPath)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                      className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-white/15"
                     >
                       <ArrowLeft size={16} />
                       Quay lại
@@ -224,35 +232,35 @@ export default function LeaveRequestDetail() {
                     <div className="hidden h-8 w-px bg-white/20 sm:block" />
                     <div>
                       <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">
-                        {isWorkerView ? "Worker Leave Request" : "My Leave Request"}
+                        Đơn nghỉ của tôi
                       </div>
-                      <h1 className="mt-1 text-2xl font-bold">Chi tiết đơn nghỉ #{leave.id}</h1>
+                      <h1 className="mt-1 text-[1.75rem] font-bold leading-tight">Chi tiết đơn nghỉ</h1>
                     </div>
                   </div>
 
                   <StatusBadge status={leave.status} />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người gửi</div>
-                    <div className="mt-2 text-lg font-semibold">{leave.userFullName}</div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người gửi</div>
+                    <div className="mt-1.5 text-base font-semibold leading-snug">{leave.userFullName}</div>
                   </div>
-                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
-                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateCreate)}</div>
+                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
+                    <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateCreate)}</div>
                   </div>
-                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                    <div className="mt-2 text-lg font-semibold">{formatLeaveDateTime(leave.dateReply)}</div>
+                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
+                    <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
-                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
-                    <div className="mt-2 text-lg font-semibold">{leave.approvedByName || "Chưa cập nhật"}</div>
+                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
+                    <div className="mt-1.5 text-base font-semibold leading-snug">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
                   </div>
-                  <div className="rounded-2xl border border-white/15 bg-white/10 p-4 md:col-span-3">
-                    <div className="text-xs uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
-                    <div className="mt-2 text-lg font-semibold">
+                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 md:col-span-3">
+                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
+                    <div className="mt-1.5 text-base font-semibold leading-snug">
                       {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
                     </div>
                   </div>
@@ -351,7 +359,7 @@ export default function LeaveRequestDetail() {
                       <DetailItem icon={FileText} label="Trạng thái" value={STATUS_MAP[leave.status]?.label || "Chưa cập nhật"} />
                       <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatLeaveDateTime(leave.dateCreate)} />
                       <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
-                      <DetailItem icon={UserRound} label="Người phê duyệt" value={leave.approvedByName} />
+                      <DetailItem icon={UserRound} label="Người phê duyệt" value={shouldShowApprover(leave) ? leave.approvedByName : ""} />
                       <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
                       <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
                     </div>

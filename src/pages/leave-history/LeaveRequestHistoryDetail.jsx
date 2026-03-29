@@ -63,6 +63,10 @@ function DetailItem({ icon: Icon, label, value }) {
   );
 }
 
+function shouldShowApprover(leave) {
+  return Boolean(leave?.approvedByName) && leave?.status !== "pending";
+}
+
 function getTimelineItems(leave) {
   const isApproved = leave?.status === "approved";
   const isRejected = leave?.status === "rejected";
@@ -172,7 +176,7 @@ export default function LeaveRequestHistoryDetail() {
                     <div className="hidden h-8 w-px bg-white/20 sm:block" />
                     <div>
                       <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">Leave Request History</div>
-                      <h1 className="mt-1 text-2xl font-bold">Chi tiết lịch sử đơn nghỉ #{leave.id}</h1>
+                      <h1 className="mt-1 text-2xl font-bold">Chi tiết lịch sử đơn nghỉ</h1>
                     </div>
                   </div>
 
@@ -194,7 +198,7 @@ export default function LeaveRequestHistoryDetail() {
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
-                    <div className="mt-2 text-lg font-semibold">{leave.approvedByName || "Chưa cập nhật"}</div>
+                    <div className="mt-2 text-lg font-semibold">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
                   </div>
                   <div className="rounded-2xl border border-white/15 bg-white/10 p-4 md:col-span-3">
                     <div className="text-xs uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
@@ -213,7 +217,7 @@ export default function LeaveRequestHistoryDetail() {
                     <div className="mt-5 grid gap-3 md:grid-cols-2">
                       <DetailItem icon={UserRound} label="Nhân viên gửi đơn" value={leave.userFullName} />
                       <DetailItem icon={CalendarClock} label="Ngày tạo đơn" value={formatLeaveDateTime(leave.dateCreate)} />
-                      <DetailItem icon={UserRound} label="Người phê duyệt" value={leave.approvedByName} />
+                      <DetailItem icon={UserRound} label="Người phê duyệt" value={shouldShowApprover(leave) ? leave.approvedByName : ""} />
                       <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
                       <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
                     </div>

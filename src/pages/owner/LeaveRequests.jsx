@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
@@ -94,8 +96,13 @@ function toIsoFromLocalDateTime(value) {
   return parsed.toISOString();
 }
 
+function shouldShowApprover(leave) {
+  return Boolean(leave?.approvedByName) && leave?.status !== "pending";
+}
+
 export default function LeaveRequests() {
   const location = useLocation();
+  const user = getStoredUser();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,9 +118,10 @@ export default function LeaveRequests() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
-  const isWorkerView = location.pathname.startsWith("/worker/leave-requests");
-  const detailBasePath = isWorkerView ? "/worker/leave-requests" : "/leave-requests";
-  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
+  const isWorkerRoute = location.pathname.startsWith("/worker/leave-requests");
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const detailBasePath = isWorkerRoute ? "/worker/leave-requests" : "/leave-requests";
+  const LayoutComponent = primaryRole === "worker" || primaryRole === "kcs" ? WorkerLayout : PmOwnerLayout;
 
   useEffect(() => {
     let active = true;
@@ -420,13 +428,13 @@ export default function LeaveRequests() {
                               <div className="mt-2 text-xs text-slate-500">
                                 Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
                               </div>
-                              {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
+                              {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                               {item.cancelContent ? <div className="mt-1 text-xs text-slate-500">Lý do hủy: {item.cancelContent}</div> : null}
                             </td>
                             <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
                             <td className="px-5 py-4 align-top text-sm text-slate-700">
                               <div>{formatLeaveDateTime(item.dateReply)}</div>
-                              {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                              {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
                             </td>
                             <td className="px-5 py-4 align-top">
                               <StatusBadge status={item.status} />

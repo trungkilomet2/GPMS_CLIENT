@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -101,7 +101,6 @@ function SummaryCard({ label, value, icon, active, onClick }) {
 
 export default function LeaveList() {
   const navigate = useNavigate();
-  const mountedRef = useRef(true);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -111,13 +110,6 @@ export default function LeaveList() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     const handler = () => setRefreshKey((prev) => prev + 1);
@@ -144,6 +136,15 @@ export default function LeaveList() {
 
         if (search.trim()) {
           params.FilterQuery = search.trim();
+        }
+
+        if (statusFilter !== "all") {
+          params.Status = statusFilter;
+        }
+
+        if (dateFilter) {
+          params.DateCreateFrom = new Date(`${dateFilter}T00:00:00`).toISOString();
+          params.DateCreateTo = new Date(`${dateFilter}T23:59:59.999`).toISOString();
         }
 
         const response = await LeaveService.getLeaveRequests(params);
@@ -205,14 +206,8 @@ export default function LeaveList() {
   const paginated = useMemo(
     () =>
       items
-        .filter((item) => {
-          const matchStatus = statusFilter === "all" || item.status === statusFilter;
-          const matchDate = !dateFilter || String(item.dateCreate ?? "").startsWith(dateFilter);
-
-          return matchStatus && matchDate;
-        })
         .sort((left, right) => compareLeaveDateDesc(left.dateCreate, right.dateCreate)),
-    [dateFilter, items, statusFilter]
+    [items]
   );
 
   const resetFilters = () => {
@@ -268,6 +263,8 @@ export default function LeaveList() {
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
+                  <option value="cancel_requested">Chờ hủy</option>
+                  <option value="cancelled">Đã hủy</option>
                 </select>
               </label>
 
@@ -355,7 +352,7 @@ export default function LeaveList() {
                           <div className="mt-2 text-xs text-slate-500">
                             Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
                           </div>
-                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
+                          {item.approvedByName && item.status !== "pending" ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                           {item.denyContent && (
                             <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                               Lý do từ chối: {item.denyContent}
@@ -365,7 +362,7 @@ export default function LeaveList() {
                         <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">
                           <div>{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</div>
-                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                          {item.approvedByName && item.status !== "pending" ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
                         </td>
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />

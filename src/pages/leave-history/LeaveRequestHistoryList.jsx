@@ -73,6 +73,10 @@ function SummaryCard({ label, value, icon: Icon }) {
   );
 }
 
+function shouldShowApprover(leave) {
+  return Boolean(leave?.approvedByName) && leave?.status !== "pending";
+}
+
 export default function LeaveRequestHistoryList() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -259,13 +263,13 @@ export default function LeaveRequestHistoryList() {
                           <div className="mt-2 text-xs text-slate-500">
                             Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
                           </div>
-                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
+                          {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                           {item.cancelContent ? <div className="mt-1 text-xs text-slate-500">Lý do hủy: {item.cancelContent}</div> : null}
                         </td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">
                           <div>{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</div>
-                          {item.approvedByName ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                          {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
                         </td>
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />

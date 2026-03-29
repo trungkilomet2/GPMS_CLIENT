@@ -66,7 +66,8 @@ const normalizeEmployee = (item = {}) => {
   const workerSkillCandidates = splitRoles(
     item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
   );
-  const workerRole = workerSkillCandidates[0] ?? "";
+  const workerSkillNames = Array.from(new Set(workerSkillCandidates.filter(Boolean)));
+  const workerRole = workerSkillNames[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);
   const managerIdRaw = item.managerId ?? item.manager?.id ?? item.parentId ?? null;
@@ -98,6 +99,8 @@ const normalizeEmployee = (item = {}) => {
     role,
     roles,
     roleLabels: roles.map(getSystemRoleLabel),
+    workerSkillNames,
+    workerSkillLabels: workerSkillNames.map(getWorkerSkillLabel),
     workerRole,
     workerRoleLabel: workerRole ? getWorkerSkillLabel(workerRole) : "",
     workerSkill: workerRole,

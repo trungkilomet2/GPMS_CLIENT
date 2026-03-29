@@ -40,6 +40,7 @@ const EmployeeDirectory = lazy(() => import("@/pages/employees/EmployeeDirectory
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
+const EmployeeSkillAssignment = lazy(() => import("@/pages/employees/EmployeeSkillAssignment"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
 const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
 const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
@@ -115,6 +116,7 @@ export const routes = [
   { path: "/employees/workers", element: guardByRoles(["Owner", "PM"], <EmployeeList />) },
   { path: "/employees/create", element: guardByRoles(["Owner"], <EmployeeCreate />) },
   { path: "/employees/:id/edit", element: guardByRoles(["Owner"], <EmployeeUpdate />) },
+  { path: "/employees/:id/skills", element: guardByRoles(["Owner"], <EmployeeSkillAssignment />) },
   { path: "/employees/:id", element: guardByRoles(["Owner", "PM"], <EmployeeDetail />) },
   { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },
   { path: "/payroll/:employeeId", element: guardByRoles(["Owner"], <PayrollDetail />) },

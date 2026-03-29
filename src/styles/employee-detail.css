@@ -76,6 +76,14 @@
   transform: translateY(-1px);
 }
 
+.employee-detail-btn--secondary {
+  margin-top: 0.85rem;
+  background: #f6fbf8;
+  color: #1f6b42;
+  border: 1px solid #d7e5dd;
+  box-shadow: none;
+}
+
 .employee-detail-btn--danger {
   background: linear-gradient(135deg, #e36c5c 0%, #c84638 100%);
   box-shadow: 0 16px 30px rgba(200, 70, 56, 0.18);

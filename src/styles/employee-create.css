@@ -99,6 +99,12 @@
   transform: none;
 }
 
+.employee-create-btn--compact {
+  min-height: 2.8rem;
+  padding: 0 1rem;
+  border-radius: 0.9rem;
+}
+
 .employee-create-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.82fr);
@@ -310,6 +316,16 @@
   font-weight: 600;
 }
 
+.employee-create-inline-link {
+  color: #1f6b42;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.employee-create-inline-link:hover {
+  text-decoration: underline;
+}
+
 .employee-create-banner--error {
   border: 1px solid #f0c8c2;
   background: #fff4f2;
@@ -484,6 +500,202 @@
   line-height: 1.55;
 }
 
+.employee-skill-assignment__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #dce8e1;
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, #fbfdfa 0%, #f5faf7 100%);
+}
+
+.employee-skill-assignment__worker {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.employee-skill-assignment__worker-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  background: #e7f8ee;
+  color: #2d9058;
+}
+
+.employee-skill-assignment__worker-name {
+  color: #1a2e23;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.employee-skill-assignment__worker-meta {
+  margin-top: 0.2rem;
+  color: #6b7d74;
+  font-size: 0.9rem;
+}
+
+.employee-skill-assignment__stats {
+  display: flex;
+  align-items: stretch;
+  gap: 0.8rem;
+}
+
+.employee-skill-assignment__stat {
+  min-width: 7rem;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid #dce8e1;
+  padding: 0.85rem 1rem;
+  text-align: center;
+}
+
+.employee-skill-assignment__stat strong {
+  display: block;
+  color: #1f6b42;
+  font-size: 1.35rem;
+}
+
+.employee-skill-assignment__stat span {
+  color: #6b7d74;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.employee-skill-assignment__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.employee-skill-assignment__table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border: 1px solid #dce8e1;
+  border-radius: 1.35rem;
+  background: #fff;
+}
+
+.employee-skill-assignment__table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.employee-skill-assignment__table thead th {
+  padding: 1rem 1.1rem;
+  background: #f6faf8;
+  color: #496056;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.employee-skill-assignment__table tbody td {
+  padding: 1rem 1.1rem;
+  border-top: 1px solid #edf3ef;
+  vertical-align: middle;
+}
+
+.employee-skill-assignment__table tbody tr.is-selected {
+  background: #f6fcf8;
+}
+
+.employee-skill-assignment__skill-name {
+  color: #1a2e23;
+  font-weight: 800;
+}
+
+.employee-skill-assignment__skill-code,
+.employee-skill-assignment__skill-desc {
+  margin-top: 0.2rem;
+  color: #72837a;
+  font-size: 0.88rem;
+}
+
+.employee-skill-assignment__tick-head,
+.employee-skill-assignment__tick-cell {
+  width: 8rem;
+  text-align: center;
+}
+
+.employee-skill-assignment__tick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  background: #e9f7ef;
+  color: #1f6b42;
+  padding: 0.45rem 0.8rem;
+}
+
+.employee-skill-assignment__tick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.employee-skill-assignment__tick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.employee-skill-assignment__tick span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 1.5px solid #c7d7ce;
+  border-radius: 0.45rem;
+  background: #fff;
+  color: transparent;
+  transition: all 140ms ease;
+}
+
+.employee-skill-assignment__tick.is-selected span {
+  border-color: #2d9058;
+  background: linear-gradient(135deg, #1e6e43 0%, #2d9058 100%);
+  color: #fff;
+}
+
+.employee-skill-assignment__selected-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.employee-skill-assignment__chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #edf7f1;
+  color: #1f6b42;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.employee-skill-assignment__empty {
+  padding: 1.25rem 0.2rem;
+  text-align: center;
+  color: #6b7d74;
+  font-weight: 600;
+}
+
 @keyframes employee-create-spin {
   from {
     transform: rotate(0deg);
@@ -526,5 +738,12 @@
   .employee-create-avatar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .employee-skill-assignment__summary,
+  .employee-skill-assignment__toolbar,
+  .employee-skill-assignment__stats {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
