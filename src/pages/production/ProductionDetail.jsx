@@ -778,7 +778,7 @@ export default function ProductionDetail() {
                                </td>
                               <td className="px-4 py-3 text-center">
                                 {(() => {
-                                  const label = getPlanStatusLabel(row.statusName || row.statusId || row.status);
+                                  const label = row.statusName || getPlanStatusLabel(row.statusId || row.status);
                                   const style = STATUS_STYLES[label] || STATUS_STYLES.default;
                                   return (
                                     <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border whitespace-nowrap shadow-sm ${style}`}>

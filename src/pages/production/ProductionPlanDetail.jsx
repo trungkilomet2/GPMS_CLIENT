@@ -186,7 +186,9 @@ export default function ProductionPlanDetail() {
           cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
           startDate: part?.startDate ?? part?.planStartDate ?? "-",
           endDate: part?.endDate ?? part?.planEndDate ?? "-",
-          status: part?.statusId ?? part?.statusName ?? part?.status ?? 1,
+          status: part?.statusName ?? part?.statusId ?? part?.status ?? 1,
+          statusName: part?.statusName ?? null,
+          statusId: part?.statusId ?? null,
           assignedWorkers:
             part?.assignedWorkers ??
             part?.workers ??
@@ -600,8 +602,8 @@ export default function ProductionPlanDetail() {
                       <th className="px-4 py-3 text-left">STT</th>
                       <th className="px-4 py-3 text-left">Tên công đoạn</th>
                       <th className="px-4 py-3 text-left">Thợ được giao</th>
-                      <th className="px-4 py-3 text-left">Thời gian bắt đầu</th>
-                      <th className="px-4 py-3 text-left">Thời gian kết thúc</th>
+                      <th className="px-4 py-3 text-left">Bắt đầu</th>
+                      <th className="px-4 py-3 text-left">Kết thúc</th>
                       <th className="px-4 py-3 text-right">Giá/SP</th>
                       <th className="px-4 py-3 text-center">Trạng thái</th>
                       <th className="px-4 py-3 text-center">Thao tác</th>
@@ -609,12 +611,12 @@ export default function ProductionPlanDetail() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {pageData.map((row, idx) => (
-                      <tr key={`${row.partId}-${idx}`} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3 text-slate-500">
+                      <tr key={`${row.partId}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-slate-400">
                           {String(pageIndex * pageSize + idx + 1).padStart(2, "0")}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-800">{row.partName || "-"}</div>
+                          <div className="font-semibold text-slate-900">{row.partName || "-"}</div>
                         </td>
                         <td className="px-4 py-3">
                           {Array.isArray(row.assignedWorkers) && row.assignedWorkers.length > 0 ? (
@@ -622,27 +624,27 @@ export default function ProductionPlanDetail() {
                               {row.assignedWorkers.map((worker) => (
                                 <span
                                   key={`${row.partId}-${worker}`}
-                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                                  className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-100"
                                 >
                                   {worker}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-slate-400">-</span>
+                            <span className="text-slate-300 italic text-[11px]">Chưa giao</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.startDate)}</td>
-                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.endDate)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.startDate)}</td>
+                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.endDate)}</td>
+                        <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
+                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} đ` : "-"}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {(() => {
-                            const label = getPlanStatusLabel(row.statusName || row.statusId || row.status);
+                            const label = row.statusName || getPlanStatusLabel(row.status);
                             const style = STATUS_STYLES[label] || STATUS_STYLES.default;
                             return (
-                              <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase whitespace-nowrap shadow-sm ${style}`}>
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border whitespace-nowrap shadow-sm ${style}`}>
                                 {label}
                               </span>
                             );

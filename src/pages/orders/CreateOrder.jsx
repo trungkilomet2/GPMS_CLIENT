@@ -410,6 +410,23 @@ export default function CreateOrder() {
       prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
     );
   };
+  
+  const removeTemplateItem = (index) => {
+    setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+    if (errors.templates) {
+      setErrors((prev) => {
+        const newTemplates = { ...prev.templates };
+        delete newTemplates[index];
+        const adjusted = {};
+        Object.keys(newTemplates).forEach((key) => {
+          const k = parseInt(key);
+          if (k > index) adjusted[k - 1] = newTemplates[key];
+          else adjusted[k] = newTemplates[key];
+        });
+        return { ...prev, templates: adjusted };
+      });
+    }
+  };
 
   const handleDeleteMaterial = (index) => {
     setMaterials((prev) => prev.filter((_, i) => i !== index));
