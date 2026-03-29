@@ -9,10 +9,12 @@ export const API_ENDPOINTS = {
   ACCOUNT: {
     LOGIN: `${BASE_URL}/api/Account/login`,
     REGISTER: `${BASE_URL}/api/Account/register`,
+    FORGOT_PASSWORD: "",
   },
 
   EMAIL: {
     SEND_OTP: `${BASE_URL}/api/Email/sent-otp-email`,
+    RESEND_OTP: `${BASE_URL}/api/Email/resent-otp-email`,
     VERIFY_EMAIL: `${BASE_URL}/api/Email/verify-email`,
   },
 

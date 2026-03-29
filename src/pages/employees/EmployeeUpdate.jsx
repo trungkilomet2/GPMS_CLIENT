@@ -57,6 +57,7 @@ export default function EmployeeUpdate() {
           WorkerService.getEmployeeById(id),
           WorkerService.getEmployeeDirectory({
             pageSize: 100,
+            includeHidden: true,
           }),
         ]);
 
@@ -129,6 +130,17 @@ export default function EmployeeUpdate() {
       }));
     }
   }, [availableManagers, form.managerId]);
+
+  useEffect(() => {
+    if (form.role !== "PM") return;
+    if (String(form.managerId ?? "").trim()) return;
+    if (availableManagers.length !== 1) return;
+
+    setForm((prev) => ({
+      ...prev,
+      managerId: String(availableManagers[0].id),
+    }));
+  }, [availableManagers, form.managerId, form.role]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({

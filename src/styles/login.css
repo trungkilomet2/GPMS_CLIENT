@@ -446,6 +446,37 @@ body{
   margin-top:6px;
 }
 
+.forgot-card{
+  display:flex;
+  flex-direction:column;
+}
+
+.forgot-success{
+  margin-bottom:16px;
+  padding:16px 18px;
+  border-radius:16px;
+  background:rgba(45,106,79,0.1);
+  border:1px solid rgba(45,106,79,0.28);
+}
+
+.forgot-success h3{
+  font-size:18px;
+  font-weight:700;
+  color:#1f4d3a;
+  margin-bottom:8px;
+}
+
+.forgot-success p{
+  margin-bottom:0;
+  color:#325246;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.forgot-success__hint{
+  margin-top:8px;
+}
+
 
 .input-error{
   border-color:#e53935 !important;
