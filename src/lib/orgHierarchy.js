@@ -57,6 +57,20 @@ export const INTERNAL_PROJECT_ROLES = new Set([
   "worker",
 ]);
 
+const SYSTEM_ROLE_ALIASES = {
+  admin: "Admin",
+  customer: "Customer",
+  owner: "Owner",
+  pm: "PM",
+  "project manager": "PM",
+  worker: "Worker",
+};
+
+export function normalizeSystemRoleName(role = "") {
+  const normalized = String(role ?? "").trim().toLowerCase();
+  return SYSTEM_ROLE_ALIASES[normalized] ?? String(role ?? "").trim();
+}
+
 export function splitRoles(value = "") {
   if (Array.isArray(value)) {
     return value
@@ -68,17 +82,20 @@ export function splitRoles(value = "") {
         }
         return "";
       })
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(normalizeSystemRoleName);
   }
 
   return String(value ?? "")
     .split(",")
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(normalizeSystemRoleName);
 }
 
 export function getSystemRoleLabel(role = "") {
-  return SYSTEM_ROLE_LABELS[role] ?? role;
+  const normalizedRole = normalizeSystemRoleName(role);
+  return SYSTEM_ROLE_LABELS[normalizedRole] ?? normalizedRole;
 }
 
 export function getWorkerSkillLabel(skill = "") {
@@ -92,7 +109,7 @@ export function isWorkerSkillName(name = "") {
 }
 
 export function pickPrimarySystemRole(roleValue = "") {
-  const roles = splitRoles(roleValue);
+  const roles = splitRoles(roleValue).map(normalizeSystemRoleName);
   for (const role of SYSTEM_ROLE_PRIORITY) {
     if (roles.includes(role)) return role;
   }
@@ -100,7 +117,7 @@ export function pickPrimarySystemRole(roleValue = "") {
 }
 
 export function getManagerRoleHint(role = "") {
-  switch (role) {
+  switch (normalizeSystemRoleName(role)) {
     case "Owner":
       return "Không có cấp quản lý trực tiếp trong mô hình 1 xưởng.";
     case "PM":
@@ -113,7 +130,7 @@ export function getManagerRoleHint(role = "") {
 }
 
 export function getAllowedManagerRoles(role = "") {
-  switch (role) {
+  switch (normalizeSystemRoleName(role)) {
     case "Owner":
       return [];
     case "PM":
@@ -130,7 +147,7 @@ export function isManagerRequired(role = "") {
 }
 
 export function getRoleHierarchyTag(role = "") {
-  switch (role) {
+  switch (normalizeSystemRoleName(role)) {
     case "Owner":
       return "Cấp owner";
     case "PM":

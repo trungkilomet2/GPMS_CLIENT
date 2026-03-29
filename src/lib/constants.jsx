@@ -45,48 +45,71 @@ export const NAV_MENU = [
   {
     label: "Trang chủ",
     icon: ICONS.home,
+    path: "/home",
     hasDropdown: false,
   },
   {
     label: "Thông tin",
     icon: ICONS.info,
+    path: "/pages/thong-tin",
     hasDropdown: true,
-    items: ["Giới thiệu", "Năng lực xưởng may", "Quy trình đặt may", "Nhận gia công FOB/CMT/ODM", "Liên hệ", "Dịch vụ"],
+    items: [
+      { label: "Giới thiệu", path: "/pages/gioi-thieu" },
+      { label: "Năng lực xưởng may", path: "/pages/nang-luc-xuong-may" },
+      { label: "Quy trình đặt may", path: "/pages/quy-trinh-dat-may" },
+      { label: "Nhận gia công FOB/CMT/ODM", path: "/pages/nhan-gia-cong-fob-cmt-odm" },
+      { label: "Liên hệ", path: "/pages/lien-he" },
+      { label: "Dịch vụ", path: "/pages/dich-vu" },
+    ],
   },
   {
     label: "Sản phẩm gia công",
     icon: ICONS.shop,
+    path: "/pages/san-pham-gia-cong",
     hasDropdown: true,
-    items: ["Áo thun local brand", "Đồng phục công ty", "Váy đầm thời trang", "Quần áo trẻ em", "Quần áo thể thao", "Hàng thiết kế"],
+    items: [
+      { label: "Áo thun local brand", path: "/pages/ao-thun-local-brand" },
+      { label: "Đồng phục công ty", path: "/pages/dong-phuc-cong-ty" },
+      { label: "Váy đầm thời trang", path: "/pages/vay-dam-thoi-trang" },
+      { label: "Quần áo trẻ em", path: "/pages/quan-ao-tre-em" },
+      { label: "Quần áo thể thao", path: "/pages/quan-ao-the-thao" },
+      { label: "Hàng thiết kế", path: "/pages/hang-thiet-ke" },
+    ],
   },
   {
     label: "Xưởng may",
     icon: ICONS.factory,
+    path: "/pages/xuong-may",
     hasDropdown: true,
-    items: ["Xưởng may Hà Nội", "Xưởng may local brand", "Xưởng may đồng phục", "Xưởng may số lượng ít"],
-  },
-  {
-    label: "Đào tạo",
-    icon: ICONS.grad,
-    hasDropdown: false,
+    items: [
+      { label: "Xưởng may Hà Nội", path: "/pages/xuong-may-ha-noi" },
+      { label: "Xưởng may local brand", path: "/pages/xuong-may-local-brand" },
+      { label: "Xưởng may đồng phục", path: "/pages/xuong-may-dong-phuc" },
+      { label: "Xưởng may số lượng ít", path: "/pages/xuong-may-so-luong-it" },
+    ],
   },
   {
     label: "Tin tức",
     icon: ICONS.news,
+    path: "/pages/tin-tuc",
     hasDropdown: true,
-    items: ["Tin tức ngành may", "Kinh nghiệm sản xuất", "Xu hướng thời trang"],
+    items: [
+      { label: "Tin tức ngành may", path: "/pages/tin-tuc-nganh-may" },
+      { label: "Kinh nghiệm sản xuất", path: "/pages/kinh-nghiem-san-xuat" },
+      { label: "Xu hướng thời trang", path: "/pages/xu-huong-thoi-trang" },
+    ],
   },
 ];
 
 export const CATEGORIES = [
-  "Xưởng may Hà Nội",
-  "Xưởng may Local brand",
-  "Quần áo Trẻ em",
-  "Quần áo Nữ",
-  "Quần áo Nam",
-  "Quần áo Thể thao",
-  "May số lượng ít",
-  "Hàng thiết kế",
+  { label: "Xưởng may Hà Nội", path: "/pages/xuong-may-ha-noi" },
+  { label: "Xưởng may Local brand", path: "/pages/xuong-may-local-brand" },
+  { label: "Quần áo Trẻ em", path: "/pages/quan-ao-tre-em" },
+  { label: "Quần áo Nữ", path: "/pages/vay-dam-thoi-trang" },
+  { label: "Quần áo Nam", path: "/pages/ao-thun-local-brand" },
+  { label: "Quần áo Thể thao", path: "/pages/quan-ao-the-thao" },
+  { label: "May số lượng ít", path: "/pages/xuong-may-so-luong-it" },
+  { label: "Hàng thiết kế", path: "/pages/hang-thiet-ke" },
 ];
 
 // Homepage section data

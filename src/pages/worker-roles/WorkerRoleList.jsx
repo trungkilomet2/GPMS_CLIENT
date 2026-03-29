@@ -123,7 +123,7 @@ export default function WorkerRoleList() {
             <div>
               <h1 className="worker-role-hero__title">Danh sách vai trò thợ</h1>
               <p className="worker-role-hero__subtitle">
-                Chỉ hiển thị chuyên môn dành cho worker, tách biệt với role hệ thống và hierarchy Owner / PM / Team Lead / Worker.
+                Chỉ hiển thị chuyên môn dành cho worker, tách biệt với role hệ thống và hierarchy Owner / PM / Worker.
               </p>
             </div>
 

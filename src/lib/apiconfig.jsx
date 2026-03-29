@@ -83,10 +83,11 @@ export const API_ENDPOINTS = {
   USER: {
     // GET — không có ID, backend decode từ token
     VIEW_PROFILE: `${BASE_URL}/api/User/view-profile`,
+    LIST: `${BASE_URL}/api/User`,
     USER_DETAIL: (id) => `${BASE_URL}/api/User/user-detail/${id}`,
     GET_USER_DETAIL: (id) => `${BASE_URL}/api/User/get-user-detail/${id}`,
     ADMIN_USER_LIST: `${BASE_URL}/api/User/admin/user-list`,
-    ADMIN_USER_DETAIL: (id) => `${BASE_URL}/api/User/get-user-detail-for-admin/${id}`,
+    ADMIN_USER_DETAIL: (id) => `${BASE_URL}/api/User/user-detail/${id}`,
     ADMIN_CREATE_USER: `${BASE_URL}/api/User/admin/create-user`,
     ADMIN_DISABLE_USER: (id) => `${BASE_URL}/api/User/admin/disable/${id}`,
     ADMIN_ASSIGN_ROLES: (id) => `${BASE_URL}/api/User/admin/assign-roles/${id}`,
@@ -97,6 +98,9 @@ export const API_ENDPOINTS = {
 
   PERMISSION: {
     GET_ALL: `${BASE_URL}/api/Permission`,
+    UPDATE: (id) => `${BASE_URL}/api/Permission/${id}`,
+    AUDIT: `${BASE_URL}/api/Permission/audit`,
+    ROLE_LIST: `${BASE_URL}/api/Role`,
   },
 
   LOG: {

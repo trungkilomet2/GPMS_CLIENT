@@ -17,8 +17,6 @@ export function getPostLoginPath(roleValue) {
       return "/dashboard";
     case "pm":
       return "/production";
-    case "teamLeader":
-      return "/production-plan/production-plan";
     case "worker":
       return "/worker/production-plan";
     default:
