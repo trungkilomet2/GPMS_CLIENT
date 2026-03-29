@@ -35,6 +35,14 @@ function toApiTimestamp(value = "") {
   return date.toISOString();
 }
 
+function toTimestampNumber(value = "") {
+  const timestamp = toApiTimestamp(value);
+  if (!timestamp) return null;
+
+  const parsed = new Date(timestamp).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function extractPropertyValue(properties = "", key = "") {
   if (!properties || !key) return "";
 
@@ -103,31 +111,28 @@ export default function AdminSystemLog() {
   const levelOptions = useMemo(() => ["all", "Information", "Warning", "Error"], []);
 
   const loadLogs = async ({
-    nextPageIndex = pageIndex,
-    nextSearch = search,
-    nextFromTimestamp = fromTimestamp,
-    nextToTimestamp = toTimestamp,
+    keepSelection = true,
   } = {}) => {
     try {
       setIsLoading(true);
       setError("");
 
-      const response = await LogService.getAll({
-        PageIndex: nextPageIndex,
-        PageSize: pageSize,
-        SortColumn: "Name",
-        SortOrder: "DESC",
-        ...(String(nextSearch ?? "").trim() ? { FilterQuery: String(nextSearch).trim() } : {}),
-        ...(toApiTimestamp(nextFromTimestamp) ? { fromTimestamp: toApiTimestamp(nextFromTimestamp) } : {}),
-        ...(toApiTimestamp(nextToTimestamp) ? { toTimestamp: toApiTimestamp(nextToTimestamp) } : {}),
+      const response = await LogService.getAllPages({
+        pageSize: 100,
+        pageIndex: 0,
+        sortColumn: "Name",
+        sortOrder: "DESC",
       });
 
       const items = Array.isArray(response?.data) ? response.data.map(normalizeLogItem) : [];
       setLogs(items);
-      setRecordCount(Number(response?.recordCount ?? items.length ?? 0));
+      setRecordCount(items.length);
       setSelectedLogId((current) => {
         if (items.length === 0) return null;
-        return items.some((item) => item.id === current) ? current : items[0].id;
+        if (keepSelection && items.some((item) => item.id === current)) {
+          return current;
+        }
+        return items[0].id;
       });
     } catch (nextError) {
       setLogs([]);
@@ -145,12 +150,15 @@ export default function AdminSystemLog() {
 
   useEffect(() => {
     loadLogs();
-  }, [pageIndex]);
+  }, []);
 
   const filteredLogs = useMemo(() => {
     const keyword = normalizeSearchText(search);
+    const fromDate = toTimestampNumber(fromTimestamp);
+    const toDate = toTimestampNumber(toTimestamp);
 
     return logs.filter((log) => {
+      const logTime = new Date(log.timestamp).getTime();
       const searchableText = normalizeSearchText([
         log.message,
         log.messageTemplate,
@@ -163,38 +171,52 @@ export default function AdminSystemLog() {
       ].filter(Boolean).join(" "));
 
       const searchMatch = !keyword || searchableText.includes(keyword);
-      const levelMatch = levelFilter === "all" || log.level === levelFilter;
+      const levelMatch = levelFilter === "all" || String(log.level).toLowerCase() === String(levelFilter).toLowerCase();
+      const fromMatch = fromDate == null || (!Number.isNaN(logTime) && logTime >= fromDate);
+      const toMatch = toDate == null || (!Number.isNaN(logTime) && logTime <= toDate);
 
-      return searchMatch && levelMatch;
+      return searchMatch && levelMatch && fromMatch && toMatch;
     });
-  }, [levelFilter, logs, search]);
+  }, [fromTimestamp, levelFilter, logs, search, toTimestamp]);
+
+  const paginatedLogs = useMemo(() => {
+    const start = pageIndex * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, pageIndex, pageSize]);
 
   const stats = useMemo(
     () => ({
-      total: recordCount,
+      total: filteredLogs.length,
       errors: filteredLogs.filter((log) => String(log.level).toLowerCase() === "error").length,
       warnings: filteredLogs.filter((log) => String(log.level).toLowerCase() === "warning").length,
       exceptions: filteredLogs.filter((log) => Boolean(log.exception)).length,
     }),
-    [filteredLogs, recordCount]
+    [filteredLogs]
   );
 
   const selectedLog = useMemo(
-    () => filteredLogs.find((log) => log.id === selectedLogId) || filteredLogs[0] || null,
-    [filteredLogs, selectedLogId]
+    () => paginatedLogs.find((log) => log.id === selectedLogId) || paginatedLogs[0] || null,
+    [paginatedLogs, selectedLogId]
   );
 
-  const totalPages = Math.max(1, Math.ceil((recordCount || 0) / pageSize));
+  useEffect(() => {
+    const total = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+    if (pageIndex > total - 1) {
+      setPageIndex(0);
+      return;
+    }
+
+    setSelectedLogId((current) => {
+      if (paginatedLogs.length === 0) return null;
+      return paginatedLogs.some((log) => log.id === current) ? current : paginatedLogs[0].id;
+    });
+  }, [filteredLogs.length, pageIndex, pageSize, paginatedLogs]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const currentPage = pageIndex + 1;
 
   const applyFilters = () => {
     setPageIndex(0);
-    loadLogs({
-      nextPageIndex: 0,
-      nextSearch: search,
-      nextFromTimestamp: fromTimestamp,
-      nextToTimestamp: toTimestamp,
-    });
   };
 
   const clearFilters = () => {
@@ -203,12 +225,6 @@ export default function AdminSystemLog() {
     setFromTimestamp("");
     setToTimestamp("");
     setPageIndex(0);
-    loadLogs({
-      nextPageIndex: 0,
-      nextSearch: "",
-      nextFromTimestamp: "",
-      nextToTimestamp: "",
-    });
   };
 
   return (
@@ -242,7 +258,7 @@ export default function AdminSystemLog() {
                 ? "Đang tải nhật ký hệ thống từ backend."
                 : error
                   ? "Không thể tải dữ liệu log."
-                  : `Đã tải ${filteredLogs.length} log trong trang ${currentPage}/${totalPages}.`
+                  : `Đã tải ${recordCount} log, đang hiển thị ${filteredLogs.length} log sau khi lọc.`
             }
             description={
               error ||
@@ -304,7 +320,7 @@ export default function AdminSystemLog() {
               <div className="admin-filter-actions">
                 <div className="admin-filter-info">
                   <ClipboardList size={16} />
-                  <span>{filteredLogs.length} log trong trang</span>
+                  <span>{filteredLogs.length} log phù hợp</span>
                 </div>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={applyFilters}>
                   Áp dụng
@@ -324,7 +340,7 @@ export default function AdminSystemLog() {
                   <p className="admin-card__subtitle">Quét nhanh theo thời gian, mức độ và request path.</p>
                 </div>
                 <div className="admin-inline-summary">
-                  <span className="admin-inline-summary__item">{filteredLogs.length} log trong trang</span>
+                  <span className="admin-inline-summary__item">{filteredLogs.length} log phù hợp</span>
                   <span className="admin-inline-summary__item">{stats.errors} lỗi</span>
                 </div>
               </div>
@@ -349,7 +365,7 @@ export default function AdminSystemLog() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredLogs.map((log) => {
+                      {paginatedLogs.map((log) => {
                         const isSelected = selectedLog?.id === log.id;
 
                         return (
