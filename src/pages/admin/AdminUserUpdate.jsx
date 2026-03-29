@@ -292,7 +292,7 @@ export default function AdminUserUpdate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại chi tiết user</span>
               </Link>
-              <h1 className="admin-hero__title">Update User Screen</h1>
+              <h1 className="admin-hero__title">Cập nhật tài khoản</h1>
               <p className="admin-hero__subtitle">
                 Màn chỉnh sửa để Admin cập nhật hồ sơ bằng endpoint `update-user-for-admin` và gán lại role khi cần.
               </p>
@@ -310,7 +310,7 @@ export default function AdminUserUpdate() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{isSubmitting ? "Đang lưu..." : "Save Changes"}</span>
+                  <span>{isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}</span>
                 </button>
                 <button
                   type="button"
@@ -319,7 +319,7 @@ export default function AdminUserUpdate() {
                   disabled={user.status === "inactive" || isDisabling}
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}</span>
+                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Khóa tài khoản"}</span>
                 </button>
               </div>
             ) : null}

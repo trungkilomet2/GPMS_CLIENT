@@ -1,5 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { getStoredUser } from "@/lib/authStorage";
+import { extractRoleValue } from "@/lib/authIdentity";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
 
@@ -10,7 +11,7 @@ export default function RoleRouteGuard({ children, allowedRoles = [] }) {
     return <Navigate to="/login" replace />;
   }
 
-  const roles = splitRoles(user.role);
+  const roles = splitRoles(extractRoleValue(user) || user?.role || user?.roles || "");
 
   if (hasAnyRole(roles, allowedRoles)) {
     return children;

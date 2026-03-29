@@ -304,7 +304,7 @@ export default function EmployeeUpdate() {
                 {form.role === "Worker" ? (
                   <div className="employee-create-banner">
                     <span>
-                      Chuyên môn của worker đã được tách sang màn riêng để hỗ trợ chọn nhiều skill cùng lúc.
+                     
                       {" "}
                       <Link to={`/employees/${id}/skills`} className="employee-create-inline-link">
                         Mở màn gán skill

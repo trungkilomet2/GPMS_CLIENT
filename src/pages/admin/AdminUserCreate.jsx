@@ -106,7 +106,7 @@ export default function AdminUserCreate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại danh sách user</span>
               </Link>
-              <h1 className="admin-hero__title">Add New User Screen</h1>
+              <h1 className="admin-hero__title">Tạo tài khoản mới</h1>
               <p className="admin-hero__subtitle">
                 Form onboarding cho Admin tạo account mới bằng API `create-user` và gán role ngay từ bước khởi tạo.
               </p>
@@ -123,7 +123,7 @@ export default function AdminUserCreate() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                <span>{isSubmitting ? "Đang tạo..." : "Create User"}</span>
+                <span>{isSubmitting ? "Đang tạo..." : "Tạo user"}</span>
               </button>
             </div>
           </div>

@@ -50,7 +50,7 @@ function normalizeRole(item = {}) {
 }
 
 function normalizePermission(item = {}) {
-  const roles = Array.isArray(item.roles) ? item.roles.map(normalizeRole).filter((role) => role.id && role.name) : [];
+  const roles = Array.isArray(item.roles) ? item.roles.map(normalizeRole).filter((role) => role.name) : [];
 
   return {
     id: Number(item.id ?? 0) || null,
@@ -70,7 +70,7 @@ function normalizeAuditItem(item = {}) {
     action: String(item.action ?? item.permission?.action ?? "").trim(),
     actor: String(item.actor ?? item.userName ?? item.createdBy ?? "").trim(),
     changedAt: item.changedAt ?? item.createdAt ?? item.timestamp ?? "",
-    roles: Array.isArray(item.roles) ? item.roles.map(normalizeRole).filter((role) => role.id && role.name) : [],
+    roles: Array.isArray(item.roles) ? item.roles.map(normalizeRole).filter((role) => role.name) : [],
   };
 }
 
@@ -132,7 +132,7 @@ const PermissionService = {
 
     return {
       ...response,
-      data: uniqueById(data.map(normalizeRole).filter((item) => item.id && item.name)),
+      data: uniqueById(data.map(normalizeRole).filter((item) => item.name)),
     };
   },
 };

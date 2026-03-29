@@ -108,6 +108,7 @@ export default function AdminUserList() {
     const keyword = normalizeSearchText(search);
 
     return users.filter((user) => {
+      const roleSearchText = Array.isArray(user.roleNames) ? user.roleNames.join(" ") : "";
       const searchableText = normalizeSearchText(
         [
           user.fullName,
@@ -115,7 +116,7 @@ export default function AdminUserList() {
           user.email,
           user.phoneNumber,
           user.location,
-          user.roleLabel,
+          roleSearchText,
         ]
           .filter(Boolean)
           .join(" ")
@@ -371,12 +372,18 @@ export default function AdminUserList() {
                           </div>
                         </td>
                         <td>
-                          <div className="admin-chips">
-                            <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
-                          </div>
-                          <div className="admin-table__secondary">
-                            {user.roleNames?.join(", ") || user.roleLabel}
-                          </div>
+                          {user.roleNames?.length ? (
+                            <>
+                              <div className="admin-chips">
+                                <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
+                              </div>
+                              <div className="admin-table__secondary">
+                                {user.roleNames.join(", ")}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="admin-table__secondary">&nbsp;</div>
+                          )}
                         </td>
                         <td>
                           <div className="admin-chips">

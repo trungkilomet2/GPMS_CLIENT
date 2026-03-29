@@ -188,9 +188,9 @@ export default function AdminManagePermission() {
                         <div className="admin-permission-item__heading">{permission.controller}.{permission.action}</div>
                         <div className="admin-permission-item__code">{permission.method} / {permission.controller}</div>
                       </div>
-                      <div className="admin-chips">
-                        {permission.roles.map((role) => (
-                          <span key={`${permission.id}-${role.id}`} className="admin-badge admin-badge--tone-info">
+                        <div className="admin-chips">
+                          {permission.roles.map((role) => (
+                          <span key={`${permission.id}-${role.id ?? role.name}`} className="admin-badge admin-badge--tone-info">
                             {role.name}
                           </span>
                         ))}
@@ -198,6 +198,19 @@ export default function AdminManagePermission() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </section>
+          ) : null}
+
+          {!permissionLoading && !permissionError && activeBackendPermissions.length === 0 ? (
+            <section className="admin-card">
+              <div className="admin-state">
+                <div className="admin-state__content">
+                  <strong>Chưa có permission cho vai trò này</strong>
+                  <span>
+                    Role {activeRole?.label || selectedRole} hiện chưa được backend trả permission nào, hoặc dữ liệu role-permission vẫn chưa được cấu hình.
+                  </span>
+                </div>
               </div>
             </section>
           ) : null}
