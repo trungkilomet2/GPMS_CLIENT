@@ -290,11 +290,11 @@ export default function AdminUserUpdate() {
             <div className="admin-hero__heading">
               <Link to={user ? `/admin/users/${user.id}` : "/admin/users"} className="admin-hero__back">
                 <ArrowLeft size={18} />
-                <span>Quay lại chi tiết user</span>
+                <span>Quay lại chi tiết tài khoản</span>
               </Link>
-              <h1 className="admin-hero__title">Update User Screen</h1>
+              <h1 className="admin-hero__title">Cập nhật tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Màn chỉnh sửa để Admin cập nhật hồ sơ bằng endpoint `update-user-for-admin` và gán lại role khi cần.
+                Cập nhật hồ sơ, ảnh đại diện và vai trò hệ thống của người dùng khi cần điều chỉnh quyền truy cập.
               </p>
             </div>
 
@@ -310,7 +310,7 @@ export default function AdminUserUpdate() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{isSubmitting ? "Đang lưu..." : "Save Changes"}</span>
+                  <span>{isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}</span>
                 </button>
                 <button
                   type="button"
@@ -319,7 +319,7 @@ export default function AdminUserUpdate() {
                   disabled={user.status === "inactive" || isDisabling}
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}</span>
+                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Vô hiệu hóa tài khoản"}</span>
                 </button>
               </div>
             ) : null}
@@ -357,8 +357,8 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Thông tin user hiện tại</h2>
-                      <p className="admin-card__subtitle">Endpoint update yêu cầu đầy đủ họ tên, số điện thoại, email và địa điểm. Role sẽ được cập nhật riêng qua API assign-roles.</p>
+                      <h2 className="admin-card__title">Thông tin tài khoản hiện tại</h2>
+                      <p className="admin-card__subtitle">Điền đầy đủ hồ sơ liên hệ trước khi lưu. Nếu đổi vai trò, hệ thống sẽ gán lại quyền theo role mới.</p>
                     </div>
                   </div>
 
@@ -445,8 +445,8 @@ export default function AdminUserUpdate() {
 
                   <div className="mt-4">
                     <AdminBanner
-                      title="Màn update admin đang dùng 3 API thật."
-                      description="`get-user-detail-for-admin/{id}` để load hồ sơ, `update-user-for-admin/{id}` để lưu thông tin cơ bản, và `assign-roles/{id}` để đổi role trên backend."
+                      title="Màn cập nhật đang đồng bộ trực tiếp với backend."
+                      description="Hồ sơ hiện tại được tải từ API admin detail, phần thông tin cơ bản lưu qua API cập nhật, và vai trò mới sẽ được gán lại sau khi lưu thành công."
                       tone="info"
                     />
                   </div>
@@ -500,7 +500,7 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Snapshot user</h2>
+                      <h2 className="admin-card__title">Tóm tắt tài khoản</h2>
                       <p className="admin-card__subtitle">Đối chiếu nhanh thông tin trước khi bấm lưu.</p>
                     </div>
                   </div>
@@ -517,8 +517,8 @@ export default function AdminUserUpdate() {
                       <span>{user.roleNames?.join(", ") || user.roleLabel}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Checklist</strong>
-                      <span>Nếu cần khóa tài khoản, dùng nút Disable User. Nếu chỉ sửa hồ sơ, form này sẽ không động vào trạng thái account.</span>
+                      <strong>Lưu ý thao tác</strong>
+                      <span>Nếu cần khóa tài khoản, dùng nút Vô hiệu hóa tài khoản. Nếu chỉ sửa hồ sơ, form này sẽ không thay đổi trạng thái hoạt động.</span>
                     </div>
                   </div>
                 </section>

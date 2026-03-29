@@ -172,6 +172,30 @@ export default function RegisterPage() {
     }
   };
 
+  const handleResendOtp = async () => {
+    if (!validateForm({ includeOtp: false })) return;
+
+    try {
+      setLoading(true);
+
+      await authService.resendRegisterOtp({
+        email: formData.email.trim(),
+      });
+
+      setSubmitError("");
+      setErrors((prev) => ({ ...prev, otp: "" }));
+    } catch (error) {
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleVerifyAndRegister = async () => {
     if (!validateForm({ includeOtp: true })) return;
 
@@ -379,7 +403,7 @@ export default function RegisterPage() {
                 </span>
                 <button
                   type="button"
-                  onClick={handleSendOtp}
+                  onClick={handleResendOtp}
                   disabled={loading}
                   style={{
                     border: "none",

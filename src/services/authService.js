@@ -276,6 +276,21 @@ export const authService = {
     return data;
   },
 
+  async resendRegisterOtp(payload) {
+    const res = await fetch(API_ENDPOINTS.EMAIL.RESEND_OTP, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
   async requestPasswordReset(payload) {
     const endpoint = API_ENDPOINTS.ACCOUNT.FORGOT_PASSWORD;
 

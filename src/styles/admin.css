@@ -638,6 +638,7 @@ textarea.admin-field__control {
 
 .admin-grid--permissions {
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.95fr);
+  align-items: start;
 }
 
 .admin-profile {
@@ -1014,6 +1015,7 @@ textarea.admin-field__control {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  align-self: start;
 }
 
 .admin-grid--logs {

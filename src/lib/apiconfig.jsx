@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
 
   EMAIL: {
     SEND_OTP: `${BASE_URL}/api/Email/sent-otp-email`,
+    RESEND_OTP: `${BASE_URL}/api/Email/resent-otp-email`,
     VERIFY_EMAIL: `${BASE_URL}/api/Email/verify-email`,
   },
 

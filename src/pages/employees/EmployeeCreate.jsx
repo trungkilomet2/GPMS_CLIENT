@@ -50,6 +50,7 @@ export default function EmployeeCreate() {
       try {
         const response = await WorkerService.getEmployeeDirectory({
           pageSize: 100,
+          includeHidden: true,
         });
         if (!mounted) return;
         setManagerOptions(response?.data ?? []);
@@ -95,6 +96,17 @@ export default function EmployeeCreate() {
       }));
     }
   }, [availableManagers, form.managerId]);
+
+  useEffect(() => {
+    if (form.role !== "PM") return;
+    if (String(form.managerId ?? "").trim()) return;
+    if (availableManagers.length !== 1) return;
+
+    setForm((prev) => ({
+      ...prev,
+      managerId: String(availableManagers[0].id),
+    }));
+  }, [availableManagers, form.managerId, form.role]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({
