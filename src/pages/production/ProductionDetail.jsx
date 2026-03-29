@@ -146,7 +146,7 @@ export default function ProductionDetail() {
         pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
         pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
         pmId: payload.pm?.id ?? payload.pmId ?? null,
-        pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
+        pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
         note: payload.note ?? payload.productionNote ?? "",
         order: {
           ...order,
@@ -343,7 +343,7 @@ export default function ProductionDetail() {
     try {
       const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
       if (!userId) {
-        alert("Không tìm thấy thông tin người dùng.");
+        toast.error("Không tìm thấy thông tin người dùng.");
         return;
       }
       await ProductionService.approveProduction(production.productionId, { userId });
@@ -352,16 +352,19 @@ export default function ProductionDetail() {
     } catch (err) {
       console.error("Lỗi khi chấp nhận đơn sản xuất:", err);
       const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi chấp nhận đơn sản xuất.";
-      alert(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
   const handleRejectProduction = async (reason) => {
-    if (isActionLocked) return;
+    // Only block if it's already rejected or completed/in production (if you want to be strict)
+    // But for Owner, we want them to be able to cancel in early stages even after PM approval
+    if (isActionLocked && !isOwner) return;
+    if (statusName === "Hoàn thành") return;
     try {
       const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
       if (!userId) {
-        alert("Không tìm thấy thông tin người dùng.");
+        toast.error("Không tìm thấy thông tin người dùng.");
         return;
       }
       await ProductionService.rejectProduction(production.productionId, { userId, reason });
@@ -371,7 +374,7 @@ export default function ProductionDetail() {
     } catch (err) {
       console.error("Lỗi khi từ chối đơn sản xuất:", err);
       const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi từ chối đơn sản xuất.";
-      alert(errorMsg);
+      toast.error(errorMsg);
     }
   };
 
@@ -451,7 +454,7 @@ export default function ProductionDetail() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {/* Nút cho Owner duyệt ĐƠN sản xuất ban đầu */}
+              {/* Nút cho PM duyệt ĐƠN sản xuất ban đầu */}
               {isPM && isPendingApproval && (
                 <>
                   <button type="button"
@@ -467,6 +470,17 @@ export default function ProductionDetail() {
                     Từ chối đơn
                   </button>
                 </>
+              )}
+
+              {/* Nút cho Owner hủy ĐƠN sản xuất trực tiếp */}
+              {isOwner && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan) && (
+                <button type="button"
+                  onClick={() => setIsReasonModalOpen(true)}
+                  className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
+                  title="Hủy đơn sản xuất ngay lập tức"
+                >
+                  Hủy đơn sản xuất
+                </button>
               )}
 
               {/* Nút cho Owner duyệt KẾ HOẠCH sau khi PM gửi */}
@@ -518,6 +532,53 @@ export default function ProductionDetail() {
                   {checkingCuttingBook ? "Đang kiểm tra..." : "Sổ cắt"}
                 </button>
               )}
+
+              {(isPM || isOwner) && isInProduction && (
+                <Link
+                  to="/output-history"
+                  state={{ productionId: production.productionId, production }}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Lịch sử báo cáo
+                </Link>
+              )}
+
+              {(isInProduction || isAccepted) && (() => {
+                const user = getStoredUser();
+                const userId = String(user?.id || user?.userId || user?.accountId || "").trim().toLowerCase();
+                const userName = (user?.fullName || user?.name || user?.userName || "").toLowerCase().trim();
+
+                const isAssignedToAny = steps.some(row => {
+                  const rawAssignees = [
+                    ...(Array.isArray(row.assignees) ? row.assignees : []),
+                    ...(Array.isArray(row.assignedWorkers) ? row.assignedWorkers : []),
+                    ...(Array.isArray(row.workers) ? row.workers : [])
+                  ];
+                  return rawAssignees.some(val => {
+                    if (!val) return false;
+                    if (typeof val === 'object') {
+                      const vid = String(val.id || val.userId || val.accountId || "").trim().toLowerCase();
+                      const vname = (val.fullName || val.name || val.userName || "").toLowerCase().trim();
+                      return (userId && vid === userId) || (userName && vname === userName);
+                    }
+                    const s = String(val).toLowerCase().trim();
+                    return (userId && s === userId) || (userName && s === userName);
+                  });
+                });
+
+                if (isAssignedToAny) {
+                  return (
+                    <Link
+                      to="/worker/daily-report"
+                      state={{ plan: { production: { ...production, orderName: order.orderName }, steps: steps.map(s => ({ ...s, id: s.id ?? s.partId, partName: s.partName ?? s.name, cpu: s.cpu ?? s.unitPrice ?? s.price })) } }}
+                      className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 shadow-md"
+                    >
+                      Báo cáo sản lượng
+                    </Link>
+                  );
+                }
+                return null;
+              })()}
 
               {(isPM || isOwner) && isInProduction && (
                 <Link

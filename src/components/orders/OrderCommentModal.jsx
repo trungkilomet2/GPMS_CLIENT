@@ -1,6 +1,7 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
 import CommentService from '@/services/CommentService';
+import { toast } from 'react-toastify';
 import BASE_URL from '@/lib/apiconfig';
 import { getAuthItem, getStoredUser } from '@/lib/authStorage';
 
@@ -155,7 +156,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
       await fetchComments();
     } catch (error) {
       console.error('Lỗi gửi bình luận:', error);
-      alert('Không thể gửi tin nhắn. Vui lòng thử lại!');
+      toast.error('Không thể gửi tin nhắn. Vui lòng thử lại!');
     } finally {
       setIsSubmitting(false);
     }

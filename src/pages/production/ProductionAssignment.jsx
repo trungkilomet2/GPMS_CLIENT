@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Search, Users, Check, AlertTriangle, Info } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -51,7 +53,7 @@ export default function ProductionAssignment() {
         productionId: payload.productionId ?? payload.id,
         pmId: pm.id ?? null,
         pm,
-        orderId: order.id,
+        orderId: order.id || order.orderId || null,
         orderName: order.orderName,
         pStartDate: payload.startDate ?? order.startDate ?? null,
         pEndDate: payload.endDate ?? order.endDate ?? null,
@@ -81,6 +83,7 @@ export default function ProductionAssignment() {
     if (incoming?.production && incomingPmId) {
       return {
         ...incoming.production,
+        orderId: incoming.production.orderId ?? incoming.production.order?.id ?? incoming.production.order?.orderId ?? null,
         pmId: incomingPmId,
         product: incoming.product ?? null,
       };
@@ -207,6 +210,7 @@ export default function ProductionAssignment() {
       .then((res) => {
         const list = res?.data?.data || res?.data || res || [];
         if (Array.isArray(list)) {
+          const pm = selectedProduction?.pm || {};
           const mapped = list.map((w) => {
             const info = w.workerInfo || w || {};
             const skills = Array.isArray(w.workerSkillInfo)
@@ -224,7 +228,35 @@ export default function ProductionAssignment() {
               leaveDate: leaveDate || w.leaveDate || "",
               role: w.role || "Worker",
             };
-          }).filter(w => w.id !== ""); // Filter out empty IDs just in case
+          }).filter(w => w.id !== "");
+
+          // Inject PM managing this production if not in list
+          if (pm.id && !mapped.some(w => String(w.id) === String(pm.id))) {
+            mapped.push({
+              id: String(pm.id),
+              fullName: pm.fullName || pm.name || `PM #${pm.id}`,
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "PM",
+            });
+          }
+
+          // Inject current user if they are Owner and not in list
+          const currentUser = getStoredUser();
+          const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+          const isOwner = hasAnyRole(roleValue, ["Owner", "Admin"]);
+          if (isOwner && currentUser?.id && !mapped.some(w => String(w.id) === String(currentUser.id))) {
+            mapped.push({
+              id: String(currentUser.id),
+              fullName: currentUser.fullName || currentUser.name || "Owner",
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "Owner",
+            });
+          }
+
           setWorkers(mapped);
         }
       })
@@ -501,26 +533,28 @@ export default function ProductionAssignment() {
                 <p className="text-slate-600">Phân công theo công đoạn đã lập trong kế hoạch sản xuất.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleEdit}
-              disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
-                ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
-            >
-              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
-                Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
-              ))}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleEdit}
+                disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
+              >
+                {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
+                  Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
+                ))}
+              </button>
+            </div>
           </div>
 
           {incoming?.production && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
                 <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
-                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
+                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId || selectedProduction.order?.id || selectedProduction.order?.orderId || "-"}` : "-"} />
                 <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />
               </div>
@@ -867,7 +901,12 @@ function SummaryItem({ label, value }) {
 }
 
 
+const PLAN_STEPS = [
+  { partName: "Cắt Vải", cpu: 5000, startDate: "2026-03-01", endDate: "2026-03-05" },
+  { partName: "May", cpu: 15000, startDate: "2026-03-05", endDate: "2026-03-15" },
+  { partName: "Đóng gói", cpu: 2000, startDate: "2026-03-15", endDate: "2026-03-20" },
+];
 
-
-
-
+const MOCK_PRODUCTIONS = [
+  { productionId: 9, orderId: 5, pmName: "Tùng Quản Lý", status: "Đang Sản Xuất" },
+];

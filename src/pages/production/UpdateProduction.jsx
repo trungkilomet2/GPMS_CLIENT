@@ -289,10 +289,10 @@ export default function UpdateProduction() {
     try {
       setIsSubmitting(true);
       await ProductionService.updateProductionPm(production.productionId, form.pmId);
-      alert("Cập nhật PM quản lý thành công!");
+      toast.success("Cập nhật PM quản lý thành công!");
       navigate(`/production/${production.productionId}`);
     } catch (_err) {
-      alert("Không thể cập nhật PM quản lý.");
+      toast.error("Không thể cập nhật PM quản lý.");
     } finally {
       setIsSubmitting(false);
     }
