@@ -439,7 +439,7 @@ export default function ProductionPlanDetail() {
                 (() => {
                   const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
                   const canReport = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
-                  
+
                   return canReport ? (
                     <Link
                       to="/worker/daily-report"
@@ -455,7 +455,7 @@ export default function ProductionPlanDetail() {
                   const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
                   const isApproved = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
                   const hasEnoughParts = totalParts >= 3;
-                  
+
                   const canAssign = isApproved && hasEnoughParts;
                   const assignmentLink = `/production-plan/assign/${plan?.production?.productionId}`;
                   const state = { production: plan?.production, product: plan?.product, steps: plan?.steps };
@@ -615,7 +615,6 @@ export default function ProductionPlanDetail() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-slate-800">{row.partName || "-"}</div>
-                          <div className="text-[11px] text-slate-400">Giai đoạn: Rập</div>
                         </td>
                         <td className="px-4 py-3">
                           {Array.isArray(row.assignedWorkers) && row.assignedWorkers.length > 0 ? (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, CalendarDays, BookOpen, ChevronRight, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, BookOpen, ChevronRight, X, ClipboardCheck } from "lucide-react";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import CuttingNotebookService from "@/services/CuttingNotebookService";
 import { toast } from "react-toastify";
@@ -10,29 +10,6 @@ import ProductionPartService from "@/services/ProductionPartService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/internalRoleFlow";
 
-const MOCK_TASKS = [
-  {
-    id: 1,
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Diễu nẹp cổ",
-    cpu: 800,
-  },
-  {
-    id: 2,
-    productionId: 1001,
-    orderName: "Đồng phục công ty ABC",
-    partName: "Đính mác",
-    cpu: 200,
-  },
-  {
-    id: 3,
-    productionId: 1002,
-    orderName: "Áo hoodie mùa đông",
-    partName: "Kiểm hàng",
-    cpu: 100,
-  },
-];
 
 function toArray(value) {
   if (Array.isArray(value)) return value;
@@ -141,6 +118,7 @@ export default function WorkerDailyReport() {
       .map((value) => normalizeWorkerValue(value))
       .filter(Boolean)
   );
+
   const filteredPlanSteps = (() => {
     if (planSteps.length === 0) return [];
     return planSteps.filter((step) =>
@@ -162,9 +140,9 @@ export default function WorkerDailyReport() {
       isCuttingStep: step?.isCuttingStep ?? false,
     }))
     : (assignment
-      ? [assignment].filter((item) =>
-        isStepAssignedToCurrentWorker(item, currentWorkerIdSet, currentWorkerNameSet)
-      )
+      ? (isStepAssignedToCurrentWorker(assignment, currentWorkerIdSet, currentWorkerNameSet)
+        ? [assignment]
+        : [])
       : MOCK_TASKS);
   const today = useMemo(() => formatDateInput(), []);
   const [reportDate, setReportDate] = useState(today);
@@ -185,6 +163,9 @@ export default function WorkerDailyReport() {
   const [showLogSelector, setShowLogSelector] = useState(false);
   const [currentNotebookLogs, setCurrentNotebookLogs] = useState([]);
   const [activeRowId, setActiveRowId] = useState(null);
+
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [changedItems, setChangedItems] = useState([]);
 
   const fetchNotebookLogs = async (row) => {
     if (!row?.productionId) return;
@@ -244,7 +225,11 @@ export default function WorkerDailyReport() {
       const [mm, dd, yyyy] = raw.split("/").map((v) => v.trim());
       if (yyyy && mm && dd) return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
     }
-    return raw;
+    // Handle ISO string or date string with T
+    if (raw.includes("T")) {
+      return raw.split("T")[0];
+    }
+    return raw.substring(0, 10);
   };
 
   const sameDate = (value, target) => {
@@ -275,6 +260,18 @@ export default function WorkerDailyReport() {
     let active = true;
     const loadLogs = async () => {
       if (!Array.isArray(rows) || rows.length === 0) return;
+
+      // Clear existing quantities and IDs before loading for a new date
+      // but keep the basic info (partId, name, etc.)
+      setRows(prev => prev.map(row => ({
+        ...row,
+        workLogId: null,
+        logReadOnly: false,
+        quantity: ""
+      })));
+      setDraftRows(null);
+      setIsEditing(false);
+
       let rowsToUse = rows;
       const missingPart = rows.filter((row) => !row.partId && row.partName);
       const productionId =
@@ -315,8 +312,15 @@ export default function WorkerDailyReport() {
           const partId = partIdKeys[idx];
           const effectiveList = unwrapArrayPayload(res);
           if (effectiveList.length === 0) return;
-          const latest = effectiveList.sort((a, b) => new Date(b.workDate) - new Date(a.workDate))[0];
-          if (latest) byPart.set(partId, latest);
+
+          // Find the EXACT log for the selected reportDate (ignoring time)
+          const targetDateStr = normalizeDateString(reportDate); // yyyy-mm-dd
+          const matchLog = effectiveList.find(log => {
+            const logDate = normalizeDateString(log.workDate || log.reportDate);
+            return logDate === targetDateStr;
+          });
+
+          if (matchLog) byPart.set(partId, matchLog);
         });
 
         const applyLogs = (list) =>
@@ -378,7 +382,37 @@ export default function WorkerDailyReport() {
     };
   };
 
-  const saveAll = async () => {
+  const handlePreSaveCheck = () => {
+    if (!canEdit || isSavingAll) return;
+    const currentRows = isEditing ? draftRows : rows;
+    if (!Array.isArray(currentRows) || currentRows.length === 0) return;
+
+    // Detect actual changes compared to current saved rows
+    const changes = currentRows.filter((row) => {
+      if (!row.partId || row.logReadOnly) return false;
+      const original = rows.find((r) => r.id === row.id);
+      const currentQty = Number(row.quantity || 0);
+      const originalQty = original ? Number(original.quantity || 0) : 0;
+
+      // If it's a new entry (no workLogId) and has quantity > 0, it's a change
+      if (!row.workLogId && currentQty > 0) return true;
+      // If it's an existing entry and quantity is different
+      if (row.workLogId && currentQty !== originalQty) return true;
+
+      return false;
+    });
+
+    if (changes.length === 0) {
+      toast.info("Không có thay đổi nào để lưu.");
+      return;
+    }
+
+    setChangedItems(changes);
+    setIsConfirmOpen(true);
+  };
+
+  const executeSaveAll = async () => {
+    setIsConfirmOpen(false);
     if (!canEdit || isSavingAll) return;
     const currentRows = isEditing ? draftRows : rows;
     if (!Array.isArray(currentRows) || currentRows.length === 0) return;
@@ -388,6 +422,12 @@ export default function WorkerDailyReport() {
         currentRows.map(async (row) => {
           if (!row?.partId) return { row, skipped: true };
           if (row.logReadOnly) return { row, skipped: true };
+
+          // Only save if it's in the changedItems list to optimize (optional, but let's stick to user request)
+          // Actually, let's keep original logic but only call for those with changes to be safe
+          const isChanged = changedItems.some(c => c.id === row.id);
+          if (!isChanged) return { row, skipped: true };
+
           const payload = buildPayload(row);
           let createdId = row.workLogId ?? null;
           if (row.workLogId) {
@@ -417,9 +457,13 @@ export default function WorkerDailyReport() {
       if (failed.length === 0) {
         setIsEditing(false);
         setDraftRows(null);
+        toast.success("Báo cáo sản lượng đã được lưu thành công.");
+      } else {
+        toast.warning(`Đã xảy ra lỗi khi lưu ${failed.length} dòng.`);
       }
     } catch (err) {
       console.error(err);
+      toast.error("Lỗi hệ thống khi lưu báo cáo.");
     } finally {
       setIsSavingAll(false);
     }
@@ -478,7 +522,7 @@ export default function WorkerDailyReport() {
                     Hủy
                   </button>
                   <button
-                    onClick={saveAll}
+                    onClick={handlePreSaveCheck}
                     disabled={!canEdit || isSavingAll}
                     className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
                   >
@@ -651,6 +695,64 @@ export default function WorkerDailyReport() {
               <button onClick={() => setShowLogSelector(false)} className="rounded-xl border border-slate-200 px-5 py-2 text-sm font-bold text-slate-600">
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Confirmation Modal */}
+      {isConfirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-md">
+          <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-white/95 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="bg-emerald-600 px-6 py-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                  <ClipboardCheck size={22} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Xác nhận báo cáo sản lượng</h3>
+                  <p className="text-emerald-50/80 text-xs">Vui lòng kiểm tra lại các thông tin trước khi lưu</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Danh sách các phần tử thay đổi</div>
+              <div className="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100">
+                    <tr>
+                      <th className="px-4 py-2 text-left">Công đoạn</th>
+                      <th className="px-4 py-2 text-right">Số lượng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100/50">
+                    {changedItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-emerald-50/30 transition-colors">
+                        <td className="px-4 py-3 font-medium text-slate-700">{item.partName}</td>
+                        <td className="px-4 py-3 text-right font-black text-emerald-700">{item.quantity} cái</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3">
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => setIsConfirmOpen(false)}
+                    className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:border-slate-300"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    onClick={executeSaveAll}
+                    className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 shadow-lg shadow-emerald-200"
+                  >
+                    Xác nhận & Lưu
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

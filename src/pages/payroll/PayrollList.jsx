@@ -204,10 +204,14 @@ export default function PayrollList() {
                         <tr key={worker.userId || worker.workerName} className="group hover:bg-slate-50/80 transition-all">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-black uppercase shadow-sm">
-                                {worker.workerName ? worker.workerName.charAt(0) : "?"}
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-black uppercase shadow-sm overflow-hidden">
+                                {worker.avatarUrl ? (
+                                  <img src={worker.avatarUrl} alt={worker.fullName || worker.workerName} className="h-full w-full object-cover" />
+                                ) : (
+                                  (worker.fullName || worker.workerName || "?").charAt(0)
+                                )}
                               </div>
-                              <span className="font-bold text-slate-900">{worker.workerName}</span>
+                              <span className="font-bold text-slate-900">{worker.fullName || worker.workerName}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">

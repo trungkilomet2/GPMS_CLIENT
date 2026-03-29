@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const WORKER_NAV_ITEMS = [
@@ -35,9 +36,10 @@ export default function WorkerSidebar() {
 
   const user = getStoredUser();
   const navItems = WORKER_NAV_ITEMS;
-  const brandSubtitle = "Nhân viên";
+  const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
+  const brandSubtitle = hasAnyRole(roleValue, ["Owner", "Admin"]) ? "Tổng quan" : (hasAnyRole(roleValue, ["PM", "Manager"]) ? "Quản lý" : "Nhân viên");
   const defaultName = "Nhân viên";
-  const roleLabel = "Worker";
+  const roleLabel = roleValue || "Worker";
 
   useEffect(() => {
     try {

@@ -55,8 +55,10 @@ export default function PayrollDetail() {
   const stats = useMemo(() => {
     const totalQty = workerLogs.reduce((sum, log) => sum + log.quantity, 0);
     const totalSalary = workerLogs.reduce((sum, log) => sum + log.quantity * log.cpu, 0);
-    const workerName = workerLogs[0]?.workerName || employeeId;
-    return { totalQty, totalSalary, workerName };
+    const firstLog = workerLogs[0];
+    const workerName = firstLog?.workerFullName || firstLog?.workerName || employeeId;
+    const workerAvatar = firstLog?.workerAvatar || null;
+    return { totalQty, totalSalary, workerName, workerAvatar };
   }, [workerLogs, employeeId]);
 
   const formatDate = (dateStr) => {
@@ -81,14 +83,25 @@ export default function PayrollDetail() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Chi tiết lương: {stats.workerName}
-                </h1>
-                <p className="text-slate-600 text-sm">
-                  Kỳ lương: Tháng {month}/{year}
-                </p>
-              </div>
+               <div className="flex items-center gap-4">
+                 {stats.workerAvatar ? (
+                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-sm ring-1 ring-slate-100">
+                     <img src={stats.workerAvatar} alt={stats.workerName} className="h-full w-full object-cover" />
+                   </div>
+                 ) : (
+                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-black uppercase text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                     {stats.workerName.charAt(0)}
+                   </div>
+                 )}
+                 <div className="flex flex-col gap-1">
+                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                     Chi tiết lương: {stats.workerName}
+                   </h1>
+                   <p className="text-slate-600 text-sm">
+                     Kỳ lương: Tháng {month}/{year}
+                   </p>
+                 </div>
+               </div>
             </div>
           </div>
 
