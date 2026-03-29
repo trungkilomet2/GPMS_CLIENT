@@ -1,5 +1,4 @@
 ﻿import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
 
 vi.mock('@/layouts/MainLayout', () => ({
@@ -14,11 +13,7 @@ vi.mock('@/components/homepage/CTA', () => ({ default: () => <div>CTA Section</d
 
 describe('HomePage', () => {
   it('renders all homepage sections inside MainLayout', () => {
-    render(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>
-    );
+    render(<HomePage />);
 
     expect(screen.getByTestId('main-layout')).toBeInTheDocument();
     expect(screen.getByText('Hero Section')).toBeInTheDocument();

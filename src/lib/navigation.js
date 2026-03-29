@@ -1,9 +1,7 @@
 import { matchPath } from "react-router-dom";
-import { getMarketingPageLabel } from "@/lib/marketingPages";
 
 export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
-  { path: "/pages/:slug", label: ({ slug }) => getMarketingPageLabel(slug), parent: "/home" },
   { path: "/dashboard", label: "Dashboard" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
   { path: "/admin/users", label: "Quản lý user", parent: "/dashboard" },
@@ -24,11 +22,6 @@ export const BREADCRUMB_CONFIG = [
   { path: "/employees/management", label: "Nhóm quản lý", parent: "/employees" },
   { path: "/employees/workers", label: "Nhóm nhân viên", parent: "/employees" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
-  {
-    path: "/employees/:id/skills",
-    label: ({ id }) => `Gán skill cho nhân viên #${id}`,
-    parent: "/employees",
-  },
   { path: "/worker-roles", label: "Vai trò thợ", parent: "/home" },
   { path: "/worker-roles/create", label: "Thêm vai trò thợ", parent: "/worker-roles" },
   { path: "/worker/assignments", label: "Công việc được giao", parent: "/home" },

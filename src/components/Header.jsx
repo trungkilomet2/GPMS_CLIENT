@@ -63,9 +63,6 @@ export default function Header() {
     : "U";
 
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
-  const isGuestActive = (item) =>
-    (item.path && isActive(item.path)) ||
-    item.items?.some((sub) => isActive(sub.path));
 
   const openProfileMenu = () => {
     if (profileCloseTimer.current) {
@@ -217,7 +214,7 @@ export default function Header() {
               {catOpen && (
                 <div className="cat-panel" onClick={e => e.stopPropagation()}>
                   {CATEGORIES.map(c => (
-                    <Link key={c.label} to={c.path} onClick={() => setCatOpen(false)}>{c.label}</Link>
+                    <a key={c} href="#" onClick={e => { e.preventDefault(); setCatOpen(false); }}>{c}</a>
                   ))}
                 </div>
               )}
@@ -233,33 +230,17 @@ export default function Header() {
                   className="mnav-item"
                   onMouseEnter={() => { if (item.hasDropdown) setOpenMenu(`guest-${i}`); }}
                   onMouseLeave={() => setOpenMenu(null)}
+                  onClick={e => { e.stopPropagation(); if (item.hasDropdown) setOpenMenu(openMenu === `guest-${i}` ? null : `guest-${i}`); }}
                 >
-                  <button
-                    className={`mnav-a${isGuestActive(item) ? " active-m" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (item.hasDropdown) {
-                        setOpenMenu(openMenu === `guest-${i}` ? null : `guest-${i}`);
-                        return;
-                      }
-                      if (item.path) navigate(item.path);
-                    }}
-                  >
+                  <button className={`mnav-a${i === 0 ? " active-m" : ""}`}>
                     <SvgIcon d={item.icon} size={14} />
                     {item.label.toUpperCase()}
                     {item.hasDropdown && <span className="plus">▾</span>}
                   </button>
                   {item.hasDropdown && openMenu === `guest-${i}` && (
                     <div className="mnav-dropdown" onClick={e => e.stopPropagation()}>
-                      {item.path && (
-                        <Link to={item.path} onClick={() => setOpenMenu(null)}>
-                          Xem tổng quan
-                        </Link>
-                      )}
                       {item.items.map(sub => (
-                        <Link key={sub.path} to={sub.path} onClick={() => setOpenMenu(null)}>
-                          {sub.label}
-                        </Link>
+                        <a key={sub} href="#" onClick={e => { e.preventDefault(); setOpenMenu(null); }}>{sub}</a>
                       ))}
                     </div>
                   )}

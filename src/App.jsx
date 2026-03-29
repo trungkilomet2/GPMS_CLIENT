@@ -3,7 +3,6 @@ import { routes } from '@/routes';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ProfileCompletionGuard from '@/routes/ProfileCompletionGuard';
 import { ToastContainer } from 'react-toastify';
-import ChativeMessenger from '@/components/ChativeMessenger';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function App() {
@@ -20,7 +19,6 @@ export default function App() {
           </ProfileCompletionGuard>
         </Suspense>
       </BrowserRouter>
-      <ChativeMessenger />
       <ToastContainer position="top-right" autoClose={3000} />
     </>
   );

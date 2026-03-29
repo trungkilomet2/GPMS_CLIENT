@@ -1,18 +1,7 @@
-import { Link } from "react-router-dom";
+import { C } from "../lib/constants";
 
-const FOOTER_MENU = [
-  { label: "Trang chủ", path: "/home" },
-  { label: "Giới thiệu", path: "/pages/gioi-thieu" },
-  { label: "Dịch vụ", path: "/pages/dich-vu" },
-  { label: "Quy trình đặt may", path: "/pages/quy-trinh-dat-may" },
-  { label: "Liên hệ", path: "/pages/lien-he" },
-];
-const FOOTER_SUPPORT = [
-  { label: "Thông tin xưởng", path: "/pages/xuong-may" },
-  { label: "Năng lực xưởng may", path: "/pages/nang-luc-xuong-may" },
-  { label: "Sản phẩm gia công", path: "/pages/san-pham-gia-cong" },
-  { label: "Tin tức ngành may", path: "/pages/tin-tuc-nganh-may" },
-];
+const FOOTER_MENU = ["Trang chủ", "Giới thiệu", "Sản phẩm may", "Quy trình", "Liên hệ"];
+const FOOTER_SUPPORT = ["Hướng dẫn sử dụng", "Câu hỏi thường gặp", "Chính sách bảo mật", "Điều khoản sử dụng"];
 const FOOTER_CONTACT = [
   ["📍", "123 Đường ABC, Quận 1, TP.HCM"],
   ["📞", "(+84) 123 456 789"],
@@ -44,13 +33,13 @@ export default function Footer() {
           {/* Menu */}
           <div className="footer-col">
             <h4 className="footer-col-head">Menu</h4>
-            {FOOTER_MENU.map((item) => <Link key={item.path} to={item.path} className="footer-link">{item.label}</Link>)}
+            {FOOTER_MENU.map(l => <a key={l} href="#" className="footer-link">{l}</a>)}
           </div>
 
           {/* Hỗ trợ */}
           <div className="footer-col">
             <h4 className="footer-col-head">Hỗ trợ</h4>
-            {FOOTER_SUPPORT.map((item) => <Link key={item.path} to={item.path} className="footer-link">{item.label}</Link>)}
+            {FOOTER_SUPPORT.map(l => <a key={l} href="#" className="footer-link">{l}</a>)}
           </div>
 
           {/* Contact */}

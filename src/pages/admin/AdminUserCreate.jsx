@@ -106,7 +106,7 @@ export default function AdminUserCreate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại danh sách user</span>
               </Link>
-              <h1 className="admin-hero__title">Tạo tài khoản mới</h1>
+              <h1 className="admin-hero__title">Add New User Screen</h1>
               <p className="admin-hero__subtitle">
                 Form onboarding cho Admin tạo account mới bằng API `create-user` và gán role ngay từ bước khởi tạo.
               </p>
@@ -123,7 +123,7 @@ export default function AdminUserCreate() {
                 disabled={isSubmitting}
               >
                 {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                <span>{isSubmitting ? "Đang tạo..." : "Tạo user"}</span>
+                <span>{isSubmitting ? "Đang tạo..." : "Create User"}</span>
               </button>
             </div>
           </div>
@@ -176,8 +176,8 @@ export default function AdminUserCreate() {
 
                 <div className="mt-4">
                   <AdminBanner
-                    title="Form tạo user đang bám theo API create-user."
-                    description="Các trường hiện có gồm họ tên, username, password và role."
+                    title="Các trường liên hệ, MFA và ghi chú chưa có trong API create-user."
+                    description="Sau khi backend bổ sung endpoint chi tiết/update user, mình có thể nối tiếp các trường đó vào form admin này."
                     tone="info"
                   />
                 </div>
@@ -194,8 +194,8 @@ export default function AdminUserCreate() {
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Role sẽ được gán</h2>
-                    <p className="admin-card__subtitle">Thông tin vai trò đang chọn để tạo tài khoản.</p>
+                    <h2 className="admin-card__title">Quyền theo role</h2>
+                    <p className="admin-card__subtitle">Xem nhanh phần quyền web đang gắn với role đã chọn.</p>
                   </div>
                 </div>
 
@@ -207,12 +207,13 @@ export default function AdminUserCreate() {
                     </div>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>Nhóm vai trò</strong>
+                    <strong>Phạm vi quyền</strong>
                     <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
+                    <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} quyền đang được web hiển thị` : "Role này chưa có dữ liệu quyền tương ứng trên web"}</span>
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Mô tả role</strong>
-                    <span>{permissionProfile?.description || "Không có mô tả thêm."}</span>
+                    <span>{permissionProfile?.description}</span>
                   </div>
                 </div>
               </section>
@@ -220,23 +221,23 @@ export default function AdminUserCreate() {
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Lưu ý khi tạo tài khoản</h2>
-                    <p className="admin-card__subtitle">Những điểm chính theo luồng backend hiện tại.</p>
+                    <h2 className="admin-card__title">Checklist cấp quyền</h2>
+                    <p className="admin-card__subtitle">Các bước Admin nên xác nhận trước khi cấp account mới.</p>
                   </div>
                 </div>
 
                 <div className="admin-preview-list">
                   <div className="admin-preview-list__item">
-                    <strong>1. Chọn đúng role</strong>
+                    <strong>1. Xác minh nhu cầu truy cập</strong>
                     <span>Đảm bảo role phản ánh đúng công việc và không cấp thừa quyền so với nhu cầu thật.</span>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>2. Kiểm tra lại thông tin đăng nhập</strong>
-                    <span>Backend hiện tạo user bằng họ tên, username, password và role.</span>
+                    <strong>2. Ghi nhớ giới hạn API</strong>
+                    <span>Form này hiện mới lưu được 4 trường mà backend `create-user` đang hỗ trợ.</span>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>3. Có thể chỉnh sửa sau khi tạo</strong>
-                    <span>Sau khi tạo xong, admin vẫn có thể cập nhật hồ sơ và gán lại role ở màn cập nhật.</span>
+                    <strong>3. Kiểm tra lại role sau khi tạo</strong>
+                    <span>Nếu cần đổi role ngay sau đó, Admin có thể vào màn Update User để gán lại bằng API assign-roles.</span>
                   </div>
                 </div>
               </section>

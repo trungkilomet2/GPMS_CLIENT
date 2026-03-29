@@ -5,7 +5,6 @@ import { getStoredUser } from "@/lib/authStorage";
 import { isProfileComplete } from "@/lib/profileCompletion";
 import { authService } from "@/services/authService";
 import { validatePassword, validateUserName } from "@/lib/validators";
-import "../styles/auth.css";
 import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
@@ -229,7 +228,7 @@ export default function LoginPage() {
                 onChange={e => setRemember(e.target.checked)} />
               Ghi nhớ đăng nhập
             </label>
-            <span className="auth-note">Chưa hỗ trợ quên mật khẩu</span>
+            <a href="#" className="forgot-link">Quên mật khẩu?</a>
           </div>
 
           <button type="submit" className="login-btn" disabled={loading}>

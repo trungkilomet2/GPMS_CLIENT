@@ -292,7 +292,7 @@ export default function AdminUserUpdate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại chi tiết user</span>
               </Link>
-              <h1 className="admin-hero__title">Cập nhật tài khoản</h1>
+              <h1 className="admin-hero__title">Update User Screen</h1>
               <p className="admin-hero__subtitle">
                 Màn chỉnh sửa để Admin cập nhật hồ sơ bằng endpoint `update-user-for-admin` và gán lại role khi cần.
               </p>
@@ -310,7 +310,7 @@ export default function AdminUserUpdate() {
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{isSubmitting ? "Đang lưu..." : "Lưu thay đổi"}</span>
+                  <span>{isSubmitting ? "Đang lưu..." : "Save Changes"}</span>
                 </button>
                 <button
                   type="button"
@@ -319,7 +319,7 @@ export default function AdminUserUpdate() {
                   disabled={user.status === "inactive" || isDisabling}
                 >
                   {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Khóa tài khoản"}</span>
+                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Disable User"}</span>
                 </button>
               </div>
             ) : null}
@@ -445,8 +445,8 @@ export default function AdminUserUpdate() {
 
                   <div className="mt-4">
                     <AdminBanner
-                      title="Màn cập nhật đang dùng các endpoint admin hiện có."
-                      description="Chi tiết user, cập nhật hồ sơ và gán lại role đều đang đi theo contract backend hiện tại."
+                      title="Màn update admin đang dùng 3 API thật."
+                      description="`get-user-detail-for-admin/{id}` để load hồ sơ, `update-user-for-admin/{id}` để lưu thông tin cơ bản, và `assign-roles/{id}` để đổi role trên backend."
                       tone="info"
                     />
                   </div>
@@ -473,8 +473,8 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Role đang chọn</h2>
-                      <p className="admin-card__subtitle">Thông tin vai trò sẽ được gán cho tài khoản.</p>
+                      <h2 className="admin-card__title">Quyền theo role đang chọn</h2>
+                      <p className="admin-card__subtitle">Xem nhanh phần quyền web sẽ hiển thị theo role mới.</p>
                     </div>
                   </div>
 
@@ -486,12 +486,12 @@ export default function AdminUserUpdate() {
                       </div>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Nhóm vai trò</strong>
+                      <strong>Thông tin quyền</strong>
                       <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
-                      <span>{permissionProfile?.description || "Không có mô tả thêm."}</span>
+                      <span>{permissionProfile?.description || "Role này chưa có dữ liệu quyền tương ứng trên web."}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Chuyên môn hiện tại</strong>
+                      <strong>Chuyên môn thợ hiện tại</strong>
                       <span>{user.workerRole || "Chưa gán chuyên môn thợ"}</span>
                     </div>
                   </div>
@@ -500,8 +500,8 @@ export default function AdminUserUpdate() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                      <h2 className="admin-card__title">Thông tin hiện tại</h2>
-                      <p className="admin-card__subtitle">Đối chiếu nhanh dữ liệu trước khi bấm lưu.</p>
+                      <h2 className="admin-card__title">Snapshot user</h2>
+                      <p className="admin-card__subtitle">Đối chiếu nhanh thông tin trước khi bấm lưu.</p>
                     </div>
                   </div>
 
@@ -517,8 +517,8 @@ export default function AdminUserUpdate() {
                       <span>{user.roleNames?.join(", ") || user.roleLabel}</span>
                     </div>
                     <div className="admin-preview-list__item">
-                      <strong>Lưu ý</strong>
-                      <span>Nếu cần khóa tài khoản, dùng nút Disable User. Form này chỉ cập nhật hồ sơ và role.</span>
+                      <strong>Checklist</strong>
+                      <span>Nếu cần khóa tài khoản, dùng nút Disable User. Nếu chỉ sửa hồ sơ, form này sẽ không động vào trạng thái account.</span>
                     </div>
                   </div>
                 </section>

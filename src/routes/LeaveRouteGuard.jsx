@@ -1,6 +1,5 @@
 import { Navigate } from "react-router-dom";
 import { getStoredUser } from "@/lib/authStorage";
-import { extractRoleValue } from "@/lib/authIdentity";
 import { canManageLeaveRequests, getDefaultRouteForRole } from "@/lib/roleAccess";
 
 export default function LeaveRouteGuard({ children }) {
@@ -10,11 +9,9 @@ export default function LeaveRouteGuard({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
-
-  if (canManageLeaveRequests(roleValue)) {
+  if (canManageLeaveRequests(user.role)) {
     return children;
   }
 
-  return <Navigate to={getDefaultRouteForRole(roleValue)} replace />;
+  return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
 }

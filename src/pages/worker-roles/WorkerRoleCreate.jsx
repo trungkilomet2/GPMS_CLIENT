@@ -62,7 +62,7 @@ export default function WorkerRoleCreate() {
               </Link>
               <h1 className="worker-role-hero__title">Thêm vai trò thợ</h1>
               <p className="worker-role-hero__subtitle">
-                Tạo mới chuyên môn riêng cho worker, không dùng để tạo role hệ thống trong hierarchy Owner / PM / Worker.
+                Tạo mới chuyên môn riêng cho worker, không dùng để tạo role hệ thống trong hierarchy Owner / PM / Team Lead / Worker.
               </p>
             </div>
           </div>

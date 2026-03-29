@@ -12,7 +12,6 @@ import {
   validatePassword,
   validateUserName,
 } from "@/lib/validators";
-import "../styles/auth.css";
 import "../styles/login.css";
 import "../styles/register.css";
 

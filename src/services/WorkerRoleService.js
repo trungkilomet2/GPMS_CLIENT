@@ -125,21 +125,16 @@ const WorkerRoleService = {
     }
 
     const employeeRoles = employees
-      .flatMap((employee, index) =>
-        (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : [])
-          .filter((skillName) => isWorkerSkillName(skillName))
-          .map((skillName, skillIndex) => ({
-            id: rolesFromApi.length + index + skillIndex + 1,
-            name: skillName,
-          }))
-      );
+      .filter((employee) => isWorkerSkillName(employee.workerSkill))
+      .map((employee, index) => ({
+        id: rolesFromApi.length + index + 1,
+        name: employee.workerSkill,
+      }));
 
     const roles = mergeRoles(rolesFromApi, employeeRoles);
 
     return roles.map((role) => {
-      const members = employees.filter((employee) =>
-        (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : []).includes(role.name)
-      );
+      const members = employees.filter((employee) => employee.workerSkill === role.name);
 
       return {
         ...role,

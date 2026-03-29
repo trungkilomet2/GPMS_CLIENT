@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -7,7 +7,6 @@ import {
   LoaderCircle,
   MapPin,
   Mail,
-  PencilLine,
   Phone,
   Pencil,
   ShieldCheck,
@@ -17,7 +16,6 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
-import "@/styles/employee-create.css";
 import "@/styles/employee-detail.css";
 
 const STATUS_MAP = {
@@ -37,7 +35,6 @@ function getInitials(name = "") {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
-  const location = useLocation();
   const currentUser = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const isOwner = primaryRole === "owner";
@@ -110,14 +107,6 @@ export default function EmployeeDetail() {
           workerSkill: sourceEmployee.workerSkill || directoryEmployee?.workerSkill || "",
           workerSkillLabel:
             sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
-          workerSkillNames:
-            sourceEmployee.workerSkillNames?.length
-              ? sourceEmployee.workerSkillNames
-              : directoryEmployee?.workerSkillNames ?? [],
-          workerSkillLabels:
-            sourceEmployee.workerSkillLabels?.length
-              ? sourceEmployee.workerSkillLabels
-              : directoryEmployee?.workerSkillLabels ?? [],
           role: sourceEmployee.role || directoryEmployee?.role || "",
           roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
           roleLabels:
@@ -149,15 +138,6 @@ export default function EmployeeDetail() {
 
   const statusConfig = employee ? STATUS_MAP[employee.status] ?? STATUS_MAP.active : STATUS_MAP.active;
   const roles = useMemo(() => employee?.roleLabels ?? [], [employee]);
-  const workerSkillLabels = useMemo(
-    () =>
-      employee?.workerSkillLabels?.length
-        ? employee.workerSkillLabels
-        : employee?.workerSkillLabel
-          ? [employee.workerSkillLabel]
-          : [],
-    [employee]
-  );
 
   return (
     <DashboardLayout>
@@ -220,12 +200,6 @@ export default function EmployeeDetail() {
             </div>
           ) : employee ? (
             <div className="employee-detail-grid employee-detail-grid--simple">
-              {location.state?.skillsUpdated ? (
-                <div className="employee-create-banner">
-                  <span>Danh sách skill của worker đã được cập nhật.</span>
-                </div>
-              ) : null}
-
               <section className="employee-detail-card employee-detail-profile">
                 <div className="employee-detail-profile__avatar">
                   {employee.avatarUrl ? (
@@ -312,20 +286,12 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-role-block">
                     <div className="employee-detail-role-label">Chuyên môn</div>
                     <div className="employee-detail-role-pills">
-                      {workerSkillLabels.length ? (
-                        workerSkillLabels.map((skillLabel) => (
-                          <span key={skillLabel} className="employee-detail-machine-pill">{skillLabel}</span>
-                        ))
+                      {employee.workerSkill ? (
+                        <span className="employee-detail-machine-pill">{employee.workerSkillLabel}</span>
                       ) : (
                         <span className="employee-detail-role-empty">Chưa cập nhật chuyên môn</span>
                       )}
                     </div>
-                    {isOwner && employee.roles?.includes("Worker") ? (
-                      <Link to={`/employees/${id}/skills`} className="employee-detail-btn employee-detail-btn--secondary">
-                        <PencilLine size={16} />
-                        <span>Gán skill</span>
-                      </Link>
-                    ) : null}
                   </div>
 
                   <div className="employee-detail-role-block">
