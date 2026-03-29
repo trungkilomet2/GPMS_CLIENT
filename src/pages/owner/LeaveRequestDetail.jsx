@@ -52,8 +52,8 @@ function StatusBadge({ status }) {
   const Icon = config.icon;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${config.badge}`}>
-      <Icon size={14} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${config.badge}`}>
+      <Icon size={13} />
       {config.label}
     </span>
   );
@@ -61,12 +61,12 @@ function StatusBadge({ status }) {
 
 function DetailItem({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        <Icon size={14} />
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+      <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <Icon size={13} />
         {label}
       </div>
-      <div className="text-sm font-medium leading-6 text-slate-800">{value || "Chưa cập nhật"}</div>
+      <div className="text-[13px] font-medium leading-5 text-slate-800">{value || "Chưa cập nhật"}</div>
     </div>
   );
 }
@@ -204,7 +204,7 @@ export default function LeaveRequestDetail() {
   return (
     <LayoutComponent>
       <div className="leave-page leave-detail-page">
-        <div className="leave-shell mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="leave-shell mx-auto flex max-w-[72rem] flex-col gap-5 px-4 py-6 sm:px-5 lg:px-6">
           {loading ? (
             <div className="flex min-h-[24rem] items-center justify-center rounded-3xl border border-slate-200 bg-white shadow-sm">
               <div className="flex flex-col items-center gap-3 text-slate-500">
@@ -218,7 +218,7 @@ export default function LeaveRequestDetail() {
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-3.5 rounded-[2rem] bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-5 text-white shadow-lg">
+              <div className="flex flex-col gap-3 rounded-[2rem] bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-5 text-white shadow-lg">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <button
@@ -231,7 +231,7 @@ export default function LeaveRequestDetail() {
                     </button>
                     <div className="hidden h-8 w-px bg-white/20 sm:block" />
                     <div>
-                      <div className="text-xs uppercase tracking-[0.24em] text-emerald-100/80">
+                      <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80">
                         Đơn nghỉ của tôi
                       </div>
                       <h1 className="mt-1 text-[1.75rem] font-bold leading-tight">Chi tiết đơn nghỉ</h1>
@@ -267,18 +267,18 @@ export default function LeaveRequestDetail() {
                 </div>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-                <div className="space-y-6">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-900">Nội dung xin nghỉ</h2>
-                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-7 text-amber-900">
+              <div className="grid gap-5 lg:grid-cols-[1.12fr_0.88fr]">
+                <div className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Nội dung xin nghỉ</h2>
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] leading-6 text-amber-900">
                       {leave.content}
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-900">Phản hồi xử lý</h2>
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Phản hồi xử lý</h2>
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-[13px] leading-6 text-slate-700">
                       {leave.status === "rejected"
                         ? leave.denyContent || "Đơn đã bị từ chối nhưng chưa có nội dung phản hồi."
                         : leave.status === "cancel_requested"
@@ -291,13 +291,13 @@ export default function LeaveRequestDetail() {
                     </div>
 
                     {(canCancelPending || canRequestCancel) ? (
-                      <div className="mt-5">
+                      <div className="mt-4">
                         <div className="flex flex-wrap gap-3">
                           <button
                             type="button"
                             disabled={submitting}
                             onClick={() => setCancelOpen((prev) => !prev)}
-                            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                           >
                             <XCircle size={16} />
                             {canCancelPending ? "Hủy đơn nghỉ" : "Gửi yêu cầu hủy"}
@@ -305,7 +305,7 @@ export default function LeaveRequestDetail() {
                         </div>
 
                         {cancelOpen ? (
-                          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <label className="mb-2 block text-sm font-semibold text-slate-700">
                               {canCancelPending ? "Lý do hủy đơn" : "Lý do yêu cầu hủy"}
                             </label>
@@ -318,14 +318,14 @@ export default function LeaveRequestDetail() {
                                   ? "Nhập lý do hủy đơn nghỉ (bắt buộc)"
                                   : "Nhập lý do yêu cầu hủy đơn nghỉ (bắt buộc)"
                               }
-                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
+                              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                             />
                             <div className="mt-3 flex justify-end">
                               <button
                                 type="button"
                                 disabled={submitting || !cancelReason.trim()}
                                 onClick={handleCancelAction}
-                                className="rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {submitting
                                   ? "Đang xử lý..."
@@ -340,7 +340,7 @@ export default function LeaveRequestDetail() {
                     ) : null}
 
                     {leave.rejectCancelContent ? (
-                      <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm leading-7 text-rose-800">
+                      <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3.5 text-[13px] leading-6 text-rose-800">
                         <div className="mb-2 flex items-center gap-2 font-semibold">
                           <MessageSquareQuote size={16} />
                           Lý do từ chối yêu cầu hủy
@@ -351,10 +351,10 @@ export default function LeaveRequestDetail() {
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-900">Thông tin đơn</h2>
-                    <div className="mt-5 grid gap-3">
+                <div className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Thông tin đơn</h2>
+                    <div className="mt-4 grid gap-3">
                       <DetailItem icon={UserRound} label="Người gửi" value={leave.userFullName} />
                       <DetailItem icon={FileText} label="Trạng thái" value={STATUS_MAP[leave.status]?.label || "Chưa cập nhật"} />
                       <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatLeaveDateTime(leave.dateCreate)} />
@@ -365,18 +365,18 @@ export default function LeaveRequestDetail() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <h2 className="text-lg font-bold text-slate-900">Timeline xử lý</h2>
-                    <div className="mt-5 space-y-4">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Timeline xử lý</h2>
+                    <div className="mt-4 space-y-3">
                       {timelineItems.map((item, index) => (
-                        <div key={item.title} className="flex gap-4">
+                        <div key={item.title} className="flex gap-3">
                           <div className="flex flex-col items-center">
-                            <div className="mt-1 h-3 w-3 rounded-full bg-emerald-500" />
+                            <div className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
                             {index < timelineItems.length - 1 && <div className="mt-2 h-full w-px bg-slate-200" />}
                           </div>
-                          <div className="pb-4">
+                          <div className="pb-3">
                             <div className="text-sm font-semibold text-slate-800">{item.title}</div>
-                            <div className="mt-1 text-sm leading-6 text-slate-500">{item.value}</div>
+                            <div className="mt-1 text-[13px] leading-5 text-slate-500">{item.value}</div>
                           </div>
                         </div>
                       ))}

@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
   ACCOUNT: {
     LOGIN: `${BASE_URL}/api/Account/login`,
     REGISTER: `${BASE_URL}/api/Account/register`,
+    FORGOT_PASSWORD: "",
   },
 
   EMAIL: {

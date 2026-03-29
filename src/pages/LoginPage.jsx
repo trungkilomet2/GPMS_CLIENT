@@ -228,7 +228,7 @@ export default function LoginPage() {
                 onChange={e => setRemember(e.target.checked)} />
               Ghi nhớ đăng nhập
             </label>
-            <a href="#" className="forgot-link">Quên mật khẩu?</a>
+            <Link to="/forgot-password" className="forgot-link">Quên mật khẩu?</Link>
           </div>
 
           <button type="submit" className="login-btn" disabled={loading}>
