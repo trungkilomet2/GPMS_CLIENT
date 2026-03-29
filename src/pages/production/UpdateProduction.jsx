@@ -114,7 +114,8 @@ export default function UpdateProduction() {
         const response = await WorkerService.getAllEmployees();
         const items = response?.data ?? [];
         const pms = items.filter((item) =>
-          item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM"))
+          item.status === "active" &&
+          (item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM")))
         );
         if (!active) return;
         setPmUsers(pms);
