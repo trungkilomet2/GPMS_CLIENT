@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll } from "@/utils/payrollUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -29,7 +30,7 @@ export default function PayrollList() {
       const data = await fetchAggregatedPayroll(selectedMonth, selectedYear, isRefresh);
       setWorkerSummary(data || []);
     } catch (err) {
-      setError("Không thể tải dữ liệu bảng lương. Vui lòng thử lại sau.");
+      setError(getErrorMessage(err, "Không thể tải dữ liệu bảng lương. Vui lòng thử lại sau."));
       console.error(err);
     } finally {
       setLoading(false);

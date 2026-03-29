@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, useLocation, Link } from "reac
 import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2 } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -35,7 +36,7 @@ export default function PayrollDetail() {
         }
       } catch (err) {
         if (active) {
-          setError("Không thể tải chi tiết lương.");
+          setError(getErrorMessage(err, "Không thể tải chi tiết lương."));
           console.error(err);
         }
       } finally {

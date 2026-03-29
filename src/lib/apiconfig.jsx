@@ -134,6 +134,10 @@ export const API_ENDPOINTS = {
   PRODUCT: {
     GET_ALL: `${BASE_URL}/api/Product/product-list`,
   },
+  TEMPLATE: {
+    LIST: `${BASE_URL}/api/Template/template/list`,
+    CREATE: `${BASE_URL}/api/Template/template/create`,
+  },
 };
 
 export default BASE_URL;

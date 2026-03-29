@@ -6,6 +6,7 @@ import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
 import { getStoredUser } from '@/lib/authStorage';
+import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
@@ -40,7 +41,10 @@ export default function CreateOrder() {
 
         if (active) setProfileCheck({ checking: false, missing });
       } catch (error) {
-        if (active) setProfileCheck({ checking: false, missing: ['email', 'số điện thoại', 'địa chỉ'] });
+        if (active) {
+          setProfileCheck({ checking: false, missing: ['email', 'số điện thoại', 'địa chỉ'] });
+          console.error("Profile check failed:", error);
+        }
       }
     };
 
@@ -320,8 +324,9 @@ export default function CreateOrder() {
             return updated;
           });
         }
-      } catch {
-        // keep preview; user can edit to retry
+      } catch (error) {
+        console.error("Material image upload failed:", error);
+        toast.error(getErrorMessage(error, "Không thể tải ảnh vật liệu lên Cloudinary."));
       }
     }
   };
@@ -536,21 +541,9 @@ export default function CreateOrder() {
       await OrderService.createOrder(payload);
       setIsSuccessOpen(true);
     } catch (error) {
-      console.error('Lỗi API (CreateOrder):', error.response?.data || error.message);
-      const data = error.response?.data;
-      let errorMsg = 'Không thể kết nối đến máy chủ';
-
-      if (data) {
-        if (data.errors) {
-          errorMsg = Object.values(data.errors)
-            .flat()
-            .map(translateError)
-            .join(' - ');
-        } else {
-          errorMsg = translateError(data.detail || data.title || error.message);
-        }
-      }
-      toast.error('Lỗi: ' + errorMsg);
+      console.error('Lỗi API (CreateOrder):', error);
+      const errMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ');
+      toast.error('Lỗi: ' + errMsg);
     } finally {
       setIsSubmitting(false);
     }

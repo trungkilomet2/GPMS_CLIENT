@@ -9,22 +9,9 @@ import {
   pickPrimarySystemRole,
   splitRoles,
 } from "@/lib/orgHierarchy";
+import { getErrorMessage } from "@/utils/errorUtils";
 
-export const getEmployeeModuleErrorMessage = (error, fallbackMessage) => {
-  if (error?.response?.status === 403) {
-    return "Bạn không có quyền truy cập chức năng này.";
-  }
-
-  const data = error?.response?.data ?? {};
-  const fieldErrors =
-    data?.errors && typeof data.errors === "object"
-      ? Object.entries(data.errors).flatMap(([, messages]) =>
-          (Array.isArray(messages) ? messages : [messages]).map((message) => String(message))
-        )
-      : [];
-
-  return fieldErrors[0] || data?.message || data?.title || data?.detail || fallbackMessage;
-};
+export const getEmployeeModuleErrorMessage = getErrorMessage;
 
 const parseApiPayload = (rawResponse) =>
   typeof rawResponse === "string"

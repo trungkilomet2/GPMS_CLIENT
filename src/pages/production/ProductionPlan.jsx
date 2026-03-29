@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
+import TemplateService from "@/services/TemplateService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
 import { getProductionStatusLabel } from "@/utils/statusUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import "@/styles/homepage.css";
@@ -283,6 +285,10 @@ export default function ProductionPlan() {
   const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
   const [hasExistingParts, setHasExistingParts] = useState(false);
   const [formError, setFormError] = useState("");
+  const [dynamicTemplates, setDynamicTemplates] = useState([]);
+  const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [form, setForm] = useState({
     partName: "",
     startDate: "",
@@ -366,6 +372,7 @@ export default function ProductionPlan() {
         );
       } catch (err) {
         console.error("Lỗi tải danh sách đơn sản xuất:", err);
+        toast.error(getErrorMessage(err, "Không thể tải danh sách đơn sản xuất."));
       }
     };
     fetchList();
@@ -399,6 +406,7 @@ export default function ProductionPlan() {
           }
         } catch (err) {
           console.error("Error fetching existing parts:", err);
+          // Silent or soft error: we might still allow creating new ones
         }
       };
       fetchParts();
@@ -441,6 +449,7 @@ export default function ProductionPlan() {
         });
       } catch (err) {
         console.error("Lỗi chi tiết đơn sản xuất:", err);
+        toast.error(getErrorMessage(err, "Không thể tải chi tiết đơn sản xuất."));
       }
     };
     fetchDetail();
@@ -453,24 +462,96 @@ export default function ProductionPlan() {
     if (type.includes("quần") || type.includes("quan") || type.includes("jean")) return "Quần";
     if (type.includes("giày") || type.includes("giay") || type.includes("shoe")) return "Giày";
     if (type.includes("mũ") || type.includes("mu") || type.includes("cap")) return "Mũ";
+    if (type.includes("người") || type.includes("nguoi") || type.includes("user")) return "Người dùng";
     return "all";
   }, [selectedProduction]);
 
+  const combinedTemplates = useMemo(() => {
+    const system = TEMPLATE_LIBRARY.map((t) => ({
+      ...t,
+      isSystem: true,
+      key: `sys-${t.key || t.label}`,
+    }));
+
+    const user = dynamicTemplates.map((t) => ({
+      key: `user-${t.templateId}`,
+      label: t.templateName,
+      category: "Người dùng",
+      description: `Mẫu người dùng với ${t.steps?.length || 0} công đoạn.`,
+      steps: Array.isArray(t.steps)
+        ? t.steps.map((s) => ({
+          partName: s.partName,
+          cpu: 0, // Fallback as API doesn't provide cpu
+        }))
+        : [],
+      isSystem: false,
+    }));
+
+    return [...system, ...user];
+  }, [dynamicTemplates]);
+
+  const fetchDynamicTemplates = async () => {
+    try {
+      const res = await TemplateService.getTemplates();
+      const list = res?.data?.data ?? res?.data ?? [];
+      setDynamicTemplates(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("Lỗi tải template người dùng:", err);
+      // Optional: toast.error(getErrorMessage(err, "Không thể tải mẫu thiết kế cá nhân."));
+    }
+  };
+
+  useEffect(() => {
+    fetchDynamicTemplates();
+  }, []);
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      toast.error("Vui lòng nhập tên template.");
+      return;
+    }
+    if (rows.length === 0) {
+      toast.error("Không có công đoạn nào để lưu thành mẫu.");
+      return;
+    }
+
+    try {
+      setIsSavingTemplate(true);
+      const payload = {
+        templateName: newTemplateName.trim(),
+        steps: rows.map((row, idx) => ({
+          partName: row.partName,
+          stepOrder: idx + 1,
+        })),
+      };
+      await TemplateService.createTemplate(payload);
+      toast.success("Đã lưu mẫu công đoạn thành công!");
+      setIsSaveTemplateModalOpen(false);
+      setNewTemplateName("");
+      // Refresh list
+      fetchDynamicTemplates();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể lưu mẫu công đoạn."));
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
   const templatesByUserStep = useMemo(() => {
     if (!userStepFilters.length) {
-      return TEMPLATE_LIBRARY.map((template) => ({
+      return combinedTemplates.map((template) => ({
         ...template,
         filteredSteps: template.steps,
       }));
     }
 
-    return TEMPLATE_LIBRARY.map((template) => {
+    return combinedTemplates.map((template) => {
       const filteredSteps = template.steps.filter((step) =>
         userStepFilters.some((filter) => normalizeText(step.partName).includes(filter))
       );
       return { ...template, filteredSteps };
     }).filter((template) => template.filteredSteps.length > 0);
-  }, [userStepFilters]);
+  }, [userStepFilters, combinedTemplates]);
 
   const visibleTemplates = useMemo(() => {
     if (templateCategory === "all") return templatesByUserStep;
@@ -618,20 +699,7 @@ export default function ProductionPlan() {
       savePlan();
     } catch (error) {
       console.error("Save Error:", error);
-      console.log("Error Response:", error?.response?.data);
-      
-      let errMsg = "Lưu công đoạn thất bại.";
-      const data = error?.response?.data;
-      if (data?.errors) {
-        errMsg = Object.values(data.errors).flat().join(" | ");
-      } else if (data?.message) {
-        errMsg = data.message;
-      } else if (data?.detail) {
-        errMsg = data.detail;
-      } else if (data?.title) {
-      } else if (typeof data === 'string' && data) {
-        errMsg = data;
-      }
+      const errMsg = getErrorMessage(error, "Lưu công đoạn thất bại.");
       
       toast.error(errMsg);
       setSavePartsMessage({ type: "error", text: `Chi tiết lỗi: ${errMsg}` });
@@ -915,7 +983,7 @@ export default function ProductionPlan() {
             {showTemplateSection && (
               <>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {["all", "Áo", "Quần", "Giày", "Mũ"].map((item) => {
+                  {["all", "Áo", "Quần", "Giày", "Mũ", "Người dùng"].map((item) => {
                     const label = item === "all" ? "Tất cả" : item;
                     const active = templateCategory === item;
                     return (
@@ -940,14 +1008,6 @@ export default function ProductionPlan() {
                       Lọc theo công đoạn: {userStepLabels[0]}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => saveCurrentDesign("Bản thiết kế của tôi")}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-emerald-200"
-                    disabled={!rows.length || !selectedProductionId}
-                  >
-                    Lưu bản thiết kế
-                  </button>
                   <button
                     type="button"
                     onClick={() => toggleAllTemplates(true)}
@@ -999,8 +1059,8 @@ export default function ProductionPlan() {
                           <div className="text-sm font-semibold text-slate-900">{template.label}</div>
                           <div className="mt-1 text-xs text-slate-500">{template.description}</div>
                         </div>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                          {template.category}
+                         <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${template.isSystem ? "border-slate-200 bg-slate-50 text-slate-600" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                          {template.isSystem ? "Hệ thống" : "Của tôi"}
                         </span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -1053,7 +1113,14 @@ export default function ProductionPlan() {
                 <p className="leave-table-card__subtitle">Quản lý công đoạn theo tổ trưởng và giá/sp.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-
+                <button
+                  type="button"
+                  onClick={() => setIsSaveTemplateModalOpen(true)}
+                  disabled={!rows.length || !isAssignedPM}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-3.5 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                >
+                  Lưu mẫu công đoạn
+                </button>
                 <button
                   onClick={openAddModal}
                   disabled={!selectedProductionId || !isAssignedPM}
@@ -1260,6 +1327,83 @@ export default function ProductionPlan() {
         onConfirm={() => saveSteps(true)}
         onClose={() => setIsConfirmSaveOpen(false)}
       />
+
+      {isSaveTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Lưu mẫu công đoạn
+              </h3>
+              <button
+                onClick={() => setIsSaveTemplateModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                Đóng
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="space-y-5">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tên mẫu thiết kế</label>
+                  <input
+                    type="text"
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    placeholder="Ví dụ: Mẫu áo thun cao cấp v2"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 shadow-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center justify-between">
+                    <span>Xem trước công đoạn ({rows.length})</span>
+                    <span className="text-[10px] text-slate-400 normal-case font-normal italic">Thứ tự này sẽ được lưu cố định</span>
+                  </label>
+                  <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-2 text-sm">
+                    <div className="space-y-1.5">
+                      {rows.map((row, idx) => (
+                        <div key={`preview-${idx}`} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm">
+                          <span className="flex-none w-6 h-6 flex items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-100">
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm text-slate-700 font-medium truncate">{row.partName}</span>
+                          {row.cpu && (
+                            <span className="flex-none ml-auto text-[10px] font-semibold text-slate-400">
+                              {Number(row.cpu).toLocaleString("vi-VN")} đ
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed italic bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                  <span className="font-bold text-amber-700">Lưu ý:</span> Bản thiết kế này sẽ được lưu vào hệ thống để bạn có thể tái sử dụng cho các đơn hàng tương tự trong tương lai.
+                </p>
+              </div>
+              <div className="mt-8 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsSaveTemplateModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleCreateTemplate}
+                  disabled={isSavingTemplate || !newTemplateName.trim()}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all active:scale-95"
+                >
+                  {isSavingTemplate ? <Loader2 className="animate-spin" size={16} /> : null}
+                  {isSavingTemplate ? "Đang lưu..." : "Xác nhận lưu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </OwnerLayout>
   );
 }

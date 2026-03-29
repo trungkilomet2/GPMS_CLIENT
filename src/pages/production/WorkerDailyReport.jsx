@@ -8,6 +8,7 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
 import { getStoredUser } from "@/lib/authStorage";
+import { getErrorMessage } from "@/utils/errorUtils";
 import { hasAnyRole } from "@/lib/internalRoleFlow";
 
 
@@ -101,6 +102,8 @@ function formatDateInput(date = new Date()) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+import { getPlanStatusLabel } from "@/utils/statusUtils";
+
 export default function WorkerDailyReport() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,12 +122,29 @@ export default function WorkerDailyReport() {
       .filter(Boolean)
   );
 
+  const isStepAvailableForReporting = (step) => {
+    if (!step) return false;
+    const statusLabel = getPlanStatusLabel(step.statusName ?? step.status ?? step.statusId ?? "");
+    const normalized = String(statusLabel || "").toLowerCase().trim();
+    
+    const isHidden = 
+      normalized.includes("đã hoàn thành") || 
+      normalized.includes("hoàn thành") || 
+      normalized.includes("chờ nghiệm thu") ||
+      normalized === "da hoan thanh" ||
+      normalized === "hoan thanh" ||
+      normalized === "cho nghiem thu";
+
+    return !isHidden;
+  };
+
   const filteredPlanSteps = (() => {
     if (planSteps.length === 0) return [];
     return planSteps.filter((step) =>
       isStepAssignedToCurrentWorker(step, currentWorkerIdSet, currentWorkerNameSet)
     );
   })();
+
   const initialBase = planSteps.length > 0
     ? filteredPlanSteps.map((step, index) => ({
       id: step?.id ?? step?.partId ?? `${plan?.production?.productionId || "plan"}-${index}`,
@@ -135,15 +155,24 @@ export default function WorkerDailyReport() {
       cpu: step?.cpu ?? step?.unitPrice ?? 0,
       workLogId: step?.workLogId ?? null,
       logReadOnly: false,
+      status: step?.status,
+      statusName: step?.statusName,
+      statusId: step?.statusId,
       assignedWorkers: step?.assignedWorkers ?? step?.workerNames ?? step?.workers ?? step?.workerList ?? step?.assignees ?? [],
       assignedWorkerIds: step?.assignedWorkerIds ?? step?.workerIds ?? step?.assigneeIds ?? [],
       isCuttingStep: step?.isCuttingStep ?? false,
     }))
     : (assignment
       ? (isStepAssignedToCurrentWorker(assignment, currentWorkerIdSet, currentWorkerNameSet)
-        ? [assignment]
+        ? [{
+           ...assignment,
+           status: assignment?.status,
+           statusName: assignment?.statusName,
+           statusId: assignment?.statusId
+          }]
         : [])
       : MOCK_TASKS);
+
   const today = useMemo(() => formatDateInput(), []);
   const [reportDate, setReportDate] = useState(today);
   const [isSavingAll, setIsSavingAll] = useState(false);
@@ -151,9 +180,15 @@ export default function WorkerDailyReport() {
   const [rows, setRows] = useState(() =>
     initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
   );
-  const [isEditing, setIsEditing] = useState(
-    Boolean(assignment) || (planSteps.length > 0 && filteredPlanSteps.length > 0)
-  );
+
+  const isToday = reportDate === today;
+
+  const [isEditing, setIsEditing] = useState(() => {
+    if (assignment) return isStepAvailableForReporting(assignment);
+    const available = filteredPlanSteps.filter(isStepAvailableForReporting);
+    return available.length > 0;
+  });
+
   const [draftRows, setDraftRows] = useState(() =>
     planSteps.length > 0 || assignment
       ? initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
@@ -190,7 +225,7 @@ export default function WorkerDailyReport() {
       setShowLogSelector(true);
     } catch (err) {
       console.error(err);
-      toast.error("Lỗi khi tải dữ liệu sổ cắt.");
+      toast.error(getErrorMessage(err, "Lỗi khi tải dữ liệu sổ cắt."));
     } finally {
       setIsLoadingLogs(false);
     }
@@ -214,9 +249,12 @@ export default function WorkerDailyReport() {
     );
   };
 
-  const isToday = reportDate === today;
   const canEdit = isToday && isEditing;
-  const displayedRows = isEditing ? (draftRows || []) : rows;
+  const allRows = isEditing ? (draftRows || []) : rows;
+  const displayedRows = allRows.filter(row => {
+    if (!isToday) return true;
+    return isStepAvailableForReporting(row);
+  });
 
   const normalizeDateString = (target) => {
     if (!target) return "";
@@ -326,7 +364,10 @@ export default function WorkerDailyReport() {
         const applyLogs = (list) =>
           list.map((row) => {
             const log = row.partId ? byPart.get(String(row.partId)) : null;
-            if (!log) return row;
+            if (!log) {
+              // Reset transient fields if no log is found for the current reportDate
+              return { ...row, quantity: "", workLogId: null, logReadOnly: false };
+            }
             const nextQty = log.quantity ?? "";
             return {
               ...row,
@@ -338,7 +379,7 @@ export default function WorkerDailyReport() {
 
         const applied = applyLogs(rowsToUse);
         setRows(applied);
-        setDraftRows((prev) => (prev ? applied : prev));
+        setDraftRows((prev) => (prev ? applied.map((r) => ({ ...r })) : prev));
       } catch (err) {
         console.error(err);
       } finally {
@@ -444,6 +485,11 @@ export default function WorkerDailyReport() {
         .map((res, idx) => ({ res, row: currentRows[idx] }))
         .filter((item) => item.res.status === "rejected");
 
+      const failedWithReasons = failed.map((item) => ({
+        row: item.row,
+        reason: getErrorMessage(item.res.reason, "Lỗi không xác định")
+      }));
+
       const updatedRows = currentRows.map((row, idx) => {
         const res = results[idx];
         if (res.status !== "fulfilled") return row;
@@ -457,13 +503,22 @@ export default function WorkerDailyReport() {
       if (failed.length === 0) {
         setIsEditing(false);
         setDraftRows(null);
-        toast.success("Báo cáo sản lượng đã được lưu thành công.");
+        toast.success("Đã lưu tất cả báo cáo thành công.");
       } else {
-        toast.warning(`Đã xảy ra lỗi khi lưu ${failed.length} dòng.`);
+        // Ghi log chi tiết lỗi vào console cho developer
+        console.error("Chi tiết lưu thất bại:", failedWithReasons);
+
+        // Thông báo cho người dùng một cách thân thiện
+        const firstReason = failedWithReasons[0].reason;
+        if (failed.length === 1) {
+          toast.warning(firstReason);
+        } else {
+          toast.warning(`Không thể lưu ${failed.length} dòng. Lỗi: ${firstReason}`);
+        }
       }
     } catch (err) {
       console.error(err);
-      toast.error("Lỗi hệ thống khi lưu báo cáo.");
+      toast.error(getErrorMessage(err, "Lỗi hệ thống khi lưu báo cáo."));
     } finally {
       setIsSavingAll(false);
     }
