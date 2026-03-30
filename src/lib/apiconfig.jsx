@@ -48,6 +48,7 @@ export const API_ENDPOINTS = {
     SUBMIT_PLAN: (id) => `${BASE_URL}/api/Production/production/submit/production-plan/${id}`,
     OUTPUT_HISTORY_WORKER: (workerId) => `${BASE_URL}/api/Production/production/output/history/worker/${workerId}`,
     OUTPUT_HISTORY_ALL: `${BASE_URL}/api/Production/production/output/history`,
+    COMPLETE: (id) => `${BASE_URL}/api/Production/production/complete/${id}`,
   },
   PRODUCTION_PART: {
     LIST_BY_PRODUCTION: (productionId) =>
@@ -60,7 +61,9 @@ export const API_ENDPOINTS = {
     CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
     UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
     GET_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
-    CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/${partId}/issue`,
+    CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
+    DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
+    GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
   },
 
   CUTTING_NOTEBOOK: {

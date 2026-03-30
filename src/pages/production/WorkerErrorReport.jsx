@@ -10,10 +10,10 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 const SEVERITIES = [
-  { value: "low", label: "Thấp", priority: 0 },
-  { value: "medium", label: "Trung bình", priority: 1 },
-  { value: "high", label: "Cao", priority: 2 },
-  { value: "critical", label: "Nghiêm trọng", priority: 3 },
+  { value: "low", label: "Thấp", priority: 1 },
+  { value: "medium", label: "Trung bình", priority: 2 },
+  { value: "high", label: "Cao", priority: 3 },
+  { value: "critical", label: "Nghiêm trọng", priority: 4 },
 ];
 
 const ERROR_TYPES = [
@@ -235,22 +235,7 @@ export default function WorkerErrorReport() {
 
         setParts(mappedParts);
 
-        // Extract unique workers from all parts of this production
-        const workerMap = new Map();
-        rawParts.forEach((part) => {
-          const workerList = part?.assignedWorkers ?? part?.workerList ?? part?.workers ?? [];
-          if (Array.isArray(workerList)) {
-            workerList.forEach((w) => {
-              const info = w?.workerInfo ?? w ?? {};
-              const id = String(info.workerId || info.id || info.userId || "");
-              const name = info.workerName || info.fullName || info.userName || "";
-              if (id && name && !workerMap.has(id)) {
-                workerMap.set(id, { id, fullName: name });
-              }
-            });
-          }
-        });
-        setEmployees(Array.from(workerMap.values()));
+        setParts(mappedParts);
       } catch {
         if (!active) return;
         if (fallbackAssignedPart) {
@@ -274,6 +259,35 @@ export default function WorkerErrorReport() {
       active = false;
     };
   }, [form.productionId, normalizedAssignment, isPartLocked]);
+
+  useEffect(() => {
+    const partId = String(form.partId || "").trim();
+    if (!partId) {
+      setEmployees([]);
+      return;
+    }
+
+    let active = true;
+    const fetchIssueWorkers = async () => {
+      try {
+        setLoadingEmployees(true);
+        const res = await ProductionPartService.getIssueWorkers(partId);
+        if (!active) return;
+        const list = res?.data?.data ?? res?.data ?? [];
+        setEmployees(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Lỗi tải danh sách thợ cho công đoạn:", err);
+        if (active) setEmployees([]);
+      } finally {
+        if (active) setLoadingEmployees(false);
+      }
+    };
+
+    fetchIssueWorkers();
+    return () => {
+      active = false;
+    };
+  }, [form.partId]);
 
   const productionOptions = useMemo(() => {
     const map = new Map();

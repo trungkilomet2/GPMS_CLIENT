@@ -38,6 +38,12 @@ const ProductionPartService = {
       }
     );
   },
+  donePart(partId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.DONE_A_PART(partId), payload);
+  },
+  getIssueWorkers(partId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_ISSUE_WORKERS(partId));
+  },
 };
 
 export default ProductionPartService;

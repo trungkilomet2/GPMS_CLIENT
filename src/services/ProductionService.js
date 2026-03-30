@@ -47,6 +47,9 @@ const ProductionService = {
   getOutputHistory() {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION.OUTPUT_HISTORY_ALL);
   },
+  completeProduction(id, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.COMPLETE(id), payload);
+  },
 };
 
 export default ProductionService;

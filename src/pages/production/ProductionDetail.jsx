@@ -107,6 +107,9 @@ export default function ProductionDetail() {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
+  const [isDonePartModalOpen, setIsDonePartModalOpen] = useState(false);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [selectedPartId, setSelectedPartId] = useState(null);
 
   const [production, setProduction] = useState(null);
   const [customerProfile, setCustomerProfile] = useState(null);
@@ -128,6 +131,30 @@ export default function ProductionDetail() {
   const currentUserId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
   const isAssignedPM = isPM && String(currentUserId) === String(production?.pmId);
   const customerId = getOrderCustomerId(production?.order);
+  const statusName = production?.status;
+  const isPendingApproval = statusName === "Chờ Xét Duyệt";
+  const isAccepted = statusName === "Chấp Nhận";
+  const isPendingPlanApproval = statusName === "Chờ Xét Duyệt Kế Hoạch";
+  const isNeedUpdatePlan = statusName === "Cần Chỉnh Sửa Kế Hoạch";
+  const isInProduction = statusName === "Đang Sản Xuất";
+  const isRejectedProduction = statusName === "Từ Chối";
+  const isActionLocked = ["Từ Chối", "Hoàn Thành", "Hết Hạn"].includes(statusName);
+
+  const allStepsCompleted = steps.length > 0 && steps.every(s => {
+    const label = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+    return label === "Đã Hoàn Thành" || label === "Hoàn Thành";
+  });
+
+  console.log("Debug [CompleteButton]:", { 
+    isOwner, isPM, isInProduction, stepsCount: steps.length, allStepsCompleted 
+  });
+  if (!allStepsCompleted && isInProduction) {
+    const incomplete = steps.filter(s => {
+      const l = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+      return l !== "Đã Hoàn Thành" && l !== "Hoàn Thành";
+    }).map(s => s.partName || s.name);
+    console.debug("Stages not completed:", incomplete);
+  }
 
   useEffect(() => {
     let active = true;
@@ -327,8 +354,6 @@ export default function ProductionDetail() {
   }
 
   const rejectedStatusLabel = getProductionStatusLabel(2); // "Từ Chối"
-  const isRejectedProduction = String(production?.status ?? "").trim().toLowerCase() === String(rejectedStatusLabel).trim().toLowerCase();
-  const isActionLocked = isApprovedProduction || isRejectedProduction;
 
   const productionStartDateText = formatOrderDate(production.pStartDate);
   const productionEndDateText = formatOrderDate(production.pEndDate);
@@ -357,24 +382,97 @@ export default function ProductionDetail() {
   };
 
   const handleRejectProduction = async (reason) => {
-    // Only block if it's already rejected or completed/in production (if you want to be strict)
-    // But for Owner, we want them to be able to cancel in early stages even after PM approval
     if (isActionLocked && !isOwner) return;
     if (statusName === "Hoàn thành") return;
     try {
-      const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
-      if (!userId) {
+      const uId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      if (!uId) {
         toast.error("Không tìm thấy thông tin người dùng.");
         return;
       }
-      await ProductionService.rejectProduction(production.productionId, { userId, reason });
+      
+      const userId = Number(uId);
+      const productionId = Number(production.productionId);
+
+      console.debug("[rejectProduction] Sending:", { productionId, userId, reason });
+
+      const res = await ProductionService.rejectProduction(productionId, { userId, reason });
+      console.debug("[rejectProduction] Success:", res);
+      
       setProduction((prev) => (prev ? { ...prev, status: getProductionStatusLabel(2) } : prev));
       setIsReasonModalOpen(false);
       setIsRejectSuccessModalOpen(true);
     } catch (err) {
       console.error("Lỗi khi từ chối đơn sản xuất:", err);
-      const errorMsg = err.response?.data?.message || err.message || "Đã xảy ra lỗi khi từ chối đơn sản xuất.";
+      const data = err.response?.data;
+      const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
+      console.error("Chi tiết lỗi từ Backend:", backendError);
+      
+      const errorMsg = backendError || err.message || "Đã xảy ra lỗi khi từ chối đơn sản xuất.";
       toast.error(errorMsg);
+    }
+  };
+
+  const handleDonePart = (partId) => {
+    if (!(isOwner || isPM)) return;
+    setSelectedPartId(partId);
+    setIsDonePartModalOpen(true);
+  };
+
+  const confirmDonePart = async () => {
+    if (!selectedPartId) return;
+    
+    try {
+      setLoading(true);
+      const uId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      const userId = Number(uId);
+
+      console.debug("[donePart] Sending:", { partId: selectedPartId, userId });
+
+      // Many APIs in this project expect a payload even for PATCH
+      await ProductionPartService.donePart(selectedPartId, { userId });
+      
+      toast.success("Đã xác nhận hoàn thành công đoạn.");
+      setIsDonePartModalOpen(false);
+      // Refresh the page after a short delay to allow toast visibility
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      console.error("Lỗi khi hoàn thành công đoạn:", err);
+      const data = err.response?.data;
+      const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
+      console.error("Chi tiết lỗi từ Backend:", backendError);
+      
+      const errorMsg = backendError || err.message || "Không thể hoàn thành công đoạn.";
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+      setSelectedPartId(null);
+    }
+  };
+
+  const confirmCompleteProduction = async () => {
+    try {
+      setLoading(true);
+      const uId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+      const userId = Number(uId);
+
+      await ProductionService.completeProduction(production.productionId, { userId });
+      
+      toast.success("Đã hoàn thành đơn sản xuất!");
+      setIsCompleteModalOpen(false);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      console.error("Lỗi khi hoàn thành đơn sản xuất:", err);
+      const data = err.response?.data;
+      const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
+      const errorMsg = backendError || err.message || "Không thể hoàn thành đơn sản xuất.";
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -399,7 +497,9 @@ export default function ProductionDetail() {
     try {
       await ProductionService.approveProductionPlan(production.productionId);
       toast.success("Đã duyệt kế hoạch");
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) { toast.error("Không thể duyệt kế hoạch"); }
   };
 
@@ -408,7 +508,9 @@ export default function ProductionDetail() {
     try {
       await ProductionService.requestPlanUpdate(production.productionId);
       toast.success("Đã gửi yêu cầu sửa");
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) { toast.error("Không thể gửi yêu cầu"); }
   };
 
@@ -421,18 +523,14 @@ export default function ProductionDetail() {
     try {
       await ProductionService.submitProductionPlan(production.productionId);
       toast.success("Đã gửi duyệt kế hoạch.");
-      window.location.reload();
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       toast.error("Không thể gửi duyệt kế hoạch.");
     }
   };
 
-  const statusName = String(production?.status ?? "").trim();
-  const isPendingApproval = statusName === "Chờ Xét Duyệt";
-  const isAccepted = statusName === "Chấp Nhận";
-  const isPendingPlanApproval = statusName === "Chờ Xét Duyệt Kế Hoạch";
-  const isNeedUpdatePlan = statusName === "Cần Chỉnh Sửa Kế Hoạch";
-  const isInProduction = statusName === "Đang Sản Xuất";
 
   return (
     <OwnerLayout>
@@ -473,7 +571,7 @@ export default function ProductionDetail() {
               )}
 
               {/* Nút cho Owner hủy ĐƠN sản xuất trực tiếp */}
-              {isOwner && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan) && (
+              {isOwner && isPendingApproval && (
                 <button type="button"
                   onClick={() => setIsReasonModalOpen(true)}
                   className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100"
@@ -541,6 +639,15 @@ export default function ProductionDetail() {
                 >
                   Lịch sử báo cáo
                 </Link>
+              )}
+
+              {(isOwner || isPM) && isInProduction && allStepsCompleted && (
+                <button type="button"
+                  onClick={() => setIsCompleteModalOpen(true)}
+                  className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-sm"
+                >
+                  Hoàn thành đơn sản xuất
+                </button>
               )}
 
               {(isInProduction || isAccepted) && (() => {
@@ -767,15 +874,15 @@ export default function ProductionDetail() {
                                   )}
                                 </div>
                               </td>
-                               <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
+                              <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
                                 {formatDateTime(row.startDate)}
-                               </td>
-                               <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
+                              </td>
+                              <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
                                 {formatDateTime(row.endDate)}
-                               </td>
-                               <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
+                              </td>
+                              <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
                                 {Number(row.cpu).toLocaleString('vi-VN')} đ
-                               </td>
+                              </td>
                               <td className="px-4 py-3 text-center">
                                 {(() => {
                                   const label = row.statusName || getPlanStatusLabel(row.statusId || row.status);
@@ -806,6 +913,15 @@ export default function ProductionDetail() {
                                   >
                                     Báo lỗi
                                   </Link>
+                                  {(isOwner || isPM) && (row.statusName === "Chờ Nghiệm Thu" || getPlanStatusLabel(row.statusId || row.status) === "Chờ Nghiệm Thu") && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDonePart(row.id || row.partId)}
+                                      className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 underline cursor-pointer"
+                                    >
+                                      Hoàn thành
+                                    </button>
+                                  )}
                                   <Link
                                     to={`/production/part/${row.id}/history`}
                                     state={{ part: row, production }}
@@ -898,51 +1014,70 @@ export default function ProductionDetail() {
         </div>
       </div>
 
-      {!isOwner && (
-        <>
-          <OrderStatusReasonModal
-            isOpen={isReasonModalOpen}
-            onClose={() => setIsReasonModalOpen(false)}
-            onSubmit={handleRejectProduction}
-            title="Từ chối đơn sản xuất"
-            description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
-            confirmText="Xác nhận từ chối"
-            tone="danger"
-            requireReason
-          />
-          <OrderStatusReasonModal
-            isOpen={isApproveModalOpen}
-            onClose={() => setIsApproveModalOpen(false)}
-            onSubmit={() => {
-              handleApproveProduction();
-              setIsApproveModalOpen(false);
-            }}
-            title="Chấp nhận đơn sản xuất"
-            description="Bạn có chắc muốn chấp nhận đơn sản xuất này không?"
-            confirmText="Xác nhận"
-            tone="warning"
-            requireReason={false}
-          />
-          <SuccessModal
-            isOpen={isSuccessModalOpen}
-            onClose={() => setIsSuccessModalOpen(false)}
-            onPrimary={() => navigate("/production")}
-            title="Duyệt thành công"
-            description={`Đơn sản xuất #PR-${production?.productionId} đã được chấp nhận.`}
-            primaryLabel="Về danh sách"
-            hideSecondary={true}
-          />
-          <SuccessModal
-            isOpen={isRejectSuccessModalOpen}
-            onClose={() => setIsRejectSuccessModalOpen(false)}
-            onPrimary={() => navigate("/production")}
-            title="Từ chối thành công"
-            description={`Đơn sản xuất #PR-${production?.productionId} đã bị từ chối.`}
-            primaryLabel="Về danh sách"
-            hideSecondary={true}
-          />
-        </>
-      )}
+      <OrderStatusReasonModal
+        isOpen={isReasonModalOpen}
+        onClose={() => setIsReasonModalOpen(false)}
+        onSubmit={handleRejectProduction}
+        title="Từ chối đơn sản xuất"
+        description="Vui lòng nhập lý do từ chối để lưu vào hệ thống."
+        confirmText="Xác nhận từ chối"
+        tone="danger"
+        requireReason
+      />
+      <OrderStatusReasonModal
+        isOpen={isApproveModalOpen}
+        onClose={() => setIsApproveModalOpen(false)}
+        onSubmit={() => {
+          handleApproveProduction();
+          setIsApproveModalOpen(false);
+        }}
+        title="Chấp nhận đơn sản xuất"
+        description="Bạn có chắc muốn chấp nhận đơn sản xuất này không?"
+        confirmText="Xác nhận"
+        tone="warning"
+        requireReason={false}
+      />
+      <OrderStatusReasonModal
+        isOpen={isDonePartModalOpen}
+        onClose={() => {
+          setIsDonePartModalOpen(false);
+          setSelectedPartId(null);
+        }}
+        onSubmit={confirmDonePart}
+        title="Hoàn thành công đoạn"
+        description="Bạn có chắc chắn muốn xác nhận hoàn thành công đoạn này không?"
+        confirmText="Hoàn thành"
+        tone="warning"
+        requireReason={false}
+      />
+      <OrderStatusReasonModal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        onSubmit={confirmCompleteProduction}
+        title="Hoàn thành đơn sản xuất"
+        description="Bạn có chắc chắn muốn xác nhận hoàn thành toàn bộ đơn sản xuất này không? Hành động này sẽ cập nhật trạng thái đơn hàng sang hoàn thành."
+        confirmText="Xác nhận hoàn thành"
+        tone="warning"
+        requireReason={false}
+      />
+      <SuccessModal
+        isOpen={isSuccessModalOpen}
+        onClose={() => setIsSuccessModalOpen(false)}
+        onPrimary={() => navigate("/production")}
+        title="Duyệt thành công"
+        description={`Đơn sản xuất #PR-${production?.productionId} đã được chấp nhận.`}
+        primaryLabel="Về danh sách"
+        hideSecondary={true}
+      />
+      <SuccessModal
+        isOpen={isRejectSuccessModalOpen}
+        onClose={() => setIsRejectSuccessModalOpen(false)}
+        onPrimary={() => navigate("/production")}
+        title="Từ chối thành công"
+        description={`Đơn sản xuất #PR-${production?.productionId} đã bị từ chối.`}
+        primaryLabel="Về danh sách"
+        hideSecondary={true}
+      />
     </OwnerLayout>
   );
 }
