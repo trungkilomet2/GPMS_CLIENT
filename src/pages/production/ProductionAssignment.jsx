@@ -717,7 +717,7 @@ export default function ProductionAssignment() {
                                   Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                                 </div>
                                 <div className="mt-1 text-sm text-slate-500">
-                                  {row.startDate || "-"} → {row.endDate || "-"}
+                                  {(row.startDate || "-").replace("T", " ")} → {(row.endDate || "-").replace("T", " ")}
                                 </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
@@ -824,7 +824,7 @@ export default function ProductionAssignment() {
                                         <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
                                         {isOnLeave ? (
                                           <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                            Nghỉ {worker.leaveDate || ""}
+                                            Nghỉ {(worker.leaveDate || "").replace("T", " ")}
                                           </span>
                                         ) : (
                                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
