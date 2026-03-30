@@ -8,6 +8,9 @@ const TemplateService = {
   createTemplate(payload) {
     return axiosClient.post(API_ENDPOINTS.TEMPLATE.CREATE, payload);
   },
+  deleteTemplate(id) {
+    return axiosClient.delete(API_ENDPOINTS.TEMPLATE.DELETE(id));
+  },
 };
 
 export default TemplateService;

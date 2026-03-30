@@ -145,17 +145,6 @@ export default function ProductionDetail() {
     return label === "Đã Hoàn Thành" || label === "Hoàn Thành";
   });
 
-  console.log("Debug [CompleteButton]:", { 
-    isOwner, isPM, isInProduction, stepsCount: steps.length, allStepsCompleted 
-  });
-  if (!allStepsCompleted && isInProduction) {
-    const incomplete = steps.filter(s => {
-      const l = s.statusName || getPlanStatusLabel(s.statusId || s.status);
-      return l !== "Đã Hoàn Thành" && l !== "Hoàn Thành";
-    }).map(s => s.partName || s.name);
-    console.debug("Stages not completed:", incomplete);
-  }
-
   useEffect(() => {
     let active = true;
 
@@ -390,7 +379,7 @@ export default function ProductionDetail() {
         toast.error("Không tìm thấy thông tin người dùng.");
         return;
       }
-      
+
       const userId = Number(uId);
       const productionId = Number(production.productionId);
 
@@ -398,7 +387,7 @@ export default function ProductionDetail() {
 
       const res = await ProductionService.rejectProduction(productionId, { userId, reason });
       console.debug("[rejectProduction] Success:", res);
-      
+
       setProduction((prev) => (prev ? { ...prev, status: getProductionStatusLabel(2) } : prev));
       setIsReasonModalOpen(false);
       setIsRejectSuccessModalOpen(true);
@@ -407,7 +396,7 @@ export default function ProductionDetail() {
       const data = err.response?.data;
       const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
       console.error("Chi tiết lỗi từ Backend:", backendError);
-      
+
       const errorMsg = backendError || err.message || "Đã xảy ra lỗi khi từ chối đơn sản xuất.";
       toast.error(errorMsg);
     }
@@ -421,7 +410,7 @@ export default function ProductionDetail() {
 
   const confirmDonePart = async () => {
     if (!selectedPartId) return;
-    
+
     try {
       setLoading(true);
       const uId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
@@ -431,7 +420,7 @@ export default function ProductionDetail() {
 
       // Many APIs in this project expect a payload even for PATCH
       await ProductionPartService.donePart(selectedPartId, { userId });
-      
+
       toast.success("Đã xác nhận hoàn thành công đoạn.");
       setIsDonePartModalOpen(false);
       // Refresh the page after a short delay to allow toast visibility
@@ -443,7 +432,7 @@ export default function ProductionDetail() {
       const data = err.response?.data;
       const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
       console.error("Chi tiết lỗi từ Backend:", backendError);
-      
+
       const errorMsg = backendError || err.message || "Không thể hoàn thành công đoạn.";
       toast.error(errorMsg);
     } finally {
@@ -459,7 +448,7 @@ export default function ProductionDetail() {
       const userId = Number(uId);
 
       await ProductionService.completeProduction(production.productionId, { userId });
-      
+
       toast.success("Đã hoàn thành đơn sản xuất!");
       setIsCompleteModalOpen(false);
       setTimeout(() => {
@@ -697,17 +686,6 @@ export default function ProductionDetail() {
                     ? "Chỉnh sửa phân công"
                     : "Phân công lao động"}
                 </Link>
-              )}
-
-              {/* Nút Sửa chung cho Owner */}
-              {isOwner && (
-                <button type="button"
-                  onClick={() => navigate(`/production/${production.productionId}/edit`, { state: { production } })}
-                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-2 text-slate-400 transition hover:bg-slate-50"
-                  title="Chỉnh sửa thông tin chung"
-                >
-                  <FileText size={18} />
-                </button>
               )}
             </div>
           </div>

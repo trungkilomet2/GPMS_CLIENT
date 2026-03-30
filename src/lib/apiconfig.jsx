@@ -142,6 +142,7 @@ export const API_ENDPOINTS = {
   TEMPLATE: {
     LIST: `${BASE_URL}/api/Template/template/list`,
     CREATE: `${BASE_URL}/api/Template/template/create`,
+    DELETE: (id) => `${BASE_URL}/api/Template/template/delete/${id}`,
   },
 };
 

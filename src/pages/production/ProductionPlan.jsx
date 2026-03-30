@@ -289,6 +289,8 @@ export default function ProductionPlan() {
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
   const [form, setForm] = useState({
     partName: "",
     startDate: "",
@@ -485,6 +487,7 @@ export default function ProductionPlan() {
         }))
         : [],
       isSystem: false,
+      templateId: t.templateId,
     }));
 
     return [...system, ...user];
@@ -534,6 +537,27 @@ export default function ProductionPlan() {
       toast.error(getErrorMessage(err, "Không thể lưu mẫu công đoạn."));
     } finally {
       setIsSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = (template) => {
+    if (template.isSystem) return;
+    setTemplateToDelete(template);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+
+    try {
+      await TemplateService.deleteTemplate(templateToDelete.templateId);
+      toast.success(`Đã xóa mẫu "${templateToDelete.label}" thành công!`);
+      fetchDynamicTemplates();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể xóa mẫu thiết kế."));
+    } finally {
+      setIsConfirmDeleteOpen(false);
+      setTemplateToDelete(null);
     }
   };
 
@@ -1059,9 +1083,24 @@ export default function ProductionPlan() {
                           <div className="text-sm font-semibold text-slate-900">{template.label}</div>
                           <div className="mt-1 text-xs text-slate-500">{template.description}</div>
                         </div>
-                         <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${template.isSystem ? "border-slate-200 bg-slate-50 text-slate-600" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                          {template.isSystem ? "Hệ thống" : "Của tôi"}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${template.isSystem ? "border-slate-200 bg-slate-50 text-slate-600" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                            {template.isSystem ? "Hệ thống" : "Của tôi"}
+                          </span>
+                          {!template.isSystem && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(template);
+                              }}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition"
+                              title="Xóa mẫu này"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {(templateExpanded[template.key] ? template.filteredSteps : template.filteredSteps.slice(0, 6)).map((step) => (
@@ -1326,6 +1365,13 @@ export default function ProductionPlan() {
         description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại có thể tạo thêm các bản ghi trùng lặp (không ghi đè). Bạn có chắc chắn muốn tiếp tục lưu không?"
         onConfirm={() => saveSteps(true)}
         onClose={() => setIsConfirmSaveOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={isConfirmDeleteOpen}
+        title="Xác nhận xóa mẫu thiết kế"
+        description={`Bạn có chắc chắn muốn xóa mẫu thiết kế "${templateToDelete?.label}" không? Hành động này không thể hoàn tác.`}
+        onConfirm={confirmDeleteTemplate}
+        onClose={() => setIsConfirmDeleteOpen(false)}
       />
 
       {isSaveTemplateModalOpen && (
