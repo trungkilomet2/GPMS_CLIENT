@@ -67,7 +67,7 @@ export default function WorkerErrorReport() {
       partName: assignment?.partName ?? "",
       startDate: assignment?.startDate ?? "",
       endDate: assignment?.endDate ?? "",
-      errorType: assignment?.errorType ?? "process",
+      errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
     };
   }, [assignment]);
@@ -572,50 +572,25 @@ export default function WorkerErrorReport() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase text-slate-500">Loại lỗi</label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
                   <select
-                    value={form.errorType}
-                    onChange={(event) => handleChange("errorType", event.target.value)}
+                    value={form.partId}
+                    onChange={(event) => handleChange("partId", event.target.value)}
+                    disabled={!form.productionId || isPartLocked}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
-                    {ERROR_TYPES.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
+                    <option value="">Chọn công đoạn...</option>
+                    {parts.map((item) => (
+                      <option key={item.id} value={item.id}>{item.partName || `Part #${item.id}`}</option>
                     ))}
                   </select>
+                  {loadingParts && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải công đoạn...</div>
+                  )}
+                  {!loadingParts && partsError && (
+                    <div className="mt-1 text-xs text-rose-600">{partsError}</div>
+                  )}
                 </div>
-
-                {Number(form.errorType) === 0 || isPartLocked ? (
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
-                    <select
-                      value={form.partId}
-                      onChange={(event) => handleChange("partId", event.target.value)}
-                      disabled={!form.productionId || isPartLocked}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    >
-                      <option value="">Chọn công đoạn...</option>
-                      {parts.map((item) => (
-                        <option key={item.id} value={item.id}>{item.partName || `Part #${item.id}`}</option>
-                      ))}
-                    </select>
-                    {loadingParts && (
-                      <div className="mt-1 text-xs text-slate-400">Đang tải công đoạn...</div>
-                    )}
-                    {!loadingParts && partsError && (
-                      <div className="mt-1 text-xs text-rose-600">{partsError}</div>
-                    )}
-                  </div>
-                ) : Number(form.errorType) === 3 ? (
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Mô tả lỗi</label>
-                    <input
-                      value={form.title}
-                      onChange={(event) => handleChange("title", event.target.value)}
-                      placeholder="Nhập chi tiết lỗi khác..."
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    />
-                  </div>
-                ) : null}
 
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
@@ -743,8 +718,8 @@ export default function WorkerErrorReport() {
                     <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
-                    <InfoItem label="Bắt đầu" value={selectedPart.startDate || "-"} />
-                    <InfoItem label="Kết thúc" value={selectedPart.endDate || "-"} />
+                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ")} />
+                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ")} />
                   </div>
                 ) : (
                   <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>

@@ -791,7 +791,17 @@ export default function ProductionDetail() {
                                 <div className="flex flex-col items-center gap-1">
                                   <Link
                                     to="/worker/error-report"
-                                    state={{ assignment: { ...row, productionId: production.productionId, orderName: order.orderName } }}
+                                    state={{
+                                      assignment: {
+                                        partId: row.id,
+                                        productionId: production.productionId,
+                                        orderName: order.orderName,
+                                        partName: row.partName || row.name,
+                                        startDate: row.startDate,
+                                        endDate: row.endDate,
+                                        errorType: 0,
+                                      }
+                                    }}
                                     className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
                                   >
                                     Báo lỗi

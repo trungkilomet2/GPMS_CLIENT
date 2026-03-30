@@ -100,7 +100,7 @@ export const routes = [
   { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/worker/daily-report", element: guardByRoles(["Owner", "PM", "Worker", "KCS"], <WorkerDailyReport />) },
   { path: "/worker/daily-report/edit", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReportEdit />) },
-  { path: "/worker/error-report", element: guardByRoles(["Worker", "KCS"], <WorkerErrorReport />) },
+  { path: "/worker/error-report", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader", "Worker", "KCS"], <WorkerErrorReport />) },
   { path: "/worker/cutting-book", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBook />) },
   { path: "/worker/cutting-book/detail/:id", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBookDetail />) },
   { path: "/worker/assignments", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <WorkerAssignment />) },

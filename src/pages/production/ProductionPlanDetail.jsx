@@ -661,6 +661,7 @@ export default function ProductionPlanDetail() {
                                 partName: row.partName,
                                 startDate: row.startDate,
                                 endDate: row.endDate,
+                                errorType: 0,
                               },
                             }}
                             className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
