@@ -373,13 +373,19 @@ export default function WorkerErrorReport() {
     const next = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
     if (next.length === 0) return;
 
-    const mapped = next.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+    // Limit to exactly 1 image
+    const singleFile = next[0];
+    const mapped = {
+      id: `${singleFile.name}-${singleFile.size}-${singleFile.lastModified}`,
+      file: singleFile,
+      preview: URL.createObjectURL(singleFile),
+    };
 
-    setAttachments((prev) => [...prev, ...mapped]);
+    // Replace current rather than append
+    setAttachments((prev) => {
+      prev.forEach(item => { if (item?.preview) URL.revokeObjectURL(item.preview); });
+      return [mapped];
+    });
   };
 
   const handleDrop = (event) => {
@@ -679,27 +685,28 @@ export default function WorkerErrorReport() {
                   }}
                 >
                   <ImagePlus size={18} className="text-slate-400" />
-                  Kéo thả ảnh hoặc bấm để tải lên
+                  Kéo thả 1 ảnh minh chứng hoặc bấm để chọn
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  multiple
                   className="hidden"
                   onChange={(event) => handleFiles(event.target.files)}
                 />
+                <p className="mt-1 text-[10px] text-slate-400 italic">Hệ thống hỗ trợ lưu tối đa 1 ảnh minh chứng cho mỗi báo cáo lỗi.</p>
                 {attachments.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {attachments.map((item) => (
-                      <div key={item.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div key={item.id} className="relative overflow-hidden rounded-xl border-2 border-rose-100 bg-white shadow-sm">
                         <img src={item.preview} alt={item.file.name} className="h-28 w-full object-cover" />
                         <button
                           type="button"
                           onClick={() => removeAttachment(item.id)}
-                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-600 shadow hover:text-rose-600"
+                          className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 p-1 text-white shadow hover:bg-rose-700 transition-colors"
+                          title="Gỡ bỏ"
                         >
-                          Xóa
+                          <svg size={12} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                       </div>
                     ))}
@@ -732,8 +739,8 @@ export default function WorkerErrorReport() {
                     <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
-                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ")} />
-                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ")} />
+                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ").slice(0, 16)} />
+                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ").slice(0, 16)} />
                   </div>
                 ) : (
                   <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>

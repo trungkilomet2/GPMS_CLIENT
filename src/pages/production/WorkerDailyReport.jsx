@@ -109,6 +109,9 @@ export default function WorkerDailyReport() {
   const location = useLocation();
   const assignment = location.state?.assignment || null;
   const plan = location.state?.plan || null;
+  const productInfo = plan?.product || assignment?.product || null;
+  const maxQty = productInfo?.quantity ? Number(productInfo.quantity) : null;
+  
   const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
   const currentUser = getStoredUser() || {};
   const currentWorkerIdSet = new Set(
@@ -351,11 +354,13 @@ export default function WorkerDailyReport() {
           const effectiveList = unwrapArrayPayload(res);
           if (effectiveList.length === 0) return;
 
-          // Find the EXACT log for the selected reportDate (ignoring time)
+          // Find the EXACT log for the selected reportDate (ignoring time) AND current user
           const targetDateStr = normalizeDateString(reportDate); // yyyy-mm-dd
           const matchLog = effectiveList.find(log => {
             const logDate = normalizeDateString(log.workDate || log.reportDate);
-            return logDate === targetDateStr;
+            const logUserId = String(log.userId || log.uId || "");
+            const matchesUser = currentWorkerIdSet.has(logUserId);
+            return logDate === targetDateStr && matchesUser;
           });
 
           if (matchLog) byPart.set(partId, matchLog);
@@ -429,11 +434,17 @@ export default function WorkerDailyReport() {
     if (!Array.isArray(currentRows) || currentRows.length === 0) return;
 
     // Detect actual changes compared to current saved rows
+    const errors = [];
     const changes = currentRows.filter((row) => {
       if (!row.partId || row.logReadOnly) return false;
       const original = rows.find((r) => r.id === row.id);
       const currentQty = Number(row.quantity || 0);
       const originalQty = original ? Number(original.quantity || 0) : 0;
+
+      // Local validation: Check against max order quantity if available
+      if (maxQty !== null && currentQty > maxQty) {
+        errors.push(`${row.partName}: Số lượng (${currentQty}) vượt quá tổng đơn hàng (${maxQty}).`);
+      }
 
       // If it's a new entry (no workLogId) and has quantity > 0, it's a change
       if (!row.workLogId && currentQty > 0) return true;
@@ -442,6 +453,11 @@ export default function WorkerDailyReport() {
 
       return false;
     });
+
+    if (errors.length > 0) {
+      toast.error(errors[0]);
+      return;
+    }
 
     if (changes.length === 0) {
       toast.info("Không có thay đổi nào để lưu.");
@@ -509,11 +525,11 @@ export default function WorkerDailyReport() {
         console.error("Chi tiết lưu thất bại:", failedWithReasons);
 
         // Thông báo cho người dùng một cách thân thiện
-        const firstReason = failedWithReasons[0].reason;
+        const firstFailed = failedWithReasons[0];
         if (failed.length === 1) {
-          toast.warning(firstReason);
+          toast.error(`${firstFailed.row.partName}: ${firstFailed.reason}`);
         } else {
-          toast.warning(`Không thể lưu ${failed.length} dòng. Lỗi: ${firstReason}`);
+          toast.error(`Lỗi lưu ${failed.length} dòng. Dòng đầu tiên (${firstFailed.row.partName}): ${firstFailed.reason}`);
         }
       }
     } catch (err) {
@@ -638,23 +654,31 @@ export default function WorkerDailyReport() {
                         </td>
                         <td className="px-3 py-2">
                           {canEdit && !row.logReadOnly ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                value={row.quantity}
-                                onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
-                                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                              />
-                              {row.isCuttingStep && (
-                                <button
-                                  type="button"
-                                  onClick={() => fetchNotebookLogs(row)}
-                                  title="Lấy dữ liệu từ sổ cắt"
-                                  className="flex h-9 w-10 min-w-[40px] items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors"
-                                >
-                                  <BookOpen size={16} />
-                                </button>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={maxQty || undefined}
+                                  value={row.quantity}
+                                  onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
+                                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                                />
+                                {row.isCuttingStep && (
+                                  <button
+                                    type="button"
+                                    onClick={() => fetchNotebookLogs(row)}
+                                    title="Lấy dữ liệu từ sổ cắt"
+                                    className="flex h-9 w-10 min-w-[40px] items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                  >
+                                    <BookOpen size={16} />
+                                  </button>
+                                )}
+                              </div>
+                              {maxQty !== null && (
+                                <div className="text-[10px] text-slate-400 text-center font-medium">
+                                  Tối đa: {maxQty}
+                                </div>
                               )}
                             </div>
                           ) : (

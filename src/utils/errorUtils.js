@@ -28,7 +28,19 @@ export const getErrorMessage = (error, fallbackMsg = "Thao tác thất bại.") 
   if (data.title && data.title !== "One or more validation errors occurred.") return String(data.title);
   
   // Trường hợp data là chuỗi thuần túy
-  if (typeof data === "string" && data.trim()) return data;
+  if (typeof data === "string" && data.trim()) {
+    // Detect if the string is an HTML document (common for 500 server errors)
+    if (data.includes("<!DOCTYPE") || data.includes("<html")) {
+      const statusText = error?.response?.status ? ` (Mã: ${error.response.status})` : "";
+      return `Máy chủ gặp sự cố${statusText}. Vui lòng liên hệ kỹ thuật.`;
+    }
+    // Truncate long messages (like partial stack traces) instead of using fallback
+    if (data.length > 300) {
+      return data.substring(0, 250) + "...";
+    }
+    return data;
+  }
 
-  return fallbackMsg;
+  // Cuối cùng dùng message từ Axios hoặc fallback
+  return error?.message || fallbackMsg;
 };

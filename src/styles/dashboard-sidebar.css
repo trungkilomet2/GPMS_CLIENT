@@ -110,9 +110,9 @@
 }
 
 .dashboard-sidebar__item.is-active {
-  background: linear-gradient(135deg, #f2b15f 0%, #f6c679 100%);
-  color: #1a2e23;
-  box-shadow: 0 10px 24px rgba(242, 177, 95, 0.26);
+  background: linear-gradient(135deg, #1e6e43 0%, #2d9058 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(30, 110, 67, 0.2);
 }
 
 .dashboard-sidebar__item.is-disabled {
@@ -148,8 +148,9 @@
 }
 
 .dashboard-sidebar__account.is-active {
-  background: linear-gradient(135deg, #f2b15f 0%, #f6c679 100%);
-  box-shadow: 0 10px 24px rgba(242, 177, 95, 0.26);
+  background: linear-gradient(135deg, #1e6e43 0%, #2d9058 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(30, 110, 67, 0.2);
 }
 
 .dashboard-sidebar__avatar {

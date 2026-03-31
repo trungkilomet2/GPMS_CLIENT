@@ -9,6 +9,7 @@ import { formatOrderDate, formatDateTime } from "@/lib/orders/formatters";
 import { getOrderCustomerId } from "@/lib/orders/customerInfo";
 import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
 import SuccessModal from "@/components/SuccessModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import ProductionService from "@/services/ProductionService";
 import { STATUS_STYLES as PRODUCTION_STATUS_STYLES, getProductionStatusLabel, getPlanStatusLabel, STATUS_STYLES } from "@/utils/statusUtils";
 import { userService } from "@/services/UserService";
@@ -107,6 +108,11 @@ export default function ProductionDetail() {
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
+  const [isApproveOrderConfirmOpen, setIsApproveOrderConfirmOpen] = useState(false);
+  const [isApprovePlanConfirmOpen, setIsApprovePlanConfirmOpen] = useState(false);
+  const [isRequestPlanUpdateConfirmOpen, setIsRequestPlanUpdateConfirmOpen] = useState(false);
+  const [isSubmitPlanConfirmOpen, setIsSubmitPlanConfirmOpen] = useState(false);
+  const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
   const [isDonePartModalOpen, setIsDonePartModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null);
@@ -120,9 +126,7 @@ export default function ProductionDetail() {
   const [totalParts, setTotalParts] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 10;
-  const [reportedErrorCount, setReportedErrorCount] = useState(0);
-  const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
-
+  
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
   const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
@@ -286,41 +290,16 @@ export default function ProductionDetail() {
     return () => { active = false; };
   }, [production?.productionId]);
 
-  useEffect(() => {
-    if (!production?.productionId) return;
-    try {
-      const raw = localStorage.getItem("gpms-error-reports");
-      if (!raw) return setReportedErrorCount(0);
-      const list = JSON.parse(raw);
-      const count = (Array.isArray(list) ? list : []).filter(i => String(i?.productionId) === String(production.productionId)).length;
-      setReportedErrorCount(count);
-    } catch { setReportedErrorCount(0); }
-  }, [production?.productionId]);
+
 
   const pageData = useMemo(() => {
     const start = pageIndex * pageSize;
     return steps.slice(start, start + pageSize);
   }, [steps, pageIndex]);
 
-  const totalCpu = steps.reduce((sum, s) => sum + (Number(s.cpu) || 0), 0);
-  const progressSummary = useMemo(() => {
-    const total = totalParts || steps?.length || 0;
-    const today = new Date();
-    const completedCount = steps.filter((row) => {
-      if (row.status === "Hoàn thành") return true;
-      const raw = row.endDate;
-      if (!raw || raw === "-") return false;
-      const parsed = new Date(raw);
-      return Number.isFinite(parsed.getTime()) && parsed <= today;
-    }).length;
-    const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0;
-    return { completed: completedCount, total, percent };
-  }, [steps, totalParts]);
-
   const order = production?.order || {};
   const isApprovedProduction = production?.status && !["Chờ Xét Duyệt", "Từ Chối", "-"].includes(production.status);
   const softTemplates = Array.isArray(order.templates) ? order.templates.filter(t => t.type !== "HARD") : [];
-  const progressPercent = steps.length > 0 ? Math.round((steps.filter(s => s.status === "Hoàn thành").length / steps.length) * 100) : 0;
 
   if (loading) {
     return (
@@ -344,16 +323,14 @@ export default function ProductionDetail() {
 
   const rejectedStatusLabel = getProductionStatusLabel(2); // "Từ Chối"
 
-  const productionStartDateText = formatOrderDate(production.pStartDate);
-  const productionEndDateText = formatOrderDate(production.pEndDate);
-  const productionDateRangeText =
-    productionStartDateText === "-" && productionEndDateText === "-"
-      ? "-"
-      : `${productionStartDateText} -> ${productionEndDateText}`;
-  const productionDurationText = getProductionDurationText(production.pStartDate, production.pEndDate);
+
 
   const handleApproveProduction = async () => {
     if (isActionLocked) return;
+    setIsApproveOrderConfirmOpen(true);
+  };
+
+  const confirmApproveProduction = async () => {
     try {
       const userId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
       if (!userId) {
@@ -362,6 +339,7 @@ export default function ProductionDetail() {
       }
       await ProductionService.approveProduction(production.productionId, { userId });
       setProduction((prev) => (prev ? { ...prev, status: getProductionStatusLabel(4) } : prev));
+      setIsApproveOrderConfirmOpen(false);
       setIsSuccessModalOpen(true);
     } catch (err) {
       console.error("Lỗi khi chấp nhận đơn sản xuất:", err);
@@ -481,37 +459,43 @@ export default function ProductionDetail() {
     } finally { setCheckingCuttingBook(false); }
   };
 
-  const handleApprovePlan = async () => {
-    if (!window.confirm("Chấp nhận kế hoạch này?")) return;
+  const handleApprovePlan = () => setIsApprovePlanConfirmOpen(true);
+  const confirmApprovePlan = async () => {
     try {
       await ProductionService.approveProductionPlan(production.productionId);
       toast.success("Đã duyệt kế hoạch");
+      setIsApprovePlanConfirmOpen(false);
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (err) { toast.error("Không thể duyệt kế hoạch"); }
   };
 
-  const handleRequestPlanUpdate = async () => {
-    if (!window.confirm("Yêu cầu sửa lại kế hoạch?")) return;
+  const handleRequestPlanUpdate = () => setIsRequestPlanUpdateConfirmOpen(true);
+  const confirmRequestPlanUpdate = async () => {
     try {
       await ProductionService.requestPlanUpdate(production.productionId);
       toast.success("Đã gửi yêu cầu sửa");
+      setIsRequestPlanUpdateConfirmOpen(false);
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (err) { toast.error("Không thể gửi yêu cầu"); }
   };
 
-  const handleSubmitPlan = async () => {
+  const handleSubmitPlan = () => {
     if (steps.length === 0) {
       toast.warn("Vui lòng tạo ít nhất một công đoạn trước khi gửi duyệt.");
       return;
     }
-    if (!window.confirm("Gửi kế hoạch này cho Owner duyệt?")) return;
+    setIsSubmitPlanConfirmOpen(true);
+  };
+
+  const confirmSubmitPlan = async () => {
     try {
       await ProductionService.submitProductionPlan(production.productionId);
       toast.success("Đã gửi duyệt kế hoạch.");
+      setIsSubmitPlanConfirmOpen(false);
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -666,7 +650,13 @@ export default function ProductionDetail() {
                   return (
                     <Link
                       to="/worker/daily-report"
-                      state={{ plan: { production: { ...production, orderName: order.orderName }, steps: steps.map(s => ({ ...s, id: s.id ?? s.partId, partName: s.partName ?? s.name, cpu: s.cpu ?? s.unitPrice ?? s.price })) } }}
+                      state={{ 
+                        plan: { 
+                          production: { ...production, orderName: order.orderName }, 
+                          product: order,
+                          steps: steps.map(s => ({ ...s, id: s.id ?? s.partId, partName: s.partName ?? s.name, cpu: s.cpu ?? s.unitPrice ?? s.price })) 
+                        } 
+                      }}
                       className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 shadow-md"
                     >
                       Báo cáo sản lượng
@@ -699,9 +689,10 @@ export default function ProductionDetail() {
               <DetailRow label="Mã đơn sản xuất" value={`#PR-${production.productionId}`} />
               <DetailRow label="Trạng thái" value={production.status} />
               <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
-              <DetailRow label="Thời gian thực hiện" value={productionDateRangeText} />
-              <DetailRow label="Số ngày thực hiện" value={productionDurationText} />
             </div>
+
+
+
             <div className="p-5 border-t border-slate-100 bg-amber-50/30">
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Ghi chú đơn sản xuất</p>
               <p className="text-sm text-slate-700 leading-relaxed italic">
@@ -724,8 +715,11 @@ export default function ProductionDetail() {
                   <p className="mt-3 text-[11px] text-red-400 font-medium">
                     Thời gian từ chối:{" "}
                     {new Date(rejectReason.createdAt).toLocaleString("vi-VN", {
-                      dateStyle: "short",
-                      timeStyle: "short",
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })}
                   </p>
                 )}
@@ -791,30 +785,7 @@ export default function ProductionDetail() {
 
               {isApprovedProduction && (
                 <div className="space-y-6">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
-                    <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-4">
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                        <div className="text-[10px] font-bold uppercase text-slate-400">Lỗi báo cáo</div>
-                        <div className="mt-1 flex items-center justify-between">
-                          <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
-                          <Link to={`/production/${production.productionId}/errors`} className="text-[10px] font-bold text-emerald-700 hover:underline">Chi tiết</Link>
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                        <div className="text-[10px] font-bold uppercase text-slate-400">Hiệu suất</div>
-                        <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                        <div className="text-[10px] font-bold uppercase text-slate-400">Hoàn thành</div>
-                        <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.completed}/{progressSummary.total}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                        <div className="text-[10px] font-bold uppercase text-slate-400">Lương công đoạn</div>
-                        <div className="mt-1 text-lg font-bold text-emerald-700">{totalCpu.toLocaleString("vi-VN")} đ</div>
-                      </div>
-                    </div>
-                  </div>
+
 
                   <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
                     <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
@@ -973,20 +944,7 @@ export default function ProductionDetail() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-widest text-rose-700 mb-3">
-                  Tổng hợp lỗi
-                </div>
-                <p className="text-sm text-rose-800 mb-4">
-                  Xem nhanh các lỗi đã báo cáo liên quan đến đơn sản xuất này.
-                </p>
-                <button type="button"
-                  onClick={() => navigate(`/production/${production.productionId}/errors`)}
-                  className="cursor-pointer w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700"
-                >
-                  Xem tổng hợp lỗi
-                </button>
-              </div>
+
             </div>
           </div>
         </div>
@@ -1055,6 +1013,39 @@ export default function ProductionDetail() {
         description={`Đơn sản xuất #PR-${production?.productionId} đã bị từ chối.`}
         primaryLabel="Về danh sách"
         hideSecondary={true}
+      />
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={isApproveOrderConfirmOpen}
+        title="Duyệt đơn sản xuất"
+        description="Bạn có chắc chắn muốn chấp nhận đơn sản xuất này?"
+        onConfirm={confirmApproveProduction}
+        onClose={() => setIsApproveOrderConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isApprovePlanConfirmOpen}
+        title="Duyệt kế hoạch sản xuất"
+        description="Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này? Sau khi duyệt, kế hoạch sẽ chuyển sang trạng thái sản xuất."
+        onConfirm={confirmApprovePlan}
+        onClose={() => setIsApprovePlanConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isRequestPlanUpdateConfirmOpen}
+        title="Yêu cầu sửa kế hoạch"
+        description="Bạn có chắc chắn muốn yêu cầu PM chỉnh sửa lại các công đoạn trong kế hoạch này?"
+        onConfirm={confirmRequestPlanUpdate}
+        onClose={() => setIsRequestPlanUpdateConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isSubmitPlanConfirmOpen}
+        title="Gửi duyệt kế hoạch"
+        description="Bạn có chắc chắn muốn gửi kế hoạch sản xuất này cho chủ xưởng xét duyệt?"
+        onConfirm={confirmSubmitPlan}
+        onClose={() => setIsSubmitPlanConfirmOpen(false)}
       />
     </OwnerLayout>
   );

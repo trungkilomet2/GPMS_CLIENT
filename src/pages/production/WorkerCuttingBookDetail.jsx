@@ -194,7 +194,13 @@ export default function WorkerCuttingBookDetail() {
       setRecords((prev) => [mapNotebookLogToRecord(newLog), ...prev]);
 
       clearRecord();
-      setSavedAt(new Date().toLocaleString("vi-VN"));
+      setSavedAt(new Date().toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }));
       toast.success("Đã ghi dòng mới thành công!");
       return true;
     } catch (err) {

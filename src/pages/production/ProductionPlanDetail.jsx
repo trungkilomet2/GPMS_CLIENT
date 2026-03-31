@@ -11,6 +11,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
+import ConfirmModal from "@/components/ConfirmModal";
 import { STATUS_STYLES, getProductionStatusLabel, getPlanStatusLabel } from "@/utils/statusUtils";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
@@ -75,8 +76,10 @@ export default function ProductionPlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isApproveConfirmOpen, setIsApproveConfirmOpen] = useState(false);
+  const [isRequestUpdateConfirmOpen, setIsRequestUpdateConfirmOpen] = useState(false);
   const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const user = getStoredUser();
@@ -319,12 +322,13 @@ export default function ProductionPlanDetail() {
     }
   };
 
-  const handleApprovePlan = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này?")) return;
+  const handleApprovePlan = () => setIsApproveConfirmOpen(true);
+  const confirmApprovePlan = async () => {
     try {
       setLoading(true);
       await ProductionService.approveProductionPlan(id);
       toast.success("Đã chấp nhận kế hoạch sản xuất.");
+      setIsApproveConfirmOpen(false);
       window.location.reload();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Không thể chấp nhận kế hoạch.");
@@ -333,12 +337,13 @@ export default function ProductionPlanDetail() {
     }
   };
 
-  const handleRequestUpdate = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại kế hoạch này?")) return;
+  const handleRequestUpdate = () => setIsRequestUpdateConfirmOpen(true);
+  const confirmRequestUpdate = async () => {
     try {
       setLoading(true);
       await ProductionService.requestPlanUpdate(id);
       toast.success("Đã gửi yêu cầu chỉnh sửa kế hoạch.");
+      setIsRequestUpdateConfirmOpen(false);
       window.location.reload();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Không thể gửi yêu cầu chỉnh sửa.");
@@ -445,7 +450,7 @@ export default function ProductionPlanDetail() {
                   return canReport ? (
                     <Link
                       to="/worker/daily-report"
-                      state={{ plan: { production: plan.production, steps: plan.steps } }}
+                      state={{ plan: { production: plan.production, steps: plan.steps, product: plan.product } }}
                       className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
                     >
                       Báo cáo sản lượng
@@ -696,6 +701,22 @@ export default function ProductionPlanDetail() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isApproveConfirmOpen}
+        title="Duyệt kế hoạch sản xuất"
+        description="Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này? Sau khi duyệt, kế hoạch sẽ chuyển sang trạng thái sản xuất."
+        onConfirm={confirmApprovePlan}
+        onClose={() => setIsApproveConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isRequestUpdateConfirmOpen}
+        title="Yêu cầu sửa kế hoạch"
+        description="Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại các công đoạn trong kế hoạch này?"
+        onConfirm={confirmRequestUpdate}
+        onClose={() => setIsRequestUpdateConfirmOpen(false)}
+      />
     </OwnerLayout>
   );
 }
