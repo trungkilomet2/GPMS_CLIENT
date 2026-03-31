@@ -2,18 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPostLoginPath } from "@/lib/authRouting";
-
-function splitRoles(value) {
-  if (Array.isArray(value)) return value.map((v) => String(v ?? "").trim()).filter(Boolean);
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 
 function getRoleLabel(roleValue) {
   const roles = splitRoles(roleValue);
@@ -49,14 +41,9 @@ export default function InternalProfileView() {
   const location = useLocation();
   const storedUser = useMemo(() => getStoredUser(), []);
   const Layout = useMemo(() => {
-    const roleValue = storedUser?.role;
-    const roles = splitRoles(roleValue).map((item) => item.toLowerCase());
+    const primaryRole = getPrimaryWorkspaceRole(storedUser?.role);
 
-    if (roles.includes("worker")) return WorkerLayout;
-    if (roles.includes("team leader") || roles.includes("teamleader") || roles.includes("tl")) {
-      return TeamLeaderLayout;
-    }
-
+    if (primaryRole === "worker") return WorkerLayout;
     return DashboardLayout;
   }, [storedUser]);
 

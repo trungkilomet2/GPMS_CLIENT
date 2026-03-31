@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -17,10 +17,10 @@ const SEVERITIES = [
 ];
 
 const ERROR_TYPES = [
-  { value: "process", label: "Lỗi công đoạn" },
-  { value: "cutting", label: "Lỗi cắt" },
-  { value: "sewing", label: "Lỗi may" },
-  { value: "other", label: "Lỗi khác" },
+  { value: 0, label: "Lỗi công đoạn" },
+  { value: 1, label: "Lỗi cắt" },
+  { value: 2, label: "Lỗi may" },
+  { value: 3, label: "Lỗi khác" },
 ];
 
 const toList = (payload) => {
@@ -50,7 +50,7 @@ const getPriorityBySeverity = (severity) =>
   SEVERITIES.find((item) => item.value === severity)?.priority ?? 2;
 
 const getErrorTypeLabel = (value) =>
-  ERROR_TYPES.find((item) => item.value === value)?.label ?? value;
+  ERROR_TYPES.find((item) => item.value === Number(value))?.label ?? value;
 
 export default function WorkerErrorReport() {
   const navigate = useNavigate();
@@ -67,7 +67,7 @@ export default function WorkerErrorReport() {
       partName: assignment?.partName ?? "",
       startDate: assignment?.startDate ?? "",
       endDate: assignment?.endDate ?? "",
-      errorType: assignment?.errorType ?? "process",
+      errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
     };
   }, [assignment]);
@@ -77,15 +77,18 @@ export default function WorkerErrorReport() {
       ? String(normalizedAssignment.productionId)
       : "",
     partId: normalizedAssignment?.partId ? String(normalizedAssignment.partId) : "",
-    errorType: normalizedAssignment?.errorType || "process",
+    errorType: normalizedAssignment?.errorType !== undefined ? normalizedAssignment.errorType : 0,
     otherErrorDetail: normalizedAssignment?.otherErrorDetail || "",
     severity: "medium",
     title: "",
     description: "",
     quantity: "",
     happenAt: "",
-    suggestion: "",
+    repairWorker: "",
   });
+
+  const [employees, setEmployees] = useState([]);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   const [notice, setNotice] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -171,29 +174,30 @@ export default function WorkerErrorReport() {
     };
   }, []);
 
+
   useEffect(() => {
     const productionId = String(form.productionId || "").trim();
     if (!productionId) {
       setParts([]);
       setPartsError("");
+      setEmployees([]);
       return;
     }
 
     const fallbackAssignedPart =
       normalizedAssignment?.partId &&
-      normalizedAssignment?.productionId &&
-      String(normalizedAssignment.productionId) === productionId
+        normalizedAssignment?.productionId &&
+        String(normalizedAssignment.productionId) === productionId
         ? {
-            id: normalizedAssignment.partId,
-            productionId,
-            orderName: normalizedAssignment.orderName,
-            partName: normalizedAssignment.partName,
-            startDate: normalizedAssignment.startDate,
-            endDate: normalizedAssignment.endDate,
-          }
+          id: normalizedAssignment.partId,
+          productionId,
+          orderName: normalizedAssignment.orderName,
+          partName: normalizedAssignment.partName,
+          startDate: normalizedAssignment.startDate,
+          endDate: normalizedAssignment.endDate,
+        }
         : null;
 
-    // When opened from plan detail with a fixed part, don't block the UI by part list API.
     if (isPartLocked && fallbackAssignedPart) {
       setParts([fallbackAssignedPart]);
       setPartsError("");
@@ -206,11 +210,12 @@ export default function WorkerErrorReport() {
     const fetchParts = async () => {
       try {
         setLoadingParts(true);
+        setLoadingEmployees(true);
         setPartsError("");
 
         const response = await ProductionPartService.getPartsByProduction(productionId, {
           PageIndex: 0,
-          PageSize: 200,
+          PageSize: 100,
           SortColumn: "Name",
           SortOrder: "ASC",
         });
@@ -218,7 +223,8 @@ export default function WorkerErrorReport() {
         if (!active) return;
 
         const payload = response?.data ?? response;
-        const mappedParts = toList(payload).map((item) => mapPart(item, productionId));
+        const rawParts = toList(payload);
+        const mappedParts = rawParts.map((item) => mapPart(item, productionId));
         const hasAssignedPart = mappedParts.some(
           (item) => String(item.id ?? "") === String(normalizedAssignment?.partId ?? "")
         );
@@ -226,6 +232,8 @@ export default function WorkerErrorReport() {
         if (fallbackAssignedPart && !hasAssignedPart) {
           mappedParts.unshift(fallbackAssignedPart);
         }
+
+        setParts(mappedParts);
 
         setParts(mappedParts);
       } catch {
@@ -238,7 +246,10 @@ export default function WorkerErrorReport() {
           setPartsError("Không thể tải danh sách công đoạn.");
         }
       } finally {
-        if (active) setLoadingParts(false);
+        if (active) {
+          setLoadingParts(false);
+          setLoadingEmployees(false);
+        }
       }
     };
 
@@ -248,6 +259,35 @@ export default function WorkerErrorReport() {
       active = false;
     };
   }, [form.productionId, normalizedAssignment, isPartLocked]);
+
+  useEffect(() => {
+    const partId = String(form.partId || "").trim();
+    if (!partId) {
+      setEmployees([]);
+      return;
+    }
+
+    let active = true;
+    const fetchIssueWorkers = async () => {
+      try {
+        setLoadingEmployees(true);
+        const res = await ProductionPartService.getIssueWorkers(partId);
+        if (!active) return;
+        const list = res?.data?.data ?? res?.data ?? [];
+        setEmployees(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Lỗi tải danh sách thợ cho công đoạn:", err);
+        if (active) setEmployees([]);
+      } finally {
+        if (active) setLoadingEmployees(false);
+      }
+    };
+
+    fetchIssueWorkers();
+    return () => {
+      active = false;
+    };
+  }, [form.partId]);
 
   const productionOptions = useMemo(() => {
     const map = new Map();
@@ -297,7 +337,24 @@ export default function WorkerErrorReport() {
   }, [form.partId, parts, normalizedAssignment]);
 
   const handleChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [field]: value };
+
+      if (field === "errorType") {
+        const typeNum = Number(value);
+        if (typeNum === 1 || typeNum === 2) {
+          const matchTerm = typeNum === 1 ? "cắt" : "may";
+          const matchedPart = parts.find(p =>
+            p.partName?.toLowerCase().includes(matchTerm)
+          );
+          if (matchedPart) {
+            next.partId = String(matchedPart.id);
+          }
+        }
+      }
+
+      return next;
+    });
     setNotice("");
     setSubmitError("");
   };
@@ -316,13 +373,19 @@ export default function WorkerErrorReport() {
     const next = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
     if (next.length === 0) return;
 
-    const mapped = next.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+    // Limit to exactly 1 image
+    const singleFile = next[0];
+    const mapped = {
+      id: `${singleFile.name}-${singleFile.size}-${singleFile.lastModified}`,
+      file: singleFile,
+      preview: URL.createObjectURL(singleFile),
+    };
 
-    setAttachments((prev) => [...prev, ...mapped]);
+    // Replace current rather than append
+    setAttachments((prev) => {
+      prev.forEach(item => { if (item?.preview) URL.revokeObjectURL(item.preview); });
+      return [mapped];
+    });
   };
 
   const handleDrop = (event) => {
@@ -339,20 +402,6 @@ export default function WorkerErrorReport() {
     });
   };
 
-  const buildDescription = () => {
-    const lines = [];
-
-    if (form.description?.trim()) lines.push(form.description.trim());
-    lines.push(`Loại lỗi: ${getErrorTypeLabel(form.errorType)}`);
-
-    if (form.errorType === "other" && form.otherErrorDetail?.trim()) {
-      lines.push(`Chi tiết lỗi khác: ${form.otherErrorDetail.trim()}`);
-    }
-    if (form.happenAt) lines.push(`Thời gian phát sinh: ${form.happenAt}`);
-    if (form.suggestion?.trim()) lines.push(`Gợi ý xử lý: ${form.suggestion.trim()}`);
-
-    return lines.join("\n");
-  };
 
   const resetFormAfterSubmit = () => {
     setForm((prev) => ({
@@ -361,7 +410,7 @@ export default function WorkerErrorReport() {
       description: "",
       quantity: "",
       happenAt: "",
-      suggestion: "",
+      repairWorker: "",
       otherErrorDetail: "",
     }));
 
@@ -378,18 +427,30 @@ export default function WorkerErrorReport() {
 
     const productionId = String(form.productionId || "").trim();
     const partId = String(form.partId || "").trim();
-    const title = String(form.title || "").trim();
+
+    let title = String(form.title || "").trim();
+    const typeNum = Number(form.errorType);
+
+    if (typeNum !== 3) {
+      const typeLabel = getErrorTypeLabel(typeNum);
+      if (typeNum === 0) {
+        title = `${typeLabel}: ${selectedPart?.partName || `Mã #${partId}`}`;
+      } else {
+        title = `${typeLabel}`;
+      }
+    }
 
     if (!productionId) {
-      setSubmitError("Vui lòng chọn production.");
+      setSubmitError("Vui lòng chọn đơn sản xuất.");
       return;
     }
     if (!partId) {
-      setSubmitError("Vui lòng chọn công đoạn để báo lỗi.");
+      setSubmitError("Vui lòng chọn công đoạn tương ứng với loại lỗi.");
       return;
     }
     if (!title) {
-      setSubmitError("Vui lòng nhập tiêu đề lỗi.");
+      const titleLabel = typeNum === 3 ? "mô tả chi tiết lỗi" : "tiêu đề lỗi";
+      setSubmitError(`Vui lòng nhập ${titleLabel}.`);
       return;
     }
 
@@ -415,10 +476,17 @@ export default function WorkerErrorReport() {
       const formData = new FormData();
       formData.append("CreatedBy", String(createdBy));
       formData.append("Priority", String(getPriorityBySeverity(form.severity)));
+      formData.append("TypeIssue", String(form.errorType));
       formData.append("Title", title);
 
-      const description = buildDescription();
-      if (description) formData.append("Description", description);
+      let fullDescription = form.description || "";
+      if (form.errorType === 3 && form.otherErrorDetail?.trim()) {
+        fullDescription += `\n(Chi tiết khác: ${form.otherErrorDetail.trim()})`;
+      }
+      if (form.happenAt) fullDescription += `\n(Xảy ra lúc: ${form.happenAt})`;
+      if (form.repairWorker) fullDescription += `\n(Thợ sửa: ${form.repairWorker})`;
+
+      if (fullDescription) formData.append("Description", fullDescription);
 
       if (qtyRaw) {
         formData.append("Quantity", String(Number(qtyRaw)));
@@ -491,14 +559,14 @@ export default function WorkerErrorReport() {
             >
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Production</label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Đơn sản xuất</label>
                   <select
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   >
-                    <option value="">Chọn production...</option>
+                    <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
                       <option key={item.productionId} value={item.productionId}>
                         {`#PR-${item.productionId}${item.orderName ? ` - ${item.orderName}` : ""}`}
@@ -506,7 +574,7 @@ export default function WorkerErrorReport() {
                     ))}
                   </select>
                   {loadingProductions && (
-                    <div className="mt-1 text-xs text-slate-400">Đang tải production...</div>
+                    <div className="mt-1 text-xs text-slate-400">Đang tải đơn sản xuất...</div>
                   )}
                 </div>
 
@@ -544,30 +612,6 @@ export default function WorkerErrorReport() {
                   )}
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase text-slate-500">Loại lỗi</label>
-                  <select
-                    value={form.errorType}
-                    onChange={(event) => handleChange("errorType", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    {ERROR_TYPES.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                  </select>
-                  {form.errorType === "other" && (
-                    <div className="mt-3">
-                      <label className="text-xs font-semibold uppercase text-slate-500">Thông tin lỗi khác</label>
-                      <input
-                        value={form.otherErrorDetail}
-                        onChange={(event) => handleChange("otherErrorDetail", event.target.value)}
-                        placeholder="Nhập thông tin lỗi khác..."
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                      />
-                    </div>
-                  )}
-                </div>
-
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
                   <input
@@ -590,16 +634,6 @@ export default function WorkerErrorReport() {
               </div>
 
               <div className="mt-4">
-                <label className="text-xs font-semibold uppercase text-slate-500">Tiêu đề lỗi</label>
-                <input
-                  value={form.title}
-                  onChange={(event) => handleChange("title", event.target.value)}
-                  placeholder="Ví dụ: Lỗi lệch đường may cổ"
-                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                />
-              </div>
-
-              <div className="mt-4">
                 <label className="text-xs font-semibold uppercase text-slate-500">Mô tả chi tiết</label>
                 <textarea
                   rows={4}
@@ -612,13 +646,22 @@ export default function WorkerErrorReport() {
 
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Gợi ý xử lý</label>
-                  <input
-                    value={form.suggestion}
-                    onChange={(event) => handleChange("suggestion", event.target.value)}
-                    placeholder="Ví dụ: kiểm tra lại máy may"
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi</label>
+                  <select
+                    value={form.repairWorker}
+                    onChange={(event) => handleChange("repairWorker", event.target.value)}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  />
+                  >
+                    <option value="">Chọn thợ sửa lỗi...</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.fullName}>
+                        {emp.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingEmployees && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải danh sách thợ...</div>
+                  )}
                 </div>
               </div>
 
@@ -642,27 +685,28 @@ export default function WorkerErrorReport() {
                   }}
                 >
                   <ImagePlus size={18} className="text-slate-400" />
-                  Kéo thả ảnh hoặc bấm để tải lên
+                  Kéo thả 1 ảnh minh chứng hoặc bấm để chọn
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  multiple
                   className="hidden"
                   onChange={(event) => handleFiles(event.target.files)}
                 />
+                <p className="mt-1 text-[10px] text-slate-400 italic">Hệ thống hỗ trợ lưu tối đa 1 ảnh minh chứng cho mỗi báo cáo lỗi.</p>
                 {attachments.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {attachments.map((item) => (
-                      <div key={item.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div key={item.id} className="relative overflow-hidden rounded-xl border-2 border-rose-100 bg-white shadow-sm">
                         <img src={item.preview} alt={item.file.name} className="h-28 w-full object-cover" />
                         <button
                           type="button"
                           onClick={() => removeAttachment(item.id)}
-                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-600 shadow hover:text-rose-600"
+                          className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 p-1 text-white shadow hover:bg-rose-700 transition-colors"
+                          title="Gỡ bỏ"
                         >
-                          Xóa
+                          <svg size={12} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                       </div>
                     ))}
@@ -692,14 +736,14 @@ export default function WorkerErrorReport() {
                 {selectedPart ? (
                   <div className="space-y-2 text-sm text-slate-700">
                     <InfoItem label="Part ID" value={selectedPart.id} />
-                    <InfoItem label="Production" value={`#PR-${selectedPart.productionId}`} />
+                    <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
-                    <InfoItem label="Bắt đầu" value={selectedPart.startDate || "-"} />
-                    <InfoItem label="Kết thúc" value={selectedPart.endDate || "-"} />
+                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ").slice(0, 16)} />
+                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ").slice(0, 16)} />
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-500">Chọn production và công đoạn để xem thông tin.</div>
+                  <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>
                 )}
               </div>
 
@@ -711,6 +755,7 @@ export default function WorkerErrorReport() {
                   <li>Ghi rõ vị trí lỗi và số lượng lỗi.</li>
                   <li>Đính kèm ảnh để tổ trưởng đánh giá nhanh.</li>
                   <li>Chọn mức độ nghiêm trọng đúng thực tế.</li>
+                  <li>Thông tin thợ sửa lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
                 </ul>
               </div>
             </div>

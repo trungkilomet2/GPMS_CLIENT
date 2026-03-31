@@ -3,10 +3,8 @@ import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 import "@/styles/internal-dashboard.css";
-
-const INTERNAL_ROLES = ["Owner", "PM"];
-const ADMIN_ROLES = ["Admin"];
 
 const QUICK_LINKS = [
   {
@@ -23,17 +21,6 @@ const QUICK_LINKS = [
   },
 ];
 
-function splitRoles(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
-  }
-
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export default function InternalDashboard() {
   const user = getStoredUser();
 
@@ -42,9 +29,10 @@ export default function InternalDashboard() {
   }
 
   const roles = splitRoles(user.role);
-  const isAdmin = roles.some((role) => ADMIN_ROLES.includes(role));
-  const isInternalUser = roles.some((role) => INTERNAL_ROLES.includes(role));
-  const isOwner = roles.includes("Owner");
+  const primaryRole = getPrimaryWorkspaceRole(roles);
+  const isAdmin = primaryRole === "admin";
+  const isInternalUser = primaryRole === "owner" || primaryRole === "pm";
+  const isOwner = primaryRole === "owner";
 
   if (isAdmin) {
     return <Navigate to="/admin/users" replace />;
@@ -59,7 +47,7 @@ export default function InternalDashboard() {
         {
           to: "/employees",
           title: "Danh sách nhân viên",
-          description: "Quản lý nhân sự nội bộ và hồ sơ tài khoản.",
+          description: "Tách riêng khu quản lý, nhân viên và màn xem worker skill.",
           icon: Users,
         },
         ...QUICK_LINKS,

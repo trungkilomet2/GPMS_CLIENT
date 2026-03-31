@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Navigate, useNavigate, Link } from "react-router-dom";
+import { getPostLoginPath } from "@/lib/authRouting";
+import { getStoredUser } from "@/lib/authStorage";
 import { authService } from "../services/authService";
 import SuccessModal from "@/components/SuccessModal";
 import {
@@ -24,6 +26,7 @@ const initialValues = {
 };
 
 export default function RegisterPage() {
+  const storedUser = getStoredUser();
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +37,10 @@ export default function RegisterPage() {
   const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+
+  if (storedUser) {
+    return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
+  }
 
   const getApiErrorDetails = (errData) => {
     const rawErrors =
@@ -152,6 +159,30 @@ export default function RegisterPage() {
       setOtpSent(true);
       setSubmitError("");
       setFormData((prev) => ({ ...prev, otp: "" }));
+      setErrors((prev) => ({ ...prev, otp: "" }));
+    } catch (error) {
+      const errData = error?.response?.data ?? {};
+      const { message, fieldErrors } = getApiErrorDetails(errData);
+      setSubmitError(message);
+      if (Object.keys(fieldErrors).length) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (!validateForm({ includeOtp: false })) return;
+
+    try {
+      setLoading(true);
+
+      await authService.resendRegisterOtp({
+        email: formData.email.trim(),
+      });
+
+      setSubmitError("");
       setErrors((prev) => ({ ...prev, otp: "" }));
     } catch (error) {
       const errData = error?.response?.data ?? {};
@@ -366,6 +397,26 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.otp && <p className="error-text">{errors.otp}</p>}
+              <div className="register-row" style={{ justifyContent: "space-between", marginTop: "0.5rem" }}>
+                <span style={{ color: "#5f7a69", fontSize: "0.92rem" }}>
+                  Chưa nhận được mã?
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "#1e8a47",
+                    fontWeight: 700,
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.7 : 1,
+                  }}
+                >
+                  {loading ? "Đang gửi lại..." : "Gửi lại mã OTP"}
+                </button>
+              </div>
             </>
           ) : null}
 

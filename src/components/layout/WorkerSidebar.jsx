@@ -1,14 +1,14 @@
-﻿import { createElement, useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { createElement, useEffect, useMemo, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, CalendarDays, ClipboardCheck, ListChecks, LogOut } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
-const NAV_ITEMS = [
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
-  { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
-  { to: "/worker/error-report", label: "Báo lỗi", icon: AlertTriangle },
+const WORKER_NAV_ITEMS = [
+  { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
+  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
 
@@ -24,6 +24,7 @@ function getInitials(name = "") {
 
 export default function WorkerSidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-worker-sidebar-collapsed");
@@ -34,6 +35,11 @@ export default function WorkerSidebar() {
   });
 
   const user = getStoredUser();
+  const navItems = WORKER_NAV_ITEMS;
+  const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
+  const brandSubtitle = hasAnyRole(roleValue, ["Owner", "Admin"]) ? "Tổng quan" : (hasAnyRole(roleValue, ["PM", "Manager"]) ? "Quản lý" : "Nhân viên");
+  const defaultName = "Nhân viên";
+  const roleLabel = roleValue || "Worker";
 
   useEffect(() => {
     try {
@@ -63,18 +69,40 @@ export default function WorkerSidebar() {
         {!collapsed && (
           <div className="dashboard-sidebar__brand-text">
             <div className="dashboard-sidebar__brand-title">GPMS</div>
-            <div className="dashboard-sidebar__brand-subtitle">Thợ may</div>
+            <div className="dashboard-sidebar__brand-subtitle">{brandSubtitle}</div>
           </div>
         )}
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            className={({ isActive }) => {
+              const currentPath = location.pathname;
+              let isCategoryActive = isActive;
+
+              // Đặc biệt cho thợ: Các trang báo cáo và sổ cắt thuộc về Kế hoạch sản xuất
+              if (to === "/worker/production-plan") {
+                isCategoryActive = isActive || 
+                  currentPath.startsWith("/worker/error-report") || 
+                  currentPath.startsWith("/worker/daily-report") ||
+                  currentPath.startsWith("/worker/cutting-book") ||
+                  currentPath.startsWith("/worker/production-plan");
+              }
+              
+              if (to === "/worker/output-history") {
+                isCategoryActive = isActive || currentPath.startsWith("/worker/output-history");
+              }
+
+              if (to === "/worker/leave-requests") {
+                isCategoryActive = isActive || currentPath.startsWith("/worker/leave-requests");
+              }
+
+              return `dashboard-sidebar__item ${isCategoryActive ? "is-active" : ""}`;
+            }}
             title={label}
-            className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
           >
             {createElement(Icon, { size: 22 })}
             {!collapsed && <span>{label}</span>}
@@ -93,8 +121,8 @@ export default function WorkerSidebar() {
           </div>
           {!collapsed && (
             <div className="dashboard-sidebar__user">
-              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Thợ may"}</div>
-              <div className="dashboard-sidebar__user-role">Worker</div>
+              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || defaultName}</div>
+              <div className="dashboard-sidebar__user-role">{roleLabel}</div>
             </div>
           )}
         </NavLink>

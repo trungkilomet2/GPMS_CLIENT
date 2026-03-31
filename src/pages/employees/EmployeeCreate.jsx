@@ -11,8 +11,9 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  EMPLOYEE_FORM_ROLE_OPTIONS,
+  EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
+  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -35,6 +36,7 @@ export default function EmployeeCreate() {
     password: "",
     fullName: "",
     role: "PM",
+    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
 
@@ -46,17 +48,15 @@ export default function EmployeeCreate() {
       setManagerError("");
 
       try {
-        const response = await WorkerService.getAllEmployees();
+        const response = await WorkerService.getEmployeeDirectory({
+          pageSize: 100,
+          includeHidden: true,
+        });
         if (!mounted) return;
         setManagerOptions(response?.data ?? []);
       } catch (error) {
         if (!mounted) return;
-        setManagerError(
-          getEmployeeModuleErrorMessage(
-            error,
-            "Không tải được danh sách quản lý để gán tuyến báo cáo."
-          )
-        );
+        setManagerError(getEmployeeModuleErrorMessage(error, "Không tải được danh sách quản lý để gán tuyến báo cáo."));
       } finally {
         if (mounted) setManagerLoading(false);
       }
@@ -96,6 +96,17 @@ export default function EmployeeCreate() {
       }));
     }
   }, [availableManagers, form.managerId]);
+
+  useEffect(() => {
+    if (form.role !== "PM") return;
+    if (String(form.managerId ?? "").trim()) return;
+    if (availableManagers.length !== 1) return;
+
+    setForm((prev) => ({
+      ...prev,
+      managerId: String(availableManagers[0].id),
+    }));
+  }, [availableManagers, form.managerId, form.role]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({
@@ -137,13 +148,22 @@ export default function EmployeeCreate() {
     setSubmitError("");
 
     try {
-      await WorkerService.createEmployee({
+      const createdEmployee = await WorkerService.createEmployee({
         userName: normalizedUserName,
         password: form.password,
         fullName: normalizedFullName,
+        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
+        workerRoleIds: [],
       });
+      const createdId = createdEmployee?.data?.id ?? createdEmployee?.id ?? null;
+      if (form.role === "Worker" && createdId != null) {
+        navigate(`/employees/${createdId}/skills`, {
+          state: { fromCreate: true },
+        });
+        return;
+      }
 
       navigate("/employees");
     } catch (error) {
@@ -169,7 +189,7 @@ export default function EmployeeCreate() {
               </Link>
               <h1 className="employee-create-hero__title">Thêm nhân viên mới</h1>
               <p className="employee-create-hero__subtitle">
-                Tạo tài khoản nhân sự theo hierarchy 1 Owner, nhiều PM, mỗi PM quản lý team lead và worker của line mình.
+                Tạo tài khoản nhân sự theo hierarchy 1 Owner, nhiều PM, mỗi PM quản lý worker của line mình.
               </p>
             </div>
 
@@ -223,7 +243,7 @@ export default function EmployeeCreate() {
                   <span className="employee-create-field__label">Vai trò hệ thống</span>
                   <ShieldCheck size={18} className="employee-create-field__icon" />
                   <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                    {EMPLOYEE_FORM_ROLE_OPTIONS.map((roleOption) => (
+                    {EMPLOYEE_CREATE_ROLE_OPTIONS.map((roleOption) => (
                       <option key={roleOption.value} value={roleOption.value}>
                         {roleOption.label}
                       </option>
@@ -258,11 +278,18 @@ export default function EmployeeCreate() {
                   </select>
                   {fieldErrors.managerId ? <span className="employee-create-field__error">{fieldErrors.managerId}</span> : null}
                 </label>
+
               </div>
 
               <div className="employee-create-banner">
                 <span>{getManagerRoleHint(form.role)}</span>
               </div>
+
+              {form.role === "Worker" ? (
+                <div className="employee-create-banner">
+                  <span>Chuyên môn của worker sẽ được gán ở màn riêng sau khi tạo xong tài khoản, hỗ trợ chọn nhiều skill cùng lúc.</span>
+                </div>
+              ) : null}
 
               {managerError ? (
                 <div className="employee-create-banner employee-create-banner--error">

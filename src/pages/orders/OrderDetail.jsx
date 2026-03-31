@@ -1,14 +1,17 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FileText, MessageSquare, History,
     Loader2, Edit3, Download, Package, Info
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 import OrderCommentModal from '@/components/orders/OrderCommentModal';
 import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal';
 import MaterialsTable from '@/components/orders/MaterialsTable';
+import CustomerInfoCard from '@/components/orders/CustomerInfoCard';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import { formatOrderDate } from '@/lib/orders/formatters';
+import { getOrderCustomerId } from '@/lib/orders/customerInfo';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
@@ -17,8 +20,34 @@ import { hasAnyRole, splitRoles } from '@/lib/authRouting';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
 import OwnerLayout from '@/layouts/OwnerLayout';
+import ProductionService from '@/services/ProductionService';
+import { getProductionStatusLabel } from '@/utils/statusUtils';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
+
+function extractRejectReasonFromResponse(response) {
+    const root = response?.data?.data ?? response?.data ?? response;
+    const payload = Array.isArray(root) ? root[0] : root;
+    if (!payload || typeof payload !== 'object') return '';
+
+    const candidateKeys = [
+        'reason',
+        'rejectReason',
+        'statusReason',
+        'note',
+        'description',
+        'content',
+        'message',
+    ];
+
+    for (const key of candidateKeys) {
+        const value = payload?.[key];
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+        }
+    }
+    return '';
+}
 
 export default function OrderDetail() {
     const { id } = useParams();
@@ -40,6 +69,11 @@ export default function OrderDetail() {
     const [denyLoading, setDenyLoading] = useState(false);
     const [denyError, setDenyError] = useState(null);
     const [denySuccess, setDenySuccess] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
+    const [rejectReasonLoading, setRejectReasonLoading] = useState(false);
+    const [rejectReasonError, setRejectReasonError] = useState(null);
+    const [hasProduction, setHasProduction] = useState(false);
+    const [isCheckingProduction, setIsCheckingProduction] = useState(false);
     const user = getStoredUser();
     const roles = splitRoles(user?.role);
     const isOwner = hasAnyRole(roles, ['owner']);
@@ -54,7 +88,7 @@ export default function OrderDetail() {
                 const response = await OrderService.getOrderDetail(id);
                 setOrder(response.data.data || response.data);
                 setError(null);
-            } catch (err) {
+            } catch (_err) {
                 setError("Không thể tải thông tin đơn hàng.");
             } finally {
                 setLoading(false);
@@ -64,26 +98,95 @@ export default function OrderDetail() {
     }, [id]);
 
     useEffect(() => {
+        let isMounted = true;
+
         const loadCustomerProfile = async () => {
-            if (!isAdmin) return;
-            const customerId =
-                order?.userId ??
-                order?.customerId ??
-                order?.ownerId ??
-                order?.user?.id ??
-                order?.user?.userId ??
-                null;
-            if (!customerId) return;
+            const customerId = getOrderCustomerId(order);
+            if (!canModerate || !customerId) {
+                if (isMounted) setCustomerProfile(null);
+                return;
+            }
             try {
                 const profile = await userService.getProfileById(customerId);
-                setCustomerProfile(profile || null);
+                if (isMounted) setCustomerProfile(profile || null);
             } catch (err) {
+                if (isMounted) setCustomerProfile(null);
                 console.error('Không thể tải hồ sơ khách hàng:', err);
             }
         };
 
         loadCustomerProfile();
+
+        return () => {
+            isMounted = false;
+        };
     }, [order, canModerate]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRejectReason = async () => {
+            const orderId = order?.id ?? id;
+            const normalized = normalizeOrderStatus(order?.statusName ?? order?.status);
+            const isRejectedOrder = normalized === 'Đã từ chối';
+
+            if (!orderId || !isRejectedOrder) {
+                if (isMounted) {
+                    setRejectReason('');
+                    setRejectReasonError(null);
+                    setRejectReasonLoading(false);
+                }
+                return;
+            }
+
+            try {
+                setRejectReasonLoading(true);
+                const response = await OrderService.getOrderRejectById(orderId);
+                const reason = extractRejectReasonFromResponse(response);
+                if (!isMounted) return;
+                setRejectReason(reason);
+                setRejectReasonError(null);
+            } catch (err) {
+                if (!isMounted) return;
+                setRejectReason('');
+                setRejectReasonError('Không thể tải lý do từ chối.');
+                console.error('Không thể tải lý do từ chối đơn hàng:', err);
+            } finally {
+                if (isMounted) setRejectReasonLoading(false);
+            }
+        };
+
+        loadRejectReason();
+        return () => { isMounted = false; };
+    }, [order?.id, order?.status, id]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const checkExistingProduction = async () => {
+            const orderId = order?.id ?? id;
+            if (!orderId) return;
+            try {
+                setIsCheckingProduction(true);
+                const response = await ProductionService.getProductionList({ PageIndex: 0, PageSize: 50 });
+                const list = response?.data?.data ?? response?.data ?? [];
+                
+                const exists = list.some((item) => {
+                    const oid = item?.order?.id ?? item?.orderId ?? item?.orderID ?? item?.order_id;
+                    const statusVal = item?.statusName ?? item?.status;
+                    const normalizedProdStatus = getProductionStatusLabel(statusVal);
+                    return String(oid) === String(orderId) && normalizedProdStatus !== 'Từ Chối';
+                });
+
+                if (isMounted) setHasProduction(exists);
+            } catch (err) {
+                console.error('Error checking existing production:', err);
+            } finally {
+                if (isMounted) setIsCheckingProduction(false);
+            }
+        };
+        checkExistingProduction();
+        return () => { isMounted = false; };
+    }, [order?.id, id]);
 
     if (loading) return (
         <OwnerLayout>
@@ -106,30 +209,21 @@ export default function OrderDetail() {
         const type = (t.type ?? '').toString().toLowerCase();
         return type.includes('soft') || !!t.file || !!t.url;
     });
-    const hardTemplates = templates.filter((t) => {
-        const type = (t.type ?? '').toString().toLowerCase();
-        return type.includes('hard');
-    });
-    const hardCopyTotal = hardTemplates.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
-    const orderOwnerId =
-        order?.userId ??
-        order?.customerId ??
-        order?.ownerId ??
-        order?.user?.id ??
-        order?.user?.userId ??
-        null;
+    const orderStatusValue = order?.statusName ?? order?.status;
+    const orderOwnerId = getOrderCustomerId(order);
     const currentUserId = user?.userId ?? user?.id ?? null;
     const canEdit =
         orderOwnerId && currentUserId && String(orderOwnerId) === String(currentUserId);
-    const normalizedStatus = normalizeOrderStatus(order?.status);
+    const normalizedStatus = normalizeOrderStatus(orderStatusValue);
     const canRequestModification = normalizedStatus === 'Chờ xét duyệt';
     const canEditOnlyWhenRequested = normalizedStatus === 'Yêu cầu chỉnh sửa';
     const isRejected = normalizedStatus === 'Đã từ chối';
     const isAccepted = normalizedStatus === 'Đã chấp nhận';
     const isCanceled = normalizedStatus === 'Đã hủy';
+    const isProcessing = normalizedStatus === 'Đang sản xuất';
     const canCancelOrder = normalizedStatus === 'Chờ xét duyệt';
     const canAccept = normalizedStatus === 'Chờ xét duyệt';
-    const canCustomerDeny = isCustomer && canEdit;
+    const canCustomerDeny = isCustomer && canEdit && !isAccepted && !isRejected && !isCanceled && !isProcessing;
 
     const updateOrderStatus = async (nextStatus, reason = '') => {
         if (!order?.id) return;
@@ -146,7 +240,8 @@ export default function OrderDetail() {
             setOrder((prev) => ({ ...prev, status: nextStatus }));
         } catch (err) {
             console.error('Lỗi cập nhật trạng thái:', err);
-            alert('Không thể cập nhật trạng thái đơn hàng.');
+            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể cập nhật trạng thái đơn hàng.';
+            toast.error(msg);
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -160,7 +255,8 @@ export default function OrderDetail() {
             setOrder((prev) => (prev ? { ...prev, status: 'Đã chấp nhận' } : prev));
         } catch (err) {
             console.error('Lỗi chấp nhận đơn hàng:', err);
-            alert('Không thể chấp nhận đơn hàng.');
+            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể chấp nhận đơn hàng.';
+            toast.error(msg);
         } finally {
             setIsUpdatingStatus(false);
         }
@@ -204,9 +300,8 @@ export default function OrderDetail() {
                 <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-start gap-3">
-                            <button
-                                onClick={() => navigate(-1)}
-                                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+                            <button onClick={() => navigate('/orders')}
+                                className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
                             >
                                 <ArrowLeft size={18} />
                             </button>
@@ -218,77 +313,74 @@ export default function OrderDetail() {
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(order.status, 'detail')}`}>
+                            <span className={`rounded-full border px-3.5 py-1 text-xs font-semibold ${getOrderStatusStyle(orderStatusValue, 'detail')}`}>
                                 {order.statusName || order.status}
                             </span>
                             {canCustomerDeny && (
-                                <button
-                                    type="button"
+                                <button type="button"
                                     onClick={() => setShowDenyConfirm(true)}
-                                    disabled={isCanceled || !canCancelOrder}
-                                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="cursor-pointer rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     Hủy đơn hàng
                                 </button>
                             )}
-                            {canModerate && (
-                                <button
-                                    type="button"
+                            {canModerate && !isRejected && normalizeOrderStatus(order.status) === 'Đã chấp nhận' && !hasProduction && (
+                                <button type="button"
                                     onClick={() => {
-                                        if (isRejected) return;
+                                        if (isCheckingProduction) return;
                                         navigate(`/production/create/${order.id}`);
                                     }}
-                                    disabled={isRejected || normalizeOrderStatus(order.status) !== 'Đã chấp nhận'}
-                                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={isCheckingProduction}
+                                    className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Tạo production
+                                    {isCheckingProduction ? "Đang kiểm tra..." : "Tạo production"}
                                 </button>
                             )}
                             {canModerate && (
                                 <>
-                                    <button
-                                        type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted || !canAccept}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted || !canAccept) return;
-                                            setIsApproveModalOpen(true);
-                                        }}
-                                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Chấp nhận
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted) return;
-                                            openReasonModal('Từ chối');
-                                        }}
-                                        className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
-                                    >
-                                        Từ chối
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={isUpdatingStatus || isRejected || isAccepted || !canRequestModification}
-                                        onClick={() => {
-                                            if (isRejected || isAccepted || !canRequestModification) return;
-                                            openReasonModal('Yêu cầu chỉnh sửa');
-                                        }}
-                                        className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        Yêu cầu chỉnh sửa
-                                    </button>
+                                    {!isRejected && !isAccepted && !isProcessing && canAccept && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                setIsApproveModalOpen(true);
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Chấp nhận
+                                        </button>
+                                    )}
+                                    {!isRejected && !isAccepted && !isProcessing && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                openReasonModal('Từ chối');
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-xs font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+                                        >
+                                            Từ chối
+                                        </button>
+                                    )}
+                                    {!isRejected && !isAccepted && !isProcessing && canRequestModification && (
+                                        <button type="button"
+                                            disabled={isUpdatingStatus}
+                                            onClick={() => {
+                                                if (isUpdatingStatus) return;
+                                                openReasonModal('Yêu cầu chỉnh sửa');
+                                            }}
+                                            className="cursor-pointer rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            Yêu cầu chỉnh sửa
+                                        </button>
+                                    )}
                                 </>
                             )}
-                            {canEdit && (
-                                <button
-                                    onClick={() => {
-                                        if (!canEditOnlyWhenRequested) return;
-                                        navigate(`/orders/edit/${order.id}`, { state: { order } });
-                                    }}
-                                    disabled={!canEditOnlyWhenRequested}
-                                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            {canEdit && canEditOnlyWhenRequested && (
+                                <button onClick={() => {
+                                    navigate(`/orders/edit/${order.id}`, { state: { order } });
+                                }}
+                                    className="cursor-pointer flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Edit3 size={16} /> Chỉnh sửa
                                 </button>
@@ -298,8 +390,8 @@ export default function OrderDetail() {
                         {(denyError || denySuccess) && (
                             <div
                                 className={`lg:col-span-3 rounded-2xl border px-4 py-3 text-sm font-semibold ${denyError
-                                        ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                        : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                     }`}
                             >
                                 {denyError || denySuccess}
@@ -389,109 +481,118 @@ export default function OrderDetail() {
                         {/* CỘT PHẢI (1/3): FILE & THẢO LUẬN */}
                         <div className="space-y-6">
                             {canModerate && (
-                                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
-                                    <div className="flex items-center gap-2 text-slate-600 mb-3">
-                                        <Info size={16} />
-                                        <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin người đặt hàng</h2>
-                                    </div>
-                                    <div className="space-y-2 text-sm text-slate-700">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Họ và tên</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.fullName ||
-                                                    customerProfile?.name ||
-                                                    order?.customerName ||
-                                                    order?.userName ||
-                                                    order?.fullName ||
-                                                    order?.user?.fullName ||
-                                                    order?.user?.name ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Số điện thoại</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.phoneNumber ||
-                                                    customerProfile?.phone ||
-                                                    order?.customerPhone ||
-                                                    order?.phone ||
-                                                    order?.phoneNumber ||
-                                                    order?.user?.phoneNumber ||
-                                                    order?.user?.phone ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-start justify-between gap-3">
-                                            <span className="text-xs font-bold text-slate-400 uppercase">Địa chỉ</span>
-                                            <span className="font-semibold text-slate-800 text-right">
-                                                {customerProfile?.location ||
-                                                    customerProfile?.address ||
-                                                    order?.customerAddress ||
-                                                    order?.address ||
-                                                    order?.location ||
-                                                    order?.user?.address ||
-                                                    order?.user?.location ||
-                                                    '-'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                <CustomerInfoCard
+                                    order={order}
+                                    profile={customerProfile}
+                                    title="Thông tin người đặt hàng"
+                                    nameLabel="Họ và tên"
+                                    phoneLabel="Số điện thoại"
+                                    addressLabel="Địa chỉ"
+                                    showHeaderIcon
+                                    rowClassName="flex items-start justify-between gap-3"
+                                />
                             )}
-                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
-                                <div>
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế bản mềm</h2>
-                                    <div className="space-y-2">
-                                        {softTemplates.length > 0 ? (
-                                            softTemplates.map((file, idx) => {
-                                                const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
-                                                const fileUrl = file.file ?? file.url ?? '';
-                                                return (
-                                                    <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all">
-                                                        <div className="flex items-center gap-3 overflow-hidden">
-                                                            <FileText size={18} className="text-emerald-600 shrink-0" />
-                                                            <div className="overflow-hidden">
-                                                                <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
-                                                                {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
+                            <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                                        File & Thiết kế đính kèm
+                                    </h2>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
+                                        {softTemplates.length} file
+                                    </span>
+                                </div>
+                                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
+                                    {softTemplates.length > 0 ? (
+                                        softTemplates.map((file, idx) => {
+                                            const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
+                                            const fileUrl = file.file ?? file.url ?? '';
+                                            const fileNote = file.note ?? file.Note ?? '';
+                                            const isImage = fileUrl && (fileUrl.toLowerCase().match(/\.(jpeg|jpg|gif|png|webp)($|\?)/) || (file.type && String(file.type).toLowerCase().includes('image')));
+                                            return (
+                                                <div key={idx} className="flex items-start justify-between p-3 rounded-xl border border-slate-100 hover:border-emerald-200 transition-all bg-slate-50/50 group">
+                                                    <div className="flex items-start gap-3 overflow-hidden w-full">
+                                                        {isImage ? (
+                                                            <div 
+                                                                className="w-10 h-10 rounded-lg shrink-0 bg-slate-100 overflow-hidden cursor-zoom-in border border-slate-200 hover:opacity-80 transition-opacity mt-0.5"
+                                                                onClick={() => { setZoomImageUrl(fileUrl); setIsImageModalOpen(true); }}
+                                                                title="Xem ảnh chi tiết"
+                                                            >
+                                                                <img src={fileUrl} alt="thumbnail" className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="w-10 h-10 rounded-lg shrink-0 bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 mt-0.5">
+                                                                <FileText size={18} />
+                                                            </div>
+                                                        )}
+                                                        <div className="flex flex-col min-w-0 flex-1">
+                                                            <p 
+                                                                className={`text-sm font-bold text-slate-700 truncate ${isImage ? 'cursor-pointer hover:text-emerald-600 transition-colors' : ''}`} 
+                                                                title={fileName}
+                                                                onClick={() => {
+                                                                    if (isImage) {
+                                                                        setZoomImageUrl(fileUrl);
+                                                                        setIsImageModalOpen(true);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {fileName}
+                                                            </p>
+                                                            {fileNote && (
+                                                                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed" title={fileNote}>
+                                                                    <span className="font-semibold text-slate-400 mr-1">Ghi chú:</span>{fileNote}
+                                                                </p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {file.size ? (
+                                                                    <span className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-400 font-medium">{isImage ? 'Ảnh đính kèm' : 'File đính kèm'}</span>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        {fileUrl ? (
-                                                            <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
-                                                                <Download size={16} />
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-[10px] text-slate-400">Không có link</span>
-                                                        )}
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="border-t pt-4">
-                                    <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bản cứng</h2>
-                                    <div className="text-sm font-semibold text-slate-700">
-                                        Số lượng bản cứng: <span className="text-emerald-700">{hardCopyTotal}</span>
-                                    </div>
+                                                    {fileUrl ? (
+                                                        <a href={fileUrl} download target="_blank" rel="noreferrer" className="w-8 h-8 rounded-full flex items-center justify-center bg-white text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-slate-200 shadow-sm shrink-0 ml-2 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 mt-0.5" title="Tải xuống">
+                                                            <Download size={14} />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 shrink-0 ml-2 mt-2">Không có link</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-slate-100 rounded-xl">
+                                            <FileText size={24} className="text-slate-300 mb-2" />
+                                            <p className="text-slate-400 text-[11px] font-medium">Không có file thiết kế nào được đính kèm</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             <div className="space-y-3">
-                                <button
-                                    onClick={() => setIsCommentModalOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
+                                <button onClick={() => setIsCommentModalOpen(true)}
+                                    className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-bold"
                                 >
                                     <MessageSquare size={16} /> Thảo luận đơn hàng
                                 </button>
-                                <button
-                                    onClick={() => setIsHistoryModalOpen(true)}
-                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                                <button onClick={() => setIsHistoryModalOpen(true)}
+                                    className="cursor-pointer w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded text-slate-700 hover:bg-slate-50 text-sm font-medium"
                                 >
                                     <History size={16} /> Lịch sử chỉnh sửa
                                 </button>
                             </div>
+
+                            {isRejected && (
+                                <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-5 shadow-sm">
+                                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-2">Lý do từ chối</p>
+                                    <p className="text-sm text-rose-800 leading-relaxed">
+                                        {rejectReasonLoading
+                                            ? 'Đang tải lý do từ chối...'
+                                            : rejectReason || rejectReasonError || 'Không có lý do từ chối.'}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -515,7 +616,8 @@ export default function OrderDetail() {
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
                         } catch (err) {
                             console.error('Lỗi yêu cầu chỉnh sửa:', err);
-                            alert('Không thể gửi yêu cầu chỉnh sửa.');
+                            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể gửi yêu cầu chỉnh sửa.';
+                            toast.error(msg);
                         } finally {
                             setIsUpdatingStatus(false);
                         }
@@ -531,9 +633,12 @@ export default function OrderDetail() {
                                 userId: user?.userId ?? user?.id ?? null,
                             });
                             setOrder((prev) => ({ ...prev, status: pendingStatus }));
+                            setRejectReason(reason?.trim() || '');
+                            setRejectReasonError(null);
                         } catch (err) {
                             console.error('Lỗi từ chối đơn hàng:', err);
-                            alert('Không thể từ chối đơn hàng.');
+                            const msg = err?.response?.data?.message || err?.response?.data?.title || 'Không thể từ chối đơn hàng.';
+                            toast.error(msg);
                         } finally {
                             setIsUpdatingStatus(false);
                         }
@@ -578,19 +683,17 @@ export default function OrderDetail() {
                             Bạn có chắc muốn hủy đơn hàng #{order?.id ?? id} không?
                         </p>
                         <div className="mt-5 flex flex-wrap justify-end gap-3">
-                            <button
-                                type="button"
+                            <button type="button"
                                 onClick={() => setShowDenyConfirm(false)}
                                 disabled={denyLoading}
-                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
+                                className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300"
                             >
                                 Hủy
                             </button>
-                            <button
-                                type="button"
+                            <button type="button"
                                 onClick={handleCustomerDenyOrder}
                                 disabled={denyLoading}
-                                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
+                                className="cursor-pointer rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:bg-rose-300"
                             >
                                 {denyLoading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
                             </button>

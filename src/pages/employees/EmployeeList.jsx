@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   BriefcaseBusiness,
   CircleAlert,
@@ -12,6 +12,8 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
@@ -27,7 +29,7 @@ const STATUS_MAP = {
 };
 
 const ROLE_GROUPS = {
-  management: ["Owner", "PM", "Admin", "Team Leader"],
+  management: ["Owner", "PM", "Admin"],
 };
 
 function getInitials(name = "") {
@@ -51,9 +53,11 @@ function normalizeSearchText(value = "") {
 }
 
 function getEmployeeSpecialty(employee) {
-  if (employee.workerSkill) {
+  const labels = Array.isArray(employee.workerSkillLabels) ? employee.workerSkillLabels : [];
+
+  if (labels.length) {
     return {
-      label: employee.workerSkillLabel,
+      label: labels.length > 2 ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}` : labels.join(", "),
       className: "employee-status employee-status--new",
     };
   }
@@ -103,6 +107,10 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 }
 
 export default function EmployeeList() {
+  const location = useLocation();
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isOwner = primaryRole === "owner";
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -111,6 +119,11 @@ export default function EmployeeList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadSeed, setReloadSeed] = useState(0);
+  const viewMode = location.pathname.includes("/employees/management")
+    ? "management"
+    : location.pathname.includes("/employees/workers")
+      ? "workers"
+      : "all";
 
   useEffect(() => {
     let mounted = true;
@@ -120,7 +133,16 @@ export default function EmployeeList() {
       setError("");
 
       try {
-        const response = await WorkerService.getAllEmployees();
+        const shouldUsePmWorkerScope =
+          primaryRole === "pm" && viewMode === "workers";
+
+        const response = shouldUsePmWorkerScope
+          ? await WorkerService.getEmployeeDirectoryByPmScope({
+              pageSize: 100,
+            })
+          : await WorkerService.getEmployeeDirectory({
+              pageSize: 100,
+            });
         if (!mounted) return;
 
         setEmployees(response?.data ?? []);
@@ -155,10 +177,24 @@ export default function EmployeeList() {
     setStatusFilter("all");
   };
 
+  const scopedEmployees = useMemo(() => {
+    if (viewMode === "management") {
+      return employees.filter((employee) =>
+        employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
+      );
+    }
+
+    if (viewMode === "workers") {
+      return employees.filter((employee) => employee.roles.includes("Worker"));
+    }
+
+    return employees;
+  }, [employees, viewMode]);
+
   const filteredEmployees = useMemo(() => {
     const keyword = normalizeSearchText(search);
 
-    return employees.filter((employee) => {
+    return scopedEmployees.filter((employee) => {
       const searchableText = normalizeSearchText(
         [
           employee.fullName,
@@ -166,7 +202,7 @@ export default function EmployeeList() {
           employee.phoneNumber,
           employee.email,
           ...(employee.roleLabels ?? []),
-          employee.workerSkillLabel,
+          ...(employee.workerSkillLabels ?? []),
           employee.managerName,
           employee.managerRoleHint,
           employee.hierarchyTag,
@@ -178,28 +214,28 @@ export default function EmployeeList() {
         !keyword || searchableText.includes(keyword);
       const matchRole = roleFilter === "all" || employee.roles.includes(roleFilter);
       const matchSpecialty =
-        specialtyFilter === "all" || employee.workerSkill === specialtyFilter;
+        specialtyFilter === "all" || (Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.includes(specialtyFilter));
       const matchStatus = statusFilter === "all" || employee.status === statusFilter;
 
       return matchSearch && matchRole && matchSpecialty && matchStatus;
     });
-  }, [employees, roleFilter, search, specialtyFilter, statusFilter]);
+  }, [roleFilter, scopedEmployees, search, specialtyFilter, statusFilter]);
 
   const stats = useMemo(() => {
-    const total = employees.length;
-    const active = employees.filter((employee) => employee.status === "active").length;
-    const management = employees.filter((employee) =>
+    const total = scopedEmployees.length;
+    const active = scopedEmployees.filter((employee) => employee.status === "active").length;
+    const management = scopedEmployees.filter((employee) =>
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
-    const skilled = employees.filter((employee) => Boolean(employee.workerSkill)).length;
+    const skilled = scopedEmployees.filter((employee) => Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.length > 0).length;
 
     return { total, active, management, skilled };
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const roleOptions = useMemo(() => {
     const optionsMap = new Map();
 
-    employees.forEach((employee) => {
+    scopedEmployees.forEach((employee) => {
       employee.roles.forEach((role, index) => {
         if (!optionsMap.has(role)) {
           optionsMap.set(role, employee.roleLabels?.[index] || role);
@@ -213,15 +249,15 @@ export default function EmployeeList() {
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const specialtyOptions = useMemo(() => {
     const optionsMap = new Map();
 
-    employees.forEach((employee) => {
-      if (employee.workerSkill) {
-        optionsMap.set(employee.workerSkill, employee.workerSkillLabel || employee.workerSkill);
-      }
+    scopedEmployees.forEach((employee) => {
+      (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : []).forEach((skillName, index) => {
+        optionsMap.set(skillName, employee.workerSkillLabels?.[index] || skillName);
+      });
     });
 
     return [
@@ -230,14 +266,38 @@ export default function EmployeeList() {
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
-  }, [employees]);
+  }, [scopedEmployees]);
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
     roleFilter !== "all" ||
     specialtyFilter !== "all" ||
     statusFilter !== "all";
-  const hasAnyEmployee = employees.length > 0;
+  const hasAnyEmployee = scopedEmployees.length > 0;
+  const pageTitle =
+    viewMode === "management"
+      ? "Danh sách quản lý"
+      : viewMode === "workers"
+        ? "Danh sách nhân viên"
+        : "Danh sách nhân viên";
+  const pageSubtitle =
+    viewMode === "management"
+      ? "Quản lý và theo dõi thông tin nhân sự có vai trò quản lý trong hệ thống."
+      : viewMode === "workers"
+        ? "Theo dõi riêng nhóm worker và chuyên môn thợ trong hệ thống."
+        : "Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Worker và chuyên môn thợ.";
+  const tableTitle =
+    viewMode === "management"
+      ? "Nhóm quản lý"
+      : viewMode === "workers"
+        ? "Nhân viên sản xuất"
+        : "Nhân sự trong xưởng";
+  const tableSubtitle =
+    viewMode === "management"
+      ? "Danh sách các tài khoản quản lý và vai trò điều hành hiện có."
+      : viewMode === "workers"
+        ? "Danh sách worker, chuyên môn thợ và tuyến quản lý hiện có."
+        : "Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.";
 
   return (
     <DashboardLayout>
@@ -245,22 +305,22 @@ export default function EmployeeList() {
         <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-hero">
             <div>
-              <h1 className="employee-hero__title">Danh sách nhân viên</h1>
-              <p className="employee-hero__subtitle">
-                Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Team Lead, Worker và chuyên môn thợ.
-              </p>
+              <h1 className="employee-hero__title">{pageTitle}</h1>
+              <p className="employee-hero__subtitle">{pageSubtitle}</p>
             </div>
 
-            <Link to="/employees/create" className="employee-hero__action">
-              <Plus size={18} />
-              <span>Thêm nhân viên</span>
-            </Link>
+            {isOwner ? (
+              <Link to="/employees/create" className="employee-hero__action">
+                <Plus size={18} />
+                <span>Thêm nhân viên</span>
+              </Link>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
             <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
-            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng, quản lý và tổ trưởng" tone="warning" />
+            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng và quản lý sản xuất" tone="warning" />
             <SummaryCard
               icon={Sparkles}
               label="Có chuyên môn"
@@ -358,8 +418,8 @@ export default function EmployeeList() {
           <div className="employee-table-card">
             <div className="employee-table-card__header">
               <div>
-                <h2 className="employee-table-card__title">Nhân sự trong xưởng</h2>
-                <p className="employee-table-card__subtitle">Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.</p>
+                <h2 className="employee-table-card__title">{tableTitle}</h2>
+                <p className="employee-table-card__subtitle">{tableSubtitle}</p>
               </div>
             </div>
 
@@ -413,14 +473,14 @@ export default function EmployeeList() {
                       >
                         Xóa bộ lọc
                       </button>
-                    ) : (
+                    ) : isOwner ? (
                       <Link
                         to="/employees/create"
                         className="employee-state-btn employee-state-btn--primary"
                       >
                         Thêm nhân viên
                       </Link>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : (

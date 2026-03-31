@@ -5,8 +5,8 @@ const ProductionService = {
   createProduction(payload) {
     return axiosClient.post(API_ENDPOINTS.PRODUCTION.CREATE, payload);
   },
-  getProductionList(params) {
-    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params });
+  getProductionList(params, config = {}) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.LIST, { params, ...config });
   },
   getProductionDetail(id) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION.DETAIL(id));
@@ -22,6 +22,33 @@ const ProductionService = {
   },
   rejectProduction(productionId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT(productionId), payload);
+  },
+  getProductionRejectReason(productionId) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.REJECT_REASON(productionId));
+  },
+  getProductionIssues(productionId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES(productionId));
+  },
+  getProductionIssueSummary(productionId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.ISSUES_SUMMARY(productionId));
+  },
+  approveProductionPlan(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.APPROVE_PLAN(id));
+  },
+  requestPlanUpdate(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.NEED_UPDATE_PLAN(id));
+  },
+  submitProductionPlan(id) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.SUBMIT_PLAN(id));
+  },
+  getWorkerOutputHistory(workerId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.OUTPUT_HISTORY_WORKER(workerId));
+  },
+  getOutputHistory() {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION.OUTPUT_HISTORY_ALL);
+  },
+  completeProduction(id, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.COMPLETE(id), payload);
   },
 };
 

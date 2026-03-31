@@ -193,6 +193,7 @@ export const userService = {
       fullName,
       name:        fullName,
       email:       String(email || "").trim(),
+      emailFromServer: Boolean(serverEmail),
       phoneNumber: String(phoneNumber || "").trim(),
       phone:       String(phoneNumber || "").trim(),
       avatarUrl:   String(avatarUrl || "").trim(),
@@ -228,40 +229,60 @@ export const userService = {
   },
   async getProfileById(userId) {
     if (userId == null) return null;
-    const res = await fetch(API_ENDPOINTS.USER.ADMIN_USER_DETAIL(userId), {
-      method: "GET",
-      credentials: "omit",
-      headers: authHeadersGet(),
-    });
+    const candidates = [
+      API_ENDPOINTS.USER.USER_DETAIL?.(userId),
+      API_ENDPOINTS.USER.GET_USER_DETAIL?.(userId),
+      API_ENDPOINTS.USER.ADMIN_USER_DETAIL?.(userId),
+    ].filter((endpoint, index, list) => endpoint && list.indexOf(endpoint) === index);
 
-    if (res.status === 401) {
-      removeAuthItem("token");
-      removeAuthItem("user");
-      window.location.href = "/login";
-      throw { status: 401 };
+    let lastError = null;
+
+    for (const endpoint of candidates) {
+      const res = await fetch(endpoint, {
+        method: "GET",
+        credentials: "omit",
+        headers: authHeadersGet(),
+      });
+
+      if (res.status === 401) {
+        removeAuthItem("token");
+        removeAuthItem("user");
+        window.location.href = "/login";
+        throw { status: 401 };
+      }
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        lastError = { response: { data: json, status: res.status } };
+        // Fallback to the next endpoint if route/permission is different by role.
+        if (res.status === 403 || res.status === 404) continue;
+        throw lastError;
+      }
+
+      const d = json.data ?? json;
+      const source = d.user ?? d;
+      const fullName = normalizeServerValue(source.fullName ?? source.userFullName ?? source.name);
+      const phoneNumber = normalizeServerValue(source.phoneNumber ?? source.phone);
+      const email = normalizeServerValue(source.email);
+      const avatarUrl = normalizeServerValue(source.avatarUrl ?? source.avartarUrl);
+      const location = normalizeServerValue(source.location ?? source.address);
+
+      return {
+        id: source.id ?? source.userId ?? userId,
+        userId: source.userId ?? source.id ?? userId,
+        fullName,
+        name: fullName,
+        phoneNumber,
+        phone: phoneNumber,
+        email,
+        avatarUrl,
+        location,
+        address: location,
+      };
     }
 
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw { response: { data: json } };
-
-    const d = json.data ?? json;
-    const fullName = normalizeServerValue(d.fullName ?? d.userFullName ?? d.name);
-    const phoneNumber = normalizeServerValue(d.phoneNumber ?? d.phone);
-    const email = normalizeServerValue(d.email);
-    const avatarUrl = normalizeServerValue(d.avatarUrl ?? d.avartarUrl);
-    const location = normalizeServerValue(d.location ?? d.address);
-
-    return {
-      id: userId,
-      fullName,
-      name: fullName,
-      phoneNumber,
-      phone: phoneNumber,
-      email,
-      avatarUrl,
-      location,
-      address: location,
-    };
+    // All endpoints failed with 403/404 (permission or not found) — return null silently
+    return null;
   },
 
   /**

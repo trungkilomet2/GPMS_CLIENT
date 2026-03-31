@@ -1,4 +1,4 @@
-﻿// src/pages/Orders.jsx
+// src/pages/Orders.jsx
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Loader2, ChevronDown, ChevronUp, FileText, Clock3, CheckCircle2, XCircle, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -16,16 +16,35 @@ function SortIcon({ direction }) {
   return direction === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />;
 }
 
-function SummaryCard({ label, value, icon, active, onClick }) {
+const SURMMARY_CARD_THEMES = {
+  emerald: {
+    wrapper: 'border-emerald-500 ring-2 ring-emerald-100',
+    iconHover: 'border-emerald-100 bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
+  },
+  sky: {
+    wrapper: 'border-sky-500 ring-2 ring-sky-100',
+    iconHover: 'border-sky-100 bg-sky-50 text-sky-700 group-hover:bg-sky-100'
+  },
+  teal: {
+    wrapper: 'border-teal-500 ring-2 ring-teal-100',
+    iconHover: 'border-teal-100 bg-teal-50 text-teal-700 group-hover:bg-teal-100'
+  },
+  rose: {
+    wrapper: 'border-rose-500 ring-2 ring-rose-100',
+    iconHover: 'border-rose-100 bg-rose-50 text-rose-700 group-hover:bg-rose-100'
+  }
+};
+
+function SummaryCard({ label, value, icon, active, onClick, theme = 'emerald' }) {
   const Icon = icon;
+  const themeStyles = SURMMARY_CARD_THEMES[theme] || SURMMARY_CARD_THEMES.emerald;
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-        active ? 'border-emerald-500 ring-2 ring-emerald-100' : 'border-slate-200'
-      }`}
+      className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${active ? themeStyles.wrapper : 'border-slate-200'
+        }`}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
@@ -33,11 +52,7 @@ function SummaryCard({ label, value, icon, active, onClick }) {
           <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{value}</div>
         </div>
 
-        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border transition-colors ${
-          active
-            ? 'border-emerald-200 bg-emerald-100 text-emerald-700'
-            : 'border-emerald-100 bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
-        }`}>
+        <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border transition-colors ${themeStyles.iconHover}`}>
           <Icon size={26} strokeWidth={2.1} />
         </div>
       </div>
@@ -65,7 +80,7 @@ export default function Orders({
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
 
-  const [sortBy, setSortBy] = useState({ key: 'id', dir: 'asc' });
+  const [sortBy, setSortBy] = useState({ key: 'id', dir: 'desc' });
 
   const shouldFetchAll = true;
 
@@ -226,7 +241,9 @@ export default function Orders({
   }, [filtered, sortBy, currentPage, pageSize, shouldFetchAll]);
 
   const stats = useMemo(() => {
-    const counts = filtered.reduce(
+    // Luôn tính toán dựa trên danh sách gốc (orders) thay vì danh sách đã lọc (filtered)
+    // để số lượng trên các thẻ không bị biến mất khi click chọn trạng thái.
+    const counts = orders.reduce(
       (acc, item) => {
         const normalized = normalizeOrderStatus(item.status);
         acc[normalized] = (acc[normalized] || 0) + 1;
@@ -236,12 +253,12 @@ export default function Orders({
     );
 
     return {
-      total: shouldFetchAll ? filtered.length : (totalCount || orders.length),
+      total: shouldFetchAll ? orders.length : (totalCount || orders.length),
       pending: counts['Chờ xét duyệt'] || 0,
       approved: counts['Đã chấp nhận'] || 0,
       rejected: counts['Đã từ chối'] || 0,
     };
-  }, [orders, filtered, totalCount, shouldFetchAll]);
+  }, [orders, totalCount, shouldFetchAll]);
 
   const toggleSort = (key) => {
     setSortBy((prev) => ({
@@ -279,10 +296,10 @@ export default function Orders({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Tổng đơn" value={stats.total} icon={FileText} active={!statusFilter} onClick={() => { setStatusFilter(''); setCurrentPage(1); }} />
-            <SummaryCard label="Chờ xét duyệt" value={stats.pending} icon={Clock3} active={statusFilter === 'Chờ xét duyệt'} onClick={() => { setStatusFilter('Chờ xét duyệt'); setCurrentPage(1); }} />
-            <SummaryCard label="Đã chấp nhận" value={stats.approved} icon={CheckCircle2} active={statusFilter === 'Đã chấp nhận'} onClick={() => { setStatusFilter('Đã chấp nhận'); setCurrentPage(1); }} />
-            <SummaryCard label="Đã từ chối" value={stats.rejected} icon={XCircle} active={statusFilter === 'Đã từ chối'} onClick={() => { setStatusFilter('Đã từ chối'); setCurrentPage(1); }} />
+            <SummaryCard theme="emerald" label="Tổng đơn" value={stats.total} icon={FileText} active={!statusFilter} onClick={() => { setStatusFilter(''); setCurrentPage(1); }} />
+            <SummaryCard theme="sky" label="Chờ xét duyệt" value={stats.pending} icon={Clock3} active={statusFilter === 'Chờ xét duyệt'} onClick={() => { setStatusFilter('Chờ xét duyệt'); setCurrentPage(1); }} />
+            <SummaryCard theme="teal" label="Đã chấp nhận" value={stats.approved} icon={CheckCircle2} active={statusFilter === 'Đã chấp nhận'} onClick={() => { setStatusFilter('Đã chấp nhận'); setCurrentPage(1); }} />
+            <SummaryCard theme="rose" label="Đã từ chối" value={stats.rejected} icon={XCircle} active={statusFilter === 'Đã từ chối'} onClick={() => { setStatusFilter('Đã từ chối'); setCurrentPage(1); }} />
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -344,23 +361,23 @@ export default function Orders({
               <table className="w-full divide-y divide-slate-200 table-fixed">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th is-sortable w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('id')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('id')}>
                       Mã đơn <SortIcon direction={sortBy.key === 'id' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-14 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Ảnh</th>
-                    <th className="leave-table-th is-sortable w-48 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('orderName')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-48 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('orderName')}>
                       Sản phẩm <SortIcon direction={sortBy.key === 'orderName' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th is-sortable w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap" onClick={() => toggleSort('size')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap" onClick={() => toggleSort('size')}>
                       Kích cỡ <SortIcon direction={sortBy.key === 'size' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th is-sortable w-20 px-2 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('color')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-20 px-2 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('color')}>
                       Màu <SortIcon direction={sortBy.key === 'color' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th is-sortable w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('quantity')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('quantity')}>
                       Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th is-sortable w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
+                    <th className="leave-table-th is-sortable cursor-pointer w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
                       Ngày dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-32 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
@@ -427,6 +444,7 @@ export default function Orders({
             />
           )}
         </div>
+        <script src="https://messenger.svc.chative.io/static/v1.0/channels/s90b3b96e-842b-47ac-9482-1335b0ea5141/messenger.js?mode=livechat" defer="defer"></script>
       </div>
     </OwnerLayout>
   );

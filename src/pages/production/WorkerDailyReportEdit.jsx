@@ -5,6 +5,7 @@ import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
+import { getStoredUser } from "@/lib/authStorage";
 
 export default function WorkerDailyReportEdit() {
   const navigate = useNavigate();
@@ -53,12 +54,13 @@ export default function WorkerDailyReportEdit() {
   };
 
   const buildPayload = (row) => {
-    const storedUserId = localStorage.getItem("userId");
+    const currentUser = getStoredUser();
+    const currentId = currentUser?.userId || currentUser?.id;
     const workDate = row.reportDate
       ? new Date(row.reportDate).toISOString()
       : new Date().toISOString();
     return {
-      userId: Number(row.userId) || Number(storedUserId) || 1,
+      userId: Number(currentId) || Number(row.userId) || 1,
       quantity: Number(row.quantity || 0),
       workDate,
     };
@@ -144,7 +146,7 @@ export default function WorkerDailyReportEdit() {
                   <thead className="leave-table-head">
                     <tr>
                       <th className="leave-table-th w-14 px-3 py-3 text-center">STT</th>
-                      <th className="leave-table-th w-36 px-3 py-3 text-left">Production</th>
+                      <th className="leave-table-th w-36 px-3 py-3 text-left">Đơn sản xuất</th>
                       <th className="leave-table-th w-44 px-3 py-3 text-left">Đơn hàng</th>
                       <th className="leave-table-th w-52 px-3 py-3 text-left">Công đoạn</th>
                       <th className="leave-table-th w-28 px-3 py-3 text-center">Đơn giá</th>

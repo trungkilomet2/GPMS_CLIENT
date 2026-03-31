@@ -9,22 +9,9 @@ import {
   pickPrimarySystemRole,
   splitRoles,
 } from "@/lib/orgHierarchy";
+import { getErrorMessage } from "@/utils/errorUtils";
 
-export const getEmployeeModuleErrorMessage = (error, fallbackMessage) => {
-  if (error?.response?.status === 403) {
-    return "Bạn không có quyền truy cập chức năng này.";
-  }
-
-  const data = error?.response?.data ?? {};
-  const fieldErrors =
-    data?.errors && typeof data.errors === "object"
-      ? Object.entries(data.errors).flatMap(([, messages]) =>
-          (Array.isArray(messages) ? messages : [messages]).map((message) => String(message))
-        )
-      : [];
-
-  return fieldErrors[0] || data?.message || data?.title || data?.detail || fallbackMessage;
-};
+export const getEmployeeModuleErrorMessage = getErrorMessage;
 
 const parseApiPayload = (rawResponse) =>
   typeof rawResponse === "string"
@@ -66,7 +53,8 @@ const normalizeEmployee = (item = {}) => {
   const workerSkillCandidates = splitRoles(
     item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
   );
-  const workerRole = workerSkillCandidates[0] ?? "";
+  const workerSkillNames = Array.from(new Set(workerSkillCandidates.filter(Boolean)));
+  const workerRole = workerSkillNames[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);
   const managerIdRaw = item.managerId ?? item.manager?.id ?? item.parentId ?? null;
@@ -98,6 +86,8 @@ const normalizeEmployee = (item = {}) => {
     role,
     roles,
     roleLabels: roles.map(getSystemRoleLabel),
+    workerSkillNames,
+    workerSkillLabels: workerSkillNames.map(getWorkerSkillLabel),
     workerRole,
     workerRoleLabel: workerRole ? getWorkerSkillLabel(workerRole) : "",
     workerSkill: workerRole,
@@ -146,6 +136,110 @@ const normalizeEmployeeResponse = (response = {}) => {
   };
 };
 
+const getCollectionMeta = (response = {}) => {
+  const recordCount = Number(
+    response?.recordCount ??
+      response?.totalCount ??
+      response?.totalRecords ??
+      response?.count
+  );
+
+  return {
+    recordCount: Number.isFinite(recordCount) && recordCount >= 0 ? recordCount : null,
+  };
+};
+
+const dedupeEmployees = (employees = []) => {
+  const uniqueEmployees = new Map();
+
+  employees.forEach((employee, index) => {
+    const key = String(employee?.id ?? employee?.userName ?? `employee-${index}`);
+    if (!uniqueEmployees.has(key)) {
+      uniqueEmployees.set(key, employee);
+    }
+  });
+
+  return Array.from(uniqueEmployees.values());
+};
+
+async function fetchEmployeePages(endpoint, options = {}) {
+  const pageSize = Number(options?.pageSize ?? 100);
+  const startPageIndex = Number(options?.pageIndex ?? 0);
+  const sortColumn = options?.sortColumn ?? "Name";
+  const sortOrder = options?.sortOrder ?? "ASC";
+  const filterQuery = String(options?.filterQuery ?? "").trim();
+  const includeHidden = Boolean(options?.includeHidden);
+  const pages = [];
+  let pageIndex = startPageIndex;
+
+  while (pageIndex < startPageIndex + 50) {
+    const rawResponse = await axiosClient.get(endpoint, {
+      params: {
+        PageIndex: pageIndex,
+        PageSize: pageSize,
+        SortColumn: sortColumn,
+        SortOrder: sortOrder,
+        ...(filterQuery ? { FilterQuery: filterQuery } : {}),
+      },
+    });
+
+    const response = parseApiPayload(rawResponse);
+    const employees = normalizeEmployeeCollection(response, { includeHidden });
+    const { recordCount } = getCollectionMeta(response);
+
+    pages.push(...employees);
+
+    if (employees.length === 0) break;
+
+    const loadedCount = (pageIndex - startPageIndex) * pageSize + employees.length;
+    if (recordCount != null && loadedCount >= recordCount) break;
+    if (employees.length < pageSize) break;
+
+    pageIndex += 1;
+  }
+
+  return dedupeEmployees(pages);
+}
+
+async function fetchEmployeesByPmPages(options = {}) {
+  const pageSize = Number(options?.pageSize ?? 100);
+  const startPageIndex = Number(options?.pageIndex ?? 0);
+  const sortColumn = options?.sortColumn ?? "Name";
+  const sortOrder = options?.sortOrder ?? "ASC";
+  const filterQuery = String(options?.filterQuery ?? "").trim();
+  const includeHidden = Boolean(options?.includeHidden);
+  const pages = [];
+  let pageIndex = startPageIndex;
+
+  while (pageIndex < startPageIndex + 50) {
+    const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES_BY_PM_ID, {
+      params: {
+        PageIndex: pageIndex,
+        PageSize: pageSize,
+        SortColumn: sortColumn,
+        SortOrder: sortOrder,
+        ...(filterQuery ? { FilterQuery: filterQuery } : {}),
+      },
+    });
+
+    const response = parseApiPayload(rawResponse);
+    const employees = normalizeEmployeeCollection(response, { includeHidden });
+    const { recordCount } = getCollectionMeta(response);
+
+    pages.push(...employees);
+
+    if (employees.length === 0) break;
+
+    const loadedCount = (pageIndex - startPageIndex) * pageSize + employees.length;
+    if (recordCount != null && loadedCount >= recordCount) break;
+    if (employees.length < pageSize) break;
+
+    pageIndex += 1;
+  }
+
+  return dedupeEmployees(pages);
+}
+
 async function fetchEmployeeByWorkerId(id, options = {}) {
   const rawResponse = await axiosClient.get(API_ENDPOINTS.WORKER.GET_BY_ID(id));
   const response = parseApiPayload(rawResponse);
@@ -166,6 +260,42 @@ const WorkerService = {
     return {
       ...response,
       data: employees,
+    };
+  },
+
+  async getEmployeeDirectory(options = {}) {
+    const employees = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, options);
+
+    return {
+      data: employees,
+      pageIndex: 0,
+      pageSize: employees.length,
+      recordCount: employees.length,
+    };
+  },
+
+  async getEmployeesByPmId(params, options = {}) {
+    const rawResponse = await axiosClient.get(
+      API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES_BY_PM_ID,
+      params ? { params } : undefined
+    );
+    const response = parseApiPayload(rawResponse);
+    const employees = normalizeEmployeeCollection(response, options);
+
+    return {
+      ...response,
+      data: employees,
+    };
+  },
+
+  async getEmployeeDirectoryByPmScope(options = {}) {
+    const employees = await fetchEmployeesByPmPages(options);
+
+    return {
+      data: employees,
+      pageIndex: 0,
+      pageSize: employees.length,
+      recordCount: employees.length,
     };
   },
 

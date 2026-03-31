@@ -1,8 +1,7 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeDollarSign,
   BriefcaseBusiness,
   ChartPie,
   ClipboardCheck,
@@ -11,10 +10,12 @@ import {
   LogOut,
   ShieldCheck,
   Users,
+  Wallet,
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
+import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -24,50 +25,29 @@ const ADMIN_NAV_ITEMS = [
 ];
 
 const OPERATION_NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false },
-  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, requiredRole: "Owner" },
-  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList, disabled: false },
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks, disabled: false },
-  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, requiredRole: "Owner" },
-  { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false },
-  { to: "/salary", label: "Bảng lương", icon: BadgeDollarSign, disabled: false, requiredRole: "Owner" },
+  { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
+  { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
+  { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
+  { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
+  { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
+  { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
+  { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
 ];
 
-function splitRoles(value) {
-  const normalizeRoleItem = (item) => {
-    if (item == null) return "";
-    if (typeof item === "string" || typeof item === "number") return String(item).trim();
-    if (typeof item === "object") return String(item.name ?? item.role ?? item.roleName ?? item.value ?? item.label ?? "").trim();
-    return "";
-  };
-
-  if (Array.isArray(value)) return value.map(normalizeRoleItem).filter(Boolean);
-
-  if (value && typeof value === "object") {
-    const normalized = normalizeRoleItem(value);
-    return normalized ? [normalized] : [];
-  }
-
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function hasRequiredRole(user, requiredRole) {
-  if (!requiredRole) return true;
+function hasRequiredRole(user, allowedRoles) {
+  if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return true;
   const roles = splitRoles(user?.role);
-  return roles.includes(requiredRole);
+  return allowedRoles.some((role) => roles.includes(role));
 }
 
 function resolveSidebarItems(user) {
-  const roles = splitRoles(user?.role);
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
 
-  if (roles.includes("Admin")) {
+  if (primaryRole === "admin") {
     return ADMIN_NAV_ITEMS;
   }
 
-  if (roles.includes("Owner") || roles.includes("PM")) {
+  if (primaryRole === "owner" || primaryRole === "pm") {
     return OPERATION_NAV_ITEMS;
   }
 
@@ -105,6 +85,7 @@ export default function Sidebar() {
     return true;
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
+  const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
 
   useEffect(() => {
     try {
@@ -140,8 +121,8 @@ export default function Sidebar() {
       </div>
 
       <nav className="dashboard-sidebar__nav">
-        {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, requiredRole }) => {
-          if (!hasRequiredRole(user, requiredRole)) return null;
+        {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, allowedRoles }) => {
+          if (!hasRequiredRole(user, allowedRoles)) return null;
 
           if (disabled) {
             return (
@@ -162,7 +143,7 @@ export default function Sidebar() {
               to={to}
               title={label}
               className={({ isActive }) => {
-                const isForcedActive = to === "/orders/owner" && isOrdersSection;
+                const isForcedActive = (to === "/orders/owner" && isOrdersSection) || (to === "/production" && isProductionSection);
                 const active = isActive || isForcedActive;
                 return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
               }}

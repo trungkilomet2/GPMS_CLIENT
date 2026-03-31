@@ -1,84 +1,101 @@
 export const STATUS_STYLES = {
-  "Cần Cập Nhật": "bg-amber-50 text-amber-700 border-amber-200",
-  "Cần Chỉnh Sửa Kế Hoạch": "bg-amber-50 text-amber-700 border-amber-200",
-  "Chấp Nhận": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Chờ Xét Duyệt": "bg-blue-50 text-blue-700 border-blue-200",
-  "Chờ Xét Duyệt Kế Hoạch": "bg-blue-50 text-blue-700 border-blue-200",
-  "Đang Sản Xuất": "bg-indigo-50 text-indigo-700 border-indigo-200",
-  "Hoàn Thành": "bg-emerald-50 text-emerald-700 border-emerald-200",
-  "Từ Chối": "bg-red-50 text-red-700 border-red-200",
-  Planned: "bg-amber-50 text-amber-700 border-amber-200",
-  "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-  Completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  default: "bg-gray-50 text-gray-700 border-gray-200",
+  "Cần Cập Nhật": "bg-slate-100 text-slate-700 border-slate-200 shadow-sm",
+  "Cần Chỉnh Sửa Kế Hoạch": "bg-amber-100/50 text-amber-700 border-amber-200 shadow-sm",
+  "Chấp Nhận": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
+  "Chờ Duyệt KH": "bg-indigo-100/50 text-indigo-700 border-indigo-200 shadow-sm",
+  "Chờ kiểm tra": "bg-sky-100/50 text-sky-700 border-sky-200 shadow-sm",
+  "Chờ Xét Duyệt": "bg-sky-100/50 text-sky-700 border-sky-200 shadow-sm",
+  "Chờ Xét Duyệt Kế Hoạch": "bg-indigo-100/50 text-indigo-700 border-indigo-200 shadow-sm",
+  "Đang Sản Xuất": "bg-blue-100/50 text-blue-700 border-blue-200 shadow-sm",
+  "Chờ Nghiệm Thu": "bg-amber-500 text-white border-amber-600 shadow-md font-bold",
+  "Đã Hoàn Thành": "bg-emerald-600 text-white border-emerald-700 shadow-md font-bold",
+  "Hoàn Thành": "bg-emerald-600 text-white border-emerald-700 shadow-md font-bold",
+  "Chưa Thực Hiện": "bg-slate-100 text-slate-500 border-slate-200 shadow-sm",
+  default: "bg-gray-100 text-gray-600 border-gray-200 shadow-sm",
 };
 
-const PRODUCTION_LABELS = {
-  "cần cập nhật": "Cần Cập Nhật",
-  "can cap nhat": "Cần Cập Nhật",
-  "need update": "Cần Cập Nhật",
-  "update required": "Cần Cập Nhật",
-  "cần chỉnh sửa kế hoạch": "Cần Chỉnh Sửa Kế Hoạch",
-  "can chinh sua ke hoach": "Cần Chỉnh Sửa Kế Hoạch",
-  "need plan update": "Cần Chỉnh Sửa Kế Hoạch",
-  "chấp nhận": "Chấp Nhận",
-  "chap nhan": "Chấp Nhận",
-  approved: "Chấp Nhận",
-  accepted: "Chấp Nhận",
-  "chờ xét duyệt": "Chờ Xét Duyệt",
-  "cho xet duyet": "Chờ Xét Duyệt",
-  pending: "Chờ Xét Duyệt",
-  waiting: "Chờ Xét Duyệt",
-  "chờ xét duyệt kế hoạch": "Chờ Xét Duyệt Kế Hoạch",
-  "cho xet duyet ke hoach": "Chờ Xét Duyệt Kế Hoạch",
-  planned: "Chờ Xét Duyệt Kế Hoạch",
+// Mapping theo bảng PS_STATUS trong DB (PS_ID → NAME)
+const PRODUCTION_STATUS_BY_ID = {
+  1: "Chờ Xét Duyệt",            // PS_ID=1 
+  2: "Từ Chối",                  // PS_ID=2
+  3: "Chấp Nhận",                // PS_ID=3
+  4: "Chờ Xét Duyệt Kế Hoạch",  // PS_ID=4
+  5: "Cần Chỉnh Sửa Kế Hoạch",  // PS_ID=5
+  6: "Đang Sản Xuất",            // PS_ID=6
+  7: "Hoàn Thành",               // PS_ID=7
+};
+
+export function getProductionStatusLabel(status) {
+  if (typeof status === "number" && PRODUCTION_STATUS_BY_ID[status]) {
+    return PRODUCTION_STATUS_BY_ID[status];
+  }
+
+  let raw = String(status ?? "").trim();
+  if (raw.normalize) {
+    raw = raw.normalize("NFC");
+  }
+  if (!raw) return "-";
+
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric) && PRODUCTION_STATUS_BY_ID[numeric]) {
+    return PRODUCTION_STATUS_BY_ID[numeric];
+  }
+
+  const normalized = raw.toLowerCase();
+
+  // Substring fallback để tránh Unicode encoding mismatch
+  if (normalized.includes("ki\u1ec3m tra")) return "Ch\u1edd ki\u1ec3m tra";
+  if (normalized.includes("kế hoạch") || normalized.includes("k\u1ebf ho\u1ea1ch")) {
+    if (normalized.includes("xét duyệt") || normalized.includes("x\u00e9t duy\u1ec7t")) return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch";
+    if (normalized.includes("chỉnh sửa") || normalized.includes("ch\u1ec9nh s\u1eeda")) return "C\u1ea7n Ch\u1ec9nh S\u1eeda K\u1ebf Ho\u1ea1ch";
+    return "Ch\u1edd X\u00e9t Duy\u1ec7t K\u1ebf Ho\u1ea1ch"; // Default plan status
+  }
+  if (normalized.includes("đang sản xuất") || normalized.includes("\u0111ang s\u1ea3n xu\u1ea5t")) return "\u0110ang S\u1ea3n Xu\u1ea5t";
+  if (normalized.includes("hoàn thành") || normalized.includes("ho\u00e0n th\u00e0nh")) return "Ho\u00e0n Th\u00e0nh";
+  if (normalized.includes("từ chối") || normalized.includes("t\u1eeb ch\u1ed1i")) return "T\u1eeb Ch\u1ed1i";
+  if (normalized.includes("chấp nhận") || normalized.includes("ch\u1ea5p nh\u1eadn")) return "Ch\u1ea5p Nh\u1eadn";
+  if (normalized.includes("chờ xét duyệt") || normalized.includes("ch\u1edd x\u00e9t duy\u1ec7t") || normalized.includes("pending") || normalized.includes("planned")) return "Ch\u1edd ki\u1ec3m tra";
+  if (normalized.includes("in progress")) return "\u0110ang S\u1ea3n Xu\u1ea5t";
+  if (normalized.includes("completed") || normalized.includes("done")) return "Ho\u00e0n Th\u00e0nh";
+
+  return raw;
+}
+
+const PLAN_LABELS = {
+  "chờ xét duyệt kế hoạch": "Chờ Duyệt KH",
+  "cho xet duyet ke hoach": "Chờ Duyệt KH",
+  planned: "Chờ Duyệt KH",
+  "chờ xét duyệt": "Chờ Duyệt KH",
+  "cho xet duyet": "Chờ Duyệt KH",
+  pending: "Chờ Duyệt KH",
   "đang sản xuất": "Đang Sản Xuất",
   "dang san xuat": "Đang Sản Xuất",
   "in progress": "Đang Sản Xuất",
-  production: "Đang Sản Xuất",
   "hoàn thành": "Hoàn Thành",
   "hoan thanh": "Hoàn Thành",
   completed: "Hoàn Thành",
   done: "Hoàn Thành",
-  "từ chối": "Từ Chối",
-  "tu choi": "Từ Chối",
-  rejected: "Từ Chối",
-  deny: "Từ Chối",
-  denied: "Từ Chối",
-};
-
-export function getProductionStatusLabel(status) {
-  const raw = String(status ?? "").trim();
-  if (!raw) return "-";
-  const normalized = raw.toLowerCase();
-  return PRODUCTION_LABELS[normalized] || raw;
-}
-
-const PLAN_LABELS = {
-  "chờ xét duyệt kế hoạch": "Planned",
-  "cho xet duyet ke hoach": "Planned",
-  planned: "Planned",
-  "chờ xét duyệt": "Planned",
-  "cho xet duyet": "Planned",
-  pending: "Planned",
-  "đang sản xuất": "In Progress",
-  "dang san xuat": "In Progress",
-  "in progress": "In Progress",
-  "hoàn thành": "Completed",
-  "hoan thanh": "Completed",
-  completed: "Completed",
-  done: "Completed",
+  "chờ nghiệm thu": "Chờ Nghiệm Thu",
+  "cho nghiem thu": "Chờ Nghiệm Thu",
+  "chờ kcs": "Chờ Nghiệm Thu",
+  "cho kcs": "Chờ Nghiệm Thu",
+  "waiting for qc": "Chờ Nghiệm Thu",
 };
 
 export function getPlanStatusLabel(status) {
   if (typeof status === "number") {
-    if (status === 1) return "Planned";
-    if (status === 2) return "In Progress";
-    if (status === 3) return "Completed";
+    if (status === 1) return "Chưa Thực Hiện";
+    if (status === 2) return "Đang Sản Xuất";
+    if (status === 3) return "Đã Hoàn Thành";
+    if (status === 4) return "Chờ Nghiệm Thu";
   }
 
-  const raw = String(status ?? "").trim();
+  let raw = String(status ?? "").trim();
+  if (raw.normalize) {
+    raw = raw.normalize("NFC");
+  }
   if (!raw) return "-";
+
   const normalized = raw.toLowerCase();
   return PLAN_LABELS[normalized] || raw;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CalendarDays,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { compareLeaveDateDesc, formatLeaveDateTime } from "@/lib/leaveDateTime";
-import LeaveService from "@/services/LeaveService";
+import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
 const PAGE_SIZE = 10;
@@ -41,6 +41,20 @@ const STATUS_MAP = {
     bg: "bg-rose-50",
     text: "text-rose-700",
     border: "border-rose-200",
+  },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    bg: "bg-orange-50",
+    text: "text-orange-700",
+    border: "border-orange-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    bg: "bg-slate-100",
+    text: "text-slate-700",
+    border: "border-slate-200",
   },
 };
 
@@ -87,7 +101,6 @@ function SummaryCard({ label, value, icon, active, onClick }) {
 
 export default function LeaveList() {
   const navigate = useNavigate();
-  const mountedRef = useRef(true);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -97,13 +110,6 @@ export default function LeaveList() {
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   useEffect(() => {
     const handler = () => setRefreshKey((prev) => prev + 1);
@@ -132,6 +138,15 @@ export default function LeaveList() {
           params.FilterQuery = search.trim();
         }
 
+        if (statusFilter !== "all") {
+          params.Status = statusFilter;
+        }
+
+        if (dateFilter) {
+          params.DateCreateFrom = new Date(`${dateFilter}T00:00:00`).toISOString();
+          params.DateCreateTo = new Date(`${dateFilter}T23:59:59.999`).toISOString();
+        }
+
         const response = await LeaveService.getLeaveRequests(params);
 
         if (!active) return;
@@ -139,14 +154,14 @@ export default function LeaveList() {
         setItems(response.data ?? []);
         setTotalCount(response.recordCount ?? response.RecordCount ?? (response.data ?? []).length);
         if (!silent) setError("");
-      } catch {
+      } catch (err) {
         if (!active) return;
 
         // Silent refresh shouldn't wipe UI; keep current list and only surface error on next hard refresh.
         if (!silent) {
           setItems([]);
           setTotalCount(0);
-          setError("Không thể tải danh sách đơn nghỉ. Vui lòng thử lại.");
+          setError(getLeaveErrorMessage(err, "Không thể tải danh sách đơn nghỉ. Vui lòng thử lại."));
         }
       } finally {
         if (active && !silent) setLoading(false);
@@ -191,14 +206,8 @@ export default function LeaveList() {
   const paginated = useMemo(
     () =>
       items
-        .filter((item) => {
-          const matchStatus = statusFilter === "all" || item.status === statusFilter;
-          const matchDate = !dateFilter || String(item.dateCreate ?? "").startsWith(dateFilter);
-
-          return matchStatus && matchDate;
-        })
         .sort((left, right) => compareLeaveDateDesc(left.dateCreate, right.dateCreate)),
-    [dateFilter, items, statusFilter]
+    [items]
   );
 
   const resetFilters = () => {
@@ -254,6 +263,8 @@ export default function LeaveList() {
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
+                  <option value="cancel_requested">Chờ hủy</option>
+                  <option value="cancelled">Đã hủy</option>
                 </select>
               </label>
 
@@ -338,6 +349,10 @@ export default function LeaveList() {
                         </td>
                         <td className="px-5 py-4 align-top">
                           <p className="line-clamp-3 max-w-xl text-sm leading-6 text-slate-700">{item.content}</p>
+                          <div className="mt-2 text-xs text-slate-500">
+                            Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
+                          </div>
+                          {item.approvedByName && item.status !== "pending" ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
                           {item.denyContent && (
                             <div className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
                               Lý do từ chối: {item.denyContent}
@@ -345,7 +360,10 @@ export default function LeaveList() {
                           )}
                         </td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
-                        <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</td>
+                        <td className="px-5 py-4 align-top text-sm text-slate-700">
+                          <div>{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</div>
+                          {item.approvedByName && item.status !== "pending" ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                        </td>
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />
                         </td>

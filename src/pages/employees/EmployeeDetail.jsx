@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -7,13 +7,17 @@ import {
   LoaderCircle,
   MapPin,
   Mail,
+  PencilLine,
   Phone,
   Pencil,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
+import "@/styles/employee-create.css";
 import "@/styles/employee-detail.css";
 
 const STATUS_MAP = {
@@ -33,6 +37,10 @@ function getInitials(name = "") {
 
 export default function EmployeeDetail() {
   const { id } = useParams();
+  const location = useLocation();
+  const currentUser = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
+  const isOwner = primaryRole === "owner";
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,17 +56,73 @@ export default function EmployeeDetail() {
       setNotFound(false);
 
       try {
-        const found = await WorkerService.getEmployeeById(id);
+        const isPm = primaryRole === "pm";
+        const directoryResponse = isPm
+          ? await WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
+          : await WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] }));
         if (!mounted) return;
 
-        if (!found) {
+        const directoryEmployees = directoryResponse?.data ?? [];
+        const directoryEmployee = directoryEmployees.find(
+          (item) => String(item.id) === String(id)
+        );
+
+        // PM detail access must stay inside their scoped directory; avoid trusting a broader detail endpoint.
+        if (isPm && !directoryEmployee) {
+          setNotFound(true);
+          setError("Bạn không có quyền xem nhân viên này hoặc nhân viên không thuộc phạm vi quản lý.");
+          setEmployee(null);
+          return;
+        }
+
+        const found = directoryEmployee
+          ? await WorkerService.getEmployeeById(id).catch((err) => {
+              if (isPm && err?.response?.status === 403) {
+                return null;
+              }
+              throw err;
+            })
+          : null;
+        if (!mounted) return;
+
+        const sourceEmployee = found ?? directoryEmployee ?? null;
+
+        if (!sourceEmployee) {
           setNotFound(true);
           setError("Không tìm thấy nhân viên phù hợp.");
           setEmployee(null);
           return;
         }
 
-        setEmployee(found);
+        const resolvedManagerId = sourceEmployee.managerId ?? directoryEmployee?.managerId ?? null;
+        const resolvedManager = directoryEmployees.find(
+          (item) => String(item.id) === String(resolvedManagerId)
+        );
+
+        setEmployee({
+          ...sourceEmployee,
+          managerId: resolvedManagerId,
+          managerName:
+            sourceEmployee.managerName ||
+            directoryEmployee?.managerName ||
+            resolvedManager?.fullName ||
+            "",
+          workerSkill: sourceEmployee.workerSkill || directoryEmployee?.workerSkill || "",
+          workerSkillLabel:
+            sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
+          workerSkillNames:
+            sourceEmployee.workerSkillNames?.length
+              ? sourceEmployee.workerSkillNames
+              : directoryEmployee?.workerSkillNames ?? [],
+          workerSkillLabels:
+            sourceEmployee.workerSkillLabels?.length
+              ? sourceEmployee.workerSkillLabels
+              : directoryEmployee?.workerSkillLabels ?? [],
+          role: sourceEmployee.role || directoryEmployee?.role || "",
+          roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
+          roleLabels:
+            sourceEmployee.roleLabels?.length ? sourceEmployee.roleLabels : directoryEmployee?.roleLabels ?? [],
+        });
       } catch (err) {
         if (!mounted) return;
 
@@ -77,7 +141,7 @@ export default function EmployeeDetail() {
     return () => {
       mounted = false;
     };
-  }, [id, reloadSeed]);
+  }, [id, primaryRole, reloadSeed]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
@@ -85,6 +149,15 @@ export default function EmployeeDetail() {
 
   const statusConfig = employee ? STATUS_MAP[employee.status] ?? STATUS_MAP.active : STATUS_MAP.active;
   const roles = useMemo(() => employee?.roleLabels ?? [], [employee]);
+  const workerSkillLabels = useMemo(
+    () =>
+      employee?.workerSkillLabels?.length
+        ? employee.workerSkillLabels
+        : employee?.workerSkillLabel
+          ? [employee.workerSkillLabel]
+          : [],
+    [employee]
+  );
 
   return (
     <DashboardLayout>
@@ -100,10 +173,12 @@ export default function EmployeeDetail() {
               <p className="employee-detail-hero__subtitle">Thông tin tài khoản, vai trò hệ thống, chuyên môn và tuyến quản lý của nhân viên trong hệ thống.</p>
             </div>
 
-            <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
-              <Pencil size={18} />
-              <span>Sửa hồ sơ</span>
-            </Link>
+            {isOwner ? (
+              <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
+                <Pencil size={18} />
+                <span>Sửa hồ sơ</span>
+              </Link>
+            ) : null}
           </div>
 
           {loading ? (
@@ -144,8 +219,15 @@ export default function EmployeeDetail() {
               </div>
             </div>
           ) : employee ? (
-            <div className="employee-detail-grid employee-detail-grid--simple">
-              <section className="employee-detail-card employee-detail-profile">
+            <>
+              {location.state?.skillsUpdated ? (
+                <div className="employee-detail-inline-banner employee-detail-inline-banner--success">
+                  Danh sách skill của worker đã được cập nhật.
+                </div>
+              ) : null}
+
+              <div className="employee-detail-grid employee-detail-grid--simple">
+                <section className="employee-detail-card employee-detail-profile">
                 <div className="employee-detail-profile__avatar">
                   {employee.avatarUrl ? (
                     <img
@@ -162,9 +244,9 @@ export default function EmployeeDetail() {
                   <span className={statusConfig.className}>{statusConfig.label}</span>
                   <span className="employee-detail-profile__username">@{employee.userName || "chua-cap-nhat"}</span>
                 </div>
-              </section>
+                </section>
 
-              <section className="employee-detail-card">
+                <section className="employee-detail-card">
                 <div className="employee-detail-card__header">
                   <div className="employee-detail-card__icon">
                     <UserRound size={20} />
@@ -198,16 +280,12 @@ export default function EmployeeDetail() {
                   </div>
                   <div className="employee-detail-info-item">
                     <BriefcaseBusiness size={17} />
-                    <span>Tuyến quản lý: {employee.managerRoleHint || "Chưa cập nhật"}</span>
-                  </div>
-                  <div className="employee-detail-info-item">
-                    <BriefcaseBusiness size={17} />
                     <span>Quản lý trực tiếp: {employee.managerName || "Chưa cập nhật"}</span>
                   </div>
                 </div>
-              </section>
+                </section>
 
-              <section className="employee-detail-card">
+                <section className="employee-detail-card">
                 <div className="employee-detail-card__header">
                   <div className="employee-detail-card__icon">
                     <BriefcaseBusiness size={20} />
@@ -235,12 +313,20 @@ export default function EmployeeDetail() {
                   <div className="employee-detail-role-block">
                     <div className="employee-detail-role-label">Chuyên môn</div>
                     <div className="employee-detail-role-pills">
-                      {employee.workerSkill ? (
-                        <span className="employee-detail-machine-pill">{employee.workerSkillLabel}</span>
+                      {workerSkillLabels.length ? (
+                        workerSkillLabels.map((skillLabel) => (
+                          <span key={skillLabel} className="employee-detail-machine-pill">{skillLabel}</span>
+                        ))
                       ) : (
                         <span className="employee-detail-role-empty">Chưa cập nhật chuyên môn</span>
                       )}
                     </div>
+                    {isOwner && employee.roles?.includes("Worker") ? (
+                      <Link to={`/employees/${id}/skills`} className="employee-detail-btn employee-detail-btn--secondary">
+                        <PencilLine size={16} />
+                        <span>Gán skill</span>
+                      </Link>
+                    ) : null}
                   </div>
 
                   <div className="employee-detail-role-block">
@@ -250,8 +336,9 @@ export default function EmployeeDetail() {
                     </div>
                   </div>
                 </div>
-              </section>
-            </div>
+                </section>
+              </div>
+            </>
           ) : null}
         </div>
       </div>

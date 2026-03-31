@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import { authService } from "@/services/authService";
 import { userService } from "@/services/userService";
 import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import {
   normalizeSpaces,
   validateAvatarFile,
@@ -109,17 +109,9 @@ export default function InternalProfileEdit() {
   const location = useLocation();
   const storedUser = useMemo(() => getStoredUser(), []);
   const Layout = useMemo(() => {
-    const roleValue = storedUser?.role;
-    const roles = String(roleValue ?? "")
-      .split(",")
-      .map((item) => item.trim().toLowerCase())
-      .filter(Boolean);
+    const primaryRole = getPrimaryWorkspaceRole(storedUser?.role);
 
-    if (roles.includes("worker")) return WorkerLayout;
-    if (roles.includes("team leader") || roles.includes("teamleader") || roles.includes("tl")) {
-      return TeamLeaderLayout;
-    }
-
+    if (primaryRole === "worker") return WorkerLayout;
     return DashboardLayout;
   }, [storedUser]);
 
@@ -133,6 +125,8 @@ export default function InternalProfileEdit() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
+  const [backendRequiresEmailVerification, setBackendRequiresEmailVerification] = useState(false);
 
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
@@ -160,6 +154,7 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
+        setInitialEmail(profile?.emailFromServer ? (profile?.email || "") : "");
         setAvatarPreview(profile?.avatarUrl || storedUser?.avatarUrl || "");
       } catch (e) {
         if (!mounted) return;
@@ -211,6 +206,13 @@ export default function InternalProfileEdit() {
   };
 
   const hasErrors = Object.values(effectiveErrors).some(Boolean);
+  const normalizedCurrentEmail = String(form.email || "").trim().toLowerCase();
+  const normalizedInitialEmail = String(initialEmail || "").trim().toLowerCase();
+  const normalizedVerifiedEmail = String(verifiedEmail || "").trim().toLowerCase();
+  const emailChanged = normalizedCurrentEmail !== normalizedInitialEmail;
+  const isCurrentEmailVerified =
+    !!normalizedCurrentEmail && normalizedCurrentEmail === normalizedVerifiedEmail;
+  const emailVerificationRequired = backendRequiresEmailVerification || emailChanged;
 
   const onChange = (name) => (e) => {
     const value = e.target.value;
@@ -225,6 +227,7 @@ export default function InternalProfileEdit() {
         setOtpStage("idle");
         setOtpCode("");
       }
+      setBackendRequiresEmailVerification(normalizedEmail !== normalizedInitialEmail);
     }
   };
 
@@ -260,7 +263,9 @@ export default function InternalProfileEdit() {
       setMessage(null);
       await authService.sendRegisterOtp({ email: String(form.email || "").trim() });
       setOtpStage("sent");
+      setOtpCode("");
       setVerifiedEmail("");
+      setBackendRequiresEmailVerification(true);
       setMessage({
         type: "success",
         text: "Mã xác thực đã được gửi tới email. Nhập OTP rồi bấm Xác minh email.",
@@ -294,6 +299,7 @@ export default function InternalProfileEdit() {
       });
       setOtpStage("verified");
       setVerifiedEmail(String(form.email || "").trim().toLowerCase());
+      setBackendRequiresEmailVerification(false);
       setMessage({
         type: "success",
         text: "Email đã được xác thực. Bạn có thể lưu thay đổi hồ sơ.",
@@ -334,6 +340,15 @@ export default function InternalProfileEdit() {
       return;
     }
 
+    if (emailVerificationRequired && !isCurrentEmailVerified) {
+      setOtpStage((prev) => (prev === "idle" ? "sent" : prev));
+      setMessage({
+        type: "error",
+        text: "Vui lòng xác minh email hiện tại bằng mã OTP trước khi lưu hồ sơ.",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       setMessage(null);
@@ -356,6 +371,8 @@ export default function InternalProfileEdit() {
       const updateResult = await userService.updateProfile(user?.userId ?? user?.id, fd);
 
       if (updateResult?.otpRequired) {
+        setBackendRequiresEmailVerification(true);
+        setOtpStage("sent");
         setMessage({
           type: "success",
           text: updateResult?.message || "Hệ thống đã gửi OTP về email. Vui lòng xác nhận để hoàn tất cập nhật hồ sơ.",
@@ -364,6 +381,9 @@ export default function InternalProfileEdit() {
       }
 
       await userService.getProfile();
+      setInitialEmail(String(form.email || "").trim());
+      setVerifiedEmail(String(form.email || "").trim().toLowerCase());
+      setBackendRequiresEmailVerification(false);
 
       setMessage({ type: "success", text: "Lưu hồ sơ thành công!" });
       setTimeout(() => navigate("/profile", { state: { refresh: Date.now() } }), 900);
@@ -383,6 +403,7 @@ export default function InternalProfileEdit() {
         ...(mapped.fieldErrors.location ? { location: true } : {}),
       }));
       if (shouldPromptVerify) {
+        setBackendRequiresEmailVerification(true);
         setOtpStage((prev) => (prev === "verified" ? prev : "sent"));
         setMessage({
           type: "error",
@@ -549,7 +570,7 @@ export default function InternalProfileEdit() {
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-extrabold text-emerald-900">
-                          Xác minh email để lưu hồ sơ
+                          {emailVerificationRequired ? "Cần xác minh email để lưu hồ sơ" : "Xác minh email"}
                         </div>
                         <span
                           className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${
@@ -562,7 +583,9 @@ export default function InternalProfileEdit() {
                         </span>
                       </div>
                       <div className="mt-1 text-xs font-semibold text-slate-500">
-                        Hệ thống yêu cầu xác minh email bằng mã OTP trước khi cập nhật hồ sơ.
+                        {emailVerificationRequired
+                          ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
+                          : "Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
                       </div>
                     </div>
 
@@ -573,12 +596,12 @@ export default function InternalProfileEdit() {
                         disabled={sendingOtp || verifyingOtp}
                         className="whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-extrabold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {sendingOtp ? "Đang gửi..." : "Gửi mã OTP"}
+                        {sendingOtp ? "Đang gửi..." : otpStage === "idle" ? "Gửi mã OTP" : "Gửi lại OTP"}
                       </button>
                     </div>
                   </div>
 
-                  {otpStage !== "idle" ? (
+                  {(otpStage !== "idle" || emailVerificationRequired) ? (
                     <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center">
                       <input
                         value={otpCode}

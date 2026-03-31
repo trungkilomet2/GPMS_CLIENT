@@ -11,6 +11,8 @@ import {
   Waypoints,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import "@/styles/worker-roles.css";
 
@@ -51,6 +53,9 @@ function getMemberSummary(members = []) {
 }
 
 export default function WorkerRoleList() {
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isOwner = primaryRole === "owner";
   const [roles, setRoles] = useState([]);
   const [search, setSearch] = useState("");
   const [usageFilter, setUsageFilter] = useState("all");
@@ -122,10 +127,12 @@ export default function WorkerRoleList() {
               </p>
             </div>
 
-            <Link to="/worker-roles/create" className="worker-role-hero__action">
-              <Plus size={18} />
-              <span>Thêm vai trò thợ</span>
-            </Link>
+            {isOwner ? (
+              <Link to="/worker-roles/create" className="worker-role-hero__action">
+                <Plus size={18} />
+                <span>Thêm vai trò thợ</span>
+              </Link>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

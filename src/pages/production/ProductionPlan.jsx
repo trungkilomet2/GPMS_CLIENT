@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Plus, Trash2, Pencil } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
+import TemplateService from "@/services/TemplateService";
 import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/roleAccess";
+import { getProductionStatusLabel } from "@/utils/statusUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
 import SuccessModal from "@/components/SuccessModal";
+import ConfirmModal from "@/components/ConfirmModal";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -83,7 +89,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "May lai áo", cpu: 220 },
       { partName: "Kiểm tra đường may", cpu: 150 },
       { partName: "Ủi hoàn thiện", cpu: 200 },
-      { partName: "KCS/Final inspection", cpu: 180 },
+      { partName: "Kiểm tra hoàn thiện", cpu: 180 },
       { partName: "Đóng gói", cpu: 120 },
     ],
   },
@@ -109,7 +115,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "Làm khuy", cpu: 220 },
       { partName: "Kiểm tra đường may", cpu: 160 },
       { partName: "Ủi hoàn thiện", cpu: 220 },
-      { partName: "KCS/Final inspection", cpu: 180 },
+      { partName: "Final inspection", cpu: 180 },
       { partName: "Đóng gói", cpu: 120 },
     ],
   },
@@ -132,7 +138,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "Ráp bo", cpu: 260 },
       { partName: "Kiểm tra đường may", cpu: 160 },
       { partName: "Ủi hoàn thiện", cpu: 220 },
-      { partName: "KCS/Final inspection", cpu: 180 },
+      { partName: "Final inspection", cpu: 180 },
       { partName: "Đóng gói", cpu: 120 },
     ],
   },
@@ -158,7 +164,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "Lên lai", cpu: 220 },
       { partName: "Kiểm tra đường may", cpu: 160 },
       { partName: "Ủi hoàn thiện", cpu: 220 },
-      { partName: "KCS/Final inspection", cpu: 180 },
+      { partName: "Final inspection", cpu: 180 },
       { partName: "Đóng gói", cpu: 120 },
     ],
   },
@@ -182,7 +188,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "Lên lai", cpu: 220 },
       { partName: "Kiểm tra đường may", cpu: 160 },
       { partName: "Ủi hoàn thiện", cpu: 220 },
-      { partName: "KCS/Final inspection", cpu: 180 },
+      { partName: "Final inspection", cpu: 180 },
       { partName: "Đóng gói", cpu: 120 },
     ],
   },
@@ -192,15 +198,15 @@ const TEMPLATE_LIBRARY = [
     category: "Giày",
     description: "Quy trình chuẩn ngành giày thể thao.",
     steps: [
-      { partName: "Cắt upper", cpu: 420 },
-      { partName: "May upper", cpu: 600 },
+      { partName: "Cắt mũ giày", cpu: 420 },
+      { partName: "May mũ giày", cpu: 600 },
       { partName: "May lót", cpu: 260 },
       { partName: "Ép đế", cpu: 720 },
       { partName: "Dán keo", cpu: 260 },
       { partName: "Lắp lót", cpu: 240 },
       { partName: "Luồn dây", cpu: 160 },
       { partName: "Vệ sinh thành phẩm", cpu: 160 },
-      { partName: "KCS/Final inspection", cpu: 200 },
+      { partName: "Final inspection", cpu: 200 },
       { partName: "Đóng hộp", cpu: 140 },
     ],
   },
@@ -215,7 +221,7 @@ const TEMPLATE_LIBRARY = [
       { partName: "May vành", cpu: 260 },
       { partName: "Lắp khóa", cpu: 180 },
       { partName: "Vệ sinh thành phẩm", cpu: 120 },
-      { partName: "KCS/Final inspection", cpu: 140 },
+      { partName: "Final inspection", cpu: 140 },
       { partName: "Đóng gói", cpu: 100 },
     ],
   },
@@ -235,18 +241,34 @@ const normalizeText = (value = "") =>
 
 export default function ProductionPlan() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const currentUser = useMemo(() => getStoredUser() || {}, []);
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+  const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
+
   const [productionList, setProductionList] = useState([]);
   const [selectedProduction, setSelectedProduction] = useState(null);
-  const [selectedProductionId, setSelectedProductionId] = useState(() => (id ? String(id) : ""));
-  const [rows, setRows] = useState(() =>
-    DEFAULT_ROWS.map((row, index) => ({
-      ...row,
-      ppId: 2000 + index,
-      productionId: id ? Number(id) : null,
-    }))
-  );
+
+  const stateProductionId = location.state?.productionId;
+  const initialProductionId = stateProductionId ? String(stateProductionId) : (id ? String(id) : "");
+  const [selectedProductionId, setSelectedProductionId] = useState(() => initialProductionId);
+
+  const [rows, setRows] = useState(() => {
+    if (location.state?.steps && Array.isArray(location.state.steps) && location.state.steps.length > 0) {
+      return location.state.steps.map((s, idx) => ({
+        ppId: 2000 + idx,
+        productionId: Number(initialProductionId),
+        partName: s.partName,
+        cpu: String(s.cpu || ""),
+        startDate: s.startDate || "",
+        endDate: s.endDate || "",
+        ppsId: s.partId || "",
+      }));
+    }
+    return [];
+  });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -260,7 +282,15 @@ export default function ProductionPlan() {
   const [savedPlanAt, setSavedPlanAt] = useState("");
   const [savingParts, setSavingParts] = useState(false);
   const [savePartsMessage, setSavePartsMessage] = useState({ type: "", text: "" });
+  const [isConfirmSaveOpen, setIsConfirmSaveOpen] = useState(false);
+  const [hasExistingParts, setHasExistingParts] = useState(false);
   const [formError, setFormError] = useState("");
+  const [dynamicTemplates, setDynamicTemplates] = useState([]);
+  const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
   const [form, setForm] = useState({
     partName: "",
     startDate: "",
@@ -288,6 +318,11 @@ export default function ProductionPlan() {
     [userStepLabels]
   );
 
+  const isAssignedPM = useMemo(() => {
+    if (!selectedProduction?.pmId) return false;
+    return isPM && String(currentUser?.userId ?? currentUser?.id) === String(selectedProduction.pmId);
+  }, [isPM, currentUser, selectedProduction]);
+
   const totalCpu = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0),
     [rows]
@@ -295,7 +330,25 @@ export default function ProductionPlan() {
 
   const formatDateTime = (value = "") => {
     if (!value) return "-";
-    return String(value).replace("T", " ");
+    return String(value).replace("T", " ").slice(0, 16);
+  };
+
+  const getDurationText = (start, end) => {
+    if (!start || !end) return "-";
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return "-";
+    const diffMs = e - s;
+    if (diffMs <= 0) return "0 giờ";
+
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(totalHours / 24);
+    const remainingHours = totalHours % 24;
+
+    let result = "";
+    if (days > 0) result += `${days} ngày `;
+    if (remainingHours > 0 || days === 0) result += `${remainingHours} giờ`;
+    return result.trim();
   };
 
   const formatDateOnly = (value = "") => {
@@ -320,12 +373,48 @@ export default function ProductionPlan() {
             : []
         );
       } catch (err) {
-        console.error("Lỗi tải ds production:", err);
+        console.error("Lỗi tải danh sách đơn sản xuất:", err);
+        toast.error(getErrorMessage(err, "Không thể tải danh sách đơn sản xuất."));
       }
     };
     fetchList();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (selectedProductionId) {
+      const fetchParts = async () => {
+        try {
+          const res = await ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 });
+          if (active && res.data && Array.isArray(res.data) && res.data.length > 0) {
+            setHasExistingParts(true);
+            setRows(prev => {
+              if (prev.length === 0) {
+                return res.data.map((s, idx) => ({
+                  ppId: 2000 + idx,
+                  productionId: Number(selectedProductionId),
+                  partName: s.partName,
+                  cpu: String(s.cpu || ""),
+                  startDate: s.startDate || "",
+                  endDate: s.endDate || "",
+                  ppsId: s.id || s.partId || ""
+                }));
+              }
+              return prev;
+            });
+          } else if (active) {
+            setHasExistingParts(false);
+          }
+        } catch (err) {
+          console.error("Error fetching existing parts:", err);
+          // Silent or soft error: we might still allow creating new ones
+        }
+      };
+      fetchParts();
+    }
+    return () => { active = false; };
+  }, [selectedProductionId]);
 
   useEffect(() => {
     let active = true;
@@ -344,12 +433,13 @@ export default function ProductionPlan() {
           productionId: payload.productionId ?? payload.id,
           orderId: order.id,
           orderName: order.orderName,
-          pStartDate: payload.startDate || payload.pStartDate,
-          pEndDate: payload.endDate || payload.pEndDate,
-          status: payload.statusName || payload.status || "Planned",
-          pmName: payload.pm?.name ?? payload.pmName,
+          pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
+          pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
+          status: getProductionStatusLabel(payload.statusName || payload.status || "Chờ Xét Duyệt"),
+          pmId: payload.pm?.id ?? payload.pmId,
+          pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
           product: {
-            productCode: order.id ? `PRD-${order.id}` : "PRD-UNKNOWN",
+            productCode: order.id ? `MSP-${order.id}` : "MÃ-SP-KXD",
             productName: order.orderName,
             type: order.type,
             size: typeof order.size === "string" ? order.size.trim() : order.size,
@@ -360,7 +450,8 @@ export default function ProductionPlan() {
           }
         });
       } catch (err) {
-        console.error("Lỗi chi tiết production:", err);
+        console.error("Lỗi chi tiết đơn sản xuất:", err);
+        toast.error(getErrorMessage(err, "Không thể tải chi tiết đơn sản xuất."));
       }
     };
     fetchDetail();
@@ -373,24 +464,118 @@ export default function ProductionPlan() {
     if (type.includes("quần") || type.includes("quan") || type.includes("jean")) return "Quần";
     if (type.includes("giày") || type.includes("giay") || type.includes("shoe")) return "Giày";
     if (type.includes("mũ") || type.includes("mu") || type.includes("cap")) return "Mũ";
+    if (type.includes("người") || type.includes("nguoi") || type.includes("user")) return "Người dùng";
     return "all";
   }, [selectedProduction]);
 
+  const combinedTemplates = useMemo(() => {
+    const system = TEMPLATE_LIBRARY.map((t) => ({
+      ...t,
+      isSystem: true,
+      key: `sys-${t.key || t.label}`,
+    }));
+
+    const user = dynamicTemplates.map((t) => ({
+      key: `user-${t.templateId}`,
+      label: t.templateName,
+      category: "Người dùng",
+      description: `Mẫu người dùng với ${t.steps?.length || 0} công đoạn.`,
+      steps: Array.isArray(t.steps)
+        ? t.steps.map((s) => ({
+          partName: s.partName,
+          cpu: 0, // Fallback as API doesn't provide cpu
+        }))
+        : [],
+      isSystem: false,
+      templateId: t.templateId,
+    }));
+
+    return [...system, ...user];
+  }, [dynamicTemplates]);
+
+  const fetchDynamicTemplates = async () => {
+    try {
+      const res = await TemplateService.getTemplates();
+      const list = res?.data?.data ?? res?.data ?? [];
+      setDynamicTemplates(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error("Lỗi tải template người dùng:", err);
+      // Optional: toast.error(getErrorMessage(err, "Không thể tải mẫu thiết kế cá nhân."));
+    }
+  };
+
+  useEffect(() => {
+    fetchDynamicTemplates();
+  }, []);
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplateName.trim()) {
+      toast.error("Vui lòng nhập tên template.");
+      return;
+    }
+    if (rows.length === 0) {
+      toast.error("Không có công đoạn nào để lưu thành mẫu.");
+      return;
+    }
+
+    try {
+      setIsSavingTemplate(true);
+      const payload = {
+        templateName: newTemplateName.trim(),
+        steps: rows.map((row, idx) => ({
+          partName: row.partName,
+          stepOrder: idx + 1,
+        })),
+      };
+      await TemplateService.createTemplate(payload);
+      toast.success("Đã lưu mẫu công đoạn thành công!");
+      setIsSaveTemplateModalOpen(false);
+      setNewTemplateName("");
+      // Refresh list
+      fetchDynamicTemplates();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể lưu mẫu công đoạn."));
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = (template) => {
+    if (template.isSystem) return;
+    setTemplateToDelete(template);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!templateToDelete) return;
+
+    try {
+      await TemplateService.deleteTemplate(templateToDelete.templateId);
+      toast.success(`Đã xóa mẫu "${templateToDelete.label}" thành công!`);
+      fetchDynamicTemplates();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Không thể xóa mẫu thiết kế."));
+    } finally {
+      setIsConfirmDeleteOpen(false);
+      setTemplateToDelete(null);
+    }
+  };
+
   const templatesByUserStep = useMemo(() => {
     if (!userStepFilters.length) {
-      return TEMPLATE_LIBRARY.map((template) => ({
+      return combinedTemplates.map((template) => ({
         ...template,
         filteredSteps: template.steps,
       }));
     }
 
-    return TEMPLATE_LIBRARY.map((template) => {
+    return combinedTemplates.map((template) => {
       const filteredSteps = template.steps.filter((step) =>
         userStepFilters.some((filter) => normalizeText(step.partName).includes(filter))
       );
       return { ...template, filteredSteps };
     }).filter((template) => template.filteredSteps.length > 0);
-  }, [userStepFilters]);
+  }, [userStepFilters, combinedTemplates]);
 
   const visibleTemplates = useMemo(() => {
     if (templateCategory === "all") return templatesByUserStep;
@@ -497,36 +682,50 @@ export default function ProductionPlan() {
     setSavedPlanAt(new Date().toLocaleString("vi-VN"));
   };
 
-  const saveSteps = async () => {
+  const saveSteps = async (force = false) => {
     if (!selectedProductionId || !rows.length || savingParts) return;
+    if (!isAssignedPM) {
+      toast.error("Bạn không phải PM được giao phụ trách đơn này. Không thể lưu kế hoạch.");
+      return;
+    }
+
+    if (rows.length < 3) {
+      toast.error("Số lượng công đoạn phải từ 3 trở lên mới có thể lưu.");
+      return;
+    }
+
+    // Show warning if parts exist and it's NOT a forced save
+    if (hasExistingParts && !force) {
+      setIsConfirmSaveOpen(true);
+      return;
+    }
+
     try {
       setSavingParts(true);
+      setIsConfirmSaveOpen(false);
       setSavePartsMessage({ type: "", text: "" });
       const productionId = Number(selectedProductionId);
-      const payload = {
-        parts: rows.map((row) => ({
-          partName: row?.partName || "",
-          startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
-          endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
-          cpu: Number(row?.cpu) || 0
-        })),
-      };
+      const payload = rows.map((row) => ({
+        productionId: productionId,
+        partName: row?.partName || "",
+        startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
+        endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
+        cpu: Number(row?.cpu || 0),
+      }));
 
-      await ProductionPartService.createParts(productionId, payload);
-      setSavePartsMessage({ type: "success", text: "Đã lưu công đoạn." });
+      // Debug: Log payload to see what's being sent
+      console.log("Saving Production Parts:", { parts: payload });
+
+      await ProductionPartService.createParts(productionId, { parts: payload });
+      setHasExistingParts(true);
+      toast.success("Đã lưu kế hoạch sản xuất thành công!");
       setIsSuccessModalOpen(true);
       savePlan();
     } catch (error) {
-      console.error(error);
-      let errMsg = "Lưu công đoạn thất bại.";
-      const data = error?.response?.data;
-      if (data?.errors) {
-        errMsg = Object.values(data.errors).flat().join(" | ");
-      } else if (data?.message) {
-        errMsg = data.message;
-      } else if (typeof data === 'string' && data) {
-        errMsg = data;
-      }
+      console.error("Save Error:", error);
+      const errMsg = getErrorMessage(error, "Lưu công đoạn thất bại.");
+      
+      toast.error(errMsg);
       setSavePartsMessage({ type: "error", text: `Chi tiết lỗi: ${errMsg}` });
     } finally {
       setSavingParts(false);
@@ -595,15 +794,26 @@ export default function ProductionPlan() {
   const handleSaveStep = () => {
     const name = form.partName.trim();
     if (!selectedProductionId) {
-      setFormError("Vui lòng chọn production trước.");
+      setFormError("Vui lòng chọn đơn sản xuất trước.");
       return;
     }
     if (!name) {
       setFormError("Tên công đoạn không được để trống.");
       return;
     }
+    if (name.length > 100) {
+      setFormError("Tên công đoạn không được dài quá 100 ký tự.");
+      return;
+    }
     if (!form.startDate) {
       setFormError("Vui lòng chọn ngày bắt đầu.");
+      return;
+    }
+    const now = new Date();
+    // Cho phép sai lệch 1 phút để tránh lỗi khi người dùng nhập liệu lâu
+    const graceNow = new Date(now.getTime() - 60000); 
+    if (new Date(form.startDate) < graceNow) {
+      setFormError("Ngày bắt đầu không được nhỏ hơn ngày giờ hiện tại.");
       return;
     }
     if (!form.endDate) {
@@ -616,6 +826,10 @@ export default function ProductionPlan() {
     }
     if (form.cpu === "" || Number(form.cpu) < 0 || isNaN(Number(form.cpu))) {
       setFormError("Giá/SP phải là số hợp lệ lớn hơn hoặc bằng 0.");
+      return;
+    }
+    if (Number(form.cpu) > 100000000) {
+      setFormError("Giá/SP không được vượt quá 100.000.000 VNĐ.");
       return;
     }
     setFormError("");
@@ -698,7 +912,7 @@ export default function ProductionPlan() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/production/${selectedProductionId}`)}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -710,23 +924,7 @@ export default function ProductionPlan() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chọn production</div>
-              <select
-                value={selectedProductionId}
-                onChange={(event) => setSelectedProductionId(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-              >
-                <option value="">Chọn production...</option>
-                {productionList.map((item) => (
-                  <option key={item.productionId} value={item.productionId}>
-                    {`#PR-${item.productionId} - ${item.orderName}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <button
@@ -735,22 +933,19 @@ export default function ProductionPlan() {
               className="w-full flex items-center justify-between mb-4 text-left"
             >
               <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin production</div>
+                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin đơn sản xuất</div>
                 <div className="text-lg font-semibold text-slate-900">
                   {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
                 </div>
               </div>
-              <span className="inline-block rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-700">
-                {selectedProduction?.status || "Chưa chọn"}
-              </span>
             </button>
             {showProductionInfo && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-700">
                 <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
                 <InfoItem label="Tên đơn" value={selectedProduction?.orderName || "-"} />
                 <InfoItem label="PM quản lý" value={selectedProduction?.pmName || "-"} />
-                <InfoItem label="Ngày bắt đầu" value={selectedProduction?.pStartDate || "-"} />
-                <InfoItem label="Ngày kết thúc" value={selectedProduction?.pEndDate || "-"} />
+                <InfoItem label="Ngày bắt đầu" value={formatDateOnly(selectedProduction?.pStartDate) || "-"} />
+                <InfoItem label="Ngày kết thúc" value={formatDateOnly(selectedProduction?.pEndDate) || "-"} />
               </div>
             )}
           </div>
@@ -812,7 +1007,7 @@ export default function ProductionPlan() {
             {showTemplateSection && (
               <>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {["all", "Áo", "Quần", "Giày", "Mũ"].map((item) => {
+                  {["all", "Áo", "Quần", "Giày", "Mũ", "Người dùng"].map((item) => {
                     const label = item === "all" ? "Tất cả" : item;
                     const active = templateCategory === item;
                     return (
@@ -837,14 +1032,6 @@ export default function ProductionPlan() {
                       Lọc theo công đoạn: {userStepLabels[0]}
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => saveCurrentDesign("Bản thiết kế của tôi")}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-emerald-200"
-                    disabled={!rows.length || !selectedProductionId}
-                  >
-                    Lưu bản thiết kế
-                  </button>
                   <button
                     type="button"
                     onClick={() => toggleAllTemplates(true)}
@@ -896,9 +1083,24 @@ export default function ProductionPlan() {
                           <div className="text-sm font-semibold text-slate-900">{template.label}</div>
                           <div className="mt-1 text-xs text-slate-500">{template.description}</div>
                         </div>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                          {template.category}
-                        </span>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${template.isSystem ? "border-slate-200 bg-slate-50 text-slate-600" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                            {template.isSystem ? "Hệ thống" : "Của tôi"}
+                          </span>
+                          {!template.isSystem && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(template);
+                              }}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition"
+                              title="Xóa mẫu này"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {(templateExpanded[template.key] ? template.filteredSteps : template.filteredSteps.slice(0, 6)).map((step) => (
@@ -952,16 +1154,16 @@ export default function ProductionPlan() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={saveSteps}
-                  disabled={!selectedProductionId || !rows.length || savingParts}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:text-emerald-300"
+                  onClick={() => setIsSaveTemplateModalOpen(true)}
+                  disabled={!rows.length || !isAssignedPM}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-3.5 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
-                  {savingParts ? "Đang lưu..." : "Lưu công đoạn"}
+                  Lưu mẫu công đoạn
                 </button>
                 <button
                   onClick={openAddModal}
-                  disabled={!selectedProductionId}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  disabled={!selectedProductionId || !isAssignedPM}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus size={16} /> Thêm công đoạn
                 </button>
@@ -983,6 +1185,7 @@ export default function ProductionPlan() {
                     <th className="leave-table-th px-3 py-3 text-left">Tên công đoạn</th>
                     <th className="leave-table-th px-3 py-3 text-center">Bắt đầu</th>
                     <th className="leave-table-th px-3 py-3 text-center">Kết thúc</th>
+                    <th className="leave-table-th px-3 py-3 text-center">Thời gian</th>
                     <th className="leave-table-th px-3 py-3 text-center">Giá/SP</th>
                     <th className="leave-table-th px-3 py-3 text-center">Thao tác</th>
                   </tr>
@@ -998,17 +1201,22 @@ export default function ProductionPlan() {
                       <td className="px-3 py-2 font-medium text-slate-700">{row.partName || "-"}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.startDate)}</td>
                       <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.endDate)}</td>
+                      <td className="px-3 py-2 text-center text-slate-500 font-medium">
+                        {getDurationText(row.startDate, row.endDate)}
+                      </td>
                       <td className="px-3 py-2 text-center font-semibold text-slate-700">
-                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VNĐ` : "-"}
                       </td>
                       <td className="px-2 py-2">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
+                              if (!isAssignedPM) return;
                               openEditModal(idx);
                             }}
-                            className="text-slate-500 hover:text-slate-700"
+                            disabled={!isAssignedPM}
+                            className={`text-slate-500 hover:text-slate-700 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
                             aria-label="Sửa công đoạn"
                           >
                             <Pencil size={16} />
@@ -1016,9 +1224,11 @@ export default function ProductionPlan() {
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
+                              if (!isAssignedPM) return;
                               removeRow(idx);
                             }}
-                            className="text-rose-500 hover:text-rose-600"
+                            disabled={!isAssignedPM}
+                            className={`text-rose-500 hover:text-rose-600 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
                             aria-label="Xóa công đoạn"
                           >
                             <Trash2 size={16} />
@@ -1027,10 +1237,10 @@ export default function ProductionPlan() {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-50">
-                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700">TOTAL</td>
-                    <td className="px-3 py-3 text-center font-semibold text-slate-700">
-                      {`${totalCpu.toLocaleString("vi-VN")} VND`}
+                  <tr className="bg-slate-50 border-t-2 border-slate-100">
+                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700 text-right">TỔNG CỘNG</td>
+                    <td className="px-3 py-3 text-center font-bold text-emerald-600">
+                      {`${totalCpu.toLocaleString("vi-VN")} VNĐ`}
                     </td>
                     <td></td>
                   </tr>
@@ -1051,7 +1261,7 @@ export default function ProductionPlan() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigate(-1)}
+                onClick={() => navigate(`/production/${selectedProductionId}`)}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 Hủy
@@ -1059,8 +1269,8 @@ export default function ProductionPlan() {
               <button
                 type="button"
                 onClick={saveSteps}
-                disabled={!selectedProductionId || !rows.length}
-                className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400"
+                disabled={!selectedProductionId || !rows.length || !isAssignedPM}
+                className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400 disabled:cursor-not-allowed"
               >
                 Lưu kế hoạch
               </button>
@@ -1149,6 +1359,97 @@ export default function ProductionPlan() {
         description="Kế hoạch sản xuất đã được lưu vào hệ thống."
         primaryLabel="OK"
       />
+      <ConfirmModal
+        isOpen={isConfirmSaveOpen}
+        title="Xác nhận lưu lại kế hoạch"
+        description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại có thể tạo thêm các bản ghi trùng lặp (không ghi đè). Bạn có chắc chắn muốn tiếp tục lưu không?"
+        onConfirm={() => saveSteps(true)}
+        onClose={() => setIsConfirmSaveOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={isConfirmDeleteOpen}
+        title="Xác nhận xóa mẫu thiết kế"
+        description={`Bạn có chắc chắn muốn xóa mẫu thiết kế "${templateToDelete?.label}" không? Hành động này không thể hoàn tác.`}
+        onConfirm={confirmDeleteTemplate}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+      />
+
+      {isSaveTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">
+                Lưu mẫu công đoạn
+              </h3>
+              <button
+                onClick={() => setIsSaveTemplateModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition"
+              >
+                Đóng
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="space-y-5">
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Tên mẫu thiết kế</label>
+                  <input
+                    type="text"
+                    value={newTemplateName}
+                    onChange={(e) => setNewTemplateName(e.target.value)}
+                    placeholder="Ví dụ: Mẫu áo thun cao cấp v2"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 shadow-sm"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block flex items-center justify-between">
+                    <span>Xem trước công đoạn ({rows.length})</span>
+                    <span className="text-[10px] text-slate-400 normal-case font-normal italic">Thứ tự này sẽ được lưu cố định</span>
+                  </label>
+                  <div className="max-h-60 overflow-y-auto rounded-xl border border-slate-100 bg-slate-50/50 p-2 text-sm">
+                    <div className="space-y-1.5">
+                      {rows.map((row, idx) => (
+                        <div key={`preview-${idx}`} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white border border-slate-100 shadow-sm">
+                          <span className="flex-none w-6 h-6 flex items-center justify-center rounded-full bg-emerald-50 text-[10px] font-bold text-emerald-600 border border-emerald-100">
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm text-slate-700 font-medium truncate">{row.partName}</span>
+                          {row.cpu && (
+                            <span className="flex-none ml-auto text-[10px] font-semibold text-slate-400">
+                              {Number(row.cpu).toLocaleString("vi-VN")} đ
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-relaxed italic bg-amber-50/50 p-3 rounded-xl border border-amber-100/50">
+                  <span className="font-bold text-amber-700">Lưu ý:</span> Bản thiết kế này sẽ được lưu vào hệ thống để bạn có thể tái sử dụng cho các đơn hàng tương tự trong tương lai.
+                </p>
+              </div>
+              <div className="mt-8 flex justify-end gap-3">
+                <button
+                  onClick={() => setIsSaveTemplateModalOpen(false)}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={handleCreateTemplate}
+                  disabled={isSavingTemplate || !newTemplateName.trim()}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 text-sm font-bold text-white shadow-lg shadow-emerald-100 hover:bg-emerald-700 hover:shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all active:scale-95"
+                >
+                  {isSavingTemplate ? <Loader2 className="animate-spin" size={16} /> : null}
+                  {isSavingTemplate ? "Đang lưu..." : "Xác nhận lưu"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </OwnerLayout>
   );
 }

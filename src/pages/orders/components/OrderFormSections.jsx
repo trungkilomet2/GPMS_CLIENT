@@ -5,6 +5,8 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 const REQUIRED_FIELDS = ['orderName', 'type', 'size', 'color', 'quantity', 'cpu', 'startDate', 'endDate'];
+const TEMPLATE_NAME_HINT = 'Gợi ý tên: Rập áo thun mặt trước, Mockup logo ngực trái, Bảng thông số size.';
+const TEMPLATE_NOTE_HINT = 'Gợi ý ghi chú: Khổ A4, in 2 màu, phiên bản V2, ưu tiên đường may cổ.';
 
 export function OrderFormSections({
   orderData,
@@ -17,15 +19,16 @@ export function OrderFormSections({
   onOpenMaterialModal,
   onEditMaterial,
   onDeleteMaterial,
-  templateFiles,
+  templateItems,
   onTemplateFileChange,
-  onRemoveTemplateFile,
-  hardCopyQty,
-  onHardCopyQtyChange,
+  onTemplateMetaChange,
+  onRemoveTemplateItem,
   totalCost,
   isSubmitting,
   onCancel,
   materialModalProps,
+  submitLabel = 'Xác nhận tạo đơn',
+  submitIcon = <Plus size={20} />,
 }) {
   return (
     <>
@@ -60,6 +63,7 @@ export function OrderFormSections({
                 </div>
               )}
             </div>
+
             <OrderInput
               label="Tên đơn hàng"
               name="orderName"
@@ -76,6 +80,7 @@ export function OrderFormSections({
               error={errors.type}
               placeholder="Sơ mi, Quần tây..."
             />
+
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-bold text-slate-700 flex items-center gap-1">
                 Kích thước <span className="text-red-500">*</span>
@@ -105,6 +110,7 @@ export function OrderFormSections({
                 </div>
               )}
             </div>
+
             <OrderInput
               label="Màu sắc"
               name="color"
@@ -113,6 +119,7 @@ export function OrderFormSections({
               error={errors.color}
               placeholder="Trắng, Xanh Navy..."
             />
+
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
               <OrderInput
                 label="Số lượng sản xuất"
@@ -143,6 +150,7 @@ export function OrderFormSections({
                 suffix="VND"
               />
             </div>
+
             <OrderInput
               label="Ngày bắt đầu"
               name="startDate"
@@ -164,51 +172,107 @@ export function OrderFormSections({
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold mb-4 border-b border-slate-100 pb-2 text-slate-900">Mẫu thiết kế</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="text-sm font-bold text-slate-700 mb-2 block">Bản mềm (upload file)</label>
-              <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
-                  <span>Chọn file</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".dxf,.iba,.mdl,.plt,.pdf,.docx,.xlsx"
-                    onChange={onTemplateFileChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx — tối đa 10MB/file</p>
-              {templateFiles.length > 0 && (
-                <ul className="mt-3 space-y-2">
-                  {templateFiles.map((file, idx) => (
-                    <li key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                      <span className="truncate">{file.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => onRemoveTemplateFile(idx)}
-                        className="text-rose-600 text-xs font-semibold hover:text-rose-700"
-                      >
-                        Xóa
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-bold text-slate-700 mb-2 block">Bản cứng (số lượng đã cung cấp)</label>
+          <label className="text-sm font-bold text-slate-700 mb-2 block">Upload file mẫu</label>
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
+              <span>Chọn file</span>
               <input
-                type="number"
-                min="0"
-                value={hardCopyQty}
-                onChange={onHardCopyQtyChange}
-                placeholder="Ví dụ: 2"
-                className="w-full border rounded-xl px-4 py-2.5 text-sm transition-all outline-none border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                type="file"
+                multiple
+                accept=".dxf,.iba,.mdl,.plt,.pdf,.docx,.xlsx,.png,.jpg,.jpeg"
+                onChange={onTemplateFileChange}
+                className="hidden"
               />
-            </div>
+            </label>
           </div>
+          <p className="text-[11px] text-slate-500 mt-2">Định dạng: .dxf, .iba, .mdl, .plt, .pdf, .docx, .xlsx, .png, .jpg, .jpeg - tối đa 10MB/file</p>
+
+          {templateItems.length > 0 ? (
+            <div className="mt-3 max-h-112 space-y-3 overflow-y-auto pr-1">
+              {templateItems.map((item, idx) => (
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-slate-700">File #{idx + 1}</div>
+                      <div className="truncate text-sm text-slate-600">{item.fileName}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveTemplateItem(idx)}
+                      className="text-rose-600 text-xs font-semibold hover:text-rose-700"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-slate-700">
+                        Tên mẫu thiết kế <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={100}
+                        value={item.templateName ?? ''}
+                        onChange={(e) => onTemplateMetaChange(idx, 'templateName', e.target.value)}
+                        placeholder="Tên mẫu thiết kế"
+                        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition
+                          ${errors.templates?.[idx]?.templateName
+                            ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+                          }`}
+                      />
+                      <div className="mt-1 flex justify-between items-center">
+                        <p className="text-[11px] text-slate-500">Ví dụ: Rập thân trước, Bảng size...</p>
+                        <span className={`text-[10px] ${(item.templateName?.length ?? 0) > 90 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                          {item.templateName?.length ?? 0}/100
+                        </span>
+                      </div>
+                      {errors.templates?.[idx]?.templateName && (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                          <AlertCircle size={12} /> {errors.templates[idx].templateName}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-bold text-slate-700">
+                        Ghi chú
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={100}
+                        value={item.note ?? ''}
+                        onChange={(e) => onTemplateMetaChange(idx, 'note', e.target.value)}
+                        placeholder="Khổ A4, in 2 màu..."
+                        className={`w-full border rounded-lg px-3 py-2 text-sm outline-none transition
+                          ${errors.templates?.[idx]?.note
+                            ? 'border-red-500 bg-red-50/30 focus:ring-2 focus:ring-red-100'
+                            : 'border-slate-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10'
+                          }`}
+                      />
+                      <div className="mt-1 flex justify-between items-center">
+                        <p className="text-[11px] text-slate-500">Bổ sung yêu cầu kỹ thuật.</p>
+                        <span className={`text-[10px] ${(item.note?.length ?? 0) > 90 ? 'text-amber-600 font-bold' : 'text-slate-400'}`}>
+                          {item.note?.length ?? 0}/100
+                        </span>
+                      </div>
+                      {errors.templates?.[idx]?.note && (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                          <AlertCircle size={12} /> {errors.templates[idx].note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-[10px] text-slate-400 italic">
+                    Loại file: <span className="font-semibold text-slate-500">{item.type === 'IMAGE' ? 'Hình ảnh' : 'Tài liệu'}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white px-3 py-3 text-xs text-slate-500">
+              Chưa có file mẫu thiết kế nào.
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -240,6 +304,7 @@ export function OrderFormSections({
               emptyText={MATERIALS_TABLE_EMPTY_TEXT.create}
               onEdit={onEditMaterial}
               onDelete={onDeleteMaterial}
+              errors={errors.materialsList}
             />
           </div>
         </div>
@@ -251,11 +316,28 @@ export function OrderFormSections({
           <textarea
             name="note"
             rows={3}
+            maxLength={255}
             value={orderData.note}
             onChange={onOrderChange}
             placeholder="Nhập yêu cầu đặc biệt về kỹ thuật, đường may hoặc đóng gói..."
-            className="block w-full border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-slate-50/30 transition-all outline-none"
+            className={`block w-full border rounded-xl px-4 py-3 focus:ring-2 bg-slate-50/30 transition-all outline-none
+              ${errors.note
+                ? 'border-red-500 focus:ring-red-100'
+                : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20'
+              }`}
           />
+          <div className="flex justify-between items-center mt-1">
+            {errors.note ? (
+              <div className="flex items-center gap-1 text-[11px] text-red-600 font-semibold animate-in fade-in slide-in-from-top-1">
+                <AlertCircle size={12} /> {errors.note}
+              </div>
+            ) : (
+              <span />
+            )}
+            <span className={`text-[11px] ${(orderData.note?.length ?? 0) > 240 ? 'text-amber-500 font-semibold' : 'text-slate-400'}`}>
+              {orderData.note?.length ?? 0}/255
+            </span>
+          </div>
         </div>
 
         <div className="flex gap-4 justify-end pt-6 border-t border-slate-100">
@@ -272,8 +354,8 @@ export function OrderFormSections({
             disabled={isSubmitting}
             className="px-10 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-200 flex items-center gap-2 transition-all active:scale-95 disabled:bg-emerald-400"
           >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-            {isSubmitting ? 'Đang xử lý...' : 'Xác nhận tạo đơn'}
+            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : submitIcon}
+            {isSubmitting ? 'Đang xử lý...' : submitLabel}
           </button>
         </div>
       </div>
@@ -313,7 +395,7 @@ export function OrderInput({
         <input
           type={type}
           name={name}
-          value={value}
+          value={value ?? ''}
           onChange={onChange}
           placeholder={placeholder}
           readOnly={readOnly}
@@ -339,3 +421,5 @@ export function OrderInput({
     </div>
   );
 }
+
+

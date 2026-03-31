@@ -12,7 +12,13 @@ const CuttingNotebookService = {
     return axiosClient.post(API_ENDPOINTS.CUTTING_NOTEBOOK.CREATE_LOG(notebookId), payload);
   },
   getListLogs: (notebookId) => {
-    return axiosClient.get(API_ENDPOINTS.CUTTING_NOTEBOOK.GET_LIST_LOGS(notebookId));
+    return axiosClient.get(API_ENDPOINTS.CUTTING_NOTEBOOK.GET_LOGS(notebookId));
+  },
+  updateNotebook: (notebookId, payload) => {
+    return axiosClient.put(API_ENDPOINTS.CUTTING_NOTEBOOK.UPDATE(notebookId), payload);
+  },
+  getNotebookById: (notebookId) => {
+    return axiosClient.get(API_ENDPOINTS.CUTTING_NOTEBOOK.GET_BY_ID(notebookId));
   },
 };
 

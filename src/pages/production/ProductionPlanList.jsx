@@ -1,21 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search } from "lucide-react";
 import Pagination from "@/components/Pagination";
-import OwnerLayout from "@/layouts/OwnerLayout";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
-import ProductionService from "@/services/ProductionService";
-import WorkerService from "@/services/WorkerService";
 import { useAuth } from "@/hooks/useAuth";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useProductionList } from "@/hooks/useProductionList";
-import { STATUS_STYLES, getPlanStatusLabel } from "@/utils/statusUtils";
+import { STATUS_STYLES, getProductionStatusLabel } from "@/utils/statusUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 
 
 export default function ProductionPlanList() {
-  const { isWorker } = useAuth();
+  const location = useLocation();
+  const { isWorker, roleValue } = useAuth();
+  const primaryRole = getPrimaryWorkspaceRole(roleValue);
+  const isWorkerRoute = location.pathname.startsWith("/worker/");
+  const isWorkerView = primaryRole === "worker";
+  const LayoutComponent = isWorkerView ? WorkerLayout : PmOwnerLayout;
+  const detailBasePath = isWorkerRoute ? "/worker/production-plan" : "/production-plan";
   const { productions, loading, error } = useProductionList();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -26,31 +32,40 @@ export default function ProductionPlanList() {
 
 
   const plans = useMemo(() => {
-    return productions.map((item) => {
-      const order = item?.order ?? {};
-      const pm = item?.pm ?? {};
-      const orderId = order?.id ?? item?.orderId ?? item?.order?.orderId ?? "-";
-      const orderName = order?.orderName ?? item?.orderName ?? "-";
-      const pmIdRaw = item?.pmInfo?.id ?? item?.pmId ?? pm?.id ?? item?.pmID ?? item?.pm_id ?? null;
-      const pmName =
-        item?.pmInfo?.fullName ??
-        item?.pmName ??
-        pm?.name ??
-        pm?.fullName ??
-        (pmIdRaw ? `PM #${pmIdRaw}` : "-");
-      const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
-      const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
-      const status = getPlanStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
-      return {
-        productionId: item?.productionId ?? item?.id ?? "-",
-        orderId,
-        orderName,
-        pmName,
-        pStartDate: startDate,
-        pEndDate: endDate,
-        status,
-      };
-    });
+    return productions
+      .filter((item) => {
+        const sid = Number(item?.statusId ?? item?.status ?? 0);
+        const name = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+        // Exclude Chờ Xét Duyệt (1) and Từ Chối (2)
+        if (sid === 1 || sid === 2) return false;
+        if (name === "Chờ Xét Duyệt" || name === "Từ Chối" || name === "Chờ kiểm tra") return false;
+        return true;
+      })
+      .map((item) => {
+        const order = item?.order ?? {};
+        const pm = item?.pm ?? {};
+        const orderId = order?.id ?? item?.orderId ?? item?.order?.orderId ?? "-";
+        const orderName = order?.orderName ?? item?.orderName ?? "-";
+        const pmIdRaw = item?.pmInfo?.id ?? item?.pmId ?? pm?.id ?? item?.pmID ?? item?.pm_id ?? null;
+        const pmName =
+          item?.pmInfo?.fullName ??
+          item?.pmName ??
+          pm?.name ??
+          pm?.fullName ??
+          (pmIdRaw ? `PM #${pmIdRaw}` : "-");
+        const startDate = item?.startDate ?? item?.pStartDate ?? order?.startDate ?? "-";
+        const endDate = item?.endDate ?? item?.pEndDate ?? order?.endDate ?? "-";
+        const status = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
+        return {
+          productionId: item?.productionId ?? item?.id ?? "-",
+          orderId,
+          orderName,
+          pmName,
+          pStartDate: startDate,
+          pEndDate: endDate,
+          status,
+        };
+      });
   }, [productions]);
 
   const filtered = useMemo(() => {
@@ -79,9 +94,9 @@ export default function ProductionPlanList() {
 
   const stats = useMemo(() => {
     const total = plans.length;
-    const planned = plans.filter((item) => item.status === "Planned").length;
-    const inProgress = plans.filter((item) => item.status === "In Progress").length;
-    const completed = plans.filter((item) => item.status === "Completed").length;
+    const planned = plans.filter((item) => item.status === "Chờ Xét Duyệt Kế Hoạch").length;
+    const inProgress = plans.filter((item) => item.status === "Đang Sản Xuất").length;
+    const completed = plans.filter((item) => item.status === "Hoàn Thành").length;
     return { total, planned, inProgress, completed };
   }, [plans]);
 
@@ -105,11 +120,11 @@ export default function ProductionPlanList() {
         pendingIds.map(async (productionId) => {
           try {
             const response = await ProductionPartService.getPartsByProduction(productionId, {
-              pageIndex: 0,
-              pageSize: 10,
-              sortColumn: "Name",
-              sortOrder: "ASC",
-            }).catch(() => ProductionPartService.getPartsByProduction(productionId));
+              PageIndex: 0,
+              PageSize: 100,
+              SortColumn: "Name",
+              SortOrder: "ASC",
+            }).catch(() => ProductionPartService.getPartsByProduction(productionId, { PageSize: 500 }));
             const payload = response?.data;
             const list =
               payload?.data ??
@@ -149,7 +164,7 @@ export default function ProductionPlanList() {
   }, [partCounts, plans]);
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -157,17 +172,14 @@ export default function ProductionPlanList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách kế hoạch sản xuất</h1>
               <p className="text-slate-600">Theo dõi kế hoạch sản xuất và tiến độ triển khai theo từng đơn hàng.</p>
             </div>
-            {!isWorker && (
-              <Link className="order-create-btn" to="/production-plan/create">
-                + Tạo kế hoạch
-              </Link>
-            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <button
               type="button"
-              className="group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md border-slate-200"
+              onClick={() => setStatusFilter("all")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "all" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+                }`}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
@@ -181,8 +193,8 @@ export default function ProductionPlanList() {
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Planned")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Planned" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Chờ Xét Duyệt Kế Hoạch")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Chờ Xét Duyệt Kế Hoạch" ? "border-indigo-500 ring-2 ring-indigo-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -190,15 +202,15 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đã lên kế hoạch</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.planned}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-indigo-100 bg-indigo-50 text-indigo-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("In Progress")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "In Progress" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Đang Sản Xuất")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Đang Sản Xuất" ? "border-violet-500 ring-2 ring-violet-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -206,15 +218,15 @@ export default function ProductionPlanList() {
                   <div className="text-sm font-semibold text-slate-500">Đang triển khai</div>
                   <div className="mt-2 text-4xl font-bold leading-none text-slate-900">{stats.inProgress}</div>
                 </div>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-emerald-100 bg-emerald-50 text-emerald-700">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1.35rem] border border-violet-100 bg-violet-50 text-violet-700">
                   <Clock3 size={26} strokeWidth={2.1} />
                 </div>
               </div>
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter("Completed")}
-              className={`group rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Completed" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
+              onClick={() => setStatusFilter("Hoàn Thành")}
+              className={`group cursor-pointer rounded-[1.75rem] border bg-white px-5 py-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${statusFilter === "Hoàn Thành" ? "border-emerald-500 ring-2 ring-emerald-100" : "border-slate-200"
                 }`}
             >
               <div className="flex items-center justify-between gap-4">
@@ -237,7 +249,7 @@ export default function ProductionPlanList() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm mã kế hoạch, production, đơn hàng, sản phẩm..."
+                  placeholder="Tìm mã kế hoạch, đơn sản xuất, đơn hàng, sản phẩm..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
@@ -250,9 +262,13 @@ export default function ProductionPlanList() {
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
                   <option value="all">Tất cả trạng thái</option>
-                  <option value="Planned">Planned</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Completed">Completed</option>
+                  <option value="Chờ Xét Duyệt">Chờ Xét Duyệt</option>
+                  <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
+                  <option value="Chấp Nhận">Chấp Nhận</option>
+                  <option value="Cần Chỉnh Sửa Kế Hoạch">Cần Chỉnh Sửa Kế Hoạch</option>
+                  <option value="Đang Sản Xuất">Đang Sản Xuất</option>
+                  <option value="Hoàn Thành">Hoàn Thành</option>
+                  <option value="Từ Chối">Từ Chối</option>
                 </select>
               </label>
               <div className="flex items-center justify-end gap-3">
@@ -280,7 +296,7 @@ export default function ProductionPlanList() {
               <table className="w-full divide-y divide-slate-200 table-auto">
                 <thead className="leave-table-head">
                   <tr>
-                    <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Production</th>
+                    <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Đơn sản xuất</th>
                     <th className="leave-table-th w-20 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Đơn hàng</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Tên đơn</th>
                     <th className="leave-table-th px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Tên quản lý</th>
@@ -328,7 +344,7 @@ export default function ProductionPlanList() {
                           </span>
                         </td>
                         <td className="px-2 py-3 text-right whitespace-nowrap">
-                          <Link to={`/production-plan/${item.productionId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                          <Link to={`${detailBasePath}/${item.productionId}`} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">
                             Xem chi tiết
                           </Link>
                         </td>
@@ -351,6 +367,6 @@ export default function ProductionPlanList() {
           )}
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }

@@ -1,7 +1,6 @@
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import TeamLeaderLayout from "@/layouts/TeamLeaderLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import MainLayout from "@/layouts/MainLayout";
 
@@ -31,10 +30,6 @@ export default function OwnerLayout({ children }) {
 
   if (roles.includes("owner") || roles.includes("pm") || roles.includes("project manager")) {
     return <DashboardLayout>{children}</DashboardLayout>;
-  }
-
-  if (roles.includes("team leader") || roles.includes("teamleader") || roles.includes("tl")) {
-    return <TeamLeaderLayout>{children}</TeamLeaderLayout>;
   }
 
   if (roles.includes("worker") || roles.includes("sewer") || roles.includes("tailor")) {

@@ -1,13 +1,15 @@
 import { createElement, useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { ClipboardList, ClipboardCheck, LogOut } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { ClipboardList, ClipboardCheck, LogOut, Users } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
   { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ClipboardList },
+  { to: "/production-plan/assign", label: "Phân công thợ", icon: Users },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardList },
+  { to: "/leave-requests", label: "Đơn nghỉ phép", icon: ClipboardCheck },
 ];
 
 function getInitials(name = "") {
@@ -22,6 +24,7 @@ function getInitials(name = "") {
 
 export default function TeamLeaderSidebar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-tl-sidebar-collapsed");
@@ -71,8 +74,25 @@ export default function TeamLeaderSidebar() {
           <NavLink
             key={to}
             to={to}
+            className={({ isActive }) => {
+              const currentPath = location.pathname;
+              let isCategoryActive = isActive;
+              
+              if (to === "/production-plan") {
+                isCategoryActive = isActive || currentPath.startsWith("/production-plan");
+              }
+
+              if (to === "/output-history") {
+                isCategoryActive = isActive || currentPath.startsWith("/output-history");
+              }
+
+              if (to === "/leave-requests") {
+                isCategoryActive = isActive || currentPath.startsWith("/leave-requests");
+              }
+
+              return `dashboard-sidebar__item ${isCategoryActive ? "is-active" : ""}`;
+            }}
             title={label}
-            className={({ isActive }) => `dashboard-sidebar__item ${isActive ? "is-active" : ""}`}
           >
             {createElement(Icon, { size: 22 })}
             {!collapsed && <span>{label}</span>}

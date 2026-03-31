@@ -146,6 +146,22 @@ export default function AdminUserList() {
     return { total, active, privileged, missingRole, needsReview };
   }, [users]);
 
+  const latestSyncAt = useMemo(() => {
+    const timestamps = users
+      .map((user) => user.updatedAt || user.createdAt || user.lastLogin)
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .filter((value) => !Number.isNaN(value.getTime()))
+      .sort((left, right) => right.getTime() - left.getTime());
+
+    return timestamps[0] ? formatAdminDateTime(timestamps[0].toISOString()) : "Chưa có dữ liệu";
+  }, [users]);
+
+  const fallbackCount = useMemo(
+    () => users.filter((user) => user.detailAvailable === false).length,
+    [users]
+  );
+
   const hasActiveFilters = Boolean(search.trim()) || roleFilter !== "all" || statusFilter !== "all";
 
   const clearFilters = () => {
@@ -206,39 +222,41 @@ export default function AdminUserList() {
         <div className="admin-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="admin-hero">
             <div className="admin-hero__heading">
-              <h1 className="admin-hero__title">View User List Screen</h1>
+              <h1 className="admin-hero__title">Quản lý tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Màn quản trị tập trung để Admin rà soát tài khoản, trạng thái truy cập, role và mức độ rủi ro của từng user.
+                Rà soát dữ liệu user mà backend đang trả về, nhận diện chỗ nào đã đủ dùng và chỗ nào còn thiếu để quản trị ổn định.
               </p>
             </div>
 
             <div className="admin-hero__actions">
               <Link to="/admin/users/create" className="admin-btn admin-btn--primary">
                 <Plus size={18} />
-                <span>Add New User</span>
+                <span>Tạo tài khoản</span>
               </Link>
             </div>
           </div>
 
-          <AdminBanner
-            title="Danh sách user đang lấy từ API admin thật."
-            description="Role hiển thị ưu tiên từ backend; nếu endpoint chưa trả role, web sẽ giữ role vừa gán gần nhất để Admin vẫn review được flow."
-            tone="info"
-          />
-
           {notice ? (
             <AdminBanner
               title={notice}
-              description="Các màn permission và system log vẫn đang dùng dữ liệu demo cho tới khi có endpoint tương ứng."
+              description="Thông báo này áp dụng cho dữ liệu vừa thao tác trên màn quản trị."
               tone={noticeTone}
             />
           ) : null}
 
+          {fallbackCount > 0 ? (
+            <AdminBanner
+              title={`${fallbackCount} tài khoản đang hiển thị từ dữ liệu danh sách`}
+              description="Backend chưa trả được detail đầy đủ cho một số user, nên web đang fallback từ user-list. Đây là dấu hiệu nên bổ sung hoặc sửa ổn định endpoint detail."
+              tone="warning"
+            />
+          ) : null}
+
           <div className="admin-stats-grid">
-            <AdminStatCard icon={Users} label="Tổng user" value={stats.total} meta="Tất cả account đang lấy từ user-list" tone="primary" />
-            <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Account vẫn có thể đăng nhập" tone="success" />
-            <AdminStatCard icon={KeyRound} label="Role đặc quyền" value={stats.privileged} meta="Admin và Owner hiện có trong hệ thống" tone="warning" />
-            <AdminStatCard icon={ShieldAlert} label="Cần rà soát" value={stats.needsReview} meta={`${stats.missingRole} user chưa có role từ API`} tone="danger" />
+            <AdminStatCard icon={Users} label="Tổng tài khoản" value={stats.total} meta={`Đồng bộ gần nhất: ${latestSyncAt}`} tone="primary" />
+            <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Có thể đăng nhập và sử dụng hệ thống" tone="success" />
+            <AdminStatCard icon={KeyRound} label="Vai trò nhạy cảm" value={stats.privileged} meta="Admin và Owner cần được rà soát định kỳ" tone="warning" />
+            <AdminStatCard icon={ShieldAlert} label="Cần kiểm tra" value={stats.needsReview} meta={`${stats.missingRole} thiếu role, ${fallbackCount} thiếu detail`} tone="danger" />
           </div>
 
           <div className="admin-filter-card">
@@ -304,10 +322,14 @@ export default function AdminUserList() {
           <div className="admin-table-card">
             <div className="admin-table-card__header">
               <div>
-                <h2 className="admin-card__title">Danh sách user quản trị</h2>
+                <h2 className="admin-card__title">Danh sách tài khoản</h2>
                 <p className="admin-card__subtitle">
-                  Ưu tiên hiển thị những account mới cập nhật hoặc có cảnh báo truy cập gần đây.
+                  Tập trung vào thông tin đủ để tìm, xem chi tiết, chỉnh sửa và khóa tài khoản nhanh.
                 </p>
+              </div>
+              <div className="admin-inline-summary">
+                <span className="admin-inline-summary__item">{filteredUsers.length} kết quả</span>
+                <span className="admin-inline-summary__item">{stats.active} đang hoạt động</span>
               </div>
             </div>
 
@@ -351,11 +373,10 @@ export default function AdminUserList() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>User</th>
-                      <th>Thông tin liên hệ</th>
-                      <th>Role & quyền</th>
+                      <th>Tài khoản</th>
+                      <th>Vai trò</th>
                       <th>Trạng thái</th>
-                      <th>Đồng bộ hệ thống</th>
+                      <th>Đồng bộ</th>
                       <th className="text-right">Thao tác</th>
                     </tr>
                   </thead>
@@ -374,25 +395,22 @@ export default function AdminUserList() {
                             <div>
                               <div className="admin-table__primary">{user.fullName}</div>
                               <div className="admin-table__secondary">@{user.userName || "chua-co-username"}</div>
+                              <div className="admin-table__secondary admin-table__stacked-meta">
+                                {user.email || "Chưa cập nhật email"}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="admin-table__primary">{user.email || "Chưa cập nhật email"}</div>
-                          <div className="admin-table__secondary">
-                            {[user.phoneNumber || "Chưa có số điện thoại", user.location || "Chưa có địa điểm"]
-                              .filter(Boolean)
-                              .join(" · ")}
                           </div>
                         </td>
                         <td>
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
-                            <span className="admin-badge admin-badge--tone-info">
-                              {user.hasKnownRole ? `${user.grantedPermissionCount} quyền preview` : "API chưa trả role"}
-                            </span>
+                            {!user.hasKnownRole ? (
+                              <span className="admin-badge admin-badge--tone-warning">Chưa đồng bộ</span>
+                            ) : null}
                           </div>
-                          <div className="admin-table__secondary">{user.roleDescription}</div>
+                          <div className="admin-table__secondary">
+                            {user.roleDescription || "Chưa có mô tả vai trò từ backend."}
+                          </div>
                         </td>
                         <td>
                           <div className="admin-chips">
@@ -401,15 +419,20 @@ export default function AdminUserList() {
                         </td>
                         <td>
                           <div className="admin-table__primary">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</div>
-                          <div className="admin-table__secondary">ID: {user.id ?? "Chưa có"}</div>
+                          <div className="admin-table__secondary">
+                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `ID: ${user.id ?? "Chưa có"}`}
+                          </div>
+                          <div className="admin-table__secondary admin-table__stacked-meta">
+                            {[user.phoneNumber, user.location].filter(Boolean).join(" · ") || "Chưa có số điện thoại hoặc địa điểm"}
+                          </div>
                         </td>
                         <td>
                           <div className="admin-table__actions">
                             <Link to={`/admin/users/${user.id}`} className="admin-link-btn admin-link-btn--primary">
-                              View Detail
+                              Xem
                             </Link>
                             <Link to={`/admin/users/${user.id}/edit`} className="admin-link-btn admin-link-btn--secondary">
-                              Update User
+                              Sửa
                             </Link>
                             <button
                               type="button"
@@ -418,10 +441,10 @@ export default function AdminUserList() {
                               disabled={user.status === "inactive" || disablingId === user.id}
                             >
                               {disablingId === user.id
-                                ? "Disabling..."
+                                ? "Đang khóa..."
                                 : user.status === "inactive"
-                                  ? "Disabled"
-                                  : "Disable"}
+                                  ? "Đã khóa"
+                                  : "Khóa"}
                             </button>
                           </div>
                         </td>

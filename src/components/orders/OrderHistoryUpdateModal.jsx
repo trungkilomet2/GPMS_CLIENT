@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, History, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
@@ -15,6 +15,7 @@ const fieldLabels = {
     QUANTITY: 'Số lượng',
     CPU: 'Đơn giá',
     NOTE: 'Ghi chú',
+    STATUS: 'Trạng thái',
     orderName: 'Tên đơn hàng',
     type: 'Loại đơn hàng',
     size: 'Kích thước (Size)',
@@ -25,6 +26,7 @@ const fieldLabels = {
     cpu: 'Đơn giá',
     note: 'Ghi chú',
     image: 'Ảnh đơn hàng',
+    status: 'Trạng thái',
 };
 
 const isImageField = (fieldName = "") => {
@@ -91,10 +93,20 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
                     setLoading(true);
                     setError(null);
                     const response = await OrderService.getUpdateOrderHistory(orderId);
-                    setHistoryData(response.data || response);
+                    // Standard axios response or unwrapped data from interceptor
+                    const finalData = (response?.data && Array.isArray(response.data)) ? response.data : (Array.isArray(response) ? response : []);
+                    setHistoryData(finalData);
                 } catch (err) {
-                    console.error('Lỗi lấy lịch sử:', err);
-                    setError('Không thể tải dữ liệu lịch sử chỉnh sửa.');
+                    // Check status in multiple places just in case
+                    const statusCode = err?.response?.status || err?.status;
+                    
+                    if (statusCode === 404) {
+                        setHistoryData([]);
+                        setError(null); // Explicitly ensure error is null
+                    } else {
+                        console.error('Lỗi lấy lịch sử:', err);
+                        setError('Không thể tải dữ liệu lịch sử chỉnh sửa.');
+                    }
                 } finally {
                     setLoading(false);
                 }
@@ -132,13 +144,20 @@ export default function OrderHistoryUpdateModal({ isOpen, onClose, orderId }) {
                             <p className="text-gray-500">Đang lấy dữ liệu...</p>
                         </div>
                     ) : error ? (
-                        <div className="flex flex-col items-center justify-center h-full py-10 text-red-500 gap-2">
-                            <AlertCircle size={32} />
-                            <p>{error}</p>
+                        <div className="flex flex-col items-center justify-center h-full py-20 text-red-500 gap-4">
+                            <div className="p-4 bg-red-50 rounded-full">
+                                <AlertCircle size={48} />
+                            </div>
+                            <p className="text-lg font-medium text-center px-6">
+                                {error}
+                            </p>
                         </div>
-                    ) : historyData.length === 0 ? (
-                        <div className="text-center py-20 text-gray-500">
-                            Chưa có lịch sử chỉnh sửa cho đơn hàng này.
+                    ) : historyData && Array.isArray(historyData) && historyData.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full py-20 text-gray-400 gap-3">
+                            <div className="p-4 bg-gray-50 rounded-full">
+                                <History size={48} className="opacity-20" />
+                            </div>
+                            <p className="font-medium text-base">Chưa có thay đổi gì.</p>
                         </div>
                     ) : (
                         historyData.map((item) => (

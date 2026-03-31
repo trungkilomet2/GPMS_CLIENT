@@ -32,6 +32,16 @@ const STATUS_MAP = {
     icon: XCircle,
     badge: "bg-rose-50 text-rose-700 border-rose-200",
   },
+  cancel_requested: {
+    label: "Chờ hủy",
+    icon: Clock3,
+    badge: "bg-orange-50 text-orange-700 border-orange-200",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    icon: XCircle,
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+  },
 };
 
 function StatusBadge({ status }) {
@@ -61,6 +71,10 @@ function SummaryCard({ label, value, icon: Icon }) {
       </div>
     </div>
   );
+}
+
+function shouldShowApprover(leave) {
+  return Boolean(leave?.approvedByName) && leave?.status !== "pending";
 }
 
 export default function LeaveRequestHistoryList() {
@@ -173,6 +187,8 @@ export default function LeaveRequestHistoryList() {
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
+                  <option value="cancel_requested">Chờ hủy</option>
+                  <option value="cancelled">Đã hủy</option>
                 </select>
               </label>
 
@@ -244,9 +260,17 @@ export default function LeaveRequestHistoryList() {
                         </td>
                         <td className="px-5 py-4 align-top">
                           <p className="line-clamp-2 max-w-xl text-sm leading-6 text-slate-700">{item.content}</p>
+                          <div className="mt-2 text-xs text-slate-500">
+                            Nghỉ từ {formatLeaveDateTime(item.fromDate)} đến {formatLeaveDateTime(item.toDate)}
+                          </div>
+                          {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">Người phê duyệt: {item.approvedByName}</div> : null}
+                          {item.cancelContent ? <div className="mt-1 text-xs text-slate-500">Lý do hủy: {item.cancelContent}</div> : null}
                         </td>
                         <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateCreate)}</td>
-                        <td className="px-5 py-4 align-top text-sm text-slate-700">{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</td>
+                        <td className="px-5 py-4 align-top text-sm text-slate-700">
+                          <div>{formatLeaveDateTime(item.dateReply, "Chưa phản hồi")}</div>
+                          {shouldShowApprover(item) ? <div className="mt-1 text-xs text-slate-500">{item.approvedByName}</div> : null}
+                        </td>
                         <td className="px-5 py-4 align-top">
                           <StatusBadge status={item.status} />
                         </td>

@@ -13,6 +13,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_FORM_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
+  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -38,6 +39,7 @@ export default function EmployeeUpdate() {
     userName: "",
     fullName: "",
     role: "PM",
+    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
 
@@ -53,7 +55,10 @@ export default function EmployeeUpdate() {
       try {
         const [employee, managerResponse] = await Promise.all([
           WorkerService.getEmployeeById(id),
-          WorkerService.getAllEmployees(),
+          WorkerService.getEmployeeDirectory({
+            pageSize: 100,
+            includeHidden: true,
+          }),
         ]);
 
         if (!mounted) return;
@@ -72,6 +77,7 @@ export default function EmployeeUpdate() {
           userName: employee.userName || "",
           fullName: employee.fullName || "",
           role: pickPrimarySystemRole(employee.role) || "PM",
+          statusId: employee.statusId ?? USER_STATUS_IDS.Active,
           managerId: employee.managerId != null ? String(employee.managerId) : "",
         });
       } catch (err) {
@@ -125,6 +131,17 @@ export default function EmployeeUpdate() {
     }
   }, [availableManagers, form.managerId]);
 
+  useEffect(() => {
+    if (form.role !== "PM") return;
+    if (String(form.managerId ?? "").trim()) return;
+    if (availableManagers.length !== 1) return;
+
+    setForm((prev) => ({
+      ...prev,
+      managerId: String(availableManagers[0].id),
+    }));
+  }, [availableManagers, form.managerId, form.role]);
+
   const handleChange = (field) => (event) => {
     setForm((prev) => ({
       ...prev,
@@ -163,8 +180,10 @@ export default function EmployeeUpdate() {
     try {
       await WorkerService.updateEmployee(id, {
         fullName: normalizedFullName,
+        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
+        workerRoleIds: [],
       });
 
       navigate(`/employees/${id}`);
@@ -192,7 +211,7 @@ export default function EmployeeUpdate() {
               </Link>
               <h1 className="employee-create-hero__title">Cập nhật thông tin nhân viên</h1>
               <p className="employee-create-hero__subtitle">
-                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Team Lead / Worker.
+                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Worker.
               </p>
             </div>
 
@@ -288,7 +307,20 @@ export default function EmployeeUpdate() {
                     </select>
                     {fieldErrors.managerId ? <span className="employee-create-field__error">{fieldErrors.managerId}</span> : null}
                   </label>
+
                 </div>
+
+                {form.role === "Worker" ? (
+                  <div className="employee-create-banner">
+                    <span>
+                      Chuyên môn của worker đã được tách sang màn riêng để hỗ trợ chọn nhiều skill cùng lúc.
+                      {" "}
+                      <Link to={`/employees/${id}/skills`} className="employee-create-inline-link">
+                        Mở màn gán skill
+                      </Link>
+                    </span>
+                  </div>
+                ) : null}
 
                 <div className="employee-create-banner">
                   <span>{getManagerRoleHint(form.role)}</span>

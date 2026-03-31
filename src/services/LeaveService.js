@@ -53,6 +53,8 @@ const normalizeStatus = (value) => {
 
   if (["approved", "approve", "đã duyệt", "da duyet"].includes(normalized)) return "approved";
   if (["rejected", "reject", "deny", "denied", "từ chối", "tu choi"].includes(normalized)) return "rejected";
+  if (["cancelled", "canceled", "cancel", "đã hủy", "da huy"].includes(normalized)) return "cancelled";
+  if (["cancel_requested", "cancel requested", "request-cancel", "requested cancel", "yêu cầu hủy", "yeu cau huy"].includes(normalized)) return "cancel_requested";
   return "pending";
 };
 
@@ -77,7 +79,22 @@ const normalizeLeaveItem = (item = {}) => ({
     item.repliedDate ??
     item.updatedAt
   ),
+  fromDate: normalizeLeaveDate(
+    item.fromDate ??
+    item.from_date ??
+    item.leaveFrom ??
+    item.startDate
+  ),
+  toDate: normalizeLeaveDate(
+    item.toDate ??
+    item.to_date ??
+    item.leaveTo ??
+    item.endDate
+  ),
   denyContent: item.denyContent ?? "",
+  cancelContent: item.cancelContent ?? "",
+  rejectCancelContent: item.rejectCancelContent ?? "",
+  approvedByName: item.approvedByName ?? item.approverName ?? "",
   status: normalizeStatus(item.status),
 });
 
@@ -148,6 +165,38 @@ const LeaveService = {
     const response = parseApiPayload(rawResponse);
 
     emitLeaveChange({ action: "deny", id });
+    return response;
+  },
+
+  async cancelLeaveRequest(id, payload) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.CANCEL(id), payload);
+    const response = parseApiPayload(rawResponse);
+
+    emitLeaveChange({ action: "cancel", id });
+    return response;
+  },
+
+  async requestCancelLeaveRequest(id, payload) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REQUEST_CANCEL(id), payload);
+    const response = parseApiPayload(rawResponse);
+
+    emitLeaveChange({ action: "request-cancel", id });
+    return response;
+  },
+
+  async confirmCancelLeaveRequest(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.CONFIRM_CANCEL(id));
+    const response = parseApiPayload(rawResponse);
+
+    emitLeaveChange({ action: "confirm-cancel", id });
+    return response;
+  },
+
+  async rejectCancelLeaveRequest(id, payload) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REJECT_CANCEL(id), payload);
+    const response = parseApiPayload(rawResponse);
+
+    emitLeaveChange({ action: "reject-cancel", id });
     return response;
   },
 

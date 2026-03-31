@@ -1,10 +1,12 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { userService } from '@/services/userService';
 import { getStoredUser } from '@/lib/authStorage';
+import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
@@ -39,7 +41,10 @@ export default function CreateOrder() {
 
         if (active) setProfileCheck({ checking: false, missing });
       } catch (error) {
-        if (active) setProfileCheck({ checking: false, missing: ['email', 'số điện thoại', 'địa chỉ'] });
+        if (active) {
+          setProfileCheck({ checking: false, missing: ['email', 'số điện thoại', 'địa chỉ'] });
+          console.error("Profile check failed:", error);
+        }
       }
     };
 
@@ -82,43 +87,158 @@ export default function CreateOrder() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderImageFile, setOrderImageFile] = useState(null);
   const [orderImagePreview, setOrderImagePreview] = useState('');
-  const [templateFiles, setTemplateFiles] = useState([]);
-  const [hardCopyQty, setHardCopyQty] = useState('');
+  const [templateItems, setTemplateItems] = useState([]);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
 
+    // IMAGE
     if (!orderImageFile && !orderData.image) newErrors.image = 'Vui lòng chọn ảnh đơn hàng';
-    if (!orderData.orderName?.trim()) newErrors.orderName = 'Tên đơn hàng không được để trống';
-    else if (orderData.orderName.trim().length < 3 || orderData.orderName.trim().length > 50) {
-      newErrors.orderName = 'Tên đơn hàng phải từ 3 đến 50 ký tự';
-    }
-    if (!orderData.type?.trim()) newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
-    if (!orderData.size?.trim()) newErrors.size = 'Kích thước không được để trống';
-    if (!orderData.color?.trim()) newErrors.color = 'Màu sắc không được để trống';
-    if (orderData.quantity <= 0) newErrors.quantity = 'Số lượng sản xuất phải lớn hơn 0';
-    if (orderData.cpu < 0) newErrors.cpu = 'Chi phí đơn vị không được âm';
-    if (orderData.cpu !== '' && Number(orderData.cpu) < 10) {
-      newErrors.cpu = 'Giá / sản phẩm phải từ 10 trở lên';
+
+    // ORDER_NAME: NOT NULL, NVARCHAR(100)
+    if (!orderData.orderName?.trim()) {
+      newErrors.orderName = 'Tên đơn hàng không được để trống';
+    } else if (orderData.orderName.trim().length < 3) {
+      newErrors.orderName = 'Tên đơn hàng phải có ít nhất 3 ký tự';
+    } else if (orderData.orderName.trim().length > 100) {
+      newErrors.orderName = 'Tên đơn hàng không được vượt quá 100 ký tự';
     }
 
+    // TYPE: NOT NULL, NVARCHAR(50)
+    if (!orderData.type?.trim()) {
+      newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
+    } else if (orderData.type.trim().length > 50) {
+      newErrors.type = 'Loại sản phẩm không được vượt quá 50 ký tự';
+    }
+
+    // SIZE: CHAR(5) — dropdown nên chỉ cần bắt buộc chọn
+    if (!orderData.size?.trim()) newErrors.size = 'Vui lòng chọn kích thước';
+
+    // COLOR: NOT NULL, NVARCHAR(30)
+    if (!orderData.color?.trim()) {
+      newErrors.color = 'Màu sắc không được để trống';
+    } else if (orderData.color.trim().length > 30) {
+      newErrors.color = 'Màu sắc không được vượt quá 30 ký tự';
+    }
+
+    // QUANTITY: INT NOT NULL, khoảng [100, 999] theo yêu cầu nghiệp vụ
+    const qty = Number(orderData.quantity);
+    if (orderData.quantity === '' || isNaN(qty)) {
+      newErrors.quantity = 'Số lượng sản xuất không được để trống';
+    } else if (!Number.isInteger(qty)) {
+      newErrors.quantity = 'Số lượng phải là số nguyên';
+    } else if (qty < 10) {
+      newErrors.quantity = 'Số lượng sản xuất tối thiểu là 10 sản phẩm';
+    } else if (qty > 9999) {
+      newErrors.quantity = 'Số lượng sản xuất tối đa là 9999 sản phẩm';
+    }
+
+    // CPU: DECIMAL(18,2) NOT NULL, >= 0
+    const cpu = Number(orderData.cpu);
+    if (orderData.cpu === '' || isNaN(cpu)) {
+      newErrors.cpu = 'Giá / sản phẩm không được để trống';
+    } else if (cpu < 0) {
+      newErrors.cpu = 'Giá / sản phẩm không được âm';
+    } else if (cpu < 1000 || cpu > 1000000000) {
+      newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 1.000.000.000 VND';
+    }
+
+    // NOTE: NVARCHAR(255) — nullable, chỉ check độ dài
+    if (orderData.note && orderData.note.length > 255) {
+      newErrors.note = 'Ghi chú không được vượt quá 255 ký tự';
+    }
+
+    // START_DATE: DATE NOT NULL
     if (!orderData.startDate) {
       newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
     } else {
       const today = new Date();
-      const todayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().split('T')[0];
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const todayStr = `${yyyy}-${mm}-${dd}`;
       if (orderData.startDate < todayStr) {
         newErrors.startDate = 'Ngày bắt đầu không được trước ngày hiện tại';
       }
     }
+
+    // END_DATE: DATE NOT NULL, >= START_DATE
     if (!orderData.endDate) {
       newErrors.endDate = 'Vui lòng chọn ngày kết thúc';
     } else if (orderData.startDate && new Date(orderData.startDate) > new Date(orderData.endDate)) {
       newErrors.endDate = 'Ngày kết thúc không được trước ngày bắt đầu';
     }
 
+    // TEMPLATES VALIDATION (O_TEMPLATE)
+    if (templateItems.length > 0) {
+      const templateErrors = [];
+      templateItems.forEach((item, idx) => {
+        const itemErrs = {};
+        if (!item.templateName?.trim()) {
+          itemErrs.templateName = 'Tên mẫu thiết kế là bắt buộc';
+        } else if (item.templateName.trim().length > 100) {
+          itemErrs.templateName = 'Tên mẫu không được quá 100 ký tự';
+        }
+        if (item.note && item.note.length > 100) {
+          itemErrs.note = 'Ghi chú không được quá 100 ký tự';
+        }
+        if (Object.keys(itemErrs).length > 0) {
+          templateErrors[idx] = itemErrs;
+        }
+      });
+      if (templateErrors.length > 0) {
+        newErrors.templates = templateErrors;
+      }
+    }
+
+    // MATERIALS VALIDATION (O_MATERIAL)
+    if (materials.length > 0) {
+      const materialErrors = [];
+      materials.forEach((m, idx) => {
+        const mErrs = {};
+        if (!m.image) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
+        if (!m.materialName?.trim()) {
+          mErrs.materialName = 'Tên vật liệu là bắt buộc';
+        } else if (m.materialName.trim().length > 150) {
+          mErrs.materialName = 'Tên vật liệu không được quá 150 ký tự';
+        }
+
+        if (m.color && m.color.length > 30) {
+          mErrs.color = 'Màu sắc không được quá 30 ký tự';
+        } else if (!m.color?.trim()) {
+          mErrs.color = 'Màu sắc không được để trống';
+        }
+
+        if (!m.value || isNaN(m.value) || Number(m.value) <= 0) {
+          mErrs.value = 'Số lượng phải lớn hơn 0';
+        } else if (Number(m.value) > 99999) {
+          mErrs.value = 'Số lượng tối đa là 99.999';
+        }
+
+        if (!m.uom?.trim()) {
+          mErrs.uom = 'Đơn vị tính là bắt buộc';
+        } else if (m.uom.trim().length > 50) {
+          mErrs.uom = 'Đơn vị tính không được quá 50 ký tự';
+        }
+
+        if (m.note && m.note.length > 100) {
+          mErrs.note = 'Ghi chú không được quá 100 ký tự';
+        }
+
+        if (Object.keys(mErrs).length > 0) {
+          materialErrors[idx] = mErrs;
+        }
+      });
+      if (materialErrors.length > 0) {
+        newErrors.materialsList = materialErrors;
+      }
+    }
+
     setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      console.warn('Lỗi xác thực tạo đơn hàng:', newErrors);
+    }
     return Object.keys(newErrors).length === 0;
   };
 
@@ -175,6 +295,14 @@ export default function CreateOrder() {
     if (errors.materials) {
       setErrors((prev) => ({ ...prev, materials: null }));
     }
+    if (errors.materialsList && errors.materialsList[targetIndex]) {
+      setErrors((prev) => {
+        const newMaterialsList = prev.materialsList ? { ...prev.materialsList } : {};
+        if (targetIndex !== null) delete newMaterialsList[targetIndex];
+        return { ...prev, materialsList: newMaterialsList };
+      });
+    }
+
     setIsModalOpen(false);
 
     if (pendingMaterial.imageFile) {
@@ -196,8 +324,9 @@ export default function CreateOrder() {
             return updated;
           });
         }
-      } catch {
-        // keep preview; user can edit to retry
+      } catch (error) {
+        console.error("Material image upload failed:", error);
+        toast.error(getErrorMessage(error, "Không thể tải ảnh vật liệu lên Cloudinary."));
       }
     }
   };
@@ -209,11 +338,11 @@ export default function CreateOrder() {
     if (!file) return;
     const allowedTypes = ['image/jpeg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
+      toast.warn('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      alert('Ảnh quá lớn (tối đa 2MB)');
+      toast.warn('Ảnh quá lớn (tối đa 2MB)');
       return;
     }
     const previewUrl = URL.createObjectURL(file);
@@ -221,8 +350,26 @@ export default function CreateOrder() {
     setOrderImagePreview(previewUrl);
   };
 
-  const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx'];
+  const ALLOWED_TEMPLATE_EXTENSIONS = ['.dxf', '.iba', '.mdl', '.plt', '.pdf', '.docx', '.xlsx', '.png', '.jpg', '.jpeg'];
+  const IMAGE_TEMPLATE_EXTENSIONS = ['.png', '.jpg', '.jpeg'];
   const MAX_TEMPLATE_SIZE = 10 * 1024 * 1024;
+  const getTemplateNameFromFile = (fileName = '') => fileName.replace(/\.[^/.]+$/, '') || fileName;
+  const buildTemplateId = (file) => `${Date.now()}-${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`;
+  const getFileExtension = (fileName = '') => {
+    const parts = String(fileName).toLowerCase().split('.');
+    return parts.length > 1 ? `.${parts.pop()}` : '';
+  };
+  const detectTemplateType = (file) => {
+    const mime = String(file?.type || '').toLowerCase();
+    if (mime.startsWith('image/')) return 'IMAGE';
+    const ext = getFileExtension(file?.name || '');
+    return IMAGE_TEMPLATE_EXTENSIONS.includes(ext) ? 'IMAGE' : 'FILE';
+  };
+  const uploadTemplateByType = (item) => {
+    const normalizedType = String(item?.type || '').toUpperCase();
+    if (normalizedType === 'IMAGE') return CloudinaryService.uploadImage(item.file);
+    return CloudinaryService.uploadTemplateFile(item.file);
+  };
 
   const handleTemplateFileChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -243,25 +390,81 @@ export default function CreateOrder() {
     });
 
     if (invalid.length > 0) {
-      alert(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+      toast.error(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
     }
 
     if (valid.length > 0) {
-      setTemplateFiles((prev) => [...prev, ...valid]);
+      setTemplateItems((prev) => [
+        ...prev,
+        ...valid.map((file) => ({
+          id: buildTemplateId(file),
+          file,
+          fileName: file.name,
+          templateName: getTemplateNameFromFile(file.name),
+          type: detectTemplateType(file),
+          note: '',
+        })),
+      ]);
     }
 
     e.target.value = '';
   };
 
-  const removeTemplateFile = (index) => {
-    setTemplateFiles((prev) => prev.filter((_, i) => i !== index));
+  const updateTemplateMeta = (index, field, value) => {
+    setTemplateItems((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
+    );
+  };
+  
+  const removeTemplateItem = (index) => {
+    setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+    if (errors.templates) {
+      setErrors((prev) => {
+        const newTemplates = { ...prev.templates };
+        delete newTemplates[index];
+        const adjusted = {};
+        Object.keys(newTemplates).forEach((key) => {
+          const k = parseInt(key);
+          if (k > index) adjusted[k - 1] = newTemplates[key];
+          else adjusted[k] = newTemplates[key];
+        });
+        return { ...prev, templates: adjusted };
+      });
+    }
+  };
+
+  const handleDeleteMaterial = (index) => {
+    setMaterials((prev) => prev.filter((_, i) => i !== index));
+    if (errors.materialsList) {
+      setErrors((prev) => {
+        const newMaterialsList = { ...prev.materialsList };
+        delete newMaterialsList[index];
+        const adjustedList = {};
+        Object.keys(newMaterialsList).forEach((key) => {
+          const k = parseInt(key);
+          if (k > index) adjustedList[k - 1] = newMaterialsList[key];
+          else adjustedList[k] = newMaterialsList[key];
+        });
+        return { ...prev, materialsList: adjustedList };
+      });
+    }
+  };
+
+  const translateError = (msg) => {
+    const dictionary = {
+      'Image must be a valid URL': 'Ảnh phải là đường dẫn (URL) hợp lệ',
+      'File must be a valid URL': 'Tệp tin phải là đường dẫn (URL) hợp lệ',
+      'Start date must be greater than current date.': 'Ngày bắt đầu phải sau ngày hiện tại',
+      'One or more validation errors occurred.': 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại',
+    };
+    return dictionary[msg] || msg;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (profileCheck.missing.length > 0) {
-      alert('Vui lòng cập nhật email, số điện thoại và địa chỉ trước khi tạo đơn hàng.');
+      toast.warn('Vui lòng cập nhật email, số điện thoại và địa chỉ trước khi tạo đơn hàng.');
       return;
     }
 
@@ -281,58 +484,55 @@ export default function CreateOrder() {
 
       const materialsPayload = await Promise.all(
         materials.map(async (m) => {
+          let imageUrl = m.image || null;
           if (m.imageFile) {
             const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
-            return {
-              ...m,
-              color: m.color ?? '',
-              image: uploadRes?.url || '',
-              imageFile: undefined,
-              imagePreview: undefined,
-            };
+            imageUrl = uploadRes?.url || null;
+          } else if (typeof m.image === 'string' && !/^https?:\/\//i.test(m.image)) {
+            imageUrl = null; // Ensure invalid strings/empty are null
           }
 
-          const isRemoteUrl = typeof m.image === 'string' && /^https?:\/\//i.test(m.image);
           return {
-            ...m,
+            materialName: m.materialName ?? '',
+            image: imageUrl,
             color: m.color ?? '',
-            image: isRemoteUrl ? m.image : '',
-            imageFile: undefined,
-            imagePreview: undefined,
+            value: Number(m.value) || 0,
+            note: m.note ?? '',
+            uom: m.uom ?? '',
           };
         })
       );
 
       const templatesPayload = [];
-      if (templateFiles.length > 0) {
+      if (templateItems.length > 0) {
         const uploadResults = await Promise.all(
-          templateFiles.map((file) => CloudinaryService.uploadTemplateFile(file))
+          templateItems.map((item) => uploadTemplateByType(item))
         );
         uploadResults.forEach((res, idx) => {
           const url = res?.url || '';
           if (!url) return;
+          const item = templateItems[idx];
           templatesPayload.push({
-            templateName: templateFiles[idx]?.name || 'Bản mềm',
-            type: 'SOFT',
+            templateName: item?.templateName?.trim() || 'Template',
+            type: item?.type || detectTemplateType(item?.file),
             file: url,
-            quantity: null,
-            note: '',
+            note: item?.note?.trim() || '',
           });
-        });
-      }
-      if (Number(hardCopyQty) > 0) {
-        templatesPayload.push({
-          templateName: 'Bản cứng',
-          type: 'HARD',
-          file: null,
-          quantity: Number(hardCopyQty),
-          note: '',
         });
       }
 
       const payload = {
-        ...orderData,
-        image: orderImageUrl,
+        userId: Number(orderData.userId ?? userId) || 0,
+        image: orderImageUrl || null,
+        orderName: orderData.orderName ?? '',
+        type: orderData.type ?? '',
+        size: orderData.size ?? '',
+        color: orderData.color ?? '',
+        startDate: orderData.startDate ?? '',
+        endDate: orderData.endDate ?? '',
+        quantity: Number(orderData.quantity) || 0,
+        cpu: Number(orderData.cpu) || 0,
+        note: orderData.note ?? '',
         materials: materialsPayload,
         templates: templatesPayload,
       };
@@ -341,8 +541,9 @@ export default function CreateOrder() {
       await OrderService.createOrder(payload);
       setIsSuccessOpen(true);
     } catch (error) {
-      console.error('Lỗi API:', error.response?.data || error.message);
-      alert('Lỗi: ' + (error.response?.data?.title || 'Không thể kết nối đến máy chủ'));
+      console.error('Lỗi API (CreateOrder):', error);
+      const errMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ');
+      toast.error('Lỗi: ' + errMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -387,7 +588,7 @@ export default function CreateOrder() {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
+                  onClick={() => navigate('/orders')}
                   className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50"
                 >
                   <ArrowLeft size={20} />
@@ -400,49 +601,48 @@ export default function CreateOrder() {
 
               <form onSubmit={handleSubmit} className="space-y-8">
                 <OrderFormSections
-                orderData={orderData}
-                errors={errors}
-                onOrderChange={handleOrderChange}
-                orderImagePreview={orderImagePreview}
-                orderImageValue={orderData.image}
-                onOrderImageChange={handleOrderImageChange}
-                materials={materials}
-                onOpenMaterialModal={() => {
-                  setEditingIndex(null);
-                  setMaterialFormData({ materialName: '', color: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
-                  setIsModalOpen(true);
-                }}
-                onEditMaterial={(i) => {
-                  setEditingIndex(i);
-                  setMaterialFormData({
-                    materialName: materials[i].materialName ?? materials[i].name ?? '',
-                    color: materials[i].color ?? '',
-                    value: materials[i].value ?? materials[i].quantity ?? '',
-                    uom: materials[i].uom ?? '',
-                    image: materials[i].image ?? '',
-                    imageFile: null,
-                    imagePreview: '',
-                    note: materials[i].note ?? '',
-                  });
-                  setIsModalOpen(true);
-                }}
-                onDeleteMaterial={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
-                templateFiles={templateFiles}
-                onTemplateFileChange={handleTemplateFileChange}
-                onRemoveTemplateFile={removeTemplateFile}
-                hardCopyQty={hardCopyQty}
-                onHardCopyQtyChange={(e) => setHardCopyQty(e.target.value)}
-                totalCost={totalCost}
-                isSubmitting={isSubmitting}
-                onCancel={() => navigate(-1)}
-                materialModalProps={{
-                  isOpen: isModalOpen,
-                  onClose: () => setIsModalOpen(false),
-                  onSave: handleSaveMaterial,
-                  formData: materialFormData,
-                  onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
-                  editingIndex,
-                }}
+                  orderData={orderData}
+                  errors={errors}
+                  onOrderChange={handleOrderChange}
+                  orderImagePreview={orderImagePreview}
+                  orderImageValue={orderData.image}
+                  onOrderImageChange={handleOrderImageChange}
+                  materials={materials}
+                  onOpenMaterialModal={() => {
+                    setEditingIndex(null);
+                    setMaterialFormData({ materialName: '', color: '', value: '', uom: '', image: '', imageFile: null, imagePreview: '', note: '' });
+                    setIsModalOpen(true);
+                  }}
+                  onEditMaterial={(i) => {
+                    setEditingIndex(i);
+                    setMaterialFormData({
+                      materialName: materials[i].materialName ?? materials[i].name ?? '',
+                      color: materials[i].color ?? '',
+                      value: materials[i].value ?? materials[i].quantity ?? '',
+                      uom: materials[i].uom ?? '',
+                      image: materials[i].image ?? '',
+                      imageFile: null,
+                      imagePreview: '',
+                      note: materials[i].note ?? '',
+                    });
+                    setIsModalOpen(true);
+                  }}
+                  onDeleteMaterial={handleDeleteMaterial}
+                  templateItems={templateItems}
+                  onTemplateFileChange={handleTemplateFileChange}
+                  onTemplateMetaChange={updateTemplateMeta}
+                  onRemoveTemplateItem={removeTemplateItem}
+                  totalCost={totalCost}
+                  isSubmitting={isSubmitting}
+                  onCancel={() => navigate('/orders')}
+                  materialModalProps={{
+                    isOpen: isModalOpen,
+                    onClose: () => setIsModalOpen(false),
+                    onSave: handleSaveMaterial,
+                    formData: materialFormData,
+                    onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
+                    editingIndex,
+                  }}
                 />
               </form>
             </>

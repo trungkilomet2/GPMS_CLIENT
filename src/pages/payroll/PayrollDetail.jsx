@@ -1,315 +1,341 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  BadgeDollarSign,
-  CalendarRange,
-  CheckCircle2,
-  CircleAlert,
-  ClipboardList,
-  FileText,
-  Wallet,
-} from "lucide-react";
-import DashboardLayout from "@/layouts/DashboardLayout";
-import {
-  formatCurrency,
-  formatDateLabel,
-  formatMonthLabel,
-  getLatestPayrollMonth,
-  getPayrollFlowLabel,
-  getLatestPayrollRecordForEmployee,
-  getPayrollInitials,
-  getPayrollRecord,
-} from "@/lib/payroll";
-import "@/styles/payroll.css";
-
-const STATUS_META = {
-  paid: {
-    label: "Đã thanh toán",
-    className: "payroll-status payroll-status--paid",
-    description: "Khoản lương này đã được owner xác nhận chi trả.",
-  },
-  pending: {
-    label: "Chờ xử lý",
-    className: "payroll-status payroll-status--pending",
-    description: "Cần owner rà soát và xác nhận trước khi thanh toán.",
-  },
-};
+import { useMemo, useEffect, useState } from "react";
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from "react-router-dom";
+import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2, CreditCard } from "lucide-react";
+import PmOwnerLayout from "@/layouts/PmOwnerLayout";
+import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
+import ProductionPartService from "@/services/ProductionPartService";
+import Pagination from "@/components/Pagination";
+import ConfirmModal from "@/components/ConfirmModal";
+import SuccessModal from "@/components/SuccessModal";
+import { toast } from "react-toastify";
+import "@/styles/homepage.css";
+import "@/styles/leave.css";
 
 export default function PayrollDetail() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { employeeId } = useParams();
   const [searchParams] = useSearchParams();
-  const requestedMonth = searchParams.get("month") || getLatestPayrollMonth();
-  const exactRecord = useMemo(
-    () => getPayrollRecord(employeeId, requestedMonth),
-    [employeeId, requestedMonth]
-  );
-  const latestRecord = useMemo(
-    () => getLatestPayrollRecordForEmployee(employeeId),
-    [employeeId]
-  );
-  const record = exactRecord || latestRecord;
-  const activeMonth = record?.month || requestedMonth;
-  const [paymentState, setPaymentState] = useState({
-    status: record?.status ?? "pending",
-    paidAt: record?.paidAt ?? null,
-  });
-  const [feedback, setFeedback] = useState("");
+
+  const initialMonth = Number(searchParams.get("month")) || location.state?.month || new Date().getMonth() + 1;
+  const initialYear = Number(searchParams.get("year")) || location.state?.year || new Date().getFullYear();
+
+  const [month] = useState(initialMonth);
+  const [year] = useState(initialYear);
+  const [logs, setLogs] = useState(location.state?.logs || []);
+  const [loading, setLoading] = useState(!location.state?.logs);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [isPaying, setIsPaying] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   useEffect(() => {
-    setPaymentState({
-      status: record?.status ?? "pending",
-      paidAt: record?.paidAt ?? null,
-    });
-    setFeedback("");
-  }, [record]);
+    if (location.state?.logs) return;
 
-  const currentStatus = paymentState.status;
-  const paidAt = paymentState.paidAt;
-  const statusMeta = STATUS_META[currentStatus] ?? STATUS_META.pending;
-  const isFallbackMonth = Boolean(record && !exactRecord && requestedMonth !== activeMonth);
+    let active = true;
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const aggregated = await fetchAggregatedPayroll(month, year);
+        const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(employeeId));
+        if (active) {
+          setLogs(workerData?.logs || []);
+        }
+      } catch (err) {
+        if (active) {
+          setError(getErrorMessage(err, "Không thể tải chi tiết lương."));
+          console.error(err);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
 
-  const handleConfirmPayment = () => {
-    const confirmedAt = new Date().toISOString();
+    loadData();
+    return () => { active = false; };
+  }, [employeeId, month, year, refreshKey]);
 
-    setPaymentState({
-      status: "paid",
-      paidAt: confirmedAt,
-    });
-    setFeedback("Đã cập nhật trạng thái thanh toán trên giao diện demo.");
+  const handlePaymentAll = async (workerLogs) => {
+    if (!workerLogs?.length) return;
+    
+    // Filter out already paid logs if possible
+    const unpaidLogs = workerLogs.filter(log => !log.paidAt);
+    if (unpaidLogs.length === 0 && workerLogs.some(l => l.paidAt)) {
+      toast.info("Tất cả công đoạn hiện tại đã được thanh toán.");
+      return;
+    }
+
+    setIsConfirmOpen(true);
+  };
+
+  const confirmPaymentAll = async () => {
+    setIsConfirmOpen(false);
+    try {
+      setIsPaying(true);
+      // Group logically by partId
+      const groups = workerLogs.reduce((acc, log) => {
+        const pId = log.partId;
+        if (!pId) return acc;
+        if (!acc[pId]) acc[pId] = [];
+        acc[pId].push(log.id || log.workLogId || log.wlId);
+        return acc;
+      }, {});
+
+      const promises = Object.entries(groups).map(([partId, logIds]) => 
+        ProductionPartService.completePayment(partId, { workLogIds: logIds })
+      );
+
+      await Promise.all(promises);
+      setIsSuccessOpen(true);
+      setRefreshKey(prev => prev + 1);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Thanh toán thất bại."));
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
+  const workerLogs = useMemo(() => {
+    // If we have logs from state but navigate directly, this ensures we filter correctly
+    return getWorkerMonthlyDetail(logs, employeeId, month, year);
+  }, [logs, employeeId, month, year]);
+
+  const stats = useMemo(() => {
+    const totalQty = workerLogs.reduce((sum, log) => sum + log.quantity, 0);
+    const totalSalary = workerLogs.reduce((sum, log) => sum + log.quantity * log.cpu, 0);
+    const firstLog = workerLogs[0];
+    const workerName = firstLog?.workerFullName || firstLog?.workerName || employeeId;
+    const workerAvatar = firstLog?.workerAvatar || null;
+    return { totalQty, totalSalary, workerName, workerAvatar };
+  }, [workerLogs, employeeId]);
+
+  const totalPages = Math.ceil(workerLogs.length / pageSize);
+  const currentLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return workerLogs.slice(start, start + pageSize);
+  }, [workerLogs, currentPage, pageSize]);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("vi-VN");
+    } catch {
+      return dateStr;
+    }
   };
 
   return (
-    <DashboardLayout>
-      <div className="payroll-page payroll-page--detail">
-        <div className="payroll-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-          <div className="payroll-hero payroll-hero--detail">
-            <div className="payroll-hero__content">
-              <Link
-                to={`/salary?month=${activeMonth}`}
-                className="payroll-hero__back"
+    <PmOwnerLayout>
+      <div className="leave-page leave-list-page">
+        <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
-                <ArrowLeft size={20} />
-                <span>Quay lại bảng lương</span>
-              </Link>
-              <h1 className="payroll-hero__title">Chi tiết bảng lương</h1>
-              <p className="payroll-hero__subtitle">
-                Theo dõi thực lĩnh của worker cùng chuỗi đối soát PM và xác nhận thanh toán từ owner.
-              </p>
+                <ArrowLeft size={18} />
+              </button>
+               <div className="flex items-center gap-4">
+                 {stats.workerAvatar ? (
+                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-sm ring-1 ring-slate-100">
+                     <img src={stats.workerAvatar} alt={stats.workerName} className="h-full w-full object-cover" />
+                   </div>
+                 ) : (
+                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-black uppercase text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                     {stats.workerName.charAt(0)}
+                   </div>
+                 )}
+                 <div className="flex flex-col gap-1">
+                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                     Chi tiết lương: {stats.workerName}
+                   </h1>
+                    <p className="text-slate-600 text-sm">
+                      Kỳ lương: Tháng {month}/{year}
+                    </p>
+                  </div>
+                </div>
+            </div>
+
+            <button
+              onClick={() => handlePaymentAll(workerLogs)}
+              disabled={isPaying || workerLogs.length === 0}
+              className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPaying ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <CreditCard size={18} />
+              )}
+              Thanh toán lương
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-100">
+                  <TrendingUp size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng thu nhập tháng</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-slate-900">
+                      {stats.totalSalary.toLocaleString("vi-VN")}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">VND</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-3xl border border-blue-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-100">
+                  <Package size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sản lượng hoàn thành</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-black text-slate-900">
+                      {stats.totalQty.toLocaleString("vi-VN")}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Cái</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {!record ? (
-            <div className="payroll-state payroll-state--error">
-              <CircleAlert size={20} />
-              <div className="payroll-empty__content">
-                <strong>Không tìm thấy bảng lương phù hợp</strong>
-                <span>
-                  Kiểm tra lại nhân viên hoặc kỳ lương đang chọn rồi thử lại.
-                </span>
-              </div>
-              <div className="payroll-empty__actions">
-                <Link to="/salary" className="payroll-empty__button">
-                  Quay về danh sách
-                </Link>
+          <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[300px] relative">
+            <div className="leave-table-card__header">
+              <div className="flex items-center gap-2">
+                <Info size={16} className="text-slate-400" />
+                <h2 className="leave-table-card__title">Danh sách công đoạn đã làm trong tháng</h2>
               </div>
             </div>
-          ) : (
-            <>
-              {isFallbackMonth ? (
-                <div className="payroll-inline-note">
-                  Không tìm thấy bảng lương của kỳ {formatMonthLabel(requestedMonth)}.
-                  Hệ thống đang hiển thị kỳ gần nhất là {formatMonthLabel(activeMonth)}.
+
+            <div className="overflow-x-auto">
+              {loading && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 backdrop-blur-[2px] py-20">
+                  <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mb-2" />
+                  <p className="text-sm font-bold text-slate-600">Đang tải chi tiết...</p>
                 </div>
-              ) : null}
+              )}
 
-              <section className="payroll-detail-panel">
-                <div className="payroll-detail-panel__header">
-                  <div className={`payroll-avatar payroll-avatar--${record.avatarTone} payroll-avatar--xl`}>
-                    {getPayrollInitials(record.fullName)}
-                  </div>
+              {error && (
+                <div className="py-20 text-center text-rose-500 font-bold">{error}</div>
+              )}
 
-                  <div className="payroll-detail-panel__identity">
-                    <div className="payroll-detail-panel__eyebrow">{record.team}</div>
-                    <h2 className="payroll-detail-panel__title">
-                      Chi tiết bảng lương: {record.fullName}
-                    </h2>
-                    <p className="payroll-detail-panel__subtitle">
-                      Bảng kê sản lượng chi tiết kỳ lương {formatMonthLabel(activeMonth)} ·{" "}
-                      {record.employeeCode}
-                    </p>
-                    <p className="payroll-detail-panel__subtitle">
-                      Luồng nghiệp vụ: {getPayrollFlowLabel(record)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="payroll-detail-panel__grid">
-                  <article className="payroll-highlight-card payroll-highlight-card--primary">
-                    <div className="payroll-highlight-card__label">
-                      <BadgeDollarSign size={17} />
-                      <span>Tổng lương tháng này</span>
-                    </div>
-                    <div className="payroll-highlight-card__value">
-                      {formatCurrency(record.netIncome)}
-                    </div>
-                    <p className="payroll-highlight-card__meta">
-                      Gồm {formatCurrency(record.grossIncome)} tiền công và{" "}
-                      {formatCurrency(record.allowance)} phụ cấp.
-                    </p>
-                  </article>
-
-                  <article className="payroll-highlight-card">
-                    <div className="payroll-highlight-card__label">
-                      <CheckCircle2 size={17} />
-                      <span>Trạng thái</span>
-                    </div>
-                    <div className="payroll-highlight-card__status">
-                      <span className={statusMeta.className}>{statusMeta.label}</span>
-                    </div>
-                    <p className="payroll-highlight-card__meta">
-                      {currentStatus === "paid" && paidAt
-                        ? `Đã ghi nhận thanh toán ngày ${formatDateLabel(paidAt)}`
-                        : statusMeta.description}
-                    </p>
-                  </article>
-
-                  <article className="payroll-highlight-card">
-                    <div className="payroll-highlight-card__label">
-                      <ClipboardList size={17} />
-                      <span>Chuỗi duyệt</span>
-                    </div>
-                    <div className="payroll-highlight-card__status">
-                      <span className="payroll-status payroll-status--pending">
-                        PM: {record.workflow.managerName}
-                      </span>
-                    </div>
-                    <p className="payroll-highlight-card__meta">
-                      Owner xác nhận: {record.workflow.ownerName}
-                    </p>
-                  </article>
-                </div>
-
-                <div className="payroll-detail-panel__grid payroll-detail-panel__grid--secondary">
-                  <article className="payroll-field-card">
-                    <div className="payroll-field-card__label">
-                      <Wallet size={17} />
-                      <span>Phụ cấp</span>
-                    </div>
-                    <div className="payroll-field-card__value">
-                      {formatCurrency(record.allowance)}
-                    </div>
-                    <p className="payroll-field-card__text">
-                      Bao gồm thưởng năng suất, chuyên cần và hỗ trợ tăng ca nếu có.
-                    </p>
-                  </article>
-
-                  <article className="payroll-field-card">
-                    <div className="payroll-field-card__label">
-                      <FileText size={17} />
-                      <span>Ghi chú</span>
-                    </div>
-                    <div className="payroll-field-card__note">{record.note}</div>
-                    <p className="payroll-field-card__text">
-                      Nguồn đối soát mock: {record.workflow.sourceTables.join(", ")}.
-                    </p>
-                  </article>
-                </div>
-
-                <article className="payroll-detail-list-card">
-                  <div className="payroll-detail-list-card__header">
-                    <div>
-                      <h3 className="payroll-detail-list-card__title">
-                        Danh sách công đoạn đã làm
-                      </h3>
-                      <p className="payroll-detail-list-card__subtitle">
-                        Chi tiết sản lượng đã được chốt cho kỳ lương này.
-                      </p>
-                    </div>
-                    <span className="payroll-detail-list-card__count">
-                      {record.workItems.length} mục
-                    </span>
-                  </div>
-
-                  <div className="payroll-task-list">
-                    {record.workItems.map((item) => (
-                      <article key={item.id} className="payroll-task-card">
-                        <div className="payroll-task-card__top">
-                          <div>
-                            <h4 className="payroll-task-card__title">{item.name}</h4>
-                            <p className="payroll-task-card__plan">
-                              Mã kế hoạch: {item.planCode} · {item.productName}
-                            </p>
-                          </div>
-                          <strong className="payroll-task-card__amount">
-                            {formatCurrency(item.total)}
-                          </strong>
-                        </div>
-
-                        <div className="payroll-task-card__footer">
-                          <span>
-                            {item.quantity.toLocaleString("en-US")} cái x{" "}
-                            {formatCurrency(item.unitPrice)}
-                          </span>
-                          <span className="payroll-task-card__pill">Đã chốt công</span>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                </article>
-
-                <div className="payroll-detail-footer">
-                  <div className="payroll-detail-timeline">
-                    <div className="payroll-detail-timeline__item">
-                      <span>
-                        <CalendarRange size={16} />
-                        <span>Kỳ lương</span>
-                      </span>
-                      <strong>{formatMonthLabel(activeMonth)}</strong>
-                    </div>
-
-                    <div className="payroll-detail-timeline__item">
-                      <span>
-                        <ClipboardList size={16} />
-                        <span>Ngày tạo</span>
-                      </span>
-                      <strong>{formatDateLabel(record.createdAt)}</strong>
-                    </div>
-
-                    <div className="payroll-detail-timeline__item">
-                      <span>
-                        <CheckCircle2 size={16} />
-                        <span>Ngày thanh toán</span>
-                      </span>
-                      <strong>{formatDateLabel(paidAt)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="payroll-detail-footer__actions">
-                    <div className="payroll-detail-feedback">
-                      {feedback ? (
-                        <p className="payroll-inline-note payroll-inline-note--success">
-                          {feedback}
-                        </p>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      className="payroll-detail-cta"
-                      onClick={handleConfirmPayment}
-                      disabled={currentStatus === "paid"}
-                    >
-                      {currentStatus === "paid"
-                        ? "Đã xác nhận thanh toán"
-                        : "Xác nhận trả lương"}
-                    </button>
-                  </div>
-                </div>
-              </section>
-            </>
-          )}
+              {!loading && !error && (
+                <table className="w-full divide-y divide-slate-100 table-auto text-sm">
+                  <thead>
+                    <tr className="bg-slate-50/50">
+                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Ngày ghi nhận</th>
+                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn hàng / Sản xuất</th>
+                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn giá</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số lượng</th>
+                      <th className="px-6 py-4 text-right font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {currentLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-20 text-center text-slate-500">
+                          Không tìm thấy dữ liệu báo cáo chi tiết cho thợ này.
+                        </td>
+                      </tr>
+                    ) : (
+                      currentLogs.map((log, idx) => (
+                        <tr key={idx} className="group hover:bg-slate-50/50 transition-all border-l-4 border-transparent hover:border-emerald-500">
+                          <td className="px-6 py-5 whitespace-nowrap text-slate-500 font-medium italic">
+                            <div className="flex items-center gap-2">
+                              <Calendar size={14} className="text-slate-300" />
+                              {formatDate(log.reportDate)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="font-extrabold text-slate-900 line-clamp-1 italic text-sm">{log.orderName}</div>
+                            <Link 
+                               to={`/production/${log.productionId}`}
+                               state={{ from: location.pathname }}
+                               className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1 opacity-70 hover:opacity-100"
+                            >
+                               #PR-{log.productionId}
+                               <ArrowLeft size={10} className="rotate-180" />
+                            </Link>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="font-bold text-slate-700">{log.partName}</div>
+                            {log.paidAt && (
+                              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1 inline-block">Đã thanh toán</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-5 text-center text-slate-600 font-black">
+                            {Number(log.cpu).toLocaleString("vi-VN")}
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl bg-blue-50/50 border border-blue-100 font-black text-blue-700 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-200 transition-all duration-300 transform group-hover:scale-110">
+                              {log.quantity}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 text-right font-black text-emerald-700 text-base">
+                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className="text-[10px] opacity-50 ml-0.5">VND</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  <tfoot className="bg-slate-50/80 font-black">
+                    <tr>
+                      <td colSpan={5} className="px-6 py-4 text-right text-slate-400 uppercase tracking-widest text-[10px]">Tổng cộng thu nhập</td>
+                      <td className="px-6 py-4 text-right text-emerald-800 text-lg">
+                        {stats.totalSalary.toLocaleString("vi-VN")} VND
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+            {workerLogs.length > 0 && !loading && !error && (
+              <div className="p-6 border-t border-slate-100 bg-slate-50/30">
+                <Pagination 
+                   currentPage={currentPage}
+                   totalPages={totalPages}
+                   onPageChange={setCurrentPage}
+                   totalCount={workerLogs.length}
+                   pageSize={pageSize}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </DashboardLayout>
+
+      <ConfirmModal 
+        isOpen={isConfirmOpen}
+        title="Xác nhận thanh toán lương"
+        description={`Bạn có chắc chắn muốn thanh toán tổng cộng ${(workerLogs.reduce((sum, l) => sum + (l.quantity * l.cpu), 0)).toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
+        onConfirm={confirmPaymentAll}
+        onClose={() => setIsConfirmOpen(false)}
+      />
+
+      <SuccessModal 
+        isOpen={isSuccessOpen}
+        title="Thanh toán thành công"
+        description={`Đã xác nhận thanh toán cho toàn bộ công đoạn trong tháng của ${stats.workerName}.`}
+        primaryLabel="Đóng"
+        onPrimary={() => setIsSuccessOpen(false)}
+        onClose={() => setIsSuccessOpen(false)}
+        hideSecondary={true}
+      />
+    </PmOwnerLayout>
   );
 }

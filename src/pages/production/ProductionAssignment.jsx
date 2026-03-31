@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Search, Users, Check } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Search, Users, Check, AlertTriangle, Info } from "lucide-react";
+import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import { toast } from "react-toastify";
+import ConfirmModal from "@/components/ConfirmModal";
+import { getPlanStatusLabel, STATUS_STYLES } from "@/utils/statusUtils";
 
 export default function ProductionAssignment() {
   const { id } = useParams();
@@ -30,6 +34,8 @@ export default function ProductionAssignment() {
   const [isSaving, setIsSaving] = useState(false);
   const [fetchedProduction, setFetchedProduction] = useState(null);
   const [backendParts, setBackendParts] = useState([]); // Real parts with real IDs from backend
+  const [initialAssignments, setInitialAssignments] = useState({}); // To track changes
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const loadingWorkers = workers.length === 0 && !workerError;
 
   // Fetch production detail from API when pmId is missing (from incoming state or directly by URL)
@@ -48,7 +54,7 @@ export default function ProductionAssignment() {
         productionId: payload.productionId ?? payload.id,
         pmId: pm.id ?? null,
         pm,
-        orderId: order.id,
+        orderId: order.id || order.orderId || null,
         orderName: order.orderName,
         pStartDate: payload.startDate ?? order.startDate ?? null,
         pEndDate: payload.endDate ?? order.endDate ?? null,
@@ -68,7 +74,7 @@ export default function ProductionAssignment() {
         },
       });
     }).catch(() => {
-      setWorkerError("Không thể tải thông tin production.");
+      setWorkerError("Không thể tải thông tin đơn sản xuất.");
     });
     return () => { active = false; };
   }, [selectedProductionId, incoming]);
@@ -78,6 +84,7 @@ export default function ProductionAssignment() {
     if (incoming?.production && incomingPmId) {
       return {
         ...incoming.production,
+        orderId: incoming.production.orderId ?? incoming.production.order?.id ?? incoming.production.order?.orderId ?? null,
         pmId: incomingPmId,
         product: incoming.product ?? null,
       };
@@ -102,7 +109,7 @@ export default function ProductionAssignment() {
     let active = true;
     const fetchParts = async () => {
       try {
-        const res = await ProductionPartService.getPartsByProduction(selectedProductionId);
+        const res = await ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 });
         if (!active) return;
         const payload = res?.data?.data ?? res?.data ?? [];
         const list = Array.isArray(payload) ? payload : [];
@@ -119,13 +126,32 @@ export default function ProductionAssignment() {
     const sourceSteps = Array.isArray(incoming?.steps) && incoming.steps.length > 0
       ? incoming.steps
       : PLAN_STEPS;
+      
+    // Create a pool of backend parts to track which ones have been matched
+    const availableBackendParts = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
+
     return sourceSteps.map((row, index) => {
-      // Try to match with a real backend part by name or index
-      const realPart = backendParts[index] || backendParts.find(p => p.partName === row.partName || p.name === row.partName);
+      // 1. Try to match by exact name first
+      let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
+      
+      // 2. If no name match, fallback to the same index (assuming order is preserved)
+      if (matchIdx === -1) {
+         matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
+      }
+
+      let realPart = null;
+      if (matchIdx !== -1) {
+        realPart = availableBackendParts[matchIdx];
+        // Remove the matched part so it can't be matched twice
+        availableBackendParts.splice(matchIdx, 1);
+      }
+
       return {
         ...row,
         ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
         realPartId: realPart?.id ?? null,
+        statusName: realPart?.statusName || getPlanStatusLabel(realPart?.statusId),
+        statusId: realPart?.statusId,
         productionId: selectedProduction ? selectedProduction.productionId : null,
       };
     });
@@ -180,13 +206,14 @@ export default function ProductionAssignment() {
     const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
       || selectedProduction?.product?.endDate || "2026-12-31";
     if (!pmId) {
-      setWorkerError("Không tìm thấy thông tin PM quản lý production này.");
+      setWorkerError("Không tìm thấy thông tin PM quản lý đơn sản xuất này.");
       return;
     }
     ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
       .then((res) => {
         const list = res?.data?.data || res?.data || res || [];
         if (Array.isArray(list)) {
+          const pm = selectedProduction?.pm || {};
           const mapped = list.map((w) => {
             const info = w.workerInfo || w || {};
             const skills = Array.isArray(w.workerSkillInfo)
@@ -204,7 +231,35 @@ export default function ProductionAssignment() {
               leaveDate: leaveDate || w.leaveDate || "",
               role: w.role || "Worker",
             };
-          }).filter(w => w.id !== ""); // Filter out empty IDs just in case
+          }).filter(w => w.id !== "");
+
+          // Inject PM managing this production if not in list
+          if (pm.id && !mapped.some(w => String(w.id) === String(pm.id))) {
+            mapped.push({
+              id: String(pm.id),
+              fullName: pm.fullName || pm.name || `PM #${pm.id}`,
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "PM",
+            });
+          }
+
+          // Inject current user if they are Owner and not in list
+          const currentUser = getStoredUser();
+          const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+          const isOwner = hasAnyRole(roleValue, ["Owner", "Admin"]);
+          if (isOwner && currentUser?.id && !mapped.some(w => String(w.id) === String(currentUser.id))) {
+            mapped.push({
+              id: String(currentUser.id),
+              fullName: currentUser.fullName || currentUser.name || "Owner",
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "Owner",
+            });
+          }
+
           setWorkers(mapped);
         }
       })
@@ -216,18 +271,44 @@ export default function ProductionAssignment() {
   useEffect(() => {
     setAssignments((prev) => {
       const next = { ...prev };
+      const base = { ...initialAssignments };
+      let initialized = false;
+
+      // Create a pool of backend parts to ensure 1-to-1 matching
+      const pool = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
+
       rows.forEach((row, index) => {
         const existing = next[row.ppId]?.workerIds || [];
         if (existing.length > 0) return;
-        const realPart =
-          backendParts.find((p) => p?.id === row.realPartId) ||
-          backendParts[index] ||
-          backendParts.find((p) => p?.partName === row.partName || p?.name === row.partName);
+        
+        // 1. Match by realPartId
+        let matchIdx = pool.findIndex(p => p.id === row.realPartId);
+        
+        // 2. Match by exact name
+        if (matchIdx === -1) {
+            matchIdx = pool.findIndex(p => p.partName === row.partName || p.name === row.partName);
+        }
+        
+        // 3. Match by original preserved index
+        if (matchIdx === -1) {
+            matchIdx = pool.findIndex(p => p.originalIndex === index);
+        }
+
+        let realPart = null;
+        if (matchIdx !== -1) {
+            realPart = pool[matchIdx];
+            pool.splice(matchIdx, 1);
+        }
+
         const initialIds = extractAssignedWorkerIds(realPart, workers);
-        next[row.ppId] = {
-          workerIds: initialIds,
-        };
+        next[row.ppId] = { workerIds: initialIds };
+        base[row.ppId] = { workerIds: [...initialIds] };
+        initialized = true;
       });
+
+      if (initialized) {
+        setInitialAssignments(base);
+      }
       return next;
     });
     if (!activeRowId && rows.length > 0) {
@@ -266,6 +347,12 @@ export default function ProductionAssignment() {
   }, [workerColumns, workerQuery]);
 
   const toggleWorker = (ppId, workerId) => {
+    const row = rows.find(r => r.ppId === ppId);
+    const lockedStatuses = ["Hoàn Thành", "Đã Hoàn Thành", "Chờ Nghiệm Thu"];
+    if (lockedStatuses.includes(row?.statusName) || row?.statusId === 3 || row?.statusId === 4) {
+      toast.warning("Công đoạn đã hoàn thành hoặc đang chờ nghiệm thu, không thể thay đổi phân công.");
+      return;
+    }
     setAssignments((prev) => ({
       ...prev,
       [ppId]: {
@@ -278,6 +365,12 @@ export default function ProductionAssignment() {
   };
 
   const setRowWorkers = (ppId, nextIds) => {
+    const row = rows.find(r => r.ppId === ppId);
+    const lockedStatuses = ["Hoàn Thành", "Đã Hoàn Thành", "Chờ Nghiệm Thu"];
+    if (lockedStatuses.includes(row?.statusName) || row?.statusId === 3 || row?.statusId === 4) {
+      toast.warning("Công đoạn đã hoàn thành hoặc đang chờ nghiệm thu, không thể thay đổi phân công.");
+      return;
+    }
     setAssignments((prev) => ({
       ...prev,
       [ppId]: {
@@ -349,43 +442,88 @@ export default function ProductionAssignment() {
     return day >= from && day <= to;
   };
 
-  const handleToggleEdit = async () => {
+  const handleToggleEdit = () => {
     if (isSaving) return;
+    const canAssign = selectedProduction?.status !== "Chờ Xét Duyệt Kế Hoạch" && selectedProduction?.status !== "Cần Chỉnh Sửa Kế Hoạch";
+    if (!canAssign) {
+      toast.warning("Kế hoạch sản xuất cần được duyệt trước khi phân công lao động.");
+      return;
+    }
     if (isEditing) {
-      // User clicked Save Edit
-      try {
-        const rowsWithRealId = rows.filter(row => row.realPartId != null);
-        if (rowsWithRealId.length === 0) {
-          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
-          return;
-        }
-        setIsSaving(true);
-        const results = await Promise.allSettled(
-          rowsWithRealId.map((row) => {
-            const selectedWorkerIds = (assignments[row.ppId]?.workerIds || []).map(Number);
-            return ProductionPartService.updateAssignWorker(row.realPartId, { workerIds: selectedWorkerIds });
-          })
-        );
-        const failed = results
-          .map((res, idx) => ({ res, row: rowsWithRealId[idx] }))
-          .filter((item) => item.res.status === "rejected");
-        if (failed.length > 0) {
-          const first = failed[0]?.row;
-          toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
-          return;
-        }
-        toast.success("Lưu dữ liệu phân công thành công!");
-        setIsEditing(false);
-      } catch (err) {
-        console.error(err);
-        setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi khi lưu phân công thợ.");
-        toast.error(err?.response?.data?.detail || err?.response?.data?.message || "Phát sinh lỗi khi lưu phân công.");
-      } finally {
-        setIsSaving(false);
-      }
+      // User clicked Save Edit -> show confirm modal
+      setIsConfirmOpen(true);
     } else {
       setIsEditing(true);
       setWorkerError(null);
+    }
+  };
+
+  const handleSaveAssignments = async () => {
+    setIsConfirmOpen(false);
+    setIsSaving(true);
+    try {
+      // 1. Identify rows that have real IDs and have CHANGED (Dirty check)
+      console.log("=== START SAVE ===");
+      console.log("Total rows checking:", rows.length);
+      const dirtyRows = rows.filter(row => {
+        if (row.realPartId == null) {
+          console.warn("Row skipped because realPartId is null:", row.partName);
+          return false;
+        }
+        
+        const currentIds = [...(assignments[row.ppId]?.workerIds || [])].sort().join(',');
+        const originalIds = [...(initialAssignments[row.ppId]?.workerIds || [])].sort().join(',');
+        
+        const isDirty = currentIds !== originalIds;
+        console.log(`Row: ${row.partName} | realPartId: ${row.realPartId} | Current: [${currentIds}] | Original: [${originalIds}] | isDirty: ${isDirty}`);
+        
+        return isDirty;
+      });
+
+      console.log("Dirty rows to save:", dirtyRows.map(r => r.partName));
+
+      if (dirtyRows.length === 0) {
+        setIsEditing(false);
+        toast.success("Dữ liệu phân công đã được cập nhật."); // Give a positive feedback even if no API call was needed
+        return;
+      }
+
+
+      // 2. Save only dirty rows
+      const results = await Promise.allSettled(
+        dirtyRows.map((row) => {
+          const selectedWorkerIds = (assignments[row.ppId]?.workerIds || []).map(Number);
+          // Remove duplicates if any
+          const uniqueIds = Array.from(new Set(selectedWorkerIds));
+          return ProductionPartService.updateAssignWorker(row.realPartId, { workerIds: uniqueIds });
+        })
+      );
+
+      const failed = results
+        .map((res, idx) => ({ res, row: dirtyRows[idx] }))
+        .filter((item) => item.res.status === "rejected");
+
+      if (failed.length > 0) {
+        const first = failed[0]?.row;
+        toast.error(`Lỗi lưu ${failed.length} công đoạn. Ví dụ: ${first?.partName || "không xác định"}`);
+        return;
+      }
+
+      toast.success("Lưu dữ liệu phân công thành công!");
+      
+      // Update initial state to match current assignments
+      const updatedBase = {};
+      Object.keys(assignments).forEach(key => {
+        updatedBase[key] = { workerIds: [...(assignments[key]?.workerIds || [])] };
+      });
+      setInitialAssignments(updatedBase);
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
+      setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi khi lưu phân công thợ.");
+      toast.error("Phát sinh lỗi khi lưu phân công.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -402,28 +540,36 @@ export default function ProductionAssignment() {
                 <ArrowLeft size={18} />
               </button>
               <div className="flex flex-col gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Giao việc cho thợ</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                  {Object.values(initialAssignments).some(v => v.workerIds.length > 0) 
+                    ? "Chỉnh sửa phân công" 
+                    : "Phân công lao động"}
+                </h1>
                 <p className="text-slate-600">Phân công theo công đoạn đã lập trong kế hoạch sản xuất.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleEdit}
-              disabled={isSaving}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
-                ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-            >
-              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : "Chỉnh sửa")}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleEdit}
+                disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
+              >
+                {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
+                  Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
+                ))}
+              </button>
+            </div>
           </div>
 
           {incoming?.production && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
-                <InfoItem label="Production" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
-                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
+                <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
+                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId || selectedProduction.order?.id || selectedProduction.order?.orderId || "-"}` : "-"} />
                 <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />
               </div>
@@ -431,8 +577,19 @@ export default function ProductionAssignment() {
           )}
 
           {!incoming?.production && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-              Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800 shadow-sm flex items-center gap-3">
+              <Info size={18} />
+              <span>Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.</span>
+            </div>
+          )}
+
+          {(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-800 shadow-sm flex items-center gap-3">
+              <AlertTriangle size={18} />
+              <div>
+                <strong>Kế hoạch sản xuất hiện tại chưa được duyệt.</strong>
+                <p className="mt-1">Bạn chỉ có thể thực hiện phân công lao động sau khi chủ xưởng đã duyệt thành công bước lập kế hoạch.</p>
+              </div>
             </div>
           )}
 
@@ -570,12 +727,19 @@ export default function ProductionAssignment() {
                                 {idx + 1}
                               </div>
                               <div>
-                                <div className="text-base font-semibold text-slate-800">{row.partName}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-base font-semibold text-slate-800">{row.partName}</div>
+                                  {row.statusName && (
+                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[row.statusName] || STATUS_STYLES.default}`}>
+                                      {row.statusName}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="mt-1 text-sm text-slate-500">
                                   Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                                 </div>
                                 <div className="mt-1 text-sm text-slate-500">
-                                  {row.startDate || "-"} → {row.endDate || "-"}
+                                  {(row.startDate || "-").replace("T", " ").slice(0, 16)} → {(row.endDate || "-").replace("T", " ").slice(0, 16)}
                                 </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
@@ -633,27 +797,40 @@ export default function ProductionAssignment() {
                     </div>
                   </div>
                   {!activeRow ? (
-                    <div className="text-sm text-slate-600">Chọn một công đoạn để phân công.</div>
+                    <div className="text-sm text-slate-600 px-2 py-8 text-center italic">Chọn một công đoạn bên trái để xem danh sách thợ.</div>
                   ) : (
                     (() => {
                       const selectedIds = assignments[activeRow.ppId]?.workerIds || [];
                       const visibleWorkers = filteredWorkers.filter((worker) =>
                         showSelectedOnly ? selectedIds.includes(worker.id) : true
                       );
-                      const visibleIds = visibleWorkers.map((worker) => worker.id);
-                      const isAllVisibleSelected =
-                        visibleIds.length > 0 && visibleIds.every((workerId) => selectedIds.includes(workerId));
+                      const isLocked = 
+                        activeRow?.statusName === "Hoàn Thành" || 
+                        activeRow?.statusName === "Đã Hoàn Thành" || 
+                        activeRow?.statusName === "Chờ Nghiệm Thu" ||
+                        activeRow?.statusId === 3 || activeRow?.statusId === "3" ||
+                        activeRow?.statusId === 4 || activeRow?.statusId === "4";
 
                       return (
                         <>
+                          {isLocked && (
+                            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
+                              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+                              <div>
+                                <strong className="block font-bold text-rose-900">Công đoạn đã khóa phân công</strong>
+                                <p className="mt-0.5 opacity-90 font-medium">Bạn không thể thay đổi phân công lao động cho các công đoạn đã hoàn thành hoặc đang chờ nghiệm thu.</p>
+                              </div>
+                            </div>
+                          )}
+
                           {loadingWorkers ? (
-                            <div className="text-xs text-slate-500">Đang tải thợ...</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Đang tải danh sách thợ...</div>
                           ) : workerColumns.length === 0 ? (
-                            <div className="text-xs text-slate-500">Chưa có thợ</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Hệ thống chưa có dữ liệu thợ.</div>
                           ) : visibleWorkers.length === 0 ? (
-                            <div className="text-xs text-slate-500">Không có thợ phù hợp.</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Không tìm thấy thợ nào phù hợp.</div>
                           ) : (
-                            <div className="max-h-96 min-h-80 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                            <div className={`max-h-[500px] min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 ${isLocked ? "opacity-60 pointer-events-none grayscale-[20%]" : ""}`}>
                               {visibleWorkers.map((worker) => {
                                 const checked = selectedIds.includes(worker.id);
                                 const frequentText = worker.frequentSteps.length
@@ -661,7 +838,8 @@ export default function ProductionAssignment() {
                                   : "";
                                 const isOnLeave = worker.status === "leave";
                                 const isLeaveConflict = isOnLeave && isLeaveDuringRow(worker.leaveDate, activeRow);
-                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict;
+                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict && !isLocked;
+                                
                                 return (
                                   <button
                                     type="button"
@@ -669,17 +847,20 @@ export default function ProductionAssignment() {
                                     key={`${activeRow.ppId}-${worker.id}`}
                                     onClick={() => toggleWorker(activeRow.ppId, worker.id)}
                                     disabled={!canSelect}
-                                    className={`flex w-full items-center justify-between gap-3 px-4 py-5 text-sm font-semibold transition ${checked
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : "bg-white text-slate-700 hover:bg-slate-50"
-                                      }`}
+                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-5 text-sm font-semibold transition ${
+                                      !canSelect
+                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                        : checked
+                                          ? "cursor-pointer border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                          : "cursor-pointer border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"
+                                    }`}
                                   >
                                     <div className="min-w-0 text-left">
                                       <div className="flex flex-wrap items-center gap-2">
                                         <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
                                         {isOnLeave ? (
                                           <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                            Nghỉ {worker.leaveDate || ""}
+                                            Nghỉ {(worker.leaveDate || "").replace("T", " ").slice(0, 16)}
                                           </span>
                                         ) : (
                                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
@@ -726,6 +907,13 @@ export default function ProductionAssignment() {
         </div>
       </div>
 
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Xác nhận lưu phân công"
+        description="Bạn có chắc chắn muốn lưu các thay đổi phân công lao động cho đơn sản xuất này không?"
+        onConfirm={handleSaveAssignments}
+        onClose={() => setIsConfirmOpen(false)}
+      />
     </OwnerLayout>
   );
 }
@@ -749,7 +937,12 @@ function SummaryItem({ label, value }) {
 }
 
 
+const PLAN_STEPS = [
+  { partName: "Cắt Vải", cpu: 5000, startDate: "2026-03-01", endDate: "2026-03-05" },
+  { partName: "May", cpu: 15000, startDate: "2026-03-05", endDate: "2026-03-15" },
+  { partName: "Đóng gói", cpu: 2000, startDate: "2026-03-15", endDate: "2026-03-20" },
+];
 
-
-
-
+const MOCK_PRODUCTIONS = [
+  { productionId: 9, orderId: 5, pmName: "Tùng Quản Lý", status: "Đang Sản Xuất" },
+];
