@@ -82,6 +82,11 @@ export const API_ENDPOINTS = {
     CREATE_COMMENT: `${BASE_URL}/api/Comment/create-comment`,
   },
 
+  CUSTOMER: {
+    GET_ALL: `${BASE_URL}/api/Customer/get-all-customer`,
+    GET_ORDERS_BY_CUSTOMER: (customerId) => `${BASE_URL}/api/Customer/get-order-by-customer/${customerId}`,
+  },
+
   USER: {
     // GET — không có ID, backend decode từ token
     VIEW_PROFILE: `${BASE_URL}/api/User/view-profile`,

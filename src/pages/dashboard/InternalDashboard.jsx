@@ -1,12 +1,18 @@
 ﻿import { createElement } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { ArrowRight, BriefcaseBusiness, ClipboardList, Users } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, ClipboardList, ContactRound, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 import "@/styles/internal-dashboard.css";
 
 const QUICK_LINKS = [
+  {
+    to: "/customers",
+    title: "Quản lý khách hàng",
+    description: "Xem danh sách khách hàng và order của từng khách trong một màn hình.",
+    icon: ContactRound,
+  },
   {
     to: "/production-plan",
     title: "Kế hoạch sản xuất",

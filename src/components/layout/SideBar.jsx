@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ListChecks,
   LogOut,
+  ContactRound,
   ShieldCheck,
   Users,
   Wallet,
@@ -29,6 +30,7 @@ const OPERATION_NAV_ITEMS = [
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
+  { to: "/customers", label: "Khách hàng", icon: ContactRound, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
 ];

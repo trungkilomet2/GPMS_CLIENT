@@ -19,6 +19,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/admin/logs", label: "Nhật ký hệ thống", parent: "/dashboard" },
   { path: "/admin/permissions", label: "Quản lý phân quyền", parent: "/dashboard" },
   { path: "/employees", label: "Danh sách nhân viên", parent: "/dashboard" },
+  { path: "/customers", label: "Quản lý khách hàng", parent: "/dashboard" },
   { path: "/employees/management", label: "Nhóm quản lý", parent: "/employees" },
   { path: "/employees/workers", label: "Nhóm nhân viên", parent: "/employees" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
