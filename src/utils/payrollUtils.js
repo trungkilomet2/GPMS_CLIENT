@@ -34,7 +34,7 @@ const overlapsMonth = (startStr, endStr, month, year) => {
 
   // If no start date, we can't be sure, but let's assume it's relevant if end exists
   if (!start && !end) return true; // Fallback to include if totally unknown
-  
+
   if (start && start > targetEnd) return false;
   if (end && end < targetStart) return false;
 
@@ -74,7 +74,7 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
     if (!Array.isArray(rawProductions)) return [];
 
     // Filter relevant productions to reduce part/log requests
-    const productions = rawProductions.filter(p => 
+    const productions = rawProductions.filter(p =>
       overlapsMonth(p.startDate || p.pStartDate, p.endDate || p.pEndDate, month, year)
     );
 
@@ -128,7 +128,7 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
               orderName: part.orderName,
               orderId: part.orderId,
               workerId: log.userId,
-              workerName: log.workerName || log.userName || `Thợ #${log.userId}`,
+              workerName: log.workerName || log.userName || `Tùng Tổng Tài`, //fix cái này
               quantity: log.quantity || 0,
               reportDate: log.workDate || log.reportDate,
               workerFullName: null,
@@ -168,7 +168,7 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       stats.totalQuantity += qty;
       stats.totalSalary += qty * cpu;
       stats.logCount += 1;
-      
+
       if (log.workerFullName && !stats.fullName) stats.fullName = log.workerFullName;
       if (log.workerAvatar && !stats.avatarUrl) stats.avatarUrl = log.workerAvatar;
 

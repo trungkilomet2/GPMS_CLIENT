@@ -64,6 +64,7 @@ export const API_ENDPOINTS = {
     CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
+    COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
   },
 
   CUTTING_NOTEBOOK: {

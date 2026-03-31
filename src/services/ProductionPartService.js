@@ -44,6 +44,9 @@ const ProductionPartService = {
   getIssueWorkers(partId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_ISSUE_WORKERS(partId));
   },
+  completePayment(partId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.COMPLETE_PAYMENT(partId), payload);
+  },
 };
 
 export default ProductionPartService;
