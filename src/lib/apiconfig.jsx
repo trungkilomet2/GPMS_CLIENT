@@ -1,6 +1,11 @@
 // API Configuration
 // const BASE_URL = 'http://localhost:5229';
-const BASE_URL = 'http://26.250.4.244:5229';
+
+//main URL
+//const BASE_URL = 'http://26.250.4.244:5229';
+
+// sub URL
+const BASE_URL = 'http://26.93.63.192:8000';
 
 // const BASE_URL = 'https://localhost:7096';
 // const BASE_URL = '';
@@ -47,7 +52,7 @@ export const API_ENDPOINTS = {
     NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
     SUBMIT_PLAN: (id) => `${BASE_URL}/api/Production/production/submit/production-plan/${id}`,
     OUTPUT_HISTORY_WORKER: (workerId) => `${BASE_URL}/api/Production/production/output/history/worker/${workerId}`,
-    OUTPUT_HISTORY_ALL: `${BASE_URL}/api/Production/production/output/history`,
+    OUTPUT_HISTORY_ALL: `${BASE_URL}/api/Production/production/output/history/workers`,
     COMPLETE: (id) => `${BASE_URL}/api/Production/production/complete/${id}`,
   },
   PRODUCTION_PART: {

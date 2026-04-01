@@ -607,8 +607,6 @@ export default function ProductionPlanDetail() {
                       <th className="px-4 py-3 text-left">STT</th>
                       <th className="px-4 py-3 text-left">Tên công đoạn</th>
                       <th className="px-4 py-3 text-left">Thợ được giao</th>
-                      <th className="px-4 py-3 text-left">Bắt đầu</th>
-                      <th className="px-4 py-3 text-left">Kết thúc</th>
                       <th className="px-4 py-3 text-right">Giá/SP</th>
                       <th className="px-4 py-3 text-center">Trạng thái</th>
                       <th className="px-4 py-3 text-center">Thao tác</th>
@@ -639,8 +637,6 @@ export default function ProductionPlanDetail() {
                             <span className="text-slate-300 italic text-[11px]">Chưa giao</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.startDate)}</td>
-                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.endDate)}</td>
                         <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
                           {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} đ` : "-"}
                         </td>
@@ -678,7 +674,7 @@ export default function ProductionPlanDetail() {
                     ))}
                     {pageData.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="py-10 text-center text-slate-500">
+                        <td colSpan={6} className="py-10 text-center text-slate-500">
                           Chưa có công đoạn.
                         </td>
                       </tr>

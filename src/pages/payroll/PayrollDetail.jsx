@@ -11,6 +11,8 @@ import SuccessModal from "@/components/SuccessModal";
 import { toast } from "react-toastify";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
+import { exportDetailToExcel } from "@/utils/exportUtils";
+import { Download } from "lucide-react";
 
 export default function PayrollDetail() {
   const navigate = useNavigate();
@@ -106,12 +108,13 @@ export default function PayrollDetail() {
   }, [logs, employeeId, month, year]);
 
   const stats = useMemo(() => {
-    const totalQty = workerLogs.reduce((sum, log) => sum + log.quantity, 0);
-    const totalSalary = workerLogs.reduce((sum, log) => sum + log.quantity * log.cpu, 0);
+    const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
+    const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
+    const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
     const firstLog = workerLogs[0];
     const workerName = firstLog?.workerFullName || firstLog?.workerName || employeeId;
     const workerAvatar = firstLog?.workerAvatar || null;
-    return { totalQty, totalSalary, workerName, workerAvatar };
+    return { totalQty, uniquePartCount, totalSalary, workerName, workerAvatar };
   }, [workerLogs, employeeId]);
 
   const totalPages = Math.ceil(workerLogs.length / pageSize);
@@ -163,18 +166,29 @@ export default function PayrollDetail() {
                 </div>
             </div>
 
-            <button
-              onClick={() => handlePaymentAll(workerLogs)}
-              disabled={isPaying || workerLogs.length === 0}
-              className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isPaying ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <CreditCard size={18} />
-              )}
-              Thanh toán lương
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => exportDetailToExcel(workerLogs, stats.workerName, month, year)}
+                disabled={workerLogs.length === 0}
+                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50"
+                title="Tải chi tiết lương (Excel)"
+              >
+                <Download size={18} />
+                <span className="hidden sm:inline">Xuất chi tiết</span>
+              </button>
+              <button
+                onClick={() => handlePaymentAll(workerLogs)}
+                disabled={isPaying || workerLogs.length === 0}
+                className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPaying ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CreditCard size={18} />
+                )}
+                Thanh toán lương
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -201,12 +215,12 @@ export default function PayrollDetail() {
                   <Package size={22} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sản lượng hoàn thành</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số công đoạn hoàn thành</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-black text-slate-900">
-                      {stats.totalQty.toLocaleString("vi-VN")}
+                      {stats.uniquePartCount}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Cái</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Công đoạn</span>
                   </div>
                 </div>
               </div>

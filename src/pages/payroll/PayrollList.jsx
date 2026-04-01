@@ -15,6 +15,8 @@ import { fetchAggregatedPayroll } from "@/utils/payrollUtils";
 import { getErrorMessage } from "@/utils/errorUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
+import { exportPayrollToExcel } from "@/utils/exportUtils";
+import { FileSpreadsheet } from "lucide-react";
 
 export default function PayrollList() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
@@ -66,11 +68,12 @@ export default function PayrollList() {
             </div>
             <div className="flex items-center gap-2">
               <button 
-                className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                onClick={() => window.print()}
+                className="flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 shadow-sm"
+                onClick={() => exportPayrollToExcel(workerSummary, selectedMonth, selectedYear)}
+                disabled={loading || !workerSummary.length}
               >
-                <Download size={16} />
-                <span>Xuất báo cáo</span>
+                <FileSpreadsheet size={16} />
+                <span>Tải Excel (.xlsx)</span>
               </button>
             </div>
           </div>
@@ -187,7 +190,7 @@ export default function PayrollList() {
                   <thead className="bg-slate-50/50">
                     <tr>
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thợ</th>
-                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Sản lượng</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số công đoạn</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số báo cáo</th>
                       <th className="px-6 py-4 text-right font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thu nhập</th>
                       <th className="px-6 py-4"></th>
@@ -216,8 +219,8 @@ export default function PayrollList() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className="inline-flex items-center rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
-                              {worker.totalQuantity.toLocaleString("vi-VN")} cái
+                            <span className="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
+                              {worker.uniquePartCount || 0} công đoạn
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center text-slate-500 font-medium">

@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
@@ -89,6 +90,13 @@ export default function CreateOrder() {
   const [orderImagePreview, setOrderImagePreview] = useState('');
   const [templateItems, setTemplateItems] = useState([]);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    show: false,
+    type: null,
+    index: null,
+    title: '',
+    desc: ''
+  });
 
   const validateForm = () => {
     const newErrors = {};
@@ -382,15 +390,21 @@ export default function CreateOrder() {
       const lower = file.name.toLowerCase();
       const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
       const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
-      if (isAllowed && isSizeOk) {
+      const isNameOk = file.name.length <= 255;
+
+      if (isAllowed && isSizeOk && isNameOk) {
         valid.push(file);
       } else {
-        invalid.push(file.name);
+        let reason = "Định dạng không hỗ trợ";
+        if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
+        else if (!isNameOk) reason = "Tên file quá 255 ký tự";
+        
+        invalid.push(`${file.name} (${reason})`);
       }
     });
 
     if (invalid.length > 0) {
-      toast.error(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+      toast.error(invalid.join(', '));
     }
 
     if (valid.length > 0) {
@@ -417,37 +431,59 @@ export default function CreateOrder() {
   };
   
   const removeTemplateItem = (index) => {
-    setTemplateItems((prev) => prev.filter((_, i) => i !== index));
-    if (errors.templates) {
-      setErrors((prev) => {
-        const newTemplates = { ...prev.templates };
-        delete newTemplates[index];
-        const adjusted = {};
-        Object.keys(newTemplates).forEach((key) => {
-          const k = parseInt(key);
-          if (k > index) adjusted[k - 1] = newTemplates[key];
-          else adjusted[k] = newTemplates[key];
-        });
-        return { ...prev, templates: adjusted };
-      });
-    }
+    setDeleteConfirm({
+      show: true,
+      type: 'template',
+      index: index,
+      title: 'Xác nhận xóa mẫu thiết kế',
+      desc: 'Bạn có chắc chắn muốn xóa mẫu thiết kế này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+    });
   };
 
   const handleDeleteMaterial = (index) => {
-    setMaterials((prev) => prev.filter((_, i) => i !== index));
-    if (errors.materialsList) {
-      setErrors((prev) => {
-        const newMaterialsList = { ...prev.materialsList };
-        delete newMaterialsList[index];
-        const adjustedList = {};
-        Object.keys(newMaterialsList).forEach((key) => {
-          const k = parseInt(key);
-          if (k > index) adjustedList[k - 1] = newMaterialsList[key];
-          else adjustedList[k] = newMaterialsList[key];
+    setDeleteConfirm({
+      show: true,
+      type: 'material',
+      index: index,
+      title: 'Xác nhận xóa vật liệu',
+      desc: 'Bạn có chắc chắn muốn xóa vật liệu này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+    });
+  };
+
+  const executeDelete = () => {
+    const { type, index } = deleteConfirm;
+    if (type === 'template') {
+      setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+      if (errors.templates) {
+        setErrors((prev) => {
+          const newTemplates = { ...prev.templates };
+          delete newTemplates[index];
+          const adjusted = {};
+          Object.keys(newTemplates).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjusted[k - 1] = newTemplates[key];
+            else adjusted[k] = newTemplates[key];
+          });
+          return { ...prev, templates: adjusted };
         });
-        return { ...prev, materialsList: adjustedList };
-      });
+      }
+    } else if (type === 'material') {
+      setMaterials((prev) => prev.filter((_, i) => i !== index));
+      if (errors.materialsList) {
+        setErrors((prev) => {
+          const newMaterialsList = { ...prev.materialsList };
+          delete newMaterialsList[index];
+          const adjustedList = {};
+          Object.keys(newMaterialsList).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjustedList[k - 1] = newMaterialsList[key];
+            else adjustedList[k] = newMaterialsList[key];
+          });
+          return { ...prev, materialsList: adjustedList };
+        });
+      }
     }
+    setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
   };
 
   const translateError = (msg) => {
@@ -661,6 +697,14 @@ export default function CreateOrder() {
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        title={deleteConfirm.title}
+        description={deleteConfirm.desc}
+        onConfirm={executeDelete}
+        onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+      />
     </OwnerLayout>
   );
 }

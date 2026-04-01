@@ -159,6 +159,8 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
           totalQuantity: 0,
           totalSalary: 0,
           logCount: 0,
+          uniqueParts: new Set(),
+          uniquePartCount: 0,
           logs: [],
         });
       }
@@ -168,6 +170,8 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       stats.totalQuantity += qty;
       stats.totalSalary += qty * cpu;
       stats.logCount += 1;
+      if (log.partId) stats.uniqueParts.add(log.partId);
+      stats.uniquePartCount = stats.uniqueParts.size;
 
       if (log.workerFullName && !stats.fullName) stats.fullName = log.workerFullName;
       if (log.workerAvatar && !stats.avatarUrl) stats.avatarUrl = log.workerAvatar;

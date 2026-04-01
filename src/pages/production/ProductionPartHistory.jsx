@@ -38,6 +38,11 @@ export default function ProductionPartHistory() {
     return logs.reduce((sum, log) => sum + (Number(log.quantity) || 0), 0);
   }, [logs]);
 
+  const totalAmount = useMemo(() => {
+    const cpu = Number(partInfo.cpu || 0);
+    return totalQuantity * cpu;
+  }, [totalQuantity, partInfo.cpu]);
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     try {
@@ -105,6 +110,23 @@ export default function ProductionPartHistory() {
                 </div>
               </div>
             </div>
+
+            <div className="group relative overflow-hidden rounded-3xl border border-amber-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-100">
+                  <Package size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng tiền quyết toán</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-black text-slate-900">
+                      {totalAmount.toLocaleString("vi-VN")}
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">VND</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[400px] relative">
@@ -128,6 +150,8 @@ export default function ProductionPartHistory() {
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px] w-16">STT</th>
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thợ thực hiện</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số lượng</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn giá</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thành tiền</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Ngày ghi nhận</th>
                     </tr>
                   </thead>
@@ -145,13 +169,38 @@ export default function ProductionPartHistory() {
                             {(idx + 1).toString().padStart(2, '0')}
                           </td>
                           <td className="px-6 py-4">
-                            <span className="inline-flex items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-black text-emerald-700 uppercase tracking-wider">
-                              {log.workerName || log.userName || `Thợ #${log.userId}`}
-                            </span>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-900">
+                                {(() => {
+                                  // 1. Thử lấy trực tiếp từ log
+                                  const nameFromLog = log.fullName || log.workerFullName || log.workerName || log.userName || 
+                                                     log.worker?.fullName || log.user?.fullName || log.account?.fullName;
+                                  if (nameFromLog) return nameFromLog;
+
+                                  // 2. Thử tra cứu từ danh sách phân công (nếu có ppsInfo/partInfo)
+                                  const assignees = partInfo.assignees || partInfo.assignedWorkers || partInfo.workers || [];
+                                  const match = assignees.find(a => 
+                                    String(a.id || a.userId || a.workerId) === String(log.userId || log.uId)
+                                  );
+                                  if (match) return match.fullName || match.name || match.workerName;
+
+                                  // 3. Fallback
+                                  return `Thợ #${log.userId || log.uId || "?"}`;
+                                })()}
+                              </span>
+                            </div>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl bg-slate-100 font-black text-slate-900">
-                              {log.quantity}
+                            <span className="inline-flex h-9 min-w-[3rem] px-2 items-center justify-center rounded-xl bg-slate-100 font-black text-slate-900">
+                              {log.quantity?.toLocaleString("vi-VN")}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-center text-slate-600 font-semibold">
+                            {Number(partInfo.cpu || 0).toLocaleString("vi-VN")} đ
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-emerald-600 font-black">
+                              {(Number(log.quantity || 0) * Number(partInfo.cpu || 0)).toLocaleString("vi-VN")} đ
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center text-slate-500 font-medium">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { ArrowLeft, Plus, Trash2, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
@@ -255,9 +255,16 @@ export default function ProductionPlan() {
   const initialProductionId = stateProductionId ? String(stateProductionId) : (id ? String(id) : "");
   const [selectedProductionId, setSelectedProductionId] = useState(() => initialProductionId);
 
+  const [initialRows, setInitialRows] = useState([]);
+  const [isConfirmDeleteStepOpen, setIsConfirmDeleteStepOpen] = useState(false);
+  const [stepToDeleteIndex, setStepToDeleteIndex] = useState(null);
+  const [isConfirmCancelOpen, setIsConfirmCancelOpen] = useState(false);
+  const [isConfirmApplyOpen, setIsConfirmApplyOpen] = useState(false);
+  const [applyTarget, setApplyTarget] = useState(null);
+
   const [rows, setRows] = useState(() => {
     if (location.state?.steps && Array.isArray(location.state.steps) && location.state.steps.length > 0) {
-      return location.state.steps.map((s, idx) => ({
+      const initial = location.state.steps.map((s, idx) => ({
         ppId: 2000 + idx,
         productionId: Number(initialProductionId),
         partName: s.partName,
@@ -266,9 +273,16 @@ export default function ProductionPlan() {
         endDate: s.endDate || "",
         ppsId: s.partId || "",
       }));
+      return initial;
     }
     return [];
   });
+
+  useEffect(() => {
+    if (rows.length > 0 && initialRows.length === 0) {
+      setInitialRows(rows.map(r => ({ ...r })));
+    }
+  }, [rows, initialRows.length]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -291,10 +305,10 @@ export default function ProductionPlan() {
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
   const [form, setForm] = useState({
     partName: "",
-    startDate: "",
-    endDate: "",
     cpu: "",
   });
 
@@ -317,6 +331,40 @@ export default function ProductionPlan() {
     () => userStepLabels.map((item) => normalizeText(item)).filter(Boolean),
     [userStepLabels]
   );
+
+  const handleDragStart = (index) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = (index) => {
+    setDragOverIndex(null);
+    if (draggedIndex === null || draggedIndex === index) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const next = [...rows];
+    const [movedRow] = next.splice(draggedIndex, 1);
+    next.splice(index, 0, movedRow);
+    
+    setRows(next);
+    setDraggedIndex(null);
+    setSelectedIndex(index);
+    
+    // Optional: save order to draft
+    // savePlan();
+  };
 
   const isAssignedPM = useMemo(() => {
     if (!selectedProduction?.pmId) return false;
@@ -391,7 +439,7 @@ export default function ProductionPlan() {
             setHasExistingParts(true);
             setRows(prev => {
               if (prev.length === 0) {
-                return res.data.map((s, idx) => ({
+                const fetched = res.data.map((s, idx) => ({
                   ppId: 2000 + idx,
                   productionId: Number(selectedProductionId),
                   partName: s.partName,
@@ -400,6 +448,8 @@ export default function ProductionPlan() {
                   endDate: s.endDate || "",
                   ppsId: s.id || s.partId || ""
                 }));
+                setInitialRows(fetched.map(r => ({ ...r })));
+                return fetched;
               }
               return prev;
             });
@@ -707,6 +757,8 @@ export default function ProductionPlan() {
       const productionId = Number(selectedProductionId);
       const payload = rows.map((row) => ({
         productionId: productionId,
+        // Nếu ppsId > 2000 thì là ID ảo của Frontend, gửi 0 cho Backend tạo mới
+        partId: (row.ppsId && Number(row.ppsId) < 2000) ? Number(row.ppsId) : 0,
         partName: row?.partName || "",
         startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
         endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
@@ -718,7 +770,7 @@ export default function ProductionPlan() {
 
       await ProductionPartService.createParts(productionId, { parts: payload });
       setHasExistingParts(true);
-      toast.success("Đã lưu kế hoạch sản xuất thành công!");
+      toast.success(hasExistingParts ? "Đã cập nhật kế hoạch sản xuất thành công!" : "Đã lưu kế hoạch sản xuất thành công!");
       setIsSuccessModalOpen(true);
       savePlan();
     } catch (error) {
@@ -733,9 +785,7 @@ export default function ProductionPlan() {
   };
 
   const applySavedDesign = (design) => {
-    if (!design?.rows) return;
-    setRows(design.rows.map((row) => ({ ...row })));
-    setSelectedIndex(0);
+    handleRequestApplyDesign(design);
   };
 
   useEffect(() => {
@@ -762,7 +812,7 @@ export default function ProductionPlan() {
 
   const openAddModal = () => {
     setEditingIndex(null);
-    setForm({ partName: "", startDate: "", endDate: "", cpu: "" });
+    setForm({ partName: "", cpu: "" });
     setFormError("");
     setIsModalOpen(true);
   };
@@ -773,8 +823,6 @@ export default function ProductionPlan() {
     setEditingIndex(index);
     setForm({
       partName: target.partName || "",
-      startDate: target.startDate || "",
-      endDate: target.endDate || "",
       cpu: target.cpu || "",
     });
     setFormError("");
@@ -805,25 +853,6 @@ export default function ProductionPlan() {
       setFormError("Tên công đoạn không được dài quá 100 ký tự.");
       return;
     }
-    if (!form.startDate) {
-      setFormError("Vui lòng chọn ngày bắt đầu.");
-      return;
-    }
-    const now = new Date();
-    // Cho phép sai lệch 1 phút để tránh lỗi khi người dùng nhập liệu lâu
-    const graceNow = new Date(now.getTime() - 60000); 
-    if (new Date(form.startDate) < graceNow) {
-      setFormError("Ngày bắt đầu không được nhỏ hơn ngày giờ hiện tại.");
-      return;
-    }
-    if (!form.endDate) {
-      setFormError("Vui lòng chọn ngày kết thúc.");
-      return;
-    }
-    if (new Date(form.endDate) <= new Date(form.startDate)) {
-      setFormError("Ngày kết thúc phải sau ngày bắt đầu.");
-      return;
-    }
     if (form.cpu === "" || Number(form.cpu) < 0 || isNaN(Number(form.cpu))) {
       setFormError("Giá/SP phải là số hợp lệ lớn hơn hoặc bằng 0.");
       return;
@@ -832,7 +861,20 @@ export default function ProductionPlan() {
       setFormError("Giá/SP không được vượt quá 100.000.000 VNĐ.");
       return;
     }
+
+    const isDuplicate = rows.some((row, idx) => 
+      idx !== editingIndex && 
+      (row.partName || "").trim().toLowerCase() === name.toLowerCase()
+    );
+    if (isDuplicate) {
+      setFormError("Tên công đoạn này đã tồn tại trong danh sách.");
+      return;
+    }
+
     setFormError("");
+
+    const defaultStart = selectedProduction?.pStartDate ? `${selectedProduction.pStartDate}T08:00` : new Date().toISOString().slice(0, 16);
+    const defaultEnd = selectedProduction?.pEndDate ? `${selectedProduction.pEndDate}T17:00` : new Date().toISOString().slice(0, 16);
     setRows((prev) => {
       if (editingIndex === null) {
         const next = [
@@ -842,8 +884,8 @@ export default function ProductionPlan() {
             productionId: Number(selectedProductionId),
             partName: name,
             cpu: form.cpu.trim(),
-            startDate: form.startDate,
-            endDate: form.endDate,
+            startDate: defaultStart,
+            endDate: defaultEnd,
             ppsId: "",
           },
         ];
@@ -856,38 +898,108 @@ export default function ProductionPlan() {
         partName: name,
         cpu: form.cpu.trim(),
         productionId: Number(selectedProductionId),
-        startDate: form.startDate,
-        endDate: form.endDate,
+        startDate: defaultStart,
+        endDate: defaultEnd,
       };
       return next;
     });
     closeModal();
   };
 
-  const removeRow = (index) => {
+  const handleRequestDeleteStep = (index) => {
+    setStepToDeleteIndex(index);
+    setIsConfirmDeleteStepOpen(true);
+  };
+
+  const confirmDeleteStep = () => {
+    if (stepToDeleteIndex === null) return;
+    const index = stepToDeleteIndex;
     setRows((prev) => prev.filter((_, i) => i !== index));
     setSelectedIndex((prev) => {
       if (prev === index) return 0;
       if (prev > index) return prev - 1;
       return prev;
     });
+    setIsConfirmDeleteStepOpen(false);
+    setStepToDeleteIndex(null);
+    toast.info("Đã xóa công đoạn.");
   };
 
-  const applyTemplate = (template) => {
-    const baseStart = selectedProduction?.pStartDate ? `${selectedProduction.pStartDate}T08:00` : "";
-    const baseEnd = selectedProduction?.pEndDate ? `${selectedProduction.pEndDate}T17:00` : "";
-    const steps = template.filteredSteps?.length ? template.filteredSteps : template.steps;
-    const next = steps.map((step, index) => ({
-      ppId: 2000 + index,
-      productionId: selectedProductionId ? Number(selectedProductionId) : null,
-      partName: step.partName,
-      cpu: step.cpu ? String(step.cpu) : "",
-      startDate: baseStart,
-      endDate: baseEnd,
-      ppsId: "",
-    }));
-    setRows(next);
+  const checkIfDirty = () => {
+    if (rows.length !== initialRows.length) return true;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].partName !== initialRows[i].partName || rows[i].cpu !== initialRows[i].cpu) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleCancelPlan = () => {
+    if (checkIfDirty()) {
+      setIsConfirmCancelOpen(true);
+    } else {
+      navigate(`/production/${selectedProductionId}`);
+    }
+  };
+
+  const confirmApply = () => {
+    if (!applyTarget) return;
+    const { type, data } = applyTarget;
+    if (type === "template") {
+      const baseStart = selectedProduction?.pStartDate ? `${selectedProduction.pStartDate}T08:00` : "";
+      const baseEnd = selectedProduction?.pEndDate ? `${selectedProduction.pEndDate}T17:00` : "";
+      const stepsList = data.filteredSteps?.length ? data.filteredSteps : data.steps;
+      const next = stepsList.map((step, index) => ({
+        ppId: 2000 + index,
+        productionId: selectedProductionId ? Number(selectedProductionId) : null,
+        partName: step.partName,
+        cpu: step.cpu ? String(step.cpu) : "",
+        startDate: baseStart,
+        endDate: baseEnd,
+        ppsId: "",
+      }));
+      setRows(next);
+    } else if (type === "design") {
+      setRows(data.rows.map((row) => ({ ...row })));
+    }
     setSelectedIndex(0);
+    setIsConfirmApplyOpen(false);
+    setApplyTarget(null);
+    toast.success("Đã áp dụng thành công!");
+  };
+
+  const handleRequestApplyTemplate = (template) => {
+    if (rows.length > 0) {
+      setApplyTarget({ type: "template", data: template });
+      setIsConfirmApplyOpen(true);
+    } else {
+      // Apply directly if rows is empty
+      const baseStart = selectedProduction?.pStartDate ? `${selectedProduction.pStartDate}T08:00` : "";
+      const baseEnd = selectedProduction?.pEndDate ? `${selectedProduction.pEndDate}T17:00` : "";
+      const stepsList = template.filteredSteps?.length ? template.filteredSteps : template.steps;
+      const next = stepsList.map((step, index) => ({
+        ppId: 2000 + index,
+        productionId: selectedProductionId ? Number(selectedProductionId) : null,
+        partName: step.partName,
+        cpu: step.cpu ? String(step.cpu) : "",
+        startDate: baseStart,
+        endDate: baseEnd,
+        ppsId: "",
+      }));
+      setRows(next);
+      setSelectedIndex(0);
+    }
+  };
+
+  const handleRequestApplyDesign = (design) => {
+    if (rows.length > 0) {
+      setApplyTarget({ type: "design", data: design });
+      setIsConfirmApplyOpen(true);
+    } else {
+      setRows(design.rows.map((row) => ({ ...row })));
+      setSelectedIndex(0);
+    }
   };
 
   const toggleAllTemplates = (shouldExpand) => {
@@ -912,7 +1024,7 @@ export default function ProductionPlan() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(`/production/${selectedProductionId}`)}
+                onClick={handleCancelPlan}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -1061,7 +1173,7 @@ export default function ProductionPlan() {
                         <button
                           key={design.id}
                           type="button"
-                          onClick={() => applySavedDesign(design)}
+                          onClick={() => handleRequestApplyDesign(design)}
                           className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-emerald-300 active:translate-y-0 active:shadow-sm"
                           title={design.label}
                         >
@@ -1127,7 +1239,7 @@ export default function ProductionPlan() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => applyTemplate(template)}
+                          onClick={() => handleRequestApplyTemplate(template)}
                           className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
                         >
                           Áp dụng
@@ -1182,10 +1294,8 @@ export default function ProductionPlan() {
                 <thead className="leave-table-head">
                   <tr>
                     <th className="leave-table-th px-3 py-3 text-center">STT</th>
+                    <th className="leave-table-th px-3 py-3"></th>
                     <th className="leave-table-th px-3 py-3 text-left">Tên công đoạn</th>
-                    <th className="leave-table-th px-3 py-3 text-center">Bắt đầu</th>
-                    <th className="leave-table-th px-3 py-3 text-center">Kết thúc</th>
-                    <th className="leave-table-th px-3 py-3 text-center">Thời gian</th>
                     <th className="leave-table-th px-3 py-3 text-center">Giá/SP</th>
                     <th className="leave-table-th px-3 py-3 text-center">Thao tác</th>
                   </tr>
@@ -1194,16 +1304,32 @@ export default function ProductionPlan() {
                   {rows.map((row, idx) => (
                     <tr
                       key={`${row.ppId}-${idx}`}
-                      className={`leave-table-row hover:bg-slate-50/60 ${selectedIndex === idx ? "bg-emerald-50/60" : ""}`}
+                      draggable={isAssignedPM}
+                      onDragStart={() => handleDragStart(idx)}
+                      onDragOver={(e) => handleDragOver(e, idx)}
+                      onDragLeave={handleDragLeave}
+                      onDragEnd={() => {
+                        setDraggedIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDrop={() => handleDrop(idx)}
+                      className={`leave-table-row group transition-all duration-300 border-x-0 border-t-0 border-b-2 border-transparent 
+                        ${selectedIndex === idx ? "bg-emerald-50/60" : "hover:bg-slate-50/60"} 
+                        ${draggedIndex === idx ? "opacity-5 cursor-grabbing bg-slate-50 scale-95" : "cursor-default"}
+                        border-t-4 transition-all duration-200 
+                        ${dragOverIndex === idx ? "border-t-emerald-600 bg-emerald-50/80 shadow-sm" : "border-t-transparent"}`}
                       onClick={() => setSelectedIndex(idx)}
                     >
                       <td className="px-3 py-2 text-center">{idx + 1}</td>
-                      <td className="px-3 py-2 font-medium text-slate-700">{row.partName || "-"}</td>
-                      <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.startDate)}</td>
-                      <td className="px-3 py-2 text-center text-slate-600">{formatDateTime(row.endDate)}</td>
-                      <td className="px-3 py-2 text-center text-slate-500 font-medium">
-                        {getDurationText(row.startDate, row.endDate)}
+                      <td className="px-1 py-2 border-x-0">
+                        {isAssignedPM && (
+                          <div className={`p-1 transition-all duration-200 
+                            ${draggedIndex === idx ? "text-emerald-600 scale-125 cursor-grabbing" : "text-slate-300 cursor-grab hover:text-slate-500 hover:scale-110"}`}>
+                            <GripVertical size={18} />
+                          </div>
+                        )}
                       </td>
+                      <td className="px-3 py-2 font-medium text-slate-700 underline-offset-4">{row.partName || "-"}</td>
                       <td className="px-3 py-2 text-center font-semibold text-slate-700">
                         {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VNĐ` : "-"}
                       </td>
@@ -1225,7 +1351,7 @@ export default function ProductionPlan() {
                             onClick={(event) => {
                               event.stopPropagation();
                               if (!isAssignedPM) return;
-                              removeRow(idx);
+                              handleRequestDeleteStep(idx);
                             }}
                             disabled={!isAssignedPM}
                             className={`text-rose-500 hover:text-rose-600 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
@@ -1238,7 +1364,7 @@ export default function ProductionPlan() {
                     </tr>
                   ))}
                   <tr className="bg-slate-50 border-t-2 border-slate-100">
-                    <td colSpan={5} className="px-3 py-3 font-semibold text-slate-700 text-right">TỔNG CỘNG</td>
+                    <td colSpan={3} className="px-3 py-3 font-semibold text-slate-700 text-right">TỔNG CỘNG</td>
                     <td className="px-3 py-3 text-center font-bold text-emerald-600">
                       {`${totalCpu.toLocaleString("vi-VN")} VNĐ`}
                     </td>
@@ -1306,26 +1432,6 @@ export default function ProductionPlan() {
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Bắt đầu</label>
-                  <input
-                    type="datetime-local"
-                    value={form.startDate}
-                    onChange={(event) => handleFormChange("startDate", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Kết thúc</label>
-                  <input
-                    type="datetime-local"
-                    value={form.endDate}
-                    onChange={(event) => handleFormChange("endDate", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  />
-                </div>
-              </div>
               <div>
                 <label className="text-xs font-semibold text-slate-500 uppercase">Giá/SP</label>
                 <input
@@ -1355,14 +1461,14 @@ export default function ProductionPlan() {
         isOpen={isSuccessModalOpen}
         onClose={() => setIsSuccessModalOpen(false)}
         onPrimary={() => navigate("/production")}
-        title="Lưu thành công"
-        description="Kế hoạch sản xuất đã được lưu vào hệ thống."
+        title={hasExistingParts ? "Cập nhật thành công" : "Lưu thành công"}
+        description={hasExistingParts ? "Kế hoạch sản xuất đã được cập nhật bản ghi mới." : "Kế hoạch sản xuất đã được lưu vào hệ thống."}
         primaryLabel="OK"
       />
       <ConfirmModal
         isOpen={isConfirmSaveOpen}
-        title="Xác nhận lưu lại kế hoạch"
-        description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại có thể tạo thêm các bản ghi trùng lặp (không ghi đè). Bạn có chắc chắn muốn tiếp tục lưu không?"
+        title="Xác nhận cập nhật kế hoạch"
+        description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại sẽ ghi đè và cập nhật danh sách công đoạn hiện tại. Bạn có chắc chắn muốn tiếp tục không?"
         onConfirm={() => saveSteps(true)}
         onClose={() => setIsConfirmSaveOpen(false)}
       />
@@ -1450,6 +1556,34 @@ export default function ProductionPlan() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        isOpen={isConfirmDeleteStepOpen}
+        title="Xác nhận xóa công đoạn"
+        description={`Bạn có chắc chắn muốn xóa công đoạn "${stepToDeleteIndex !== null ? rows[stepToDeleteIndex]?.partName : ""}" không? Hành động này không thể hoàn tác.`}
+        onConfirm={confirmDeleteStep}
+        onClose={() => {
+          setIsConfirmDeleteStepOpen(false);
+          setStepToDeleteIndex(null);
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={isConfirmCancelOpen}
+        title="Thay đổi chưa lưu"
+        description="Bạn có các thay đổi chưa được lưu trong kế hoạch này. Bạn có chắc chắn muốn thoát và mất các thay đổi này không?"
+        onConfirm={() => navigate(`/production/${selectedProductionId}`)}
+        onClose={() => setIsConfirmCancelOpen(false)}
+      />
+      <ConfirmModal
+        isOpen={isConfirmApplyOpen}
+        title="Xác nhận áp dụng"
+        description="Áp dụng mẫu này sẽ ghi đè lên toàn bộ các công đoạn hiện có trong kế hoạch. Bạn có chắc chắn muốn tiếp tục không?"
+        onConfirm={confirmApply}
+        onClose={() => {
+          setIsConfirmApplyOpen(false);
+          setApplyTarget(null);
+        }}
+      />
     </OwnerLayout>
   );
 }
