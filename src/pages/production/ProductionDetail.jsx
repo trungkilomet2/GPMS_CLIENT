@@ -124,9 +124,10 @@ export default function ProductionDetail() {
   const [error, setError] = useState("");
   const [steps, setSteps] = useState([]);
   const [totalParts, setTotalParts] = useState(0);
+  const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
   const pageSize = 10;
-  
+
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
   const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
@@ -290,6 +291,28 @@ export default function ProductionDetail() {
     return () => { active = false; };
   }, [production?.productionId]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("gpms-error-reports");
+      if (!raw) {
+        setReportedErrorCount(0);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const list = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.items)
+          ? parsed.items
+          : Array.isArray(parsed?.data)
+            ? parsed.data
+            : [];
+      const count = list.filter((item) => String(item?.productionId) === String(id)).length;
+      setReportedErrorCount(count);
+    } catch {
+      setReportedErrorCount(0);
+    }
+  }, [id]);
+
 
 
   const pageData = useMemo(() => {
@@ -436,11 +459,52 @@ export default function ProductionDetail() {
       console.error("Lỗi khi hoàn thành đơn sản xuất:", err);
       const data = err.response?.data;
       const backendError = data?.detail || data?.message || data?.title || (typeof data === 'string' ? data : "");
+      console.error("Chi tiết lỗi từ Backend:", backendError);
       const errorMsg = backendError || err.message || "Không thể hoàn thành đơn sản xuất.";
       toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBaoLoi = async (row) => {
+    const hasAssignees = [
+      ...(Array.isArray(row.assignees) ? row.assignees : []),
+      ...(Array.isArray(row.assignedWorkers) ? row.assignedWorkers : []),
+      ...(Array.isArray(row.workers) ? row.workers : [])
+    ].length > 0;
+
+    if (!hasAssignees) {
+      toast.info("Công đoạn này chưa có thợ được phân công, không thể báo cáo lỗi.");
+      return;
+    }
+
+    try {
+      const res = await ProductionPartService.getWorkLogs(row.id);
+      const logs = res?.data?.data || res?.data || [];
+      if (!Array.isArray(logs) || logs.length === 0) {
+        toast.info("Công đoạn này chưa được báo cáo sản lượng, không thể báo cáo lỗi.");
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking work logs:", err);
+      // If API fails, we could either allow or block. Let's allow but log.
+    }
+
+    navigate("/worker/error-report", {
+      state: {
+        assignment: {
+          partId: row.id,
+          productionId: production.productionId,
+          orderName: order.orderName,
+          partName: row.partName || row.name,
+          startDate: row.startDate,
+          endDate: row.endDate,
+          errorType: 0,
+          happenAt: new Date().toISOString(),
+        }
+      }
+    });
   };
 
   const handleOpenCuttingBook = async () => {
@@ -606,11 +670,10 @@ export default function ProductionDetail() {
 
               {(isPM || isOwner) && isInProduction && (
                 <Link
-                  to="/output-history"
-                  state={{ productionId: production.productionId, production }}
-                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+                  to={`/production/${production.productionId}/errors`}
+                  className="rounded-xl border border-rose-200 bg-white px-4 py-2 text-xs font-bold text-rose-700 transition hover:bg-rose-50 flex items-center gap-2 shadow-sm"
                 >
-                  Lịch sử báo cáo
+                  <AlertTriangle size={14} /> Danh sách báo lỗi {reportedErrorCount > 0 && `(${reportedErrorCount})`}
                 </Link>
               )}
 
@@ -650,12 +713,12 @@ export default function ProductionDetail() {
                   return (
                     <Link
                       to="/worker/daily-report"
-                      state={{ 
-                        plan: { 
-                          production: { ...production, orderName: order.orderName }, 
+                      state={{
+                        plan: {
+                          production: { ...production, orderName: order.orderName },
                           product: order,
-                          steps: steps.map(s => ({ ...s, id: s.id ?? s.partId, partName: s.partName ?? s.name, cpu: s.cpu ?? s.unitPrice ?? s.price })) 
-                        } 
+                          steps: steps.map(s => ({ ...s, id: s.id ?? s.partId, partName: s.partName ?? s.name, cpu: s.cpu ?? s.unitPrice ?? s.price }))
+                        }
                       }}
                       className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-indigo-700 shadow-md"
                     >
@@ -798,8 +861,6 @@ export default function ProductionDetail() {
                             <th className="px-4 py-3 text-left">STT</th>
                             <th className="px-4 py-3 text-left">Tên công đoạn</th>
                             <th className="px-4 py-3 text-left">Thợ được giao</th>
-                            <th className="px-4 py-3 text-left">Bắt đầu</th>
-                            <th className="px-4 py-3 text-left">Kết thúc</th>
                             <th className="px-4 py-3 text-right">Giá/SP</th>
                             <th className="px-4 py-3 text-center">Trạng thái</th>
                             <th className="px-4 py-3 text-center">Thao tác</th>
@@ -823,12 +884,6 @@ export default function ProductionDetail() {
                                   )}
                                 </div>
                               </td>
-                              <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
-                                {formatDateTime(row.startDate)}
-                              </td>
-                              <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">
-                                {formatDateTime(row.endDate)}
-                              </td>
                               <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
                                 {Number(row.cpu).toLocaleString('vi-VN')} đ
                               </td>
@@ -845,24 +900,13 @@ export default function ProductionDetail() {
                               </td>
                               <td className="px-4 py-3 text-center">
                                 <div className="flex flex-col items-center gap-1">
-                                  <Link
-                                    to="/worker/error-report"
-                                    state={{
-                                      assignment: {
-                                        partId: row.id,
-                                        productionId: production.productionId,
-                                        orderName: order.orderName,
-                                        partName: row.partName || row.name,
-                                        startDate: row.startDate,
-                                        endDate: row.endDate,
-                                        errorType: 0,
-                                        happenAt: new Date().toISOString(),
-                                      }
-                                    }}
-                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleBaoLoi(row)}
+                                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
                                   >
                                     Báo lỗi
-                                  </Link>
+                                  </button>
                                   {(isOwner || isPM) && (row.statusName === "Chờ Nghiệm Thu" || getPlanStatusLabel(row.statusId || row.status) === "Chờ Nghiệm Thu") && (
                                     <button
                                       type="button"
@@ -884,7 +928,7 @@ export default function ProductionDetail() {
                             </tr>
                           ))}
                           {steps.length === 0 && (
-                            <tr><td colSpan="8" className="py-10 text-center text-slate-400 italic">Chưa lập kế hoạch công đoạn</td></tr>
+                            <tr><td colSpan="6" className="py-10 text-center text-slate-400 italic">Chưa lập kế hoạch công đoạn</td></tr>
                           )}
                         </tbody>
                       </table>

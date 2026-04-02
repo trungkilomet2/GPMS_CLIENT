@@ -352,6 +352,40 @@ export default function ProductionPlanDetail() {
     }
   };
 
+  const handleBaoLoi = async (row) => {
+    if (!row.assignedWorkers || row.assignedWorkers.length === 0) {
+      toast.info("Công đoạn này chưa có thợ được phân công, không thể báo cáo lỗi.");
+      return;
+    }
+
+    try {
+      const res = await ProductionPartService.getWorkLogs(row.partId);
+      const logs = res?.data?.data || res?.data || [];
+      if (!Array.isArray(logs) || logs.length === 0) {
+        toast.info("Công đoạn này chưa có báo cáo sản lượng, không thể báo cáo lỗi.");
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking work logs:", err);
+      // If API fails, allow but log.
+    }
+
+    navigate("/worker/error-report", {
+      state: {
+        assignment: {
+          partId: row.partId,
+          productionId: plan?.production?.productionId,
+          orderName: plan?.production?.orderName,
+          partName: row.partName,
+          startDate: row.startDate,
+          endDate: row.endDate,
+          errorType: 0,
+          happenAt: new Date().toISOString(),
+        },
+      },
+    });
+  };
+
   if (loading && !plan) {
     return (
       <OwnerLayout>
@@ -654,24 +688,13 @@ export default function ProductionPlanDetail() {
                           })()}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Link
-                            to="/worker/error-report"
-                            state={{
-                              assignment: {
-                                partId: row.partId,
-                                productionId: plan?.production?.productionId,
-                                orderName: plan?.production?.orderName,
-                                partName: row.partName,
-                                startDate: row.startDate,
-                                endDate: row.endDate,
-                                errorType: 0,
-                                happenAt: new Date().toISOString(),
-                              },
-                            }}
-                            className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+                          <button
+                            type="button"
+                            onClick={() => handleBaoLoi(row)}
+                            className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
                           >
                             Báo lỗi
-                          </Link>
+                          </button>
                         </td>
                       </tr>
                     ))}
