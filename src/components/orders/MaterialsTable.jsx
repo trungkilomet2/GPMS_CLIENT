@@ -113,7 +113,14 @@ export default function MaterialsTable({
                             <td className={styles.name}>
                                 <div className="flex items-center justify-center gap-2">
                                     {m.materialName}
-                                    {hasError && <span className="text-red-500" title="Dữ liệu không hợp lệ. Vui lòng chỉnh sửa!"><AlertCircle size={14} /></span>}
+                                    {hasError && (
+                                        <span 
+                                            className="text-red-500 cursor-help" 
+                                            title={Object.values(rowError).filter(Boolean).join('. ')}
+                                        >
+                                            <AlertCircle size={14} />
+                                        </span>
+                                    )}
                                 </div>
                             </td>
                             <td className={styles.color}>{m.color || '-'}</td>

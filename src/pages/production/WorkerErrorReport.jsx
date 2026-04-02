@@ -10,10 +10,10 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 const SEVERITIES = [
-  { value: "low", label: "Thấp", priority: 0 },
-  { value: "medium", label: "Trung bình", priority: 1 },
-  { value: "high", label: "Cao", priority: 2 },
-  { value: "critical", label: "Nghiêm trọng", priority: 3 },
+  { value: "low", label: "Thấp", priority: 1 },
+  { value: "medium", label: "Trung bình", priority: 2 },
+  { value: "high", label: "Cao", priority: 3 },
+  { value: "critical", label: "Nghiêm trọng", priority: 4 },
 ];
 
 const ERROR_TYPES = [
@@ -30,6 +30,18 @@ const toList = (payload) => {
   if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload)) return payload;
   return [];
+};
+
+const formatToDateTimeLocal = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 };
 
 const mapPart = (part, fallbackProductionId) => ({
@@ -67,8 +79,9 @@ export default function WorkerErrorReport() {
       partName: assignment?.partName ?? "",
       startDate: assignment?.startDate ?? "",
       endDate: assignment?.endDate ?? "",
-      errorType: assignment?.errorType ?? "process",
+      errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
+      happenAt: assignment?.happenAt ?? "",
     };
   }, [assignment]);
 
@@ -83,7 +96,7 @@ export default function WorkerErrorReport() {
     title: "",
     description: "",
     quantity: "",
-    happenAt: "",
+    happenAt: formatToDateTimeLocal(normalizedAssignment?.happenAt || new Date().toISOString()),
     repairWorker: "",
   });
 
@@ -235,22 +248,7 @@ export default function WorkerErrorReport() {
 
         setParts(mappedParts);
 
-        // Extract unique workers from all parts of this production
-        const workerMap = new Map();
-        rawParts.forEach((part) => {
-          const workerList = part?.assignedWorkers ?? part?.workerList ?? part?.workers ?? [];
-          if (Array.isArray(workerList)) {
-            workerList.forEach((w) => {
-              const info = w?.workerInfo ?? w ?? {};
-              const id = String(info.workerId || info.id || info.userId || "");
-              const name = info.workerName || info.fullName || info.userName || "";
-              if (id && name && !workerMap.has(id)) {
-                workerMap.set(id, { id, fullName: name });
-              }
-            });
-          }
-        });
-        setEmployees(Array.from(workerMap.values()));
+        setParts(mappedParts);
       } catch {
         if (!active) return;
         if (fallbackAssignedPart) {
@@ -274,6 +272,35 @@ export default function WorkerErrorReport() {
       active = false;
     };
   }, [form.productionId, normalizedAssignment, isPartLocked]);
+
+  useEffect(() => {
+    const partId = String(form.partId || "").trim();
+    if (!partId) {
+      setEmployees([]);
+      return;
+    }
+
+    let active = true;
+    const fetchIssueWorkers = async () => {
+      try {
+        setLoadingEmployees(true);
+        const res = await ProductionPartService.getIssueWorkers(partId);
+        if (!active) return;
+        const list = res?.data?.data ?? res?.data ?? [];
+        setEmployees(Array.isArray(list) ? list : []);
+      } catch (err) {
+        console.error("Lỗi tải danh sách thợ cho công đoạn:", err);
+        if (active) setEmployees([]);
+      } finally {
+        if (active) setLoadingEmployees(false);
+      }
+    };
+
+    fetchIssueWorkers();
+    return () => {
+      active = false;
+    };
+  }, [form.partId]);
 
   const productionOptions = useMemo(() => {
     const map = new Map();
@@ -359,13 +386,19 @@ export default function WorkerErrorReport() {
     const next = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
     if (next.length === 0) return;
 
-    const mapped = next.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}`,
-      file,
-      preview: URL.createObjectURL(file),
-    }));
+    // Limit to exactly 1 image
+    const singleFile = next[0];
+    const mapped = {
+      id: `${singleFile.name}-${singleFile.size}-${singleFile.lastModified}`,
+      file: singleFile,
+      preview: URL.createObjectURL(singleFile),
+    };
 
-    setAttachments((prev) => [...prev, ...mapped]);
+    // Replace current rather than append
+    setAttachments((prev) => {
+      prev.forEach(item => { if (item?.preview) URL.revokeObjectURL(item.preview); });
+      return [mapped];
+    });
   };
 
   const handleDrop = (event) => {
@@ -544,7 +577,11 @@ export default function WorkerErrorReport() {
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isProductionLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
                     <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
@@ -572,50 +609,29 @@ export default function WorkerErrorReport() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase text-slate-500">Loại lỗi</label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
                   <select
-                    value={form.errorType}
-                    onChange={(event) => handleChange("errorType", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    value={form.partId}
+                    onChange={(event) => handleChange("partId", event.target.value)}
+                    disabled={!form.productionId || isPartLocked}
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isPartLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
-                    {ERROR_TYPES.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
+                    <option value="">Chọn công đoạn...</option>
+                    {parts.map((item) => (
+                      <option key={item.id} value={item.id}>{item.partName || `Part #${item.id}`}</option>
                     ))}
                   </select>
+                  {loadingParts && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải công đoạn...</div>
+                  )}
+                  {!loadingParts && partsError && (
+                    <div className="mt-1 text-xs text-rose-600">{partsError}</div>
+                  )}
                 </div>
-
-                {Number(form.errorType) === 0 || isPartLocked ? (
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
-                    <select
-                      value={form.partId}
-                      onChange={(event) => handleChange("partId", event.target.value)}
-                      disabled={!form.productionId || isPartLocked}
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    >
-                      <option value="">Chọn công đoạn...</option>
-                      {parts.map((item) => (
-                        <option key={item.id} value={item.id}>{item.partName || `Part #${item.id}`}</option>
-                      ))}
-                    </select>
-                    {loadingParts && (
-                      <div className="mt-1 text-xs text-slate-400">Đang tải công đoạn...</div>
-                    )}
-                    {!loadingParts && partsError && (
-                      <div className="mt-1 text-xs text-rose-600">{partsError}</div>
-                    )}
-                  </div>
-                ) : Number(form.errorType) === 3 ? (
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold uppercase text-slate-500">Mô tả lỗi</label>
-                    <input
-                      value={form.title}
-                      onChange={(event) => handleChange("title", event.target.value)}
-                      placeholder="Nhập chi tiết lỗi khác..."
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    />
-                  </div>
-                ) : null}
 
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
@@ -632,8 +648,8 @@ export default function WorkerErrorReport() {
                   <input
                     type="datetime-local"
                     value={form.happenAt}
-                    onChange={(event) => handleChange("happenAt", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    readOnly
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 outline-none cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -690,27 +706,28 @@ export default function WorkerErrorReport() {
                   }}
                 >
                   <ImagePlus size={18} className="text-slate-400" />
-                  Kéo thả ảnh hoặc bấm để tải lên
+                  Kéo thả 1 ảnh minh chứng hoặc bấm để chọn
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  multiple
                   className="hidden"
                   onChange={(event) => handleFiles(event.target.files)}
                 />
+                <p className="mt-1 text-[10px] text-slate-400 italic">Hệ thống hỗ trợ lưu tối đa 1 ảnh minh chứng cho mỗi báo cáo lỗi.</p>
                 {attachments.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {attachments.map((item) => (
-                      <div key={item.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      <div key={item.id} className="relative overflow-hidden rounded-xl border-2 border-rose-100 bg-white shadow-sm">
                         <img src={item.preview} alt={item.file.name} className="h-28 w-full object-cover" />
                         <button
                           type="button"
                           onClick={() => removeAttachment(item.id)}
-                          className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-slate-600 shadow hover:text-rose-600"
+                          className="absolute right-1.5 top-1.5 rounded-full bg-rose-600 p-1 text-white shadow hover:bg-rose-700 transition-colors"
+                          title="Gỡ bỏ"
                         >
-                          Xóa
+                          <svg size={12} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                         </button>
                       </div>
                     ))}
@@ -743,8 +760,8 @@ export default function WorkerErrorReport() {
                     <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
-                    <InfoItem label="Bắt đầu" value={selectedPart.startDate || "-"} />
-                    <InfoItem label="Kết thúc" value={selectedPart.endDate || "-"} />
+                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ").slice(0, 16)} />
+                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ").slice(0, 16)} />
                   </div>
                 ) : (
                   <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>

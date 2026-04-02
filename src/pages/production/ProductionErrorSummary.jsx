@@ -1,9 +1,10 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import Pagination from "@/components/Pagination";
+import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -73,7 +74,13 @@ const formatDateTime = (value) => {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleString("vi-VN");
+  return parsed.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const normalizeIssue = (item, index) => {
@@ -112,6 +119,8 @@ export default function ProductionErrorSummary() {
   const [issueError, setIssueError] = useState("");
   const [errors, setErrors] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState("");
   const pageSize = 10;
 
   useEffect(() => {
@@ -365,6 +374,7 @@ export default function ProductionErrorSummary() {
                   <tr>
                     <th className="px-4 py-3 text-left">Công đoạn</th>
                     <th className="px-4 py-3 text-left">Tiêu đề</th>
+                    <th className="px-4 py-3 text-center">Minh chứng</th>
                     <th className="px-4 py-3 text-center">Mức độ</th>
                     <th className="px-4 py-3 text-center">Số lượng</th>
                     <th className="px-4 py-3 text-center">Thời gian</th>
@@ -379,6 +389,31 @@ export default function ProductionErrorSummary() {
                         <div className="text-[11px] text-slate-400">{item.description || ""}</div>
                       </td>
                       <td className="px-4 py-3 text-center">
+                        {item.imageUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setZoomImageUrl(item.imageUrl);
+                              setIsImageModalOpen(true);
+                            }}
+                            className="group relative inline-block overflow-hidden rounded-lg border border-slate-100 shadow-sm transition hover:border-emerald-500"
+                          >
+                            <img
+                              src={item.imageUrl}
+                              alt="Minh chứng"
+                              className="h-10 w-10 object-cover transition duration-300 group-hover:scale-110"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
+                              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                              </svg>
+                            </div>
+                          </button>
+                        ) : (
+                          <span className="text-[10px] italic text-slate-300">Không có ảnh</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
                         <span
                           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
                             SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
@@ -391,9 +426,9 @@ export default function ProductionErrorSummary() {
                       <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
                     </tr>
                   ))}
-                  {errors.length === 0 && (
+                    {errors.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-slate-500">
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
                         Chưa có lỗi nào được ghi nhận.
                       </td>
                     </tr>
@@ -421,6 +456,15 @@ export default function ProductionErrorSummary() {
           Đang tải dữ liệu đơn sản xuất...
         </div>
       )}
+
+      <OrderImageZoomModal
+        isOpen={isImageModalOpen}
+        imageUrl={zoomImageUrl}
+        onClose={() => {
+          setIsImageModalOpen(false);
+          setZoomImageUrl("");
+        }}
+      />
     </OwnerLayout>
   );
 }

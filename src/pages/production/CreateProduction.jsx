@@ -151,6 +151,7 @@ export default function CreateProduction() {
 
         const pmRoles = ["PM", "Manager", "Owner"];
         let pms = allEmployees.filter((item) => {
+          if (item.status !== "active") return false;
           // If they manage somebody, they are likely a valid PM candidate
           if (managedBySet.has(String(item.id))) return true;
 

@@ -114,7 +114,8 @@ export default function UpdateProduction() {
         const response = await WorkerService.getAllEmployees();
         const items = response?.data ?? [];
         const pms = items.filter((item) =>
-          item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM"))
+          item.status === "active" &&
+          (item?.primaryRole === "PM" || (Array.isArray(item?.roles) && item.roles.includes("PM")))
         );
         if (!active) return;
         setPmUsers(pms);
@@ -289,10 +290,10 @@ export default function UpdateProduction() {
     try {
       setIsSubmitting(true);
       await ProductionService.updateProductionPm(production.productionId, form.pmId);
-      alert("Cập nhật PM quản lý thành công!");
+      toast.success("Cập nhật PM quản lý thành công!");
       navigate(`/production/${production.productionId}`);
     } catch (_err) {
-      alert("Không thể cập nhật PM quản lý.");
+      toast.error("Không thể cập nhật PM quản lý.");
     } finally {
       setIsSubmitting(false);
     }

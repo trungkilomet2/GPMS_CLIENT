@@ -34,7 +34,7 @@ const overlapsMonth = (startStr, endStr, month, year) => {
 
   // If no start date, we can't be sure, but let's assume it's relevant if end exists
   if (!start && !end) return true; // Fallback to include if totally unknown
-  
+
   if (start && start > targetEnd) return false;
   if (end && end < targetStart) return false;
 
@@ -57,13 +57,24 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
   }
 
   try {
-    // 1. Fetch Productions (large batch)
-    const prodRes = await ProductionService.getProductionList({ PageIndex: 0, PageSize: 100 });
+    // 1. Fetch Productions and Worker Profiles
+    const [prodRes, workerDicRes] = await Promise.all([
+      ProductionService.getProductionList({ PageIndex: 0, PageSize: 100 }),
+      WorkerService.getEmployeeDirectory({ includeHidden: true }),
+    ]);
+
     const rawProductions = prodRes?.data?.data || prodRes?.data || [];
+    const workerDirectory = workerDicRes?.data || [];
+    const workerProfileMap = new Map();
+    workerDirectory.forEach(w => {
+      const key = String(w.id || w.userName);
+      workerProfileMap.set(key, w);
+    });
+
     if (!Array.isArray(rawProductions)) return [];
 
     // Filter relevant productions to reduce part/log requests
-    const productions = rawProductions.filter(p => 
+    const productions = rawProductions.filter(p =>
       overlapsMonth(p.startDate || p.pStartDate, p.endDate || p.pEndDate, month, year)
     );
 
@@ -108,7 +119,7 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
         rawLogs.forEach(log => {
           const d = new Date(log.workDate || log.reportDate);
           if (d.getMonth() + 1 === month && d.getFullYear() === year) {
-            allLogs.push({
+            const logEntry = {
               ...log,
               partId: part.id,
               partName: part.partName || part.name,
@@ -116,10 +127,22 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
               productionId: part.productionId,
               orderName: part.orderName,
               orderId: part.orderId,
-              workerName: log.workerName || log.userName || `Thợ #${log.userId}`,
+              workerId: log.userId,
+              workerName: log.workerName || log.userName || `Tùng Tổng Tài`, //fix cái này
               quantity: log.quantity || 0,
               reportDate: log.workDate || log.reportDate,
-            });
+              workerFullName: null,
+              workerAvatar: null,
+            };
+
+            // Enhance with profile
+            const profile = workerProfileMap.get(String(log.userId));
+            if (profile) {
+              logEntry.workerFullName = profile.fullName;
+              logEntry.workerAvatar = profile.avatarUrl;
+            }
+
+            allLogs.push(logEntry);
           }
         });
       }
@@ -136,6 +159,8 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
           totalQuantity: 0,
           totalSalary: 0,
           logCount: 0,
+          uniqueParts: new Set(),
+          uniquePartCount: 0,
           logs: [],
         });
       }
@@ -145,6 +170,12 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       stats.totalQuantity += qty;
       stats.totalSalary += qty * cpu;
       stats.logCount += 1;
+      if (log.partId) stats.uniqueParts.add(log.partId);
+      stats.uniquePartCount = stats.uniqueParts.size;
+
+      if (log.workerFullName && !stats.fullName) stats.fullName = log.workerFullName;
+      if (log.workerAvatar && !stats.avatarUrl) stats.avatarUrl = log.workerAvatar;
+
       stats.logs.push(log);
     });
 

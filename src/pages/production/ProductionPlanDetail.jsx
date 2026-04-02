@@ -11,6 +11,7 @@ import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
 import { hasAnyRole } from "@/lib/roleAccess";
+import ConfirmModal from "@/components/ConfirmModal";
 import { STATUS_STYLES, getProductionStatusLabel, getPlanStatusLabel } from "@/utils/statusUtils";
 import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
@@ -75,8 +76,10 @@ export default function ProductionPlanDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isApproveConfirmOpen, setIsApproveConfirmOpen] = useState(false);
+  const [isRequestUpdateConfirmOpen, setIsRequestUpdateConfirmOpen] = useState(false);
   const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const user = getStoredUser();
@@ -186,7 +189,9 @@ export default function ProductionPlanDetail() {
           cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
           startDate: part?.startDate ?? part?.planStartDate ?? "-",
           endDate: part?.endDate ?? part?.planEndDate ?? "-",
-          status: part?.statusId ?? part?.statusName ?? part?.status ?? 1,
+          status: part?.statusName ?? part?.statusId ?? part?.status ?? 1,
+          statusName: part?.statusName ?? null,
+          statusId: part?.statusId ?? null,
           assignedWorkers:
             part?.assignedWorkers ??
             part?.workers ??
@@ -317,12 +322,13 @@ export default function ProductionPlanDetail() {
     }
   };
 
-  const handleApprovePlan = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này?")) return;
+  const handleApprovePlan = () => setIsApproveConfirmOpen(true);
+  const confirmApprovePlan = async () => {
     try {
       setLoading(true);
       await ProductionService.approveProductionPlan(id);
       toast.success("Đã chấp nhận kế hoạch sản xuất.");
+      setIsApproveConfirmOpen(false);
       window.location.reload();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Không thể chấp nhận kế hoạch.");
@@ -331,12 +337,13 @@ export default function ProductionPlanDetail() {
     }
   };
 
-  const handleRequestUpdate = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại kế hoạch này?")) return;
+  const handleRequestUpdate = () => setIsRequestUpdateConfirmOpen(true);
+  const confirmRequestUpdate = async () => {
     try {
       setLoading(true);
       await ProductionService.requestPlanUpdate(id);
       toast.success("Đã gửi yêu cầu chỉnh sửa kế hoạch.");
+      setIsRequestUpdateConfirmOpen(false);
       window.location.reload();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Không thể gửi yêu cầu chỉnh sửa.");
@@ -439,11 +446,11 @@ export default function ProductionPlanDetail() {
                 (() => {
                   const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
                   const canReport = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
-                  
+
                   return canReport ? (
                     <Link
                       to="/worker/daily-report"
-                      state={{ plan: { production: plan.production, steps: plan.steps } }}
+                      state={{ plan: { production: plan.production, steps: plan.steps, product: plan.product } }}
                       className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700"
                     >
                       Báo cáo sản lượng
@@ -455,7 +462,7 @@ export default function ProductionPlanDetail() {
                   const rawStatus = String(plan?.production?.status || "").toLowerCase().normalize("NFC");
                   const isApproved = rawStatus.includes("đang sản xuất") || rawStatus.includes("hoàn thành");
                   const hasEnoughParts = totalParts >= 3;
-                  
+
                   const canAssign = isApproved && hasEnoughParts;
                   const assignmentLink = `/production-plan/assign/${plan?.production?.productionId}`;
                   const state = { production: plan?.production, product: plan?.product, steps: plan?.steps };
@@ -538,48 +545,50 @@ export default function ProductionPlanDetail() {
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
-                    <Link
-                      to={`/production/${plan?.production?.productionId}/errors`}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết
-                    </Link>
+            {!isWorker && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
+                <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
+                      <Link
+                        to={`/production/${plan?.production?.productionId}/errors`}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết
+                      </Link>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">
-                    {progressSummary.completed}/{progressSummary.total}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">
+                      {progressSummary.completed}/{progressSummary.total}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
-                  <div className="mt-1">
-                    <Link
-                      to="/worker/daily-report"
-                      state={{ plan: { production: plan?.production, steps: plan?.steps } }}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết sản lượng nhân viên
-                    </Link>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
+                    <div className="mt-1">
+                      <Link
+                        to="/worker/daily-report"
+                        state={{ plan: { production: plan?.production, steps: plan?.steps } }}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết sản lượng nhân viên
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -600,8 +609,6 @@ export default function ProductionPlanDetail() {
                       <th className="px-4 py-3 text-left">STT</th>
                       <th className="px-4 py-3 text-left">Tên công đoạn</th>
                       <th className="px-4 py-3 text-left">Thợ được giao</th>
-                      <th className="px-4 py-3 text-left">Thời gian bắt đầu</th>
-                      <th className="px-4 py-3 text-left">Thời gian kết thúc</th>
                       <th className="px-4 py-3 text-right">Giá/SP</th>
                       <th className="px-4 py-3 text-center">Trạng thái</th>
                       <th className="px-4 py-3 text-center">Thao tác</th>
@@ -609,13 +616,12 @@ export default function ProductionPlanDetail() {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {pageData.map((row, idx) => (
-                      <tr key={`${row.partId}-${idx}`} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-3 text-slate-500">
+                      <tr key={`${row.partId}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 text-slate-400">
                           {String(pageIndex * pageSize + idx + 1).padStart(2, "0")}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-800">{row.partName || "-"}</div>
-                          <div className="text-[11px] text-slate-400">Giai đoạn: Rập</div>
+                          <div className="font-semibold text-slate-900">{row.partName || "-"}</div>
                         </td>
                         <td className="px-4 py-3">
                           {Array.isArray(row.assignedWorkers) && row.assignedWorkers.length > 0 ? (
@@ -623,27 +629,25 @@ export default function ProductionPlanDetail() {
                               {row.assignedWorkers.map((worker) => (
                                 <span
                                   key={`${row.partId}-${worker}`}
-                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+                                  className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-full border border-emerald-100"
                                 >
                                   {worker}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-slate-400">-</span>
+                            <span className="text-slate-300 italic text-[11px]">Chưa giao</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.startDate)}</td>
-                        <td className="px-4 py-3 text-slate-600">{formatDateTime(row.endDate)}</td>
-                        <td className="px-4 py-3 text-right font-semibold text-slate-700">
-                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
+                        <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
+                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} đ` : "-"}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {(() => {
-                            const label = getPlanStatusLabel(row.statusName || row.statusId || row.status);
+                            const label = row.statusName || getPlanStatusLabel(row.status);
                             const style = STATUS_STYLES[label] || STATUS_STYLES.default;
                             return (
-                              <span className={`rounded-full border px-3 py-1 text-[10px] font-bold uppercase whitespace-nowrap shadow-sm ${style}`}>
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border whitespace-nowrap shadow-sm ${style}`}>
                                 {label}
                               </span>
                             );
@@ -660,6 +664,8 @@ export default function ProductionPlanDetail() {
                                 partName: row.partName,
                                 startDate: row.startDate,
                                 endDate: row.endDate,
+                                errorType: 0,
+                                happenAt: new Date().toISOString(),
                               },
                             }}
                             className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
@@ -671,7 +677,7 @@ export default function ProductionPlanDetail() {
                     ))}
                     {pageData.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="py-10 text-center text-slate-500">
+                        <td colSpan={6} className="py-10 text-center text-slate-500">
                           Chưa có công đoạn.
                         </td>
                       </tr>
@@ -694,6 +700,22 @@ export default function ProductionPlanDetail() {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isApproveConfirmOpen}
+        title="Duyệt kế hoạch sản xuất"
+        description="Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này? Sau khi duyệt, kế hoạch sẽ chuyển sang trạng thái sản xuất."
+        onConfirm={confirmApprovePlan}
+        onClose={() => setIsApproveConfirmOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={isRequestUpdateConfirmOpen}
+        title="Yêu cầu sửa kế hoạch"
+        description="Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại các công đoạn trong kế hoạch này?"
+        onConfirm={confirmRequestUpdate}
+        onClose={() => setIsRequestUpdateConfirmOpen(false)}
+      />
     </OwnerLayout>
   );
 }

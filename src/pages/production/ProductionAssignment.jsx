@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Search, Users, Check, AlertTriangle, Info } from "lucide-react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -9,6 +11,7 @@ import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import { toast } from "react-toastify";
 import ConfirmModal from "@/components/ConfirmModal";
+import { getPlanStatusLabel, STATUS_STYLES } from "@/utils/statusUtils";
 
 export default function ProductionAssignment() {
   const { id } = useParams();
@@ -51,7 +54,7 @@ export default function ProductionAssignment() {
         productionId: payload.productionId ?? payload.id,
         pmId: pm.id ?? null,
         pm,
-        orderId: order.id,
+        orderId: order.id || order.orderId || null,
         orderName: order.orderName,
         pStartDate: payload.startDate ?? order.startDate ?? null,
         pEndDate: payload.endDate ?? order.endDate ?? null,
@@ -81,6 +84,7 @@ export default function ProductionAssignment() {
     if (incoming?.production && incomingPmId) {
       return {
         ...incoming.production,
+        orderId: incoming.production.orderId ?? incoming.production.order?.id ?? incoming.production.order?.orderId ?? null,
         pmId: incomingPmId,
         product: incoming.product ?? null,
       };
@@ -146,6 +150,8 @@ export default function ProductionAssignment() {
         ...row,
         ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
         realPartId: realPart?.id ?? null,
+        statusName: realPart?.statusName || getPlanStatusLabel(realPart?.statusId),
+        statusId: realPart?.statusId,
         productionId: selectedProduction ? selectedProduction.productionId : null,
       };
     });
@@ -207,6 +213,7 @@ export default function ProductionAssignment() {
       .then((res) => {
         const list = res?.data?.data || res?.data || res || [];
         if (Array.isArray(list)) {
+          const pm = selectedProduction?.pm || {};
           const mapped = list.map((w) => {
             const info = w.workerInfo || w || {};
             const skills = Array.isArray(w.workerSkillInfo)
@@ -224,7 +231,35 @@ export default function ProductionAssignment() {
               leaveDate: leaveDate || w.leaveDate || "",
               role: w.role || "Worker",
             };
-          }).filter(w => w.id !== ""); // Filter out empty IDs just in case
+          }).filter(w => w.id !== "");
+
+          // Inject PM managing this production if not in list
+          if (pm.id && !mapped.some(w => String(w.id) === String(pm.id))) {
+            mapped.push({
+              id: String(pm.id),
+              fullName: pm.fullName || pm.name || `PM #${pm.id}`,
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "PM",
+            });
+          }
+
+          // Inject current user if they are Owner and not in list
+          const currentUser = getStoredUser();
+          const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+          const isOwner = hasAnyRole(roleValue, ["Owner", "Admin"]);
+          if (isOwner && currentUser?.id && !mapped.some(w => String(w.id) === String(currentUser.id))) {
+            mapped.push({
+              id: String(currentUser.id),
+              fullName: currentUser.fullName || currentUser.name || "Owner",
+              status: "ready",
+              frequentSteps: [],
+              leaveDate: "",
+              role: "Owner",
+            });
+          }
+
           setWorkers(mapped);
         }
       })
@@ -312,6 +347,12 @@ export default function ProductionAssignment() {
   }, [workerColumns, workerQuery]);
 
   const toggleWorker = (ppId, workerId) => {
+    const row = rows.find(r => r.ppId === ppId);
+    const lockedStatuses = ["Hoàn Thành", "Đã Hoàn Thành", "Chờ Nghiệm Thu"];
+    if (lockedStatuses.includes(row?.statusName) || row?.statusId === 3 || row?.statusId === 4) {
+      toast.warning("Công đoạn đã hoàn thành hoặc đang chờ nghiệm thu, không thể thay đổi phân công.");
+      return;
+    }
     setAssignments((prev) => ({
       ...prev,
       [ppId]: {
@@ -324,6 +365,12 @@ export default function ProductionAssignment() {
   };
 
   const setRowWorkers = (ppId, nextIds) => {
+    const row = rows.find(r => r.ppId === ppId);
+    const lockedStatuses = ["Hoàn Thành", "Đã Hoàn Thành", "Chờ Nghiệm Thu"];
+    if (lockedStatuses.includes(row?.statusName) || row?.statusId === 3 || row?.statusId === 4) {
+      toast.warning("Công đoạn đã hoàn thành hoặc đang chờ nghiệm thu, không thể thay đổi phân công.");
+      return;
+    }
     setAssignments((prev) => ({
       ...prev,
       [ppId]: {
@@ -501,26 +548,28 @@ export default function ProductionAssignment() {
                 <p className="text-slate-600">Phân công theo công đoạn đã lập trong kế hoạch sản xuất.</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleEdit}
-              disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
-                ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
-            >
-              {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
-                Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
-              ))}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleEdit}
+                disabled={isSaving || (selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${isEditing
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  } ${(selectedProduction?.status === "Chờ Xét Duyệt Kế Hoạch" || selectedProduction?.status === "Cần Chỉnh Sửa Kế Hoạch") ? "opacity-30 cursor-not-allowed" : ""}`}
+              >
+                {isSaving ? "Đang lưu..." : (isEditing ? "Lưu chỉnh sửa" : (
+                  Object.values(initialAssignments).some(v => v.workerIds.length > 0) ? "Cập nhật phân công" : "Phân công ngay"
+                ))}
+              </button>
+            </div>
           </div>
 
           {incoming?.production && (
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
                 <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
-                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
+                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId || selectedProduction.order?.id || selectedProduction.order?.orderId || "-"}` : "-"} />
                 <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />
               </div>
@@ -678,12 +727,19 @@ export default function ProductionAssignment() {
                                 {idx + 1}
                               </div>
                               <div>
-                                <div className="text-base font-semibold text-slate-800">{row.partName}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-base font-semibold text-slate-800">{row.partName}</div>
+                                  {row.statusName && (
+                                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLES[row.statusName] || STATUS_STYLES.default}`}>
+                                      {row.statusName}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="mt-1 text-sm text-slate-500">
                                   Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                                 </div>
                                 <div className="mt-1 text-sm text-slate-500">
-                                  {row.startDate || "-"} → {row.endDate || "-"}
+                                  {(row.startDate || "-").replace("T", " ").slice(0, 16)} → {(row.endDate || "-").replace("T", " ").slice(0, 16)}
                                 </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
@@ -741,27 +797,40 @@ export default function ProductionAssignment() {
                     </div>
                   </div>
                   {!activeRow ? (
-                    <div className="text-sm text-slate-600">Chọn một công đoạn để phân công.</div>
+                    <div className="text-sm text-slate-600 px-2 py-8 text-center italic">Chọn một công đoạn bên trái để xem danh sách thợ.</div>
                   ) : (
                     (() => {
                       const selectedIds = assignments[activeRow.ppId]?.workerIds || [];
                       const visibleWorkers = filteredWorkers.filter((worker) =>
                         showSelectedOnly ? selectedIds.includes(worker.id) : true
                       );
-                      const visibleIds = visibleWorkers.map((worker) => worker.id);
-                      const isAllVisibleSelected =
-                        visibleIds.length > 0 && visibleIds.every((workerId) => selectedIds.includes(workerId));
+                      const isLocked = 
+                        activeRow?.statusName === "Hoàn Thành" || 
+                        activeRow?.statusName === "Đã Hoàn Thành" || 
+                        activeRow?.statusName === "Chờ Nghiệm Thu" ||
+                        activeRow?.statusId === 3 || activeRow?.statusId === "3" ||
+                        activeRow?.statusId === 4 || activeRow?.statusId === "4";
 
                       return (
                         <>
+                          {isLocked && (
+                            <div className="mb-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
+                              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+                              <div>
+                                <strong className="block font-bold text-rose-900">Công đoạn đã khóa phân công</strong>
+                                <p className="mt-0.5 opacity-90 font-medium">Bạn không thể thay đổi phân công lao động cho các công đoạn đã hoàn thành hoặc đang chờ nghiệm thu.</p>
+                              </div>
+                            </div>
+                          )}
+
                           {loadingWorkers ? (
-                            <div className="text-xs text-slate-500">Đang tải thợ...</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Đang tải danh sách thợ...</div>
                           ) : workerColumns.length === 0 ? (
-                            <div className="text-xs text-slate-500">Chưa có thợ</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Hệ thống chưa có dữ liệu thợ.</div>
                           ) : visibleWorkers.length === 0 ? (
-                            <div className="text-xs text-slate-500">Không có thợ phù hợp.</div>
+                            <div className="py-8 text-center text-xs text-slate-500">Không tìm thấy thợ nào phù hợp.</div>
                           ) : (
-                            <div className="max-h-96 min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
+                            <div className={`max-h-[500px] min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 ${isLocked ? "opacity-60 pointer-events-none grayscale-[20%]" : ""}`}>
                               {visibleWorkers.map((worker) => {
                                 const checked = selectedIds.includes(worker.id);
                                 const frequentText = worker.frequentSteps.length
@@ -769,7 +838,8 @@ export default function ProductionAssignment() {
                                   : "";
                                 const isOnLeave = worker.status === "leave";
                                 const isLeaveConflict = isOnLeave && isLeaveDuringRow(worker.leaveDate, activeRow);
-                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict;
+                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict && !isLocked;
+                                
                                 return (
                                   <button
                                     type="button"
@@ -790,7 +860,7 @@ export default function ProductionAssignment() {
                                         <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
                                         {isOnLeave ? (
                                           <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                            Nghỉ {worker.leaveDate || ""}
+                                            Nghỉ {(worker.leaveDate || "").replace("T", " ").slice(0, 16)}
                                           </span>
                                         ) : (
                                           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
@@ -867,7 +937,12 @@ function SummaryItem({ label, value }) {
 }
 
 
+const PLAN_STEPS = [
+  { partName: "Cắt Vải", cpu: 5000, startDate: "2026-03-01", endDate: "2026-03-05" },
+  { partName: "May", cpu: 15000, startDate: "2026-03-05", endDate: "2026-03-15" },
+  { partName: "Đóng gói", cpu: 2000, startDate: "2026-03-15", endDate: "2026-03-20" },
+];
 
-
-
-
+const MOCK_PRODUCTIONS = [
+  { productionId: 9, orderId: 5, pmName: "Tùng Quản Lý", status: "Đang Sản Xuất" },
+];

@@ -7,9 +7,10 @@ export const STATUS_STYLES = {
   "Chờ Xét Duyệt": "bg-sky-100/50 text-sky-700 border-sky-200 shadow-sm",
   "Chờ Xét Duyệt Kế Hoạch": "bg-indigo-100/50 text-indigo-700 border-indigo-200 shadow-sm",
   "Đang Sản Xuất": "bg-blue-100/50 text-blue-700 border-blue-200 shadow-sm",
-  "Đã Hoàn Thành": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
-  "Hoàn Thành": "bg-emerald-100/50 text-emerald-700 border-emerald-200 shadow-sm",
-  "Chưa Thực Hiện": "bg-slate-100/80 text-slate-500 border-slate-200 shadow-sm",
+  "Chờ Nghiệm Thu": "bg-amber-500 text-white border-amber-600 shadow-md font-bold",
+  "Đã Hoàn Thành": "bg-emerald-600 text-white border-emerald-700 shadow-md font-bold",
+  "Hoàn Thành": "bg-emerald-600 text-white border-emerald-700 shadow-md font-bold",
+  "Chưa Thực Hiện": "bg-slate-100 text-slate-500 border-slate-200 shadow-sm",
   default: "bg-gray-100 text-gray-600 border-gray-200 shadow-sm",
 };
 
@@ -74,6 +75,11 @@ const PLAN_LABELS = {
   "hoan thanh": "Hoàn Thành",
   completed: "Hoàn Thành",
   done: "Hoàn Thành",
+  "chờ nghiệm thu": "Chờ Nghiệm Thu",
+  "cho nghiem thu": "Chờ Nghiệm Thu",
+  "chờ kcs": "Chờ Nghiệm Thu",
+  "cho kcs": "Chờ Nghiệm Thu",
+  "waiting for qc": "Chờ Nghiệm Thu",
 };
 
 export function getPlanStatusLabel(status) {
@@ -81,6 +87,7 @@ export function getPlanStatusLabel(status) {
     if (status === 1) return "Chưa Thực Hiện";
     if (status === 2) return "Đang Sản Xuất";
     if (status === 3) return "Đã Hoàn Thành";
+    if (status === 4) return "Chờ Nghiệm Thu";
   }
 
   let raw = String(status ?? "").trim();

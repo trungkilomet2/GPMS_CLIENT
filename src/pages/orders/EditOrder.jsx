@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle, Save } from 'lucide-react';
+import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
@@ -56,17 +58,26 @@ export default function EditOrder() {
     const [orderImagePreview, setOrderImagePreview] = useState('');
     const [templateItems, setTemplateItems] = useState([]);
     const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState({
+        show: false,
+        type: null,
+        index: null,
+        title: '',
+        desc: ''
+    });
+    const [initialState, setInitialState] = useState(null);
 
     const normalizeMaterial = (m = {}) => {
         return {
-            materialName: m.materialName ?? m.name ?? '',
-            color: m.color ?? '',
-            value: m.value ?? m.quantity ?? '',
-            uom: m.uom ?? '',
-            image: m.image ?? '',
+            id: m.id || m.materialId || null,
+            materialName: (m.materialName || m.name || '').trim(),
+            color: (m.color || '').trim(),
+            value: m.value !== undefined && m.value !== null ? m.value : (m.quantity !== undefined ? m.quantity : ''),
+            uom: (m.uom || '').trim(),
+            image: m.image || '',
             imageFile: null,
-            imagePreview: m.image ?? '',
-            note: m.note ?? '',
+            imagePreview: m.imagePreview || m.image || '',
+            note: (m.note || '').trim(),
         };
     };
 
@@ -116,6 +127,13 @@ export default function EditOrder() {
             }))
             .filter((t) => t.file);
         setTemplateItems(items);
+        
+        // Save initial state for comparison
+        setInitialState({
+            orderData: { ...formattedData },
+            materials: (data.materials || []).map(normalizeMaterial),
+            templateItems: [...items]
+        });
     };
 
     useEffect(() => {
@@ -132,7 +150,7 @@ export default function EditOrder() {
                     applyOrderData(data);
                 } catch (error) {
                     console.error('Lỗi khi tải chi tiết đơn hàng:', error);
-                    alert('Không thể tải thông tin đơn hàng.');
+                    toast.error('Không thể tải thông tin đơn hàng.');
                     navigate('/orders');
                 } finally {
                     setIsFetching(false);
@@ -204,6 +222,13 @@ export default function EditOrder() {
         // DATES
         if (!orderData.startDate) {
             newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
+        } else {
+            const today = new Date();
+            const todayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().split('T')[0];
+            // Only validate if it's a NEW date or if the original date was also in the future
+            if (orderData.startDate < todayStr) {
+                newErrors.startDate = 'Ngày bắt đầu không được trước ngày hiện tại';
+            }
         }
         if (!orderData.endDate) {
             newErrors.endDate = 'Vui lòng chọn ngày kết thúc';
@@ -271,6 +296,10 @@ export default function EditOrder() {
             }
         }
 
+        if (Object.keys(newErrors).length > 0) {
+            console.warn('Lỗi xác thực đơn hàng:', newErrors);
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -325,7 +354,16 @@ export default function EditOrder() {
             });
         }
 
-        if (errors.materials) {
+        // Clear error for this material if any
+        if (errors.materialsList) {
+            setErrors((prev) => {
+                const newMaterialsList = prev.materialsList ? { ...prev.materialsList } : {};
+                if (targetIndex !== null) delete newMaterialsList[targetIndex];
+                return { ...prev, materialsList: newMaterialsList };
+            });
+        }
+
+        if (errors.materials && materials.length + (editingIndex === null ? 1 : 0) > 0) {
             setErrors((prev) => ({ ...prev, materials: null }));
         }
         setIsModalOpen(false);
@@ -361,11 +399,11 @@ export default function EditOrder() {
         if (!file) return;
         const allowedTypes = ['image/jpeg', 'image/png'];
         if (!allowedTypes.includes(file.type)) {
-            alert('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
+            toast.warn('Chỉ chấp nhận ảnh JPG/JPEG/PNG');
             return;
         }
         if (file.size > 2 * 1024 * 1024) {
-            alert('Ảnh quá lớn (tối đa 2MB)');
+            toast.warn('Ảnh quá lớn (tối đa 2MB)');
             return;
         }
         const previewUrl = URL.createObjectURL(file);
@@ -388,15 +426,21 @@ export default function EditOrder() {
             const lower = file.name.toLowerCase();
             const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
             const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
-            if (isAllowed && isSizeOk) {
+            const isNameOk = file.name.length <= 255;
+
+            if (isAllowed && isSizeOk && isNameOk) {
                 valid.push(file);
             } else {
-                invalid.push(file.name);
+                let reason = "Định dạng không hỗ trợ";
+                if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
+                else if (!isNameOk) reason = "Tên file quá 255 ký tự";
+                
+                invalid.push(`${file.name} (${reason})`);
             }
         });
 
         if (invalid.length > 0) {
-            alert(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+            toast.error(invalid.join(', '));
         }
 
         if (valid.length > 0) {
@@ -423,11 +467,118 @@ export default function EditOrder() {
     };
 
     const removeTemplateItem = (index) => {
-        setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+        setDeleteConfirm({
+            show: true,
+            type: 'template',
+            index: index,
+            title: 'Xác nhận xóa mẫu thiết kế',
+            desc: 'Bạn có chắc chắn muốn xóa mẫu thiết kế này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+        });
+    };
+
+    const handleDeleteMaterial = (index) => {
+        setDeleteConfirm({
+            show: true,
+            type: 'material',
+            index: index,
+            title: 'Xác nhận xóa vật liệu',
+            desc: 'Bạn có chắc chắn muốn xóa vật liệu này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+        });
+    };
+
+    const executeDelete = () => {
+        const { type, index } = deleteConfirm;
+        if (type === 'template') {
+            setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+        } else if (type === 'material') {
+            setMaterials((prev) => prev.filter((_, i) => i !== index));
+            if (errors.materialsList) {
+                setErrors((prev) => {
+                    const newMaterialsList = { ...prev.materialsList };
+                    delete newMaterialsList[index];
+                    
+                    // Shift subsequent errors back
+                    const adjustedList = {};
+                    Object.keys(newMaterialsList).forEach(key => {
+                        const k = parseInt(key);
+                        if (k > index) {
+                            adjustedList[k - 1] = newMaterialsList[key];
+                        } else {
+                            adjustedList[k] = newMaterialsList[key];
+                        }
+                    });
+                    
+                    return { ...prev, materialsList: adjustedList };
+                });
+            }
+        }
+        setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
+    };
+
+    const translateError = (msg) => {
+        const dictionary = {
+            'Image must be a valid URL': 'Ảnh phải là đường dẫn (URL) hợp lệ',
+            'File must be a valid URL': 'Tệp tin phải là đường dẫn (URL) hợp lệ',
+            'Start date must be greater than current date.': 'Ngày bắt đầu phải sau ngày hiện tại',
+            'One or more validation errors occurred.': 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại',
+        };
+        return dictionary[msg] || msg;
+    };
+
+    const isDataChanged = () => {
+        if (!initialState) return true;
+
+        // Check image files first
+        if (orderImageFile || materials.some(m => m.imageFile) || templateItems.some(t => t.file instanceof File)) {
+            return true;
+        }
+
+        // Compare orderData basic fields
+        const fields = ['orderName', 'type', 'size', 'color', 'startDate', 'endDate', 'quantity', 'cpu', 'note'];
+        const isOrderDataChanged = fields.some(f => {
+            const current = orderData[f];
+            const initial = initialState.orderData[f];
+            return String(current ?? '').trim() !== String(initial ?? '').trim();
+        });
+        if (isOrderDataChanged) return true;
+
+        // Compare materials
+        if (materials.length !== initialState.materials.length) return true;
+        const areMaterialsChanged = materials.some((m, idx) => {
+            const initM = initialState.materials[idx];
+            const mFields = ['materialName', 'color', 'value', 'uom', 'image', 'note'];
+            return mFields.some(f => {
+                const current = m[f];
+                const initial = initM[f];
+                if (f === 'value') return Number(current) !== Number(initial);
+                return String(current ?? '').trim() !== String(initial ?? '').trim();
+            });
+        });
+        if (areMaterialsChanged) return true;
+
+        // Compare templates
+        if (templateItems.length !== initialState.templateItems.length) return true;
+        const areTemplatesChanged = templateItems.some((t, idx) => {
+            const initT = initialState.templateItems[idx];
+            const tFields = ['templateName', 'type', 'file', 'note'];
+            return tFields.some(f => {
+                const current = t[f];
+                const initial = initT[f];
+                return String(current ?? '').trim() !== String(initial ?? '').trim();
+            });
+        });
+        if (areTemplatesChanged) return true;
+
+        return false;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!isDataChanged()) {
+            toast.info('Không có thay đổi nào để cập nhật.');
+            return;
+        }
 
         if (!validateForm()) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -436,20 +587,27 @@ export default function EditOrder() {
 
         try {
             setIsSubmitting(true);
-            let orderImageUrl = orderData.image;
+            let orderImageUrl = orderData.image || null;
 
             if (orderImageFile) {
                 const uploadRes = await CloudinaryService.uploadImage(orderImageFile);
-                orderImageUrl = uploadRes?.url || orderImageUrl;
+                orderImageUrl = uploadRes?.url || null;
+            } else if (typeof orderData.image === 'string' && !/^https?:\/\//i.test(orderData.image)) {
+                orderImageUrl = null;
             }
 
             const materialsPayload = await Promise.all(
                 materials.map(async (m) => {
-                    const imageUrl = m.imageFile
-                        ? (await CloudinaryService.uploadImage(m.imageFile))?.url || ''
-                        : (typeof m.image === 'string' && /^https?:\/\//i.test(m.image) ? m.image : '');
+                    let imageUrl = m.image || null;
+                    if (m.imageFile) {
+                        const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
+                        imageUrl = uploadRes?.url || null;
+                    } else if (typeof m.image === 'string' && !/^https?:\/\//i.test(m.image)) {
+                        imageUrl = null;
+                    }
 
                     return {
+                        id: m.id || null,
                         materialName: m.materialName ?? '',
                         image: imageUrl,
                         color: m.color ?? '',
@@ -487,7 +645,7 @@ export default function EditOrder() {
 
             const payload = {
                 userId: Number(orderData.userId ?? userId) || 0,
-                image: orderImageUrl || '',
+                image: orderImageUrl || null,
                 orderName: orderData.orderName ?? '',
                 type: orderData.type ?? '',
                 size: orderData.size ?? '',
@@ -505,7 +663,20 @@ export default function EditOrder() {
             setIsSuccessOpen(true);
         } catch (error) {
             console.error('Lỗi API:', error.response?.data || error.message);
-            alert('Lỗi: ' + (error.response?.data?.title || 'Không thể kết nối đến máy chủ'));
+            const data = error.response?.data;
+            let errorMsg = 'Không thể kết nối đến máy chủ';
+
+            if (data) {
+                if (data.errors) {
+                    errorMsg = Object.values(data.errors)
+                        .flat()
+                        .map(translateError)
+                        .join(' - ');
+                } else {
+                    errorMsg = translateError(data.detail || data.title || error.message);
+                }
+            }
+            toast.error('Lỗi: ' + errorMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -568,7 +739,7 @@ export default function EditOrder() {
                                 });
                                 setIsModalOpen(true);
                             }}
-                            onDeleteMaterial={(i) => setMaterials(materials.filter((_, idx) => idx !== i))}
+                            onDeleteMaterial={handleDeleteMaterial}
                             templateItems={templateItems}
                             onTemplateFileChange={handleTemplateFileChange}
                             onTemplateMetaChange={updateTemplateMeta}
@@ -601,6 +772,14 @@ export default function EditOrder() {
                             setIsSuccessOpen(false);
                             navigate(`/orders/detail/${id}`);
                         }}
+                    />
+
+                    <ConfirmModal
+                        isOpen={deleteConfirm.show}
+                        title={deleteConfirm.title}
+                        description={deleteConfirm.desc}
+                        onConfirm={executeDelete}
+                        onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
                     />
                 </div>
             </div>

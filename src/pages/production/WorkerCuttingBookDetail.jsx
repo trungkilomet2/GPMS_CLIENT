@@ -16,6 +16,7 @@ import {
   getTodayString,
   hasValue
 } from "@/utils/workerCuttingBookUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -70,7 +71,7 @@ export default function WorkerCuttingBookDetail() {
         }
       } catch (err) {
         console.error("Error fetching notebook detail:", err);
-        toast.error("Không thể tải thông tin sổ cắt.");
+        toast.error(getErrorMessage(err, "Không thể tải thông tin sổ cắt."));
       } finally {
         setLoading(false);
       }
@@ -120,7 +121,7 @@ export default function WorkerCuttingBookDetail() {
         toast.success("Cập nhật thông tin chung thành công!");
       } catch (err) {
         console.error("Error updating meta:", err);
-        toast.error("Không thể cập nhật thông tin chung. Vui lòng thử lại.");
+        toast.error(getErrorMessage(err, "Không thể cập nhật thông tin chung. Vui lòng thử lại."));
         return;
       }
     }
@@ -193,23 +194,18 @@ export default function WorkerCuttingBookDetail() {
       setRecords((prev) => [mapNotebookLogToRecord(newLog), ...prev]);
 
       clearRecord();
-      setSavedAt(new Date().toLocaleString("vi-VN"));
+      setSavedAt(new Date().toLocaleString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+      }));
       toast.success("Đã ghi dòng mới thành công!");
       return true;
     } catch (err) {
       console.error("Error saving log:", err);
-      const errorData = err?.response?.data;
-      if (errorData) {
-        console.error("Server error data:", errorData);
-        if (typeof errorData === "object") {
-          const firstErr = Object.values(errorData?.errors || {})[0]?.[0] || errorData?.message || JSON.stringify(errorData);
-          toast.error(`Lỗi từ máy chủ: ${firstErr}`);
-        } else {
-          toast.error(`Lỗi từ máy chủ: ${errorData}`);
-        }
-      } else {
-        toast.error("Không thể lưu dòng ghi. Vui lòng thử lại.");
-      }
+      toast.error(getErrorMessage(err, "Không thể lưu dòng ghi. Vui lòng thử lại."));
       return false;
     } finally {
       setIsSavingRecord(false);

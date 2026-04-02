@@ -1,10 +1,18 @@
 import { useMemo, useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2 } from "lucide-react";
+import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2, CreditCard } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
+import { getErrorMessage } from "@/utils/errorUtils";
+import ProductionPartService from "@/services/ProductionPartService";
+import Pagination from "@/components/Pagination";
+import ConfirmModal from "@/components/ConfirmModal";
+import SuccessModal from "@/components/SuccessModal";
+import { toast } from "react-toastify";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
+import { exportDetailToExcel } from "@/utils/exportUtils";
+import { Download } from "lucide-react";
 
 export default function PayrollDetail() {
   const navigate = useNavigate();
@@ -20,6 +28,13 @@ export default function PayrollDetail() {
   const [logs, setLogs] = useState(location.state?.logs || []);
   const [loading, setLoading] = useState(!location.state?.logs);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [isPaying, setIsPaying] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
   useEffect(() => {
     if (location.state?.logs) return;
@@ -35,7 +50,7 @@ export default function PayrollDetail() {
         }
       } catch (err) {
         if (active) {
-          setError("Không thể tải chi tiết lương.");
+          setError(getErrorMessage(err, "Không thể tải chi tiết lương."));
           console.error(err);
         }
       } finally {
@@ -45,7 +60,47 @@ export default function PayrollDetail() {
 
     loadData();
     return () => { active = false; };
-  }, [employeeId, month, year, location.state]);
+  }, [employeeId, month, year, refreshKey]);
+
+  const handlePaymentAll = async (workerLogs) => {
+    if (!workerLogs?.length) return;
+    
+    // Filter out already paid logs if possible
+    const unpaidLogs = workerLogs.filter(log => !log.paidAt);
+    if (unpaidLogs.length === 0 && workerLogs.some(l => l.paidAt)) {
+      toast.info("Tất cả công đoạn hiện tại đã được thanh toán.");
+      return;
+    }
+
+    setIsConfirmOpen(true);
+  };
+
+  const confirmPaymentAll = async () => {
+    setIsConfirmOpen(false);
+    try {
+      setIsPaying(true);
+      // Group logically by partId
+      const groups = workerLogs.reduce((acc, log) => {
+        const pId = log.partId;
+        if (!pId) return acc;
+        if (!acc[pId]) acc[pId] = [];
+        acc[pId].push(log.id || log.workLogId || log.wlId);
+        return acc;
+      }, {});
+
+      const promises = Object.entries(groups).map(([partId, logIds]) => 
+        ProductionPartService.completePayment(partId, { workLogIds: logIds })
+      );
+
+      await Promise.all(promises);
+      setIsSuccessOpen(true);
+      setRefreshKey(prev => prev + 1);
+    } catch (err) {
+      toast.error(getErrorMessage(err, "Thanh toán thất bại."));
+    } finally {
+      setIsPaying(false);
+    }
+  };
 
   const workerLogs = useMemo(() => {
     // If we have logs from state but navigate directly, this ensures we filter correctly
@@ -53,11 +108,20 @@ export default function PayrollDetail() {
   }, [logs, employeeId, month, year]);
 
   const stats = useMemo(() => {
-    const totalQty = workerLogs.reduce((sum, log) => sum + log.quantity, 0);
-    const totalSalary = workerLogs.reduce((sum, log) => sum + log.quantity * log.cpu, 0);
-    const workerName = workerLogs[0]?.workerName || employeeId;
-    return { totalQty, totalSalary, workerName };
+    const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
+    const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
+    const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
+    const firstLog = workerLogs[0];
+    const workerName = firstLog?.workerFullName || firstLog?.workerName || employeeId;
+    const workerAvatar = firstLog?.workerAvatar || null;
+    return { totalQty, uniquePartCount, totalSalary, workerName, workerAvatar };
   }, [workerLogs, employeeId]);
+
+  const totalPages = Math.ceil(workerLogs.length / pageSize);
+  const currentLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return workerLogs.slice(start, start + pageSize);
+  }, [workerLogs, currentPage, pageSize]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -81,14 +145,49 @@ export default function PayrollDetail() {
               >
                 <ArrowLeft size={18} />
               </button>
-              <div className="flex flex-col gap-1">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Chi tiết lương: {stats.workerName}
-                </h1>
-                <p className="text-slate-600 text-sm">
-                  Kỳ lương: Tháng {month}/{year}
-                </p>
-              </div>
+               <div className="flex items-center gap-4">
+                 {stats.workerAvatar ? (
+                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-sm ring-1 ring-slate-100">
+                     <img src={stats.workerAvatar} alt={stats.workerName} className="h-full w-full object-cover" />
+                   </div>
+                 ) : (
+                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-black uppercase text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                     {stats.workerName.charAt(0)}
+                   </div>
+                 )}
+                 <div className="flex flex-col gap-1">
+                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                     Chi tiết lương: {stats.workerName}
+                   </h1>
+                    <p className="text-slate-600 text-sm">
+                      Kỳ lương: Tháng {month}/{year}
+                    </p>
+                  </div>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => exportDetailToExcel(workerLogs, stats.workerName, month, year)}
+                disabled={workerLogs.length === 0}
+                className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-all hover:bg-slate-50 disabled:opacity-50"
+                title="Tải chi tiết lương (Excel)"
+              >
+                <Download size={18} />
+                <span className="hidden sm:inline">Xuất chi tiết</span>
+              </button>
+              <button
+                onClick={() => handlePaymentAll(workerLogs)}
+                disabled={isPaying || workerLogs.length === 0}
+                className="flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-3 text-sm font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isPaying ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <CreditCard size={18} />
+                )}
+                Thanh toán lương
+              </button>
             </div>
           </div>
 
@@ -116,12 +215,12 @@ export default function PayrollDetail() {
                   <Package size={22} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Sản lượng hoàn thành</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số công đoạn hoàn thành</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-3xl font-black text-slate-900">
-                      {stats.totalQty.toLocaleString("vi-VN")}
+                      {stats.uniquePartCount}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Cái</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Công đoạn</span>
                   </div>
                 </div>
               </div>
@@ -161,43 +260,48 @@ export default function PayrollDetail() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {workerLogs.length === 0 ? (
+                    {currentLogs.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-20 text-center text-slate-500">
                           Không tìm thấy dữ liệu báo cáo chi tiết cho thợ này.
                         </td>
                       </tr>
                     ) : (
-                      workerLogs.map((log, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50 transition-all">
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-medium italic">
+                      currentLogs.map((log, idx) => (
+                        <tr key={idx} className="group hover:bg-slate-50/50 transition-all border-l-4 border-transparent hover:border-emerald-500">
+                          <td className="px-6 py-5 whitespace-nowrap text-slate-500 font-medium italic">
                             <div className="flex items-center gap-2">
                               <Calendar size={14} className="text-slate-300" />
                               {formatDate(log.reportDate)}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
-                            <div className="font-bold text-slate-900 line-clamp-1 italic">{log.orderName}</div>
+                          <td className="px-6 py-5">
+                            <div className="font-extrabold text-slate-900 line-clamp-1 italic text-sm">{log.orderName}</div>
                             <Link 
                                to={`/production/${log.productionId}`}
                                state={{ from: location.pathname }}
-                               className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1"
+                               className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1 opacity-70 hover:opacity-100"
                             >
                                #PR-{log.productionId}
                                <ArrowLeft size={10} className="rotate-180" />
                             </Link>
                           </td>
-                          <td className="px-6 py-4 font-semibold text-slate-700">{log.partName}</td>
-                          <td className="px-6 py-4 text-center text-slate-600 font-bold">
+                          <td className="px-6 py-5">
+                            <div className="font-bold text-slate-700">{log.partName}</div>
+                            {log.paidAt && (
+                              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1 inline-block">Đã thanh toán</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-5 text-center text-slate-600 font-black">
                             {Number(log.cpu).toLocaleString("vi-VN")}
                           </td>
-                          <td className="px-6 py-4 text-center">
-                            <span className="inline-flex h-8 w-12 items-center justify-center rounded-lg bg-slate-100 font-black text-slate-700">
+                          <td className="px-6 py-5 text-center">
+                            <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl bg-blue-50/50 border border-blue-100 font-black text-blue-700 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-200 transition-all duration-300 transform group-hover:scale-110">
                               {log.quantity}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-right font-black text-emerald-700">
-                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} VND
+                          <td className="px-6 py-5 text-right font-black text-emerald-700 text-base">
+                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className="text-[10px] opacity-50 ml-0.5">VND</span>
                           </td>
                         </tr>
                       ))
@@ -214,9 +318,38 @@ export default function PayrollDetail() {
                 </table>
               )}
             </div>
+            {workerLogs.length > 0 && !loading && !error && (
+              <div className="p-6 border-t border-slate-100 bg-slate-50/30">
+                <Pagination 
+                   currentPage={currentPage}
+                   totalPages={totalPages}
+                   onPageChange={setCurrentPage}
+                   totalCount={workerLogs.length}
+                   pageSize={pageSize}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      <ConfirmModal 
+        isOpen={isConfirmOpen}
+        title="Xác nhận thanh toán lương"
+        description={`Bạn có chắc chắn muốn thanh toán tổng cộng ${(workerLogs.reduce((sum, l) => sum + (l.quantity * l.cpu), 0)).toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
+        onConfirm={confirmPaymentAll}
+        onClose={() => setIsConfirmOpen(false)}
+      />
+
+      <SuccessModal 
+        isOpen={isSuccessOpen}
+        title="Thanh toán thành công"
+        description={`Đã xác nhận thanh toán cho toàn bộ công đoạn trong tháng của ${stats.workerName}.`}
+        primaryLabel="Đóng"
+        onPrimary={() => setIsSuccessOpen(false)}
+        onClose={() => setIsSuccessOpen(false)}
+        hideSecondary={true}
+      />
     </PmOwnerLayout>
   );
 }
