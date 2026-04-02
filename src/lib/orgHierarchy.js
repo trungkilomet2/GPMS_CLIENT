@@ -102,7 +102,7 @@ export function pickPrimarySystemRole(roleValue = "") {
 export function getManagerRoleHint(role = "") {
   switch (role) {
     case "Owner":
-      return "Không có cấp quản lý trực tiếp trong mô hình 1 xưởng.";
+      return "Backend hiện yêu cầu chọn một Chủ xưởng phụ trách khi cập nhật vai trò này.";
     case "PM":
       return "Báo cáo trực tiếp cho Owner.";
     case "Worker":
@@ -115,7 +115,7 @@ export function getManagerRoleHint(role = "") {
 export function getAllowedManagerRoles(role = "") {
   switch (role) {
     case "Owner":
-      return [];
+      return ["Owner"];
     case "PM":
       return ["Owner"];
     case "Worker":

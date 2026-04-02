@@ -118,6 +118,14 @@ export default function AdminUserUpdate() {
     };
   }, [id]);
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
   const handleChange = (field) => (event) => {
     setForm((current) => ({
       ...current,
@@ -142,6 +150,10 @@ export default function AdminUserUpdate() {
         avatarFile: avatarError,
       }));
       return;
+    }
+
+    if (avatarPreview?.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
     }
 
     setAvatarFile(nextFile);

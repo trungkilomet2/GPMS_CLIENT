@@ -118,7 +118,7 @@ export const routes = [
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
   { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
   { path: "/leave-requests", element: guardByRoles(["Owner", "PM"], <LeaveRequests />) },
-  { path: "/customers", element: guardByRoles(["Owner", "PM"], <CustomerManagement />) },
+  { path: "/customers", element: guardByRoles(["Owner"], <CustomerManagement />) },
   { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },
   { path: "/payroll/:workerId", element: guardByRoles(["Owner"], <PayrollDetail />) },
   { path: "/employees", element: guardByRoles(["Owner", "PM"], <EmployeeDirectory />) },

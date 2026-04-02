@@ -13,7 +13,6 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -36,7 +35,6 @@ export default function EmployeeCreate() {
     password: "",
     fullName: "",
     role: "PM",
-    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
 

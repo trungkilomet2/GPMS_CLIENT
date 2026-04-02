@@ -11,9 +11,8 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  EMPLOYEE_FORM_ROLE_OPTIONS,
+  EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  USER_STATUS_IDS,
   getAllowedManagerRoles,
   getManagerRoleHint,
   getSystemRoleLabel,
@@ -39,7 +38,6 @@ export default function EmployeeUpdate() {
     userName: "",
     fullName: "",
     role: "PM",
-    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
 
@@ -77,7 +75,6 @@ export default function EmployeeUpdate() {
           userName: employee.userName || "",
           fullName: employee.fullName || "",
           role: pickPrimarySystemRole(employee.role) || "PM",
-          statusId: employee.statusId ?? USER_STATUS_IDS.Active,
           managerId: employee.managerId != null ? String(employee.managerId) : "",
         });
       } catch (err) {
@@ -115,7 +112,6 @@ export default function EmployeeUpdate() {
       ),
     [allowedManagerRoles, managerOptions]
   );
-
   useEffect(() => {
     if (!form.managerId) return;
 
@@ -180,8 +176,7 @@ export default function EmployeeUpdate() {
     try {
       await WorkerService.updateEmployee(id, {
         fullName: normalizedFullName,
-        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
-        managerId: form.role === "Owner" ? null : Number(form.managerId),
+        managerId: Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
       });
 
@@ -271,7 +266,7 @@ export default function EmployeeUpdate() {
                     <span className="employee-create-field__label">Vai trò hệ thống</span>
                     <ShieldCheck size={18} className="employee-create-field__icon" />
                     <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                      {EMPLOYEE_FORM_ROLE_OPTIONS.map((roleOption) => (
+                      {EMPLOYEE_CREATE_ROLE_OPTIONS.map((roleOption) => (
                         <option key={roleOption.value} value={roleOption.value}>
                           {roleOption.label}
                         </option>
@@ -287,16 +282,14 @@ export default function EmployeeUpdate() {
                       value={form.managerId}
                       onChange={handleChange("managerId")}
                       className="employee-create-field__control"
-                      disabled={form.role === "Owner" || managerLoading}
+                      disabled={managerLoading}
                     >
                       <option value="">
-                        {form.role === "Owner"
-                          ? "Owner không có quản lý trực tiếp"
-                          : managerLoading
-                            ? "Đang tải danh sách quản lý..."
-                            : availableManagers.length
-                              ? "Chọn quản lý trực tiếp"
-                              : "Chưa có quản lý phù hợp"}
+                        {managerLoading
+                          ? "Đang tải danh sách quản lý..."
+                          : availableManagers.length
+                            ? "Chọn quản lý trực tiếp"
+                            : "Chưa có quản lý phù hợp"}
                       </option>
                       {availableManagers.map((manager) => (
                         <option key={manager.id} value={manager.id}>
