@@ -16,7 +16,7 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -38,8 +38,7 @@ const OPERATION_NAV_ITEMS = [
 
 function hasRequiredRole(user, allowedRoles) {
   if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return true;
-  const roles = splitRoles(user?.role);
-  return allowedRoles.some((role) => roles.includes(role));
+  return hasAnyRole(user?.role, allowedRoles);
 }
 
 function resolveSidebarItems(user) {

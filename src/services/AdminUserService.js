@@ -2,6 +2,7 @@ import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { countGrantedPermissions, getPermissionProfiles } from "@/lib/admin/adminMockStore";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 
 const ROLE_CATALOG = [
   {
@@ -35,6 +36,14 @@ const ROLE_CATALOG = [
     shortLabel: "Nhân sự vận hành",
     tone: "success",
     description: "Tài khoản nhân viên sản xuất và tác nghiệp hằng ngày.",
+  },
+  {
+    key: "Customer",
+    roleId: 2,
+    label: "Khách hàng",
+    shortLabel: "Khách hàng",
+    tone: "info",
+    description: "Tài khoản khách hàng theo dõi và tạo đơn hàng.",
   },
 ];
 
@@ -184,8 +193,8 @@ const getRoleMeta = (roleKey = "") => {
 
   return ROLE_KEY_MAP[trimmedKey] || {
     key: trimmedKey,
-    label: trimmedKey,
-    shortLabel: trimmedKey,
+    label: getSystemRoleLabel(trimmedKey),
+    shortLabel: getSystemRoleLabel(trimmedKey),
     tone: "info",
     description: "Vai trò này chưa có hồ sơ permission preview trong web admin.",
   };
@@ -298,10 +307,10 @@ const normalizeAdminUser = (item = {}) => {
     roleNames,
     roleKeys,
     roleKey: primaryRole,
-    roleLabel: roleMeta?.label || "Chưa đồng bộ role",
+    roleLabel: roleMeta?.label || "Chưa đồng bộ vai trò",
     roleTone: roleMeta?.tone || "info",
-    roleShortLabel: roleMeta?.shortLabel || "Chưa có role",
-    roleDescription: roleMeta?.description || "API user-list chưa trả thông tin role cho user này.",
+    roleShortLabel: roleMeta?.shortLabel || "Chưa có vai trò",
+    roleDescription: roleMeta?.description || "API danh sách tài khoản chưa trả thông tin vai trò cho tài khoản này.",
     grantedPermissionCount: roleMeta?.permissions ? countGrantedPermissions(roleMeta) : 0,
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",

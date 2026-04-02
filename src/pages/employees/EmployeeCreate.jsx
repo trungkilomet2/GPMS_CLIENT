@@ -152,10 +152,8 @@ export default function EmployeeCreate() {
         userName: normalizedUserName,
         password: form.password,
         fullName: normalizedFullName,
-        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
-        workerRoleIds: [],
       });
       const createdId = createdEmployee?.data?.id ?? createdEmployee?.id ?? null;
       if (form.role === "Worker" && createdId != null) {

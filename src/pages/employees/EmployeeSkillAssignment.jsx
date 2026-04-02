@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, Sparkles, UserRoundCog } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { SYSTEM_ROLE_IDS, getSystemRoleLabel } from "@/lib/orgHierarchy";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
@@ -116,13 +116,7 @@ export default function EmployeeSkillAssignment() {
     setSubmitError("");
 
     try {
-      await WorkerService.updateEmployee(id, {
-        fullName: employee.fullName,
-        statusId: Number(employee.statusId) || 1,
-        managerId: employee.managerId,
-        roleIds: [SYSTEM_ROLE_IDS.Worker],
-        workerRoleIds: selectedIds.map(Number),
-      });
+      await WorkerService.assignWorkerSkill(id, selectedIds);
 
       navigate(`/employees/${id}`, {
         state: { skillsUpdated: true },

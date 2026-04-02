@@ -14,18 +14,61 @@ const parseApiPayload = (rawResponse) => {
   }
 };
 
+const collectProblemDetailsMessages = (data) => {
+  if (!data || typeof data !== "object") return [];
+
+  const messages = [];
+  const errors = data.errors;
+
+  if (errors && typeof errors === "object") {
+    Object.values(errors).forEach((value) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          const normalized = String(item ?? "").trim();
+          if (normalized) messages.push(normalized);
+        });
+        return;
+      }
+
+      const normalized = String(value ?? "").trim();
+      if (normalized) messages.push(normalized);
+    });
+  }
+
+  const detail = String(data.detail ?? "").trim();
+  if (detail) messages.push(detail);
+
+  return [...new Set(messages)];
+};
+
 export const getLeaveErrorMessage = (error, fallbackMessage) => {
+  const status = error?.response?.status;
+  const responseData = error?.response?.data;
+  const problemMessages = collectProblemDetailsMessages(responseData);
+
   if (error?.response?.status === 403) {
     return (
-      error?.response?.data?.message ||
-      error?.response?.data?.title ||
+      responseData?.message ||
+      responseData?.title ||
       "Bạn không có quyền thực hiện thao tác này."
     );
   }
 
+  if (problemMessages.length > 0) {
+    return problemMessages.join(" ");
+  }
+
+  if (status === 400) {
+    return (
+      responseData?.message ||
+      responseData?.title ||
+      "Dữ liệu gửi lên chưa hợp lệ. Vui lòng kiểm tra lại nội dung và thời gian nghỉ."
+    );
+  }
+
   return (
-    error?.response?.data?.message ||
-    error?.response?.data?.title ||
+    responseData?.message ||
+    responseData?.title ||
     error?.message ||
     fallbackMessage
   );

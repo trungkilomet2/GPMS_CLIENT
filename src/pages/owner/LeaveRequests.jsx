@@ -96,6 +96,18 @@ function toIsoFromLocalDateTime(value) {
   return parsed.toISOString();
 }
 
+function toLocalDateKey(value) {
+  return String(value ?? "").split("T")[0];
+}
+
+function getTodayLocalDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
+
 function shouldShowApprover(leave) {
   return Boolean(leave?.approvedByName) && leave?.status !== "pending";
 }
@@ -206,6 +218,11 @@ export default function LeaveRequests() {
 
     if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
       setError("Thời gian bắt đầu nghỉ không được lớn hơn thời gian kết thúc.");
+      return;
+    }
+
+    if (toLocalDateKey(fromDate) < getTodayLocalDateKey()) {
+      setError("Ngày bắt đầu nghỉ không được ở quá khứ.");
       return;
     }
 

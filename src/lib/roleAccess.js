@@ -19,8 +19,14 @@ export function getDefaultRouteForRole(roleValue) {
       return "/production";
     case "teamLeader":
       return "/production-plan/assign";
+    case "manager":
+      return "/worker/assignments";
+    case "kcs":
+      return "/worker/daily-report";
     case "worker":
       return "/worker/assignments";
+    case "customer":
+      return "/orders";
     default:
       return "/home";
   }

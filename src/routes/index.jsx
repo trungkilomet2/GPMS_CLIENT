@@ -35,14 +35,17 @@ const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyRepor
 const WorkerDailyReportEdit = lazy(() => import("@/pages/production/WorkerDailyReportEdit"));
 const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
 const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
+const WorkerCuttingBookDetail = lazy(() => import("@/pages/production/WorkerCuttingBookDetail"));
 const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
+const CustomerManagement = lazy(() => import("@/pages/customers/CustomerManagement"));
 const EmployeeDirectory = lazy(() => import("@/pages/employees/EmployeeDirectory"));
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
+const EmployeeSkillAssignment = lazy(() => import("@/pages/employees/EmployeeSkillAssignment"));
 const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
 const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
 const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
@@ -52,6 +55,8 @@ const AdminUserDetail = lazy(() => import("@/pages/admin/AdminUserDetail"));
 const AdminUserUpdate = lazy(() => import("@/pages/admin/AdminUserUpdate"));
 const AdminSystemLog = lazy(() => import("@/pages/admin/AdminSystemLog"));
 const AdminManagePermission = lazy(() => import("@/pages/admin/AdminManagePermission"));
+const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
+const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
 
 // PROFILE
 const ProfileViewGate = lazy(() => import("@/pages/profile/ProfileViewGate"));
@@ -113,15 +118,19 @@ export const routes = [
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
   { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
   { path: "/leave-requests", element: guardByRoles(["Owner", "PM"], <LeaveRequests />) },
+  { path: "/customers", element: guardByRoles(["Owner", "PM"], <CustomerManagement />) },
+  { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },
+  { path: "/payroll/:workerId", element: guardByRoles(["Owner"], <PayrollDetail />) },
   { path: "/employees", element: guardByRoles(["Owner", "PM"], <EmployeeDirectory />) },
   { path: "/employees/management", element: guardByRoles(["Owner"], <EmployeeList />) },
   { path: "/employees/workers", element: guardByRoles(["Owner", "PM"], <EmployeeList />) },
   { path: "/employees/create", element: guardByRoles(["Owner"], <EmployeeCreate />) },
   { path: "/employees/:id/edit", element: guardByRoles(["Owner"], <EmployeeUpdate />) },
+  { path: "/employees/:id/skills", element: guardByRoles(["Owner", "PM"], <EmployeeSkillAssignment />) },
   { path: "/employees/:id", element: guardByRoles(["Owner", "PM"], <EmployeeDetail />) },
   { path: "/leave-requests/:id", element: guardByRoles(["Team Leader"], <LeaveRequestDetail />) },
   { path: "/worker-roles", element: guardByRoles(["Owner", "PM"], <WorkerRoleList />) },
-  { path: "/worker-roles/create", element: guardByRoles(["Owner"], <WorkerRoleCreate />) },
+  { path: "/worker-roles/create", element: guardByRoles(["Owner", "PM"], <WorkerRoleCreate />) },
   { path: "/admin/users", element: <AdminRouteGuard><AdminUserList /></AdminRouteGuard> },
   { path: "/admin/users/create", element: <AdminRouteGuard><AdminUserCreate /></AdminRouteGuard> },
   { path: "/admin/users/:id/edit", element: <AdminRouteGuard><AdminUserUpdate /></AdminRouteGuard> },

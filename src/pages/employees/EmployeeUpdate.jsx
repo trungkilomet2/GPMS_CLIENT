@@ -183,7 +183,6 @@ export default function EmployeeUpdate() {
         statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
-        workerRoleIds: [],
       });
 
       navigate(`/employees/${id}`);

@@ -78,6 +78,13 @@ const normalizeCollectionResponse = (response = {}, itemNormalizer) => {
   };
 };
 
+const createEmptyCollectionResponse = (params = {}) => ({
+  data: [],
+  pageIndex: toNumberOrFallback(params?.PageIndex, 0),
+  pageSize: toNumberOrFallback(params?.PageSize, 10),
+  recordCount: 0,
+});
+
 const CustomerService = {
   getCustomerModuleErrorMessage: getErrorMessage,
 
@@ -91,12 +98,20 @@ const CustomerService = {
   },
 
   async getOrdersByCustomer(customerId, params) {
-    const rawResponse = await axiosClient.get(
-      API_ENDPOINTS.CUSTOMER.GET_ORDERS_BY_CUSTOMER(customerId),
-      params ? { params } : undefined
-    );
+    try {
+      const rawResponse = await axiosClient.get(
+        API_ENDPOINTS.CUSTOMER.GET_ORDERS_BY_CUSTOMER(customerId),
+        params ? { params } : undefined
+      );
 
-    return normalizeCollectionResponse(parseApiPayload(rawResponse), normalizeOrder);
+      return normalizeCollectionResponse(parseApiPayload(rawResponse), normalizeOrder);
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        return createEmptyCollectionResponse(params);
+      }
+
+      throw error;
+    }
   },
 };
 

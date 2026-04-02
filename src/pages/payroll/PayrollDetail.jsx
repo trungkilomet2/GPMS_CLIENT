@@ -17,7 +17,7 @@ import { Download } from "lucide-react";
 export default function PayrollDetail() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { employeeId } = useParams();
+  const { workerId } = useParams();
   const [searchParams] = useSearchParams();
 
   const initialMonth = Number(searchParams.get("month")) || location.state?.month || new Date().getMonth() + 1;
@@ -44,7 +44,7 @@ export default function PayrollDetail() {
       try {
         setLoading(true);
         const aggregated = await fetchAggregatedPayroll(month, year);
-        const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(employeeId));
+        const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(workerId));
         if (active) {
           setLogs(workerData?.logs || []);
         }
@@ -60,7 +60,7 @@ export default function PayrollDetail() {
 
     loadData();
     return () => { active = false; };
-  }, [employeeId, month, year, refreshKey]);
+  }, [workerId, month, year, refreshKey]);
 
   const handlePaymentAll = async (workerLogs) => {
     if (!workerLogs?.length) return;
@@ -104,18 +104,18 @@ export default function PayrollDetail() {
 
   const workerLogs = useMemo(() => {
     // If we have logs from state but navigate directly, this ensures we filter correctly
-    return getWorkerMonthlyDetail(logs, employeeId, month, year);
-  }, [logs, employeeId, month, year]);
+    return getWorkerMonthlyDetail(logs, workerId, month, year);
+  }, [logs, workerId, month, year]);
 
   const stats = useMemo(() => {
     const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
     const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
     const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
     const firstLog = workerLogs[0];
-    const workerName = firstLog?.workerFullName || firstLog?.workerName || employeeId;
+    const workerName = firstLog?.workerFullName || firstLog?.workerName || workerId;
     const workerAvatar = firstLog?.workerAvatar || null;
     return { totalQty, uniquePartCount, totalSalary, workerName, workerAvatar };
-  }, [workerLogs, employeeId]);
+  }, [workerLogs, workerId]);
 
   const totalPages = Math.ceil(workerLogs.length / pageSize);
   const currentLogs = useMemo(() => {

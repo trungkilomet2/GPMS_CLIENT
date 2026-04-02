@@ -1,32 +1,77 @@
-﻿import { fireEvent, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import ViewProfile from '@/pages/profile/ViewProfile';
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import ViewProfile from "@/pages/profile/ViewProfile";
+import { userService } from "@/services/userService";
+import OrderService from "@/services/OrderService";
 
 const mockNavigate = vi.fn();
 
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual("react-router-dom");
   return {
     ...actual,
     useNavigate: () => mockNavigate,
   };
 });
 
-describe('ViewProfile', () => {
-  it('reads user from localStorage and switches tabs', () => {
-    localStorage.setItem('user', JSON.stringify({ name: 'Tran Van B', email: 'b@test.com' }));
+vi.mock("@/components/Header", () => ({
+  default: () => <div>Header</div>,
+}));
 
-    const { container } = render(
+vi.mock("@/services/userService", () => ({
+  userService: {
+    getProfile: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/OrderService", () => ({
+  default: {
+    getOrdersByUser: vi.fn(),
+  },
+}));
+
+describe("ViewProfile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    localStorage.setItem("token", "test-token");
+    localStorage.setItem(
+      "user",
+      JSON.stringify({
+        id: 5,
+        userId: 5,
+        fullName: "Tran Van B",
+        email: "b@test.com",
+        role: "Customer",
+      })
+    );
+  });
+
+  it("loads profile from API and switches to security tab", async () => {
+    userService.getProfile.mockResolvedValue({
+      id: 5,
+      userId: 5,
+      fullName: "Tran Van B",
+      email: "b@test.com",
+      role: "Customer",
+    });
+    OrderService.getOrdersByUser.mockResolvedValue({ data: [] });
+
+    render(
       <MemoryRouter>
         <ViewProfile />
       </MemoryRouter>
     );
 
-    expect(container.textContent).toContain('Tran Van B');
+    await waitFor(() => {
+      expect(screen.getAllByText("Tran Van B").length).toBeGreaterThan(0);
+    });
 
-    const buttons = container.querySelectorAll('button');
-    fireEvent.click(buttons[3]);
+    fireEvent.click(screen.getByRole("button", { name: /bảo mật/i }));
 
-    expect(container.querySelectorAll('input[type="password"]')).toHaveLength(3);
+    expect(screen.getByText(/đổi mật khẩu/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhập mật khẩu hiện tại")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhập mật khẩu mới")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Nhập lại mật khẩu mới")).toBeInTheDocument();
   });
 });

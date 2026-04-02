@@ -125,6 +125,7 @@ export const API_ENDPOINTS = {
     GET_BY_ID: (userId) => `${BASE_URL}/api/Worker/get-employee-by-id/${userId}`,
     CREATE: `${BASE_URL}/api/Worker/create-employee`,
     UPDATE: (userId) => `${BASE_URL}/api/Worker/update-employee/${userId}`,
+    ASSIGN_WORKER_SKILL: (userId) => `${BASE_URL}/api/Worker/assign-worker-skill/${userId}`,
   },
 
   WORKER_ROLE: {
