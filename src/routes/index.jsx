@@ -1,16 +1,19 @@
-import { lazy } from "react";
+﻿import { lazy } from "react";
 import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 import RoleRouteGuard from "@/routes/RoleRouteGuard";
 
 // HOMEPAGE
 const HomePage = lazy(() => import("@/pages/HomePage"));
+const AboutPage = lazy(() => import("@/pages/AboutPage"));
+const ServicesPage = lazy(() => import("@/pages/ServicesPage"));
+const FactoryPage = lazy(() => import("@/pages/FactoryPage"));
+const ContactPage = lazy(() => import("@/pages/ContactPage"));
 const InternalDashboard = lazy(() => import("@/pages/dashboard/InternalDashboard"));
 
 // AUTH
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
-const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
 
 // ORDERS
 const OrdersList = lazy(() => import("@/pages/orders/OrderHistory"));
@@ -26,14 +29,12 @@ const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
-const ProductionPartHistory = lazy(() => import("@/pages/production/ProductionPartHistory"));
 const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
 const WorkerDailyReportEdit = lazy(() => import("@/pages/production/WorkerDailyReportEdit"));
 const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
 const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
-const WorkerCuttingBookDetail = lazy(() => import("@/pages/production/WorkerCuttingBookDetail"));
 const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
@@ -41,11 +42,7 @@ const EmployeeDirectory = lazy(() => import("@/pages/employees/EmployeeDirectory
 const EmployeeList = lazy(() => import("@/pages/employees/EmployeeList"));
 const EmployeeCreate = lazy(() => import("@/pages/employees/EmployeeCreate"));
 const EmployeeDetail = lazy(() => import("@/pages/employees/EmployeeDetail"));
-const EmployeeSkillAssignment = lazy(() => import("@/pages/employees/EmployeeSkillAssignment"));
 const EmployeeUpdate = lazy(() => import("@/pages/employees/EmployeeUpdate"));
-const CustomerManagement = lazy(() => import("@/pages/customers/CustomerManagement"));
-const PayrollList = lazy(() => import("@/pages/payroll/PayrollList"));
-const PayrollDetail = lazy(() => import("@/pages/payroll/PayrollDetail"));
 const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail"));
 const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
 const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
@@ -75,12 +72,15 @@ export const routes = [
 
   // HOMEPAGE
   { path: "/home", element: <HomePage /> },
+  { path: "/about", element: <AboutPage /> },
+  { path: "/services", element: <ServicesPage /> },
+  { path: "/factory", element: <FactoryPage /> },
+  { path: "/contact", element: <ContactPage /> },
   { path: "/dashboard", element: guardByRoles(["Owner"], <InternalDashboard />) },
 
   // AUTH
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
-  { path: "/forgot-password", element: <ForgotPasswordPage /> },
 
   // ORDERS
   { path: "/orders", element: guardByRoles(["Owner", "Customer"], <OrdersList />) },
@@ -91,40 +91,34 @@ export const routes = [
   { path: "/orders/detail/:id", element: guardByRoles(["Owner", "PM", "Customer"], <OrderDetail />) },
   { path: "/production/create", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production/create/:orderId", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
-  { path: "/production", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
-  { path: "/production/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionDetail />) },
+  { path: "/production", element: guardByRoles(["Owner", "PM"], <ProductionList />) },
+  { path: "/production/:id", element: guardByRoles(["Owner", "PM"], <ProductionDetail />) },
   { path: "/production/:id/edit", element: guardByRoles(["Owner", "PM"], <UpdateProduction />) },
-  { path: "/production/part/:partId/history", element: guardByRoles(["Owner", "PM"], <ProductionPartHistory />) },
   { path: "/production/:id/errors", element: guardByRoles(["Owner", "PM"], <ProductionErrorSummary />) },
-  { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
+  { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanList />) },
   { path: "/production-plan/create", element: guardByRoles(["Owner", "PM"], <ProductionPlan />) },
-  { path: "/production-plan/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionDetail />) },
+  { path: "/production-plan/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanDetail />) },
   { path: "/production-plan/assign", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
-  { path: "/worker/daily-report", element: guardByRoles(["Owner", "Worker", "KCS"], <WorkerDailyReport />) },
-  { path: "/worker/daily-report/edit", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReportEdit />) },
-  { path: "/worker/error-report", element: guardByRoles(["Worker", "KCS"], <WorkerErrorReport />) },
-  { path: "/worker/cutting-book", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBook />) },
-  { path: "/worker/cutting-book/detail/:id", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBookDetail />) },
-  { path: "/worker/assignments", element: guardByRoles(["Owner", "Worker", "KCS"], <WorkerAssignment />) },
-  { path: "/worker/production-plan", element: guardByRoles(["Owner", "Worker", "KCS"], <ProductionPlanList />) },
-  { path: "/worker/production-plan/:id", element: guardByRoles(["Owner", "Worker", "KCS"], <ProductionPlanDetail />) },
-  { path: "/worker/output-history", element: guardByRoles(["Owner", "Worker", "KCS"], <OutputHistory />) },
-  { path: "/worker/leave-requests", element: guardByRoles(["Owner", "Worker", "KCS"], <LeaveRequests />) },
-  { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "Worker", "KCS"], <LeaveRequestDetail />) },
+  { path: "/worker/daily-report", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReport />) },
+  { path: "/worker/daily-report/edit", element: guardByRoles(["Worker", "KCS", "PM", "Owner"], <WorkerDailyReportEdit />) },
+  { path: "/worker/error-report", element: guardByRoles(["Worker", "KCS", "PM", "Owner"], <WorkerErrorReport />) },
+  { path: "/worker/cutting-book", element: guardByRoles(["Worker", "KCS", "PM", "Owner"], <WorkerCuttingBook />) },
+  { path: "/worker/assignments", element: guardByRoles(["Worker", "KCS"], <WorkerAssignment />) },
+  { path: "/worker/production-plan", element: guardByRoles(["Worker", "KCS"], <ProductionPlanList />) },
+  { path: "/worker/production-plan/:id", element: guardByRoles(["Worker", "KCS"], <ProductionPlanDetail />) },
+  { path: "/worker/output-history", element: guardByRoles(["Worker", "KCS"], <OutputHistory />) },
+  { path: "/worker/leave-requests", element: guardByRoles(["Worker", "KCS"], <LeaveRequests />) },
+  { path: "/worker/leave-requests/:id", element: guardByRoles(["Worker", "KCS"], <LeaveRequestDetail />) },
   { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
   { path: "/leave-requests", element: guardByRoles(["Owner", "PM"], <LeaveRequests />) },
   { path: "/employees", element: guardByRoles(["Owner", "PM"], <EmployeeDirectory />) },
-  { path: "/customers", element: guardByRoles(["Owner", "PM"], <CustomerManagement />) },
   { path: "/employees/management", element: guardByRoles(["Owner"], <EmployeeList />) },
   { path: "/employees/workers", element: guardByRoles(["Owner", "PM"], <EmployeeList />) },
   { path: "/employees/create", element: guardByRoles(["Owner"], <EmployeeCreate />) },
   { path: "/employees/:id/edit", element: guardByRoles(["Owner"], <EmployeeUpdate />) },
-  { path: "/employees/:id/skills", element: guardByRoles(["Owner"], <EmployeeSkillAssignment />) },
   { path: "/employees/:id", element: guardByRoles(["Owner", "PM"], <EmployeeDetail />) },
-  { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },
-  { path: "/payroll/:employeeId", element: guardByRoles(["Owner"], <PayrollDetail />) },
-  { path: "/leave-requests/:id", element: guardByRoles(["Owner", "PM"], <LeaveRequestDetail />) },
+  { path: "/leave-requests/:id", element: guardByRoles(["Team Leader"], <LeaveRequestDetail />) },
   { path: "/worker-roles", element: guardByRoles(["Owner", "PM"], <WorkerRoleList />) },
   { path: "/worker-roles/create", element: guardByRoles(["Owner"], <WorkerRoleCreate />) },
   { path: "/admin/users", element: <AdminRouteGuard><AdminUserList /></AdminRouteGuard> },
@@ -149,11 +143,11 @@ export const routes = [
   },
   {
     path: "/leave-history",
-    element: guardByRoles(["Owner", "PM"], <LeaveRequestHistoryList />),
+    element: guardByRoles(["Owner", "PM", "Team Leader", "Worker", "KCS"], <LeaveRequestHistoryList />),
   },
   {
     path: "/leave-history/:id",
-    element: guardByRoles(["Owner", "PM"], <LeaveRequestHistoryDetail />),
+    element: guardByRoles(["Owner", "PM", "Team Leader", "Worker", "KCS"], <LeaveRequestHistoryDetail />),
   },
 
   // 404

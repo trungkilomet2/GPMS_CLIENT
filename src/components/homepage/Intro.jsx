@@ -1,9 +1,12 @@
 import Fade from "../Fade";
+import { useNavigate } from "react-router-dom";
 
 const PRODUCTS_LIST = ["Áo thun", "Áo sơ mi", "Đồng phục", "Váy đầm", "Quần áo trẻ em"];
 const HIGHLIGHTS = ["10+ năm kinh nghiệm", "200+ công nhân", "500+ đơn hàng/tháng"];
 
 export default function Intro() {
+  const navigate = useNavigate();
+
   return (
     <section className="intro-section">
       <div className="intro-grid">
@@ -30,7 +33,7 @@ export default function Intro() {
             ))}
           </div>
 
-          <button className="btn-green">Chi tiết →</button>
+          <button className="btn-green" onClick={() => navigate("/about")}>Chi tiết →</button>
         </Fade>
 
         {/* Right: image */}

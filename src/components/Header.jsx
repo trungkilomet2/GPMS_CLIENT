@@ -83,6 +83,7 @@ export default function Header() {
   };
 
   const defaultLandingPath = user ? getPostLoginPath(user.role) : "/home";
+  const isGuestItemActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
     <header className="header-root">
@@ -232,15 +233,28 @@ export default function Header() {
                   onMouseLeave={() => setOpenMenu(null)}
                   onClick={e => { e.stopPropagation(); if (item.hasDropdown) setOpenMenu(openMenu === `guest-${i}` ? null : `guest-${i}`); }}
                 >
-                  <button className={`mnav-a${i === 0 ? " active-m" : ""}`}>
+                  <button
+                    className={`mnav-a${isGuestItemActive(item.path) ? " active-m" : ""}`}
+                    onClick={() => {
+                      if (!item.hasDropdown) {
+                        navigate(item.path);
+                      }
+                    }}
+                  >
                     <SvgIcon d={item.icon} size={14} />
                     {item.label.toUpperCase()}
                     {item.hasDropdown && <span className="plus">▾</span>}
                   </button>
                   {item.hasDropdown && openMenu === `guest-${i}` && (
                     <div className="mnav-dropdown" onClick={e => e.stopPropagation()}>
-                      {item.items.map(sub => (
-                        <a key={sub} href="#" onClick={e => { e.preventDefault(); setOpenMenu(null); }}>{sub}</a>
+                      {item.items.map((sub) => (
+                        <Link
+                          key={sub.label}
+                          to={sub.path}
+                          onClick={() => setOpenMenu(null)}
+                        >
+                          {sub.label}
+                        </Link>
                       ))}
                     </div>
                   )}

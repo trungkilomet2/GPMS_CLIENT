@@ -21,7 +21,7 @@ export default function CTA() {
             <button className="btn-white" onClick={() => navigate("/login")}>
               Bắt đầu ngay →
             </button>
-            <button className="btn-outline-white">Tìm hiểu thêm</button>
+            <button className="btn-outline-white" onClick={() => navigate("/services")}>Tìm hiểu thêm</button>
           </div>
         </div>
       </Fade>

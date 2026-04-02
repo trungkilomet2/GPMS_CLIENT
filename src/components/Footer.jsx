@@ -1,7 +1,18 @@
-import { C } from "../lib/constants";
+import { Link } from "react-router-dom";
 
-const FOOTER_MENU = ["Trang chủ", "Giới thiệu", "Sản phẩm may", "Quy trình", "Liên hệ"];
-const FOOTER_SUPPORT = ["Hướng dẫn sử dụng", "Câu hỏi thường gặp", "Chính sách bảo mật", "Điều khoản sử dụng"];
+const FOOTER_MENU = [
+  { label: "Trang chủ", path: "/home" },
+  { label: "Giới thiệu", path: "/about" },
+  { label: "Dịch vụ", path: "/services" },
+  { label: "Xưởng may", path: "/factory" },
+  { label: "Liên hệ", path: "/contact" },
+];
+const FOOTER_SUPPORT = [
+  { label: "Tư vấn báo giá", path: "/contact" },
+  { label: "Năng lực xưởng", path: "/factory" },
+  { label: "Dịch vụ gia công", path: "/services" },
+  { label: "Hợp tác sản xuất", path: "/contact" },
+];
 const FOOTER_CONTACT = [
   ["📍", "123 Đường ABC, Quận 1, TP.HCM"],
   ["📞", "(+84) 123 456 789"],
@@ -33,13 +44,13 @@ export default function Footer() {
           {/* Menu */}
           <div className="footer-col">
             <h4 className="footer-col-head">Menu</h4>
-            {FOOTER_MENU.map(l => <a key={l} href="#" className="footer-link">{l}</a>)}
+            {FOOTER_MENU.map((item) => <Link key={item.label} to={item.path} className="footer-link">{item.label}</Link>)}
           </div>
 
           {/* Hỗ trợ */}
           <div className="footer-col">
             <h4 className="footer-col-head">Hỗ trợ</h4>
-            {FOOTER_SUPPORT.map(l => <a key={l} href="#" className="footer-link">{l}</a>)}
+            {FOOTER_SUPPORT.map((item) => <Link key={item.label} to={item.path} className="footer-link">{item.label}</Link>)}
           </div>
 
           {/* Contact */}

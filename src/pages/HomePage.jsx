@@ -47,19 +47,12 @@ export default function HomePage() {
 
   return (
     <MainLayout>
-
       <Hero />
-
       <Intro />
-
       <Products products={products} loading={loading} />
-
       <Features />
-
       <Process />
-
       <CTA />
-
     </MainLayout>
   );
 }
