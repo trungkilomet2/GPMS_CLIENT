@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, ShieldAlert, ShieldCheck, Table2, Users } from "lucide-react";
+import { ArrowRight, RotateCcw, Save, ShieldAlert, ShieldCheck, Table2, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   ADMIN_DB_PERMISSION_CORE_TABLES,
-  ADMIN_DB_PERMISSION_GAPS,
   ADMIN_DB_ROLE_BLUEPRINTS,
   ADMIN_DB_USER_FOREIGN_TABLES,
   getAdminDbRoleBlueprint,
   getAdminDbRoleOptions,
 } from "@/lib/admin/adminSchemaBlueprint";
-import { AdminBanner, AdminRoleBadge, AdminStatCard } from "@/pages/admin/adminShared";
+import {
+  ADMIN_PERMISSION_ACTIONS,
+  ADMIN_PERMISSION_MODULES,
+  getPermissionProfile,
+  updatePermissionProfile,
+} from "@/lib/admin/adminMockStore";
+import { AdminBanner, AdminRoleBadge, AdminStatCard, formatAdminDateTime } from "@/pages/admin/adminShared";
 import PermissionService from "@/services/PermissionService";
 
 function normalizeSearchText(value = "") {
@@ -56,9 +61,12 @@ export default function AdminManagePermission() {
   const [permissionCount, setPermissionCount] = useState(0);
   const [permissionLoading, setPermissionLoading] = useState(true);
   const [permissionError, setPermissionError] = useState("");
+  const [draftPermissions, setDraftPermissions] = useState({});
+  const [saveNotice, setSaveNotice] = useState("");
 
   const roleOptions = useMemo(() => getAdminDbRoleOptions(), []);
   const activeBlueprint = useMemo(() => getAdminDbRoleBlueprint(selectedRole), [selectedRole]);
+  const activePermissionProfile = useMemo(() => getPermissionProfile(activeBlueprint.key), [activeBlueprint.key]);
 
   const relatedBusinessTables = useMemo(() => {
     return ADMIN_DB_USER_FOREIGN_TABLES.filter((tableInfo) =>
@@ -69,15 +77,60 @@ export default function AdminManagePermission() {
   const roleCoverageText = useMemo(() => {
     if (permissionLoading) return "Đang kiểm tra dữ liệu permission từ backend.";
     if (permissionError) return "Không tải được permission catalog.";
-    if (permissionCount > 0) return `Đã có ${permissionCount} permission từ backend, nhưng web chưa đủ metadata để chỉnh chi tiết theo từng role.`;
-    return "API permission đã sẵn sàng nhưng hiện chưa có dữ liệu để gán theo role.";
+    if (permissionCount > 0) return `Đã có ${permissionCount} permission từ backend. Ma trận bên dưới đang được admin quản lý tạm trên web để phục vụ kiểm thử và rà soát role.`;
+    return "API permission đã sẵn sàng nhưng backend chưa trả đủ metadata gán theo role, nên web đang dùng ma trận nội bộ để quản trị.";
   }, [permissionCount, permissionError, permissionLoading]);
+
+  const grantedPermissionCount = useMemo(() => {
+    return ADMIN_PERMISSION_MODULES.reduce((count, moduleItem) => {
+      const permissionSet = draftPermissions[moduleItem.key] || {};
+      return (
+        count +
+        ADMIN_PERMISSION_ACTIONS.reduce(
+          (actionCount, action) => actionCount + (permissionSet[action.key] ? 1 : 0),
+          0
+        )
+      );
+    }, 0);
+  }, [draftPermissions]);
+
+  const hasDraftChanges = useMemo(() => {
+    return JSON.stringify(draftPermissions) !== JSON.stringify(activePermissionProfile?.permissions || {});
+  }, [activePermissionProfile?.permissions, draftPermissions]);
 
   const handleRoleChange = (roleKey) => {
     const next = new URLSearchParams(searchParams);
     next.set("role", roleKey);
     setSearchParams(next);
+    setSaveNotice("");
   };
+
+  const handleTogglePermission = (moduleKey, actionKey) => {
+    setDraftPermissions((current) => ({
+      ...current,
+      [moduleKey]: {
+        ...(current[moduleKey] || {}),
+        [actionKey]: !(current[moduleKey] || {})[actionKey],
+      },
+    }));
+    setSaveNotice("");
+  };
+
+  const handleResetDraft = () => {
+    setDraftPermissions(activePermissionProfile?.permissions || {});
+    setSaveNotice("Đã hoàn tác thay đổi chưa lưu.");
+  };
+
+  const handleSaveDraft = () => {
+    const savedProfile = updatePermissionProfile(activeBlueprint.key, draftPermissions);
+    setDraftPermissions(savedProfile?.permissions || {});
+    setSaveNotice(`Đã lưu ma trận quyền cho ${activeBlueprint.label} lúc ${formatAdminDateTime(savedProfile?.updatedAt)}.`);
+  };
+
+  useEffect(() => {
+    setDraftPermissions(activePermissionProfile?.permissions || {});
+    setSaveNotice("");
+  }, [activePermissionProfile]);
 
   useEffect(() => {
     let active = true;
@@ -137,7 +190,7 @@ export default function AdminManagePermission() {
                 ? "Đang tải permission catalog."
                 : permissionCount > 0
                   ? `Đã nhận ${permissionCount} permission từ backend.`
-                  : "API permission đang hoạt động nhưng chưa có dữ liệu."
+                  : "API permission đang hoạt động nhưng chưa có dữ liệu đầy đủ."
             }
             description={permissionError || roleCoverageText}
             tone={permissionError ? "danger" : permissionCount > 0 ? "success" : "warning"}
@@ -178,6 +231,13 @@ export default function AdminManagePermission() {
               }
               tone={permissionCount > 0 ? "success" : "danger"}
             />
+            <AdminStatCard
+              icon={ShieldCheck}
+              label="Quyền đang bật"
+              value={grantedPermissionCount}
+              meta="Tổng số action đang được bật cho role đang chọn"
+              tone="warning"
+            />
           </div>
 
           <section className="admin-card">
@@ -214,6 +274,115 @@ export default function AdminManagePermission() {
           </section>
 
           <div className="admin-grid admin-grid--permissions">
+            <section className="admin-card">
+              <div className="admin-card__header">
+                <div>
+                  <h2 className="admin-card__title">Ma trận quyền theo vai trò</h2>
+                  <p className="admin-card__subtitle">
+                    Bật hoặc tắt quyền cho từng module. Thay đổi được lưu vào local admin store của web để test nhanh và rà soát role.
+                  </p>
+                </div>
+              </div>
+
+              {saveNotice ? (
+                <AdminBanner title="Cập nhật quyền" description={saveNotice} tone="success" />
+              ) : null}
+
+              <div className="admin-permission-list">
+                {ADMIN_PERMISSION_MODULES.map((moduleItem) => {
+                  const currentSet = activePermissionProfile?.permissions?.[moduleItem.key] || {};
+                  const draftSet = draftPermissions[moduleItem.key] || {};
+
+                  return (
+                    <article key={moduleItem.key} className="admin-permission-item">
+                      <div className="admin-permission-item__top">
+                        <div className="admin-permission-item__identity">
+                          <div className="admin-permission-item__code">{moduleItem.label.slice(0, 3).toUpperCase()}</div>
+                          <div className="admin-permission-item__heading">
+                            <strong>{moduleItem.label}</strong>
+                            <p className="admin-table__secondary">{moduleItem.description}</p>
+                          </div>
+                        </div>
+
+                        <div className="admin-permission-item__summary">
+                          <div className="admin-permission-item__summary-stack">
+                            <AdminRoleBadge tone={activeBlueprint.tone}>{activeBlueprint.label}</AdminRoleBadge>
+                            <AdminRoleBadge tone="info">
+                              {ADMIN_PERMISSION_ACTIONS.filter((action) => draftSet[action.key]).length} quyền bật
+                            </AdminRoleBadge>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="admin-permission-item__path">
+                        {activeBlueprint.joinPath}
+                      </div>
+
+                      <div className="admin-permission-item__body">
+                        <div className="admin-permission-panel admin-permission-panel--current">
+                          <span className="admin-permission-panel__title">Hiện tại</span>
+                          <div className="admin-permission-table__badges">
+                            {ADMIN_PERMISSION_ACTIONS.map((action) => (
+                              <AdminRoleBadge key={action.key} tone={currentSet[action.key] ? "success" : "danger"}>
+                                {action.label}: {currentSet[action.key] ? "Bật" : "Tắt"}
+                              </AdminRoleBadge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="admin-permission-panel admin-permission-panel--draft">
+                          <span className="admin-permission-panel__title">Bản nháp</span>
+                          <div className="admin-permission-table__roles">
+                            {ADMIN_PERMISSION_ACTIONS.map((action) => (
+                              <label key={action.key} className="admin-permission-check">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(draftSet[action.key])}
+                                  onChange={() => handleTogglePermission(moduleItem.key, action.key)}
+                                />
+                                <span>{action.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="admin-permission-panel admin-permission-panel--actions">
+                          <span className="admin-permission-panel__title">Ghi chú</span>
+                          <div className="admin-permission-panel__summary">
+                            {ADMIN_PERMISSION_ACTIONS.filter((action) => draftSet[action.key]).length} / {ADMIN_PERMISSION_ACTIONS.length} action đang được bật
+                          </div>
+                          <div className="admin-permission-table__draft">
+                            Cập nhật gần nhất: {formatAdminDateTime(activePermissionProfile?.updatedAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="admin-permission-table__actions">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--secondary admin-focusable"
+                  onClick={handleResetDraft}
+                  disabled={!hasDraftChanges}
+                >
+                  <RotateCcw size={16} />
+                  Hoàn tác
+                </button>
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--primary admin-focusable"
+                  onClick={handleSaveDraft}
+                  disabled={!hasDraftChanges}
+                >
+                  <Save size={16} />
+                  Lưu ma trận quyền
+                </button>
+              </div>
+            </section>
+
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
@@ -279,6 +448,10 @@ export default function AdminManagePermission() {
                   <div className="admin-preview-list__item">
                     <strong>Trạng thái permission</strong>
                     <span>{roleCoverageText}</span>
+                  </div>
+                  <div className="admin-preview-list__item">
+                    <strong>Cập nhật gần nhất</strong>
+                    <span>{formatAdminDateTime(activePermissionProfile?.updatedAt)}</span>
                   </div>
                 </div>
               </section>

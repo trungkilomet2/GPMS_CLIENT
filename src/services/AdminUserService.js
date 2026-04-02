@@ -200,6 +200,23 @@ const getRoleMeta = (roleKey = "") => {
   };
 };
 
+const parseFetchPayload = async (response) => {
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/json")) {
+    return response.json().catch(() => ({}));
+  }
+
+  const raw = await response.text().catch(() => "");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { data: raw };
+  }
+};
+
 const mapRoleIdsToKeys = (value) => {
   if (Array.isArray(value)) {
     return unique(
@@ -553,7 +570,7 @@ const AdminUserService = {
       throw { status: 401 };
     }
 
-    const json = await response.json().catch(() => ({}));
+    const json = await parseFetchPayload(response);
 
     if (!response.ok) {
       throw {
@@ -574,6 +591,10 @@ const AdminUserService = {
     const normalizedRoleIds = unique(roleKeys)
       .map((roleKey) => ROLE_KEY_MAP[String(roleKey ?? "").trim()]?.roleId)
       .filter((roleId) => Number.isFinite(roleId));
+
+    if (!normalizedRoleIds.length) {
+      throw new Error("Không có role hợp lệ để gán cho user.");
+    }
 
     const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ASSIGN_ROLES(id), {
       roleIds: normalizedRoleIds,
