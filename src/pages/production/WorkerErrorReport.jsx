@@ -32,6 +32,18 @@ const toList = (payload) => {
   return [];
 };
 
+const formatToDateTimeLocal = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+};
+
 const mapPart = (part, fallbackProductionId) => ({
   id: part?.id ?? part?.partId ?? null,
   productionId:
@@ -69,6 +81,7 @@ export default function WorkerErrorReport() {
       endDate: assignment?.endDate ?? "",
       errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
+      happenAt: assignment?.happenAt ?? "",
     };
   }, [assignment]);
 
@@ -83,7 +96,7 @@ export default function WorkerErrorReport() {
     title: "",
     description: "",
     quantity: "",
-    happenAt: "",
+    happenAt: formatToDateTimeLocal(normalizedAssignment?.happenAt || new Date().toISOString()),
     repairWorker: "",
   });
 
@@ -564,7 +577,11 @@ export default function WorkerErrorReport() {
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isProductionLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
                     <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
@@ -597,7 +614,11 @@ export default function WorkerErrorReport() {
                     value={form.partId}
                     onChange={(event) => handleChange("partId", event.target.value)}
                     disabled={!form.productionId || isPartLocked}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isPartLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
                     <option value="">Chọn công đoạn...</option>
                     {parts.map((item) => (
@@ -627,8 +648,8 @@ export default function WorkerErrorReport() {
                   <input
                     type="datetime-local"
                     value={form.happenAt}
-                    onChange={(event) => handleChange("happenAt", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    readOnly
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 outline-none cursor-not-allowed"
                   />
                 </div>
               </div>

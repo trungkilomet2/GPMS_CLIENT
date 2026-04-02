@@ -545,48 +545,50 @@ export default function ProductionPlanDetail() {
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
-                    <Link
-                      to={`/production/${plan?.production?.productionId}/errors`}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết
-                    </Link>
+            {!isWorker && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
+                <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
+                      <Link
+                        to={`/production/${plan?.production?.productionId}/errors`}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết
+                      </Link>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">
-                    {progressSummary.completed}/{progressSummary.total}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">
+                      {progressSummary.completed}/{progressSummary.total}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
-                  <div className="mt-1">
-                    <Link
-                      to="/worker/daily-report"
-                      state={{ plan: { production: plan?.production, steps: plan?.steps } }}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết sản lượng nhân viên
-                    </Link>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
+                    <div className="mt-1">
+                      <Link
+                        to="/worker/daily-report"
+                        state={{ plan: { production: plan?.production, steps: plan?.steps } }}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết sản lượng nhân viên
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -663,6 +665,7 @@ export default function ProductionPlanDetail() {
                                 startDate: row.startDate,
                                 endDate: row.endDate,
                                 errorType: 0,
+                                happenAt: new Date().toISOString(),
                               },
                             }}
                             className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"

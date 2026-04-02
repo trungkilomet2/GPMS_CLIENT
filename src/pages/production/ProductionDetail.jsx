@@ -856,6 +856,7 @@ export default function ProductionDetail() {
                                         startDate: row.startDate,
                                         endDate: row.endDate,
                                         errorType: 0,
+                                        happenAt: new Date().toISOString(),
                                       }
                                     }}
                                     className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
