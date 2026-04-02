@@ -277,12 +277,18 @@ body{
   border-radius:10px;
   border:1px solid #ddd;
   padding-left:44px;
-  padding-right:44px;
+  padding-right:56px;
   font-size:14px;
   outline:none;
   background:#fff;
   color:#111827;
   transition:all .2s ease;
+}
+
+.input-wrapper input[type="password"]::-ms-reveal,
+.input-wrapper input[type="password"]::-ms-clear,
+.input-wrapper input[type="password"]::-webkit-credentials-auto-fill-button{
+  display:none;
 }
 
 .input-wrapper input::placeholder{
@@ -304,13 +310,26 @@ body{
 
 .eye-btn{
   position:absolute;
-  right:12px;
+  right:10px;
   top:50%;
   transform:translateY(-50%);
   border:none;
   background:none;
   cursor:pointer;
   color:#6b7280;
+  width:32px;
+  height:32px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+  font-size:16px;
+  line-height:1;
+  z-index:1;
+}
+
+.eye-btn:hover{
+  background:rgba(15,61,53,0.08);
 }
 
 /* ========================= */

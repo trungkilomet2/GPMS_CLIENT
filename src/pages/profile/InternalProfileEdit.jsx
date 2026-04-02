@@ -104,6 +104,29 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
+function isGenericEntitySaveError(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("an error occurred while saving the entity changes") ||
+    message.includes("see the inner exception for details")
+  );
+}
+
+function getFallbackSaveErrorMessage(errData, fallbackMessage) {
+  const status = Number(errData?.status ?? 0);
+  const detail = String(errData?.detail ?? "").trim();
+  const title = String(errData?.title ?? "").trim();
+  const message = String(fallbackMessage ?? "").trim();
+  const genericMessage = detail || title || message;
+
+  if (status >= 500 && isGenericEntitySaveError(genericMessage)) {
+    return "Không thể lưu hồ sơ do backend trả lỗi nội bộ chung chung. Hãy kiểm tra lại email, số điện thoại hoặc ảnh đại diện rồi thử lại.";
+  }
+
+  return message || "Cập nhật thất bại.";
+}
+
 export default function InternalProfileEdit() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -361,12 +384,12 @@ export default function InternalProfileEdit() {
       fd.append("Location", normalizeSpaces(form.location));
       fd.append("Email", String(form.email || "").trim());
 
-      const avatarUpload = await buildAvatarFile(
-        avatarFile,
-        avatarPreview,
-        getInitials(form.fullName)
-      );
-      fd.append("AvartarUrl", avatarUpload);
+      if (avatarFile instanceof File) {
+        fd.append("AvartarUrl", avatarFile);
+      } else if (!String(avatarPreview || "").trim()) {
+        const avatarUpload = await buildAvatarFile(null, "", getInitials(form.fullName));
+        fd.append("AvartarUrl", avatarUpload);
+      }
 
       const updateResult = await userService.updateProfile(user?.userId ?? user?.id, fd);
 
@@ -390,8 +413,9 @@ export default function InternalProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data ?? {};
       const mapped = mapApiErrors(errData);
+      const friendlyMessage = getFallbackSaveErrorMessage(errData, mapped.message);
       const shouldPromptVerify =
-        isEmailVerificationRequiredMessage(mapped.message) ||
+        isEmailVerificationRequiredMessage(friendlyMessage) ||
         isEmailVerificationRequiredMessage(errData?.detail);
 
       setServerErrors(mapped.fieldErrors || {});
@@ -410,7 +434,7 @@ export default function InternalProfileEdit() {
           text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
         });
       } else {
-        setMessage({ type: "error", text: mapped.message });
+        setMessage({ type: "error", text: friendlyMessage });
       }
     } finally {
       setSaving(false);

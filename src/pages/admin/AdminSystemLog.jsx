@@ -95,6 +95,15 @@ function getLevelTone(level = "") {
   return "success";
 }
 
+function isErrorLevel(level = "") {
+  const normalized = String(level).toLowerCase();
+  return ["error", "critical", "fatal"].includes(normalized);
+}
+
+function isWarningLevel(level = "") {
+  return String(level).toLowerCase() === "warning";
+}
+
 export default function AdminSystemLog() {
   const [search, setSearch] = useState("");
   const [levelFilter, setLevelFilter] = useState("all");
@@ -108,7 +117,7 @@ export default function AdminSystemLog() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const levelOptions = useMemo(() => ["all", "Information", "Warning", "Error"], []);
+  const levelOptions = useMemo(() => ["all", "Warning", "Error"], []);
 
   const loadLogs = async ({
     keepSelection = true,
@@ -159,6 +168,7 @@ export default function AdminSystemLog() {
 
     return logs.filter((log) => {
       const logTime = new Date(log.timestamp).getTime();
+      const isSupportedLevel = isWarningLevel(log.level) || isErrorLevel(log.level);
       const searchableText = normalizeSearchText([
         log.message,
         log.messageTemplate,
@@ -171,11 +181,16 @@ export default function AdminSystemLog() {
       ].filter(Boolean).join(" "));
 
       const searchMatch = !keyword || searchableText.includes(keyword);
-      const levelMatch = levelFilter === "all" || String(log.level).toLowerCase() === String(levelFilter).toLowerCase();
+      const levelMatch =
+        levelFilter === "all"
+          ? isSupportedLevel
+          : levelFilter === "Warning"
+            ? isWarningLevel(log.level)
+            : isErrorLevel(log.level);
       const fromMatch = fromDate == null || (!Number.isNaN(logTime) && logTime >= fromDate);
       const toMatch = toDate == null || (!Number.isNaN(logTime) && logTime <= toDate);
 
-      return searchMatch && levelMatch && fromMatch && toMatch;
+      return isSupportedLevel && searchMatch && levelMatch && fromMatch && toMatch;
     });
   }, [fromTimestamp, levelFilter, logs, search, toTimestamp]);
 
@@ -187,8 +202,8 @@ export default function AdminSystemLog() {
   const stats = useMemo(
     () => ({
       total: filteredLogs.length,
-      errors: filteredLogs.filter((log) => String(log.level).toLowerCase() === "error").length,
-      warnings: filteredLogs.filter((log) => String(log.level).toLowerCase() === "warning").length,
+      errors: filteredLogs.filter((log) => isErrorLevel(log.level)).length,
+      warnings: filteredLogs.filter((log) => isWarningLevel(log.level)).length,
       exceptions: filteredLogs.filter((log) => Boolean(log.exception)).length,
     }),
     [filteredLogs]

@@ -138,6 +138,29 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
+function isGenericEntitySaveError(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("an error occurred while saving the entity changes") ||
+    message.includes("see the inner exception for details")
+  );
+}
+
+function getFallbackSaveErrorMessage(errData, fallbackMessage) {
+  const status = Number(errData?.status ?? 0);
+  const detail = String(errData?.detail ?? "").trim();
+  const title = String(errData?.title ?? "").trim();
+  const message = String(fallbackMessage ?? "").trim();
+  const genericMessage = detail || title || message;
+
+  if (status >= 500 && isGenericEntitySaveError(genericMessage)) {
+    return "Không thể lưu hồ sơ do backend trả lỗi nội bộ chung chung. Hãy kiểm tra lại email, số điện thoại hoặc ảnh đại diện rồi thử lại.";
+  }
+
+  return message || "Lưu thất bại. Vui lòng thử lại.";
+}
+
 async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
   if (avatarFile) return avatarFile;
 
@@ -156,8 +179,7 @@ async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
     }
   }
 
-  // Backend currently validates AvartarUrl as required.
-  // Generate a small PNG avatar so user can save profile even without uploading an image.
+  // Fallback only when the user truly has no existing avatar at all.
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 256;
@@ -523,8 +545,12 @@ export default function ProfileEdit() {
       fd.append("Location", normalizeSpaces(form.Location));
       fd.append("Email", form.Email.trim());
 
-      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
-      fd.append("AvartarUrl", avatarUpload);
+      if (avatarFile instanceof File) {
+        fd.append("AvartarUrl", avatarFile);
+      } else if (!String(avatarPreview || "").trim()) {
+        const avatarUpload = await buildAvatarFile(null, "", getInitials(form.FullName));
+        fd.append("AvartarUrl", avatarUpload);
+      }
 
       const updateResult = await userService.updateProfile(user.userId ?? user.id, fd);
 
@@ -559,8 +585,9 @@ export default function ProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data;
       const { message, fieldErrors } = getApiErrorDetails(errData);
+      const friendlyMessage = getFallbackSaveErrorMessage(errData, message);
       const shouldPromptVerify =
-        isEmailVerificationRequiredMessage(message) ||
+        isEmailVerificationRequiredMessage(friendlyMessage) ||
         isEmailVerificationRequiredMessage(errData?.detail);
 
       if (fieldErrors.length > 0) {
@@ -577,7 +604,7 @@ export default function ProfileEdit() {
           text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
         });
       } else {
-        setMsg({ type: "error", text: message });
+        setMsg({ type: "error", text: friendlyMessage });
       }
     } finally {
       setSaving(false);

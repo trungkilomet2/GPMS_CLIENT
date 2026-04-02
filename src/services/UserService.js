@@ -117,7 +117,14 @@ export const userService = {
     }
 
     const json = await res.json();
-    if (!res.ok) throw { response: { data: json } };
+    if (!res.ok) {
+      throw {
+        response: {
+          status: res.status,
+          data: json,
+        },
+      };
+    }
 
     // Unwrap data, map đúng field (kể cả typo avartarUrl)
     const d = json.data ?? {};

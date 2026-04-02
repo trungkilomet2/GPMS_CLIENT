@@ -3,6 +3,7 @@ import { routes } from '@/routes';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ProfileCompletionGuard from '@/routes/ProfileCompletionGuard';
 import { ToastContainer } from 'react-toastify';
+import ChatWidget from '@/components/ChatWidget';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function App() {
@@ -19,6 +20,7 @@ export default function App() {
           </ProfileCompletionGuard>
         </Suspense>
       </BrowserRouter>
+      <ChatWidget />
       <ToastContainer position="top-right" autoClose={3000} />
     </>
   );

@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ListChecks,
   LogOut,
+  ContactRound,
   ShieldCheck,
   Users,
   Wallet,
@@ -15,7 +16,7 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -30,14 +31,14 @@ const OPERATION_NAV_ITEMS = [
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
+  { to: "/customers", label: "Khách hàng", icon: ContactRound, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
 ];
 
 function hasRequiredRole(user, allowedRoles) {
   if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return true;
-  const roles = splitRoles(user?.role);
-  return allowedRoles.some((role) => roles.includes(role));
+  return hasAnyRole(user?.role, allowedRoles);
 }
 
 function resolveSidebarItems(user) {

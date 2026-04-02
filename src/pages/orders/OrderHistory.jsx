@@ -444,7 +444,6 @@ export default function Orders({
             />
           )}
         </div>
-        <script src="https://messenger.svc.chative.io/static/v1.0/channels/s90b3b96e-842b-47ac-9482-1335b0ea5141/messenger.js?mode=livechat" defer="defer"></script>
       </div>
     </OwnerLayout>
   );

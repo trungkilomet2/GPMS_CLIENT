@@ -312,6 +312,13 @@ const WorkerService = {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.UPDATE(id), payload);
     return parseApiPayload(rawResponse);
   },
+
+  async assignWorkerSkill(id, skillIds = []) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.ASSIGN_WORKER_SKILL(id), {
+      skillIds: skillIds.map(Number),
+    });
+    return parseApiPayload(rawResponse);
+  },
 };
 
 export default WorkerService;
