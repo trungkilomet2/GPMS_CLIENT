@@ -19,6 +19,8 @@ import { canManageLeaveRequests } from "@/lib/roleAccess";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import "@/styles/leave.css";
 
+const MAX_REVIEW_REASON_LENGTH = 100;
+
 const STATUS_MAP = {
   pending: {
     label: "Chờ duyệt",
@@ -198,12 +200,20 @@ export default function LeaveDetail() {
       return;
     }
 
-    if (!rejectReason.trim()) return;
+    const normalizedReason = rejectReason.trim();
+
+    if (!normalizedReason) return;
+
+    if (normalizedReason.length > MAX_REVIEW_REASON_LENGTH) {
+      setError(`Lý do từ chối không được vượt quá ${MAX_REVIEW_REASON_LENGTH} ký tự.`);
+      return;
+    }
 
     try {
       setSubmitting(true);
+      setError("");
       await LeaveService.denyLeaveRequest(id, {
-        denyContent: rejectReason.trim(),
+        denyContent: normalizedReason,
       });
 
       const refreshed = await LeaveService.getLeaveRequestById(id);
@@ -212,7 +222,7 @@ export default function LeaveDetail() {
           ...leave,
           status: "rejected",
           dateReply: new Date().toISOString(),
-          denyContent: rejectReason.trim(),
+          denyContent: normalizedReason,
         }
       );
       setRejectOpen(false);
@@ -247,12 +257,20 @@ export default function LeaveDetail() {
   };
 
   const handleRejectCancel = async () => {
-    if (!canConfirmCancel || !cancelRejectReason.trim()) return;
+    const normalizedReason = cancelRejectReason.trim();
+
+    if (!canConfirmCancel || !normalizedReason) return;
+
+    if (normalizedReason.length > MAX_REVIEW_REASON_LENGTH) {
+      setError(`Lý do từ chối yêu cầu hủy không được vượt quá ${MAX_REVIEW_REASON_LENGTH} ký tự.`);
+      return;
+    }
 
     try {
       setSubmitting(true);
+      setError("");
       await LeaveService.rejectCancelLeaveRequest(id, {
-        rejectCancelContent: cancelRejectReason.trim(),
+        rejectCancelContent: normalizedReason,
       });
 
       const refreshed = await LeaveService.getLeaveRequestById(id);
@@ -261,7 +279,7 @@ export default function LeaveDetail() {
           ...leave,
           status: "approved",
           dateReply: new Date().toISOString(),
-          rejectCancelContent: cancelRejectReason.trim(),
+          rejectCancelContent: normalizedReason,
         }
       );
       setCancelRejectOpen(false);
@@ -422,10 +440,17 @@ export default function LeaveDetail() {
                     <textarea
                       rows={4}
                       value={rejectReason}
-                      onChange={(e) => setRejectReason(e.target.value)}
+                      maxLength={MAX_REVIEW_REASON_LENGTH}
+                      onChange={(e) => {
+                        setRejectReason(e.target.value);
+                        if (error) setError("");
+                      }}
                       placeholder="Nhập lý do từ chối đơn nghỉ (bắt buộc)"
                       className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                     />
+                    <div className="mt-2 text-right text-xs text-slate-500">
+                      {rejectReason.trim().length}/{MAX_REVIEW_REASON_LENGTH} ký tự
+                    </div>
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
@@ -445,10 +470,17 @@ export default function LeaveDetail() {
                     <textarea
                       rows={4}
                       value={cancelRejectReason}
-                      onChange={(e) => setCancelRejectReason(e.target.value)}
+                      maxLength={MAX_REVIEW_REASON_LENGTH}
+                      onChange={(e) => {
+                        setCancelRejectReason(e.target.value);
+                        if (error) setError("");
+                      }}
                       placeholder="Nhập lý do từ chối yêu cầu hủy đơn nghỉ (bắt buộc)"
                       className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                     />
+                    <div className="mt-2 text-right text-xs text-slate-500">
+                      {cancelRejectReason.trim().length}/{MAX_REVIEW_REASON_LENGTH} ký tự
+                    </div>
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
