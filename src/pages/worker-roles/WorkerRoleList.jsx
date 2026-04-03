@@ -201,7 +201,6 @@ export default function WorkerRoleList() {
                 <table className="worker-role-table min-w-full">
                   <thead>
                     <tr>
-                      <th>Mã chuyên môn</th>
                       <th>Tên chuyên môn gốc</th>
                       <th>Tên hiển thị</th>
                       <th>Số nhân sự</th>
@@ -212,7 +211,6 @@ export default function WorkerRoleList() {
                   <tbody>
                     {filteredRoles.map((role) => (
                       <tr key={role.id}>
-                        <td className="font-semibold text-slate-800">CM-{String(role.id).padStart(3, "0")}</td>
                         <td>
                           <div className="worker-role-table__primary">{role.name}</div>
                         </td>

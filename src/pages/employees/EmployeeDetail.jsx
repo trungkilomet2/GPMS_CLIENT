@@ -28,6 +28,15 @@ const STATUS_MAP = {
   inactive: { label: "Ngừng hoạt động", className: "employee-detail-pill employee-detail-pill--warning" },
 };
 
+function pickPreferredItems(primary = [], fallback = []) {
+  const primaryItems = Array.isArray(primary) ? primary : [];
+  const fallbackItems = Array.isArray(fallback) ? fallback : [];
+
+  if (!primaryItems.length) return fallbackItems;
+  if (!fallbackItems.length) return primaryItems;
+  return primaryItems;
+}
+
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -116,13 +125,9 @@ export default function EmployeeDetail() {
           workerSkillLabel:
             sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
           workerSkillNames:
-            sourceEmployee.workerSkillNames?.length
-              ? sourceEmployee.workerSkillNames
-              : directoryEmployee?.workerSkillNames ?? [],
+            pickPreferredItems(sourceEmployee.workerSkillNames, directoryEmployee?.workerSkillNames),
           workerSkillLabels:
-            sourceEmployee.workerSkillLabels?.length
-              ? sourceEmployee.workerSkillLabels
-              : directoryEmployee?.workerSkillLabels ?? [],
+            pickPreferredItems(sourceEmployee.workerSkillLabels, directoryEmployee?.workerSkillLabels),
           role: sourceEmployee.role || directoryEmployee?.role || "",
           roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
           roleLabels:
@@ -209,12 +214,14 @@ export default function EmployeeDetail() {
   const canEditSpecialties = canAssignSpecialties(employee?.roles ?? employee?.role ?? "");
   const workerSkillLabels = useMemo(
     () =>
-      employee?.workerSkillLabels?.length
+      Array.isArray(location.state?.updatedWorkerSkillLabels)
+        ? location.state.updatedWorkerSkillLabels
+        : employee?.workerSkillLabels?.length
         ? employee.workerSkillLabels
         : employee?.workerSkillLabel
           ? [employee.workerSkillLabel]
           : [],
-    [employee]
+    [employee, location.state]
   );
 
   return (

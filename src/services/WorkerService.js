@@ -42,6 +42,34 @@ const normalizeEmployeeStatus = (value, statusId) => {
 
 const HIDDEN_DIRECTORY_ROLES = ["Admin", "Customer"];
 
+const unique = (values = []) => Array.from(new Set(values.filter(Boolean)));
+
+const extractNamesFromCollection = (collection = []) => {
+  if (!Array.isArray(collection)) return [];
+
+  return unique(
+    collection
+      .map((item) => {
+        if (item == null) return "";
+        if (typeof item === "string" || typeof item === "number") return String(item).trim();
+        if (typeof item === "object") {
+          return String(
+            item.name ??
+            item.role ??
+            item.roleName ??
+            item.skillName ??
+            item.workerSkillName ??
+            item.label ??
+            item.value ??
+            ""
+          ).trim();
+        }
+        return "";
+      })
+      .filter(Boolean)
+  );
+};
+
 const shouldHideFromEmployeeDirectory = (employee = {}) => {
   const roles = Array.isArray(employee.roles) ? employee.roles : [];
   return roles.some((role) => HIDDEN_DIRECTORY_ROLES.includes(role));
@@ -50,10 +78,12 @@ const shouldHideFromEmployeeDirectory = (employee = {}) => {
 const normalizeEmployee = (item = {}) => {
   const roles = splitRoles(item.role ?? item.roles ?? item.roleName ?? item.roleNames ?? "");
   const role = roles.join(", ");
-  const workerSkillCandidates = splitRoles(
-    item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
-  );
-  const workerSkillNames = Array.from(new Set(workerSkillCandidates.filter(Boolean)));
+  const workerSkillNames = unique([
+    ...extractNamesFromCollection(item.workerSkills),
+    ...extractNamesFromCollection(item.workerRoles),
+    ...splitRoles(item.workerSkill),
+    ...splitRoles(item.workerRole),
+  ]);
   const workerRole = workerSkillNames[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);

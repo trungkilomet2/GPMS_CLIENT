@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, Sparkles, UserRoundCog } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { canAssignSpecialties, getSystemRoleLabel } from "@/lib/orgHierarchy";
 import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
@@ -11,10 +13,35 @@ function normalizeSkillName(value = "") {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function getSkillUsageText(assignedCount = 0) {
+  const count = Number(assignedCount) || 0;
+
+  if (count <= 0) {
+    return "Chưa có nhân sự nào đang sử dụng chuyên môn này";
+  }
+
+  if (count === 1) {
+    return "Đang có 1 nhân sự sử dụng chuyên môn này";
+  }
+
+  return `Đang có ${count} nhân sự sử dụng chuyên môn này`;
+}
+
+function pickPreferredItems(primary = [], fallback = []) {
+  const primaryItems = Array.isArray(primary) ? primary : [];
+  const fallbackItems = Array.isArray(fallback) ? fallback : [];
+
+  if (!primaryItems.length) return fallbackItems;
+  if (!fallbackItems.length) return primaryItems;
+  return primaryItems.length >= fallbackItems.length ? primaryItems : fallbackItems;
+}
+
 export default function EmployeeSkillAssignment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const currentUser = getStoredUser();
+  const currentPrimaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [employee, setEmployee] = useState(null);
@@ -32,22 +59,44 @@ export default function EmployeeSkillAssignment() {
       setSubmitError("");
 
       try {
-        const [employeeResponse, workerRoles] = await Promise.all([
+        const [employeeResponse, directoryResponse, workerRoles] = await Promise.all([
           WorkerService.getEmployeeById(id),
+          currentPrimaryRole === "pm"
+            ? WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
+            : WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] })),
           WorkerRoleService.getWorkerRoles(),
         ]);
 
         if (!mounted) return;
-        if (!employeeResponse) {
+        const directoryEmployee = (directoryResponse?.data ?? []).find(
+          (item) => String(item.id) === String(id)
+        );
+        const resolvedEmployee =
+          employeeResponse || directoryEmployee
+              ? {
+                  ...(directoryEmployee ?? {}),
+                  ...(employeeResponse ?? {}),
+                workerSkillNames: pickPreferredItems(
+                    employeeResponse?.workerSkillNames,
+                    directoryEmployee?.workerSkillNames
+                  ),
+                workerSkillLabels: pickPreferredItems(
+                    employeeResponse?.workerSkillLabels,
+                    directoryEmployee?.workerSkillLabels
+                  ),
+                }
+            : null;
+
+        if (!resolvedEmployee) {
           setError("Không tìm thấy nhân viên phù hợp.");
           return;
         }
 
-        setEmployee(employeeResponse);
+        setEmployee(resolvedEmployee);
         setSkillOptions(workerRoles ?? []);
 
-        const employeeSkillNames = Array.isArray(employeeResponse.workerSkillNames)
-          ? employeeResponse.workerSkillNames.map(normalizeSkillName)
+        const employeeSkillNames = Array.isArray(resolvedEmployee.workerSkillNames)
+          ? resolvedEmployee.workerSkillNames.map(normalizeSkillName)
           : [];
         setSelectedIds(
           (workerRoles ?? [])
@@ -72,7 +121,7 @@ export default function EmployeeSkillAssignment() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [currentPrimaryRole, id]);
 
   const canAssignEmployeeSpecialties = canAssignSpecialties(employee?.roles ?? employee?.role ?? "");
 
@@ -112,6 +161,8 @@ export default function EmployeeSkillAssignment() {
 
     try {
       await WorkerService.assignWorkerSkill(id, selectedIds);
+      const updatedWorkerSkillNames = selectedSkills.map((skill) => skill.name);
+      const updatedWorkerSkillLabels = selectedSkills.map((skill) => skill.label || skill.name);
 
       if (location.state?.fromCreate) {
         navigate("/employees/workers", {
@@ -124,7 +175,11 @@ export default function EmployeeSkillAssignment() {
       }
 
       navigate(`/employees/${id}`, {
-        state: { skillsUpdated: true },
+        state: {
+          skillsUpdated: true,
+          updatedWorkerSkillNames,
+          updatedWorkerSkillLabels,
+        },
       });
     } catch (err) {
       setSubmitError(
@@ -255,7 +310,7 @@ export default function EmployeeSkillAssignment() {
                     <thead>
                       <tr>
                         <th>Chuyên môn</th>
-                        <th>Mô tả</th>
+                        <th>Tình trạng sử dụng</th>
                         <th className="employee-skill-assignment__tick-head">
                           <span className="employee-skill-assignment__tick-badge">
                             <Sparkles size={16} />
@@ -279,13 +334,10 @@ export default function EmployeeSkillAssignment() {
                             <tr key={skill.id} className={checked ? "is-selected" : ""}>
                               <td>
                                 <div className="employee-skill-assignment__skill-name">{skill.label || skill.name}</div>
-                                <div className="employee-skill-assignment__skill-code">CM-{String(skill.id).padStart(3, "0")}</div>
                               </td>
                               <td>
                                 <div className="employee-skill-assignment__skill-desc">
-                                  {skill.assignedCount > 0
-                                    ? `${skill.assignedCount} nhân sự đang dùng chuyên môn này`
-                                    : "Chưa có nhân sự nào được gán chuyên môn này"}
+                                  {getSkillUsageText(skill.assignedCount)}
                                 </div>
                               </td>
                               <td className="employee-skill-assignment__tick-cell">
