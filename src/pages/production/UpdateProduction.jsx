@@ -180,14 +180,12 @@ export default function UpdateProduction() {
           setProduction(normalized);
           return;
         }
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
-        if (!fallback) setProductionError(`Không tìm thấy đơn sản xuất #${id}.`);
+        setProduction(null);
+        setProductionError(`Không tìm thấy đơn sản xuất #${id}.`);
       } catch (_err) {
         if (!active) return;
         setProductionError("Không thể tải thông tin đơn sản xuất.");
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
+        setProduction(null);
       } finally {
         if (active) setLoadingProduction(false);
       }

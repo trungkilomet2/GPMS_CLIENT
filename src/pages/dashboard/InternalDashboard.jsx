@@ -4,13 +4,14 @@ import { ArrowRight, BriefcaseBusiness, ClipboardList, ContactRound, Users } fro
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/internal-dashboard.css";
 
 const QUICK_LINKS = [
   {
     to: "/customers",
     title: "Quản lý khách hàng",
-    description: "Xem danh sách khách hàng và order của từng khách trong một màn hình.",
+    description: "Xem danh sách khách hàng và đơn hàng của từng khách trong một màn hình.",
     icon: ContactRound,
   },
   {
@@ -53,12 +54,13 @@ export default function InternalDashboard() {
         {
           to: "/employees",
           title: "Danh sách nhân viên",
-          description: "Tách riêng khu quản lý, nhân viên và màn xem worker skill.",
+          description: "Tách riêng khu quản lý, nhân viên và danh mục chuyên môn thợ.",
           icon: Users,
         },
         ...QUICK_LINKS,
       ]
     : QUICK_LINKS;
+  const roleLabels = roles.map((role) => getSystemRoleLabel(role));
 
   return (
     <DashboardLayout>
@@ -76,7 +78,7 @@ export default function InternalDashboard() {
             <div className="internal-dashboard-hero__account">
               <div className="internal-dashboard-hero__label">Tài khoản hiện tại</div>
               <div className="internal-dashboard-hero__name">{user.fullName || user.name || user.userName}</div>
-              <div className="internal-dashboard-hero__role">{roles.join(", ") || "Người dùng nội bộ"}</div>
+              <div className="internal-dashboard-hero__role">{roleLabels.join(", ") || "Người dùng nội bộ"}</div>
             </div>
           </section>
 

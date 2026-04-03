@@ -22,4 +22,16 @@ describe("WorkerService.assignWorkerSkill", () => {
     );
     expect(result).toEqual({ data: "ok" });
   });
+
+  it("allows clearing all worker skills by sending an empty array", async () => {
+    axiosClient.put.mockResolvedValue({ data: "ok" });
+
+    const result = await WorkerService.assignWorkerSkill(7, []);
+
+    expect(axiosClient.put).toHaveBeenCalledWith(
+      API_ENDPOINTS.WORKER.ASSIGN_WORKER_SKILL(7),
+      { skillIds: [] }
+    );
+    expect(result).toEqual({ data: "ok" });
+  });
 });

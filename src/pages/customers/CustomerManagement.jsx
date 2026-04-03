@@ -19,6 +19,12 @@ function formatNumber(value) {
   return new Intl.NumberFormat("vi-VN").format(parsed);
 }
 
+function formatCurrency(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "-";
+  return `${new Intl.NumberFormat("vi-VN").format(parsed)} VNĐ/SP`;
+}
+
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -235,20 +241,20 @@ export default function CustomerManagement() {
           <section className="rounded-[2rem] bg-gradient-to-r from-[#103c25] via-[#1b5f39] to-[#25784a] px-6 py-7 text-white shadow-xl sm:px-8">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/80">Customer Management</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/80">Quản lý khách hàng</p>
                 <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Danh sách khách hàng và đơn hàng theo khách</h1>
                 <p className="mt-3 text-sm text-emerald-50/85 sm:text-base">
-                  Theo dõi nhanh thông tin khách hàng và toàn bộ order của từng khách trong cùng một màn quản lý.
+                  Theo dõi nhanh thông tin khách hàng và toàn bộ đơn hàng của từng khách trong cùng một màn quản lý.
                 </p>
               </div>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                  <div className="text-emerald-100/80">Khách đang hiển thị</div>
-                  <div className="mt-1 text-2xl font-bold">{customerStats.totalOnPage}</div>
+                <div className="flex min-h-[6.75rem] flex-col justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                  <div className="min-h-[2.5rem] text-emerald-100/80">Khách đang hiển thị</div>
+                  <div className="mt-1 text-2xl font-bold leading-none">{customerStats.totalOnPage}</div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                  <div className="text-emerald-100/80">Đơn của khách đang chọn</div>
-                  <div className="mt-1 text-2xl font-bold">{orderRecordCount}</div>
+                <div className="flex min-h-[6.75rem] flex-col justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                  <div className="min-h-[2.5rem] text-emerald-100/80">Đơn của khách đang chọn</div>
+                  <div className="mt-1 text-2xl font-bold leading-none">{orderRecordCount}</div>
                 </div>
               </div>
             </div>
@@ -284,7 +290,7 @@ export default function CustomerManagement() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Danh sách khách hàng</h2>
-                    <p className="mt-1 text-sm text-slate-500">Chọn một khách hàng để xem order tương ứng.</p>
+                    <p className="mt-1 text-sm text-slate-500">Chọn một khách hàng để xem các đơn hàng tương ứng.</p>
                   </div>
                   <div className="rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
                     {customerRecordCount} khách
@@ -380,8 +386,8 @@ export default function CustomerManagement() {
                     <h2 className="text-lg font-bold text-slate-900">Đơn hàng theo khách</h2>
                     <p className="mt-1 text-sm text-slate-500">
                       {selectedCustomer
-                        ? `Đang xem order của ${selectedCustomer.fullName}.`
-                        : "Chọn một khách hàng bên trái để tải danh sách order."}
+                        ? `Đang xem đơn hàng của ${selectedCustomer.fullName}.`
+                        : "Chọn một khách hàng bên trái để tải danh sách đơn hàng."}
                     </p>
                   </div>
 
@@ -404,7 +410,7 @@ export default function CustomerManagement() {
                   <input
                     value={orderSearchInput}
                     onChange={(event) => setOrderSearchInput(event.target.value)}
-                    placeholder="Tìm order theo tên, loại, màu, size, trạng thái..."
+                    placeholder="Tìm đơn hàng theo tên, loại, màu, size, trạng thái..."
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                     disabled={!selectedCustomerId}
                   />
@@ -444,7 +450,7 @@ export default function CustomerManagement() {
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thông tin</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thông số</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Số lượng</th>
-                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">CPU</th>
+                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Giá / sản phẩm</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thời gian</th>
                         <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Trạng thái</th>
                       </tr>
@@ -482,7 +488,7 @@ export default function CustomerManagement() {
                             <div className="mt-1">{[order.size, order.color].filter(Boolean).join(" • ") || "-"}</div>
                           </td>
                           <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatNumber(order.quantity)}</td>
-                          <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatNumber(order.cpu)}</td>
+                          <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatCurrency(order.cpu)}</td>
                           <td className="px-5 py-4 text-sm text-slate-600">
                             <div>Bắt đầu: {formatDate(order.startDate)}</div>
                             <div className="mt-1">Kết thúc: {formatDate(order.endDate)}</div>

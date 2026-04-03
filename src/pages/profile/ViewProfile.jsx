@@ -137,24 +137,12 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
     ["👤", "Người đại diện", user.fullName || user.name],
     ["✉️", "Email", user.email],
     ["📍", "Địa chỉ", user.address],
-    ["🏢", "Doanh nghiệp", user.companyName || user.department || "Đối tác ngành may mặc"],
-    ["🎭", "Vai trò", user.role || "Khách hàng doanh nghiệp"],
   ];
 
   const orderSummaryRows = [
     ["📦", "Đơn đã hoàn thành", user.completedOrders ?? "—"],
     ["🧵", "Đơn đang triển khai", user.activeProjects ?? "—"],
-    ["⭐", "Mức độ hợp tác", user.rating ?? "Tốt"],
-    ["🕒", "Lần tương tác gần nhất", user.lastOrderAt || user.joinDate || "Chưa cập nhật"],
   ];
-
-  const defaultBio = user.bio || `Khách hàng là ${user.companyName || "một doanh nghiệp"} hoạt động trong lĩnh vực may mặc, tập trung vào các đơn hàng yêu cầu tiến độ ổn định, chất lượng đồng đều và khả năng phối hợp sản xuất dài hạn.`;
-  const cooperationNotes = Array.isArray(user.cooperationNotes)
-    ? user.cooperationNotes.filter(Boolean)
-    : String(user.cooperationNotes || "")
-        .split("\n")
-        .map((item) => item.trim())
-        .filter(Boolean);
 
   return (
     <div style={{display:"grid",gridTemplateColumns:"1.05fr .95fr",gap:"1.25rem"}}>
@@ -168,21 +156,6 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
               <InfoRow key={label} icon={icon} label={label} value={value} last={i===customerProfileRows.length-1}/>
             ))}
           </div>
-        </CardSection>
-
-        <CardSection title="Giới thiệu khách hàng" mb="0">
-          <p style={{fontSize:".88rem",color:T.textMid,lineHeight:1.8}}>
-            {defaultBio}
-          </p>
-          {!!user.skills?.length && (
-            <div style={{display:"flex",flexWrap:"wrap",gap:".5rem",marginTop:"1rem"}}>
-              {user.skills.map((s)=>(
-                <span key={s} style={{background:T.light,color:T.mid,fontSize:".75rem",fontWeight:700,padding:".3rem .8rem",borderRadius:20,border:`1px solid ${T.border}`}}>
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
         </CardSection>
       </div>
 
@@ -201,21 +174,6 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
           <div style={{display:"flex",gap:".75rem",flexWrap:"wrap"}}>
             <BtnPrimary onClick={onViewOrders}>📋 Xem đơn hàng</BtnPrimary>
             <BtnSecondary onClick={onCreateOrder}>➕ Tạo yêu cầu mới</BtnSecondary>
-          </div>
-        </CardSection>
-
-        <CardSection title="Ghi chú hợp tác" mb="0">
-          <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-            {(cooperationNotes.length ? cooperationNotes : [
-              "Ưu tiên cập nhật tiến độ đơn hàng theo từng giai đoạn sản xuất.",
-              "Theo dõi lịch sử tương tác để hỗ trợ báo giá và xử lý yêu cầu nhanh hơn.",
-              "Phù hợp với khách hàng là công ty may mặc, thương hiệu thời trang hoặc chủ doanh nghiệp lớn.",
-            ]).map((item) => (
-              <div key={item} style={{display:"flex",gap:".65rem",alignItems:"flex-start",color:T.textMid,fontSize:".84rem",lineHeight:1.7}}>
-                <span style={{color:T.base,fontWeight:800}}>•</span>
-                <span>{item}</span>
-              </div>
-            ))}
           </div>
         </CardSection>
       </div>
@@ -288,29 +246,6 @@ function SectionSecurity() {
   );
 }
 
-function SectionActivity({ activities=[] }) {
-  return (
-    <CardSection title="Lịch sử hoạt động" mb="0">
-      {activities.length===0
-        ? <p style={{fontSize:".85rem",color:T.textLt,fontStyle:"italic"}}>Chưa có hoạt động nào.</p>
-        : activities.map((a,i)=>(
-          <div key={i} style={{display:"flex",gap:"1rem",paddingBottom:"1rem",marginBottom:"1rem",borderBottom:i<activities.length-1?`1px solid ${T.border}`:"none"}}>
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-              <div style={{width:10,height:10,borderRadius:"50%",background:T.base,flexShrink:0}}/>
-              {i<activities.length-1&&<div style={{width:2,flex:1,background:T.border,borderRadius:2}}/>}
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontWeight:700,fontSize:".88rem",color:T.text}}>{a.title}</div>
-              <div style={{fontSize:".82rem",color:T.textMid,margin:".2rem 0"}}>{a.description}</div>
-              <div style={{fontSize:".75rem",color:T.textLt}}>🕐 {a.time}</div>
-            </div>
-          </div>
-        ))
-      }
-    </CardSection>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div style={{minHeight:"100vh",background:T.sand,fontFamily:"'Lexend',sans-serif"}}>
@@ -337,7 +272,6 @@ function LoadingSkeleton() {
 const NAV_ITEMS = [
   {key:"info",     icon:"👤",label:"Thông tin cá nhân"},
   {key:"security", icon:"🔒",label:"Bảo mật"},
-  {key:"activity", icon:"📋",label:"Lịch sử hoạt động"},
 ];
 const IN_PROGRESS_STATUSES = ["Ch? x�t duy?t", "C?n c?p nh?t"];
 const DONE_STATUSES = ["Ch?p nh?n", "T? ch?i"];
@@ -379,14 +313,6 @@ function getCurrentUserId() {
   return storedUser?.userId || storedUser?.id || null;
 }
 
-function getStoredProfileExtras() {
-  const storedUser = getStoredUser() || {};
-  return {
-    bio: storedUser?.bio ?? "",
-    cooperationNotes: storedUser?.cooperationNotes ?? [],
-  };
-}
-
 export default function ViewProfile() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -416,10 +342,8 @@ export default function ViewProfile() {
         .then(([profileData, ordersResponse]) => {
           if (!active) return;
           const orders = ordersResponse?.data || ordersResponse || [];
-          const extras = getStoredProfileExtras();
           setProfile({
             ...profileData,
-            ...extras,
             ...buildOrderSummary(Array.isArray(orders) ? orders : []),
           });
         })
@@ -501,7 +425,7 @@ export default function ViewProfile() {
         <div style={{flex:1,paddingBottom:".5rem"}}>
           <div style={{fontSize:"1.4rem",fontWeight:800,color:T.text,marginBottom:".4rem"}}>{name}</div>
           <RoleBadge>
-            {profile?.role || "Khách hàng"}
+            Hồ sơ khách hàng
             {profile?.department ? ` · ${profile.department}` : ""}
           </RoleBadge>
         </div>
@@ -535,27 +459,12 @@ export default function ViewProfile() {
             ))}
           </div>
 
-          {/* Quick contact */}
-          <CardSection title="Liên hệ nhanh" mb="0">
-            <div style={{display:"flex",flexDirection:"column",gap:".55rem"}}>
-              {[["✉️",profile?.email]].map(([ic,val])=>val&&(
-                <div key={val} style={{display:"flex",gap:".6rem",alignItems:"center",fontSize:".82rem",color:T.textMid}}>
-                  <span style={{width:28,height:28,borderRadius:7,background:T.light,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{ic}</span>
-                  <span style={{wordBreak:"break-all"}}>{val}</span>
-                </div>
-              ))}
-              {!profile?.email&&(
-                <p style={{fontSize:".82rem",color:T.textLt,fontStyle:"italic"}}>Chưa có thông tin.</p>
-              )}
-            </div>
-          </CardSection>
         </aside>
 
         {/* Content */}
         <main>
           {tab==="info"     && <SectionInfo     user={profile} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
           {tab==="security" && <SectionSecurity/>}
-          {tab==="activity" && <SectionActivity activities={profile?.activities||[]}/>}
         </main>
       </div>
     </div>

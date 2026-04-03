@@ -110,6 +110,24 @@ function mergeRoles(baseRoles, employeeRoles) {
     }));
 }
 
+function normalizeSkillName(name = "") {
+  return String(name ?? "").trim().toLowerCase();
+}
+
+function getEmployeeSkillNames(employee = {}) {
+  const skillNames = Array.isArray(employee.workerSkillNames)
+    ? employee.workerSkillNames
+    : [employee.workerSkill].filter(Boolean);
+
+  return Array.from(
+    new Set(
+      skillNames
+        .map((skillName) => String(skillName ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 const WorkerRoleService = {
   async getWorkerRoles(options = {}) {
     const rolesFromApi = await fetchWorkerRolePages(options);
@@ -124,17 +142,24 @@ const WorkerRoleService = {
       employees = [];
     }
 
-    const employeeRoles = employees
-      .filter((employee) => isWorkerSkillName(employee.workerSkill))
-      .map((employee, index) => ({
-        id: rolesFromApi.length + index + 1,
-        name: employee.workerSkill,
-      }));
+    const employeeRoles = employees.flatMap((employee, index) =>
+      getEmployeeSkillNames(employee)
+        .filter((skillName) => isWorkerSkillName(skillName))
+        .map((skillName, skillIndex) => ({
+          id: rolesFromApi.length + index + skillIndex + 1,
+          name: skillName,
+        }))
+    );
 
     const roles = mergeRoles(rolesFromApi, employeeRoles);
 
     return roles.map((role) => {
-      const members = employees.filter((employee) => employee.workerSkill === role.name);
+      const normalizedRoleName = normalizeSkillName(role.name);
+      const members = employees.filter((employee) =>
+        getEmployeeSkillNames(employee).some(
+          (skillName) => normalizeSkillName(skillName) === normalizedRoleName
+        )
+      );
 
       return {
         ...role,
@@ -153,18 +178,18 @@ const WorkerRoleService = {
     const name = String(payload?.name ?? "").trim();
 
     if (!name) {
-      throw new Error("Tên vai trò thợ không được để trống.");
+      throw new Error("Tên chuyên môn thợ không được để trống.");
     }
 
     if (!isWorkerSkillName(name)) {
-      throw new Error("Màn này chỉ tạo chuyên môn thợ, không dùng để tạo role hệ thống.");
+      throw new Error("Màn này chỉ tạo chuyên môn thợ, không dùng để tạo vai trò hệ thống.");
     }
 
     const roles = await fetchWorkerRolePages({ pageSize: 100 });
     const duplicate = roles.some((role) => role.name.toLowerCase() === name.toLowerCase());
 
     if (duplicate) {
-      throw new Error("Vai trò thợ này đã tồn tại.");
+      throw new Error("Chuyên môn thợ này đã tồn tại.");
     }
 
     const rawResponse = await axiosClient.post(API_ENDPOINTS.WORKER_ROLE.CREATE, { name });

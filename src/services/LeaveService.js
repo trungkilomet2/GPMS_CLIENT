@@ -41,13 +41,65 @@ const collectProblemDetailsMessages = (data) => {
   return [...new Set(messages)];
 };
 
+const LEAVE_ERROR_MESSAGE_MAP = [
+  {
+    test: (message) => message.includes("status must be one of"),
+    value: "Trạng thái lọc không hợp lệ. Vui lòng chọn lại trạng thái nghỉ phép.",
+  },
+  {
+    test: (message) => message.includes("deny reason must not exceed 100 characters"),
+    value: "Lý do từ chối không được vượt quá 100 ký tự.",
+  },
+  {
+    test: (message) => message.includes("reject cancel reason must not exceed 100 characters"),
+    value: "Lý do từ chối yêu cầu hủy không được vượt quá 100 ký tự.",
+  },
+];
+
+const translateLeaveMessage = (message) => {
+  const normalized = String(message ?? "").trim();
+  if (!normalized) return "";
+
+  const lowerCased = normalized.toLowerCase();
+  const mapped = LEAVE_ERROR_MESSAGE_MAP.find((item) => item.test(lowerCased));
+  return mapped?.value ?? normalized;
+};
+
+const mapStatusToApi = (status) => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (!normalized || normalized === "all") return status;
+
+  const statusMap = {
+    pending: "Pending",
+    approved: "Approved",
+    rejected: "Denied",
+    cancelled: "Cancelled",
+    cancel_requested: "CancelRequested",
+  };
+
+  return statusMap[normalized] ?? status;
+};
+
+const normalizeLeaveQueryParams = (params) => {
+  if (!params || typeof params !== "object") return params;
+
+  const nextParams = { ...params };
+
+  if ("Status" in nextParams) {
+    nextParams.Status = mapStatusToApi(nextParams.Status);
+  }
+
+  return nextParams;
+};
+
 export const getLeaveErrorMessage = (error, fallbackMessage) => {
   const status = error?.response?.status;
   const responseData = error?.response?.data;
-  const problemMessages = collectProblemDetailsMessages(responseData);
+  const problemMessages = collectProblemDetailsMessages(responseData).map(translateLeaveMessage);
 
   if (error?.response?.status === 403) {
-    return (
+    return translateLeaveMessage(
       responseData?.message ||
       responseData?.title ||
       "Bạn không có quyền thực hiện thao tác này."
@@ -59,14 +111,14 @@ export const getLeaveErrorMessage = (error, fallbackMessage) => {
   }
 
   if (status === 400) {
-    return (
+    return translateLeaveMessage(
       responseData?.message ||
       responseData?.title ||
       "Dữ liệu gửi lên chưa hợp lệ. Vui lòng kiểm tra lại nội dung và thời gian nghỉ."
     );
   }
 
-  return (
+  return translateLeaveMessage(
     responseData?.message ||
     responseData?.title ||
     error?.message ||
@@ -152,7 +204,7 @@ const LeaveService = {
   async getLeaveRequests(params) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.LEAVE_REQUEST.GET_LIST,
-      params ? { params } : undefined
+      params ? { params: normalizeLeaveQueryParams(params) } : undefined
     );
     const response = parseApiPayload(rawResponse);
 
@@ -167,7 +219,7 @@ const LeaveService = {
   async getMyLeaveRequests(params) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.LEAVE_REQUEST.GET_MY_HISTORY,
-      params ? { params } : undefined
+      params ? { params: normalizeLeaveQueryParams(params) } : undefined
     );
     const response = parseApiPayload(rawResponse);
     const rawItems = response?.data ?? response?.items ?? response?.records ?? [];

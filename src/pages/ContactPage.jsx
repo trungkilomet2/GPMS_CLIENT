@@ -1,18 +1,7 @@
 import MainLayout from "@/layouts/MainLayout";
 import Fade from "@/components/Fade";
 import PublicPageHero from "@/components/public/PublicPageHero";
-
-const CONTACTS = [
-  { title: "Email tư vấn", value: "info@garmentpro.vn", desc: "Phù hợp khi cần gửi brief, bảng size, hình ảnh mẫu hoặc file kỹ thuật." },
-  { title: "Hotline sản xuất", value: "(+84) 123 456 789", desc: "Ưu tiên cho nhu cầu báo giá nhanh, chốt lịch họp hoặc cập nhật tiến độ đơn hàng." },
-  { title: "Địa chỉ xưởng", value: "123 Đường ABC, Quận 1, TP.HCM", desc: "Có thể hẹn lịch tham quan xưởng, duyệt mẫu và làm việc trực tiếp với bộ phận phụ trách." },
-];
-
-const HOURS = [
-  "Thứ 2 - Thứ 6: 08:00 - 17:30",
-  "Thứ 7: 08:00 - 12:00",
-  "Chủ nhật: Nhận yêu cầu online, phản hồi trong ngày làm việc kế tiếp",
-];
+import { PUBLIC_SITE_CONTENT } from "@/lib/publicSiteContent";
 
 export default function ContactPage() {
   return (
@@ -23,11 +12,7 @@ export default function ContactPage() {
         highlight="bắt đầu đơn hàng"
         description="Dù bạn đang cần báo giá, tìm xưởng gia công lâu dài hay chỉ muốn kiểm tra khả năng triển khai mẫu, đội ngũ GPMS luôn sẵn sàng hỗ trợ."
         image="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1600&q=80"
-        metrics={[
-          { value: "24h", label: "Thời gian phản hồi mục tiêu" },
-          { value: "1:1", label: "Tư vấn theo nhu cầu đơn hàng" },
-          { value: "Online + Offline", label: "Linh hoạt cách làm việc" },
-        ]}
+        metrics={PUBLIC_SITE_CONTENT.contactMetrics}
       />
 
       <section className="public-section">
@@ -40,7 +25,7 @@ export default function ContactPage() {
           </div>
 
           <div className="public-card-grid public-card-grid-3">
-            {CONTACTS.map((item, index) => (
+            {PUBLIC_SITE_CONTENT.contactCards.map((item, index) => (
               <Fade key={item.title} delay={index * 0.08}>
                 <article className="public-card public-card-accent">
                   <h3 className="public-card-title">{item.title}</h3>
@@ -62,7 +47,7 @@ export default function ContactPage() {
                 Chủ động sắp lịch để <span>trao đổi nhanh hơn</span>
               </h2>
               <div className="public-list">
-                {HOURS.map((item) => (
+                {PUBLIC_SITE_CONTENT.workingHours.map((item) => (
                   <div key={item} className="public-list-item">
                     <span className="public-list-icon">⏰</span>
                     <span>{item}</span>
@@ -74,12 +59,12 @@ export default function ContactPage() {
 
           <Fade delay={0.1}>
             <div className="public-map-card">
-              <div className="public-map-badge">GPMS Garment Workshop</div>
+              <div className="public-map-badge">Xưởng May GPMS</div>
               <p>
-                123 Đường ABC, Quận 1, TP.HCM
+                {PUBLIC_SITE_CONTENT.factoryAddressSummary}
               </p>
               <p>
-                Phù hợp để hẹn duyệt mẫu, kiểm tra chất lượng và trao đổi trực tiếp với bộ phận phụ trách đơn hàng.
+                Phù hợp để hẹn duyệt mẫu, kiểm tra chất lượng và trao đổi trực tiếp với bộ phận phụ trách đơn hàng tại {PUBLIC_SITE_CONTENT.factoryRegion}.
               </p>
             </div>
           </Fade>

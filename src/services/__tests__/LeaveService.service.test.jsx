@@ -31,4 +31,21 @@ describe("LeaveService", () => {
       "Dữ liệu gửi lên chưa hợp lệ. Vui lòng kiểm tra lại nội dung và thời gian nghỉ."
     );
   });
+
+  it("translates backend leave validation messages to Vietnamese", () => {
+    const error = {
+      response: {
+        status: 400,
+        data: {
+          errors: {
+            denyContent: ["Deny reason must not exceed 100 characters."],
+          },
+        },
+      },
+    };
+
+    expect(getLeaveErrorMessage(error, "fallback")).toBe(
+      "Lý do từ chối không được vượt quá 100 ký tự."
+    );
+  });
 });

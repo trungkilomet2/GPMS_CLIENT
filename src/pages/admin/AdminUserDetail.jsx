@@ -24,6 +24,7 @@ export default function AdminUserDetail() {
   const [notice, setNotice] = useState(location.state?.notice || "");
   const [noticeTone, setNoticeTone] = useState(location.state?.notice ? "success" : "info");
   const [isDisabling, setIsDisabling] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
   const [reloadSeed, setReloadSeed] = useState(0);
   const permissionProfile = useMemo(() => (user ? getAdminRoleProfile(user.roleKey) : null), [user]);
 
@@ -126,6 +127,41 @@ export default function AdminUserDetail() {
     }
   };
 
+  const handleEnableUser = async () => {
+    if (!user?.id || user.status === "active" || isEnabling) {
+      return;
+    }
+
+    const shouldEnable = window.confirm(
+      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "user này"} không?`
+    );
+
+    if (!shouldEnable) return;
+
+    setIsEnabling(true);
+
+    try {
+      await AdminUserService.enableUser(user.id);
+      setUser((current) => (
+        current
+          ? { ...current, status: "active", statusId: 1 }
+          : current
+      ));
+      setNotice(`Đã kích hoạt lại user ${user.fullName || user.userName}.`);
+      setNoticeTone("success");
+    } catch (err) {
+      setNotice(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể kích hoạt lại user. Vui lòng thử lại."
+        )
+      );
+      setNoticeTone("warning");
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="admin-page">
@@ -156,12 +192,14 @@ export default function AdminUserDetail() {
                 <button
                   type="button"
                   className="admin-btn admin-btn--secondary admin-focusable"
-                  onClick={handleDisableUser}
-                  disabled={user.status === "inactive" || isDisabling}
+                  onClick={user.status === "active" ? handleDisableUser : handleEnableUser}
+                  disabled={user.status === "active" ? isDisabling : isEnabling}
                 >
-                  {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
+                  {user.status === "active"
+                    ? (isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null)
+                    : (isEnabling ? <LoaderCircle size={18} className="animate-spin" /> : null)}
                   <span>
-                    {user.status === "inactive" ? "Đã vô hiệu hóa" : "Vô hiệu hóa tài khoản"}
+                    {user.status === "active" ? "Vô hiệu hóa tài khoản" : "Kích hoạt lại tài khoản"}
                   </span>
                 </button>
               </div>
@@ -174,8 +212,10 @@ export default function AdminUserDetail() {
 
           {!loading && !error && user ? (
           <AdminBanner
-              title="Hồ sơ user đang đọc từ endpoint admin detail."
-              description="Thông tin liên hệ, avatar, trạng thái, role và chuyên môn thợ đang lấy trực tiếp từ backend."
+              title={user.detailAvailable === false ? "Hồ sơ user đang tạm dựng từ dữ liệu danh sách." : "Hồ sơ user đang đọc từ endpoint user detail."}
+              description={user.detailAvailable === false
+                ? "Endpoint chi tiết chưa trả được dữ liệu cho user này, nên web đang fallback sang dữ liệu từ danh sách admin."
+                : "Thông tin liên hệ, avatar, trạng thái, role và chuyên môn thợ đang lấy trực tiếp từ backend."}
               tone="info"
             />
           ) : null}

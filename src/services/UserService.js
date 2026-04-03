@@ -83,6 +83,26 @@ function isOtpPendingResponse(payload = {}) {
   return message.includes("otp");
 }
 
+function readEmailVerificationStatus(source = {}) {
+  const directValue =
+    source.emailVerified ??
+    source.isEmailVerified ??
+    source.isVerifiedEmail ??
+    source.isEmailConfirm ??
+    source.emailConfirmed ??
+    source.isEmailConfirmed ??
+    source.isVerified ??
+    source.verified;
+
+  if (typeof directValue === "boolean") return directValue;
+
+  const normalized = String(directValue ?? "").trim().toLowerCase();
+  if (["true", "1", "verified", "confirmed"].includes(normalized)) return true;
+  if (["false", "0", "unverified", "pending"].includes(normalized)) return false;
+
+  return null;
+}
+
 export const userService = {
 
   /**
@@ -151,6 +171,10 @@ export const userService = {
     const serverPhone = normalizeServerValue(d.phoneNumber);
     const serverAvatar = normalizeServerValue(d.avartarUrl);
     const serverLocation = normalizeServerValue(d.location);
+    const emailVerified =
+      readEmailVerificationStatus(d) ??
+      readEmailVerificationStatus(stored) ??
+      readEmailVerificationStatus(cached);
 
     const fullName =
       serverFullName ||
@@ -201,6 +225,7 @@ export const userService = {
       name:        fullName,
       email:       String(email || "").trim(),
       emailFromServer: Boolean(serverEmail),
+      emailVerified,
       phoneNumber: String(phoneNumber || "").trim(),
       phone:       String(phoneNumber || "").trim(),
       avatarUrl:   String(avatarUrl || "").trim(),

@@ -31,6 +31,48 @@ import {
   getAdminInitials,
 } from "@/pages/admin/adminShared";
 
+async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
+  if (avatarFile instanceof File) return avatarFile;
+
+  if (typeof avatarPreview === "string" && avatarPreview.trim()) {
+    try {
+      const response = await fetch(avatarPreview);
+      if (response.ok) {
+        const blob = await response.blob();
+        const type = blob.type || "image/png";
+        const extension = type.split("/")[1] || "png";
+        return new File([blob], `avatar.${extension}`, { type });
+      }
+    } catch {
+      // Fall back to generated avatar.
+    }
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Không thể tạo ảnh đại diện mặc định.");
+  }
+
+  context.fillStyle = "#1f4d3a";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#ffffff";
+  context.font = "bold 96px Lexend, 'Be Vietnam Pro', system-ui, sans-serif";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  const safeInitials = String(initials || "?").trim().slice(0, 2).toUpperCase() || "?";
+  context.fillText(safeInitials, canvas.width / 2, canvas.height / 2 + 4);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.92));
+  if (!blob) {
+    throw new Error("Không thể tạo ảnh đại diện mặc định.");
+  }
+
+  return new File([blob], "avatar.png", { type: "image/png" });
+}
+
 export default function AdminUserUpdate() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -53,6 +95,7 @@ export default function AdminUserUpdate() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isDisabling, setIsDisabling] = useState(false);
+  const [isEnabling, setIsEnabling] = useState(false);
   const roleOptions = useMemo(() => getAdminSupportedRoleOptions(), []);
   const selectRoleOptions = useMemo(() => {
     if (!user?.roleKey || roleOptions.some((role) => role.key === user.roleKey)) {
@@ -199,12 +242,18 @@ export default function AdminUserUpdate() {
     setSubmitError("");
 
     try {
+      const avatarUpload = await buildAvatarFile(
+        avatarFile,
+        avatarPreview || user?.avatarUrl || "",
+        form.fullName || form.userName
+      );
+
       const updatedUser = await AdminUserService.updateUser(id, {
         fullName: normalizedValues.fullName,
         email: normalizedValues.email,
         phoneNumber: normalizedValues.phoneNumber,
         location: normalizedValues.location,
-        avatarFile,
+        avatarFile: avatarUpload,
       });
 
       if (normalizedValues.roleKey !== user?.roleKey) {
@@ -294,6 +343,38 @@ export default function AdminUserUpdate() {
     }
   };
 
+  const handleEnableUser = async () => {
+    if (!user?.id || user.status === "active" || isEnabling) {
+      return;
+    }
+
+    const shouldEnable = window.confirm(
+      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "user này"} không?`
+    );
+
+    if (!shouldEnable) return;
+
+    setIsEnabling(true);
+
+    try {
+      await AdminUserService.enableUser(user.id);
+      navigate(`/admin/users/${id}`, {
+        state: {
+          notice: `Đã kích hoạt lại user ${user.fullName || user.userName}.`,
+        },
+      });
+    } catch (err) {
+      setSubmitError(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể kích hoạt lại user. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="admin-page">
@@ -327,11 +408,13 @@ export default function AdminUserUpdate() {
                 <button
                   type="button"
                   className="admin-btn admin-btn--secondary admin-focusable"
-                  onClick={handleDisableUser}
-                  disabled={user.status === "inactive" || isDisabling}
+                  onClick={user.status === "active" ? handleDisableUser : handleEnableUser}
+                  disabled={user.status === "active" ? isDisabling : isEnabling}
                 >
-                  {isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null}
-                  <span>{user.status === "inactive" ? "Đã vô hiệu hóa" : "Vô hiệu hóa tài khoản"}</span>
+                  {user.status === "active"
+                    ? (isDisabling ? <LoaderCircle size={18} className="animate-spin" /> : null)
+                    : (isEnabling ? <LoaderCircle size={18} className="animate-spin" /> : null)}
+                  <span>{user.status === "active" ? "Vô hiệu hóa tài khoản" : "Kích hoạt lại tài khoản"}</span>
                 </button>
               </div>
             ) : null}
