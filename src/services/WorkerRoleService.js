@@ -153,18 +153,18 @@ const WorkerRoleService = {
     const name = String(payload?.name ?? "").trim();
 
     if (!name) {
-      throw new Error("Tên vai trò thợ không được để trống.");
+      throw new Error("Tên chuyên môn thợ không được để trống.");
     }
 
     if (!isWorkerSkillName(name)) {
-      throw new Error("Màn này chỉ tạo chuyên môn thợ, không dùng để tạo role hệ thống.");
+      throw new Error("Màn này chỉ tạo chuyên môn thợ, không dùng để tạo vai trò hệ thống.");
     }
 
     const roles = await fetchWorkerRolePages({ pageSize: 100 });
     const duplicate = roles.some((role) => role.name.toLowerCase() === name.toLowerCase());
 
     if (duplicate) {
-      throw new Error("Vai trò thợ này đã tồn tại.");
+      throw new Error("Chuyên môn thợ này đã tồn tại.");
     }
 
     const rawResponse = await axiosClient.post(API_ENDPOINTS.WORKER_ROLE.CREATE, { name });

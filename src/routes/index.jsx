@@ -50,6 +50,7 @@ const LeaveRequestDetail = lazy(() => import("@/pages/owner/LeaveRequestDetail")
 const WorkerRoleList = lazy(() => import("@/pages/worker-roles/WorkerRoleList"));
 const WorkerRoleCreate = lazy(() => import("@/pages/worker-roles/WorkerRoleCreate"));
 const AdminUserList = lazy(() => import("@/pages/admin/AdminUserList"));
+const AdminUserActivate = lazy(() => import("@/pages/admin/AdminUserActivate"));
 const AdminUserCreate = lazy(() => import("@/pages/admin/AdminUserCreate"));
 const AdminUserDetail = lazy(() => import("@/pages/admin/AdminUserDetail"));
 const AdminUserUpdate = lazy(() => import("@/pages/admin/AdminUserUpdate"));
@@ -132,6 +133,7 @@ export const routes = [
   { path: "/worker-roles", element: guardByRoles(["Owner", "PM"], <WorkerRoleList />) },
   { path: "/worker-roles/create", element: guardByRoles(["Owner", "PM"], <WorkerRoleCreate />) },
   { path: "/admin/users", element: <AdminRouteGuard><AdminUserList /></AdminRouteGuard> },
+  { path: "/admin/users/active", element: <AdminRouteGuard><AdminUserActivate /></AdminRouteGuard> },
   { path: "/admin/users/create", element: <AdminRouteGuard><AdminUserCreate /></AdminRouteGuard> },
   { path: "/admin/users/:id/edit", element: <AdminRouteGuard><AdminUserUpdate /></AdminRouteGuard> },
   { path: "/admin/users/:id", element: <AdminRouteGuard><AdminUserDetail /></AdminRouteGuard> },

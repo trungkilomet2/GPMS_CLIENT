@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/services/authService";
+import { locationService } from "@/services/locationService";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 import {
@@ -135,6 +136,29 @@ function isEmailVerificationRequiredMessage(value) {
     message.includes("xác thực email trước khi cập nhật") ||
     message.includes("verify email") ||
     message.includes("email not verified")
+  );
+}
+
+function isEmailAlreadyVerifiedMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được xác thực trước đó") ||
+    message.includes("email da duoc xac thuc truoc do") ||
+    message.includes("email already verified") ||
+    message.includes("already verified")
+  );
+}
+
+function isEmailAlreadyRegisteredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được đăng ký") ||
+    message.includes("email da duoc dang ky") ||
+    message.includes("email already registered") ||
+    message.includes("email already exists") ||
+    message.includes("already exists")
   );
 }
 
@@ -302,10 +326,6 @@ export default function ProfileEdit() {
     phoneNumber: user?.phoneNumber ?? user?.phone ?? "",
     location: user?.location ?? user?.address ?? "",
     avatarUrl: user?.avatarUrl ?? user?.avartarUrl ?? "",
-    bio: user?.bio ?? "",
-    cooperationNotes: Array.isArray(user?.cooperationNotes)
-      ? user.cooperationNotes.join("\n")
-      : user?.cooperationNotes ?? "",
   });
 
   // ── form fields khớp đúng tên API ──
@@ -315,12 +335,17 @@ export default function ProfileEdit() {
     Email:       "",
     PhoneNumber: "",
     Location:    "",   // tương ứng với "address" hiển thị
-    Bio:         "",
-    CooperationNotes: "",
   });
 
   const [avatarFile,  setAvatarFile]  = useState(null);   // File object gửi lên API
   const [avatarPreview, setAvatarPreview] = useState(null); // URL preview local
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+  const [locationOptionsError, setLocationOptionsError] = useState("");
 
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
@@ -361,8 +386,6 @@ export default function ProfileEdit() {
       Email: fallback.email,
       PhoneNumber: fallback.phoneNumber,
       Location: fallback.location,
-      Bio: fallback.bio,
-      CooperationNotes: fallback.cooperationNotes,
     });
     setInitialEmail("");
     if (fallback.avatarUrl) {
@@ -376,10 +399,14 @@ export default function ProfileEdit() {
           Email:       data.email       ?? data.Email       ?? "",
           PhoneNumber: data.phoneNumber ?? data.PhoneNumber ?? data.phone ?? "",
           Location:    data.location    ?? data.Location    ?? data.address ?? "",
-          Bio:         fallback.bio,
-          CooperationNotes: fallback.cooperationNotes,
         });
-        setInitialEmail(data.emailFromServer ? (data.email ?? data.Email ?? "") : "");
+        const resolvedEmail = String(data.email ?? data.Email ?? "").trim();
+        const emailVerified = data.emailVerified === true;
+        setInitialEmail(data.emailFromServer ? resolvedEmail : "");
+        setVerifiedEmail(emailVerified ? resolvedEmail.toLowerCase() : "");
+        setOtpStage(emailVerified && resolvedEmail ? "verified" : "idle");
+        setBackendRequiresEmailVerification(false);
+        setOtpCode("");
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);
@@ -393,6 +420,61 @@ export default function ProfileEdit() {
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadProvinces = async () => {
+      try {
+        setLoadingProvinces(true);
+        setLocationOptionsError("");
+        const nextProvinces = await locationService.getProvinces();
+        if (!mounted) return;
+        setProvinces(nextProvinces);
+      } catch {
+        if (!mounted) return;
+        setLocationOptionsError("Không thể tải danh sách tỉnh/thành.");
+      } finally {
+        if (mounted) setLoadingProvinces(false);
+      }
+    };
+
+    loadProvinces();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadWards = async () => {
+      if (!selectedProvinceCode) {
+        setWards([]);
+        setSelectedWardCode("");
+        return;
+      }
+
+      try {
+        setLoadingWards(true);
+        setLocationOptionsError("");
+        const nextWards = await locationService.getWardsByProvinceCode(selectedProvinceCode);
+        if (!mounted) return;
+        setWards(nextWards);
+      } catch {
+        if (!mounted) return;
+        setLocationOptionsError("Không thể tải danh sách phường/xã.");
+        setWards([]);
+      } finally {
+        if (mounted) setLoadingWards(false);
+      }
+    };
+
+    loadWards();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedProvinceCode]);
 
   /* ── Field change ── */
   const handle = (e) => {
@@ -414,6 +496,31 @@ export default function ProfileEdit() {
   const handleBlur = (e) => {
     const { name } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
+  };
+
+  const handleProvinceChange = (e) => {
+    const provinceCode = String(e.target.value || "");
+
+    setSelectedProvinceCode(provinceCode);
+    setSelectedWardCode("");
+    setTouched((prev) => ({ ...prev, Location: true }));
+    setForm((prev) => ({
+      ...prev,
+      Location: "",
+    }));
+  };
+
+  const handleWardChange = (e) => {
+    const wardCode = String(e.target.value || "");
+    const province = provinces.find((item) => String(item.code) === String(selectedProvinceCode));
+    const ward = wards.find((item) => String(item.code) === wardCode);
+
+    setSelectedWardCode(wardCode);
+    setTouched((prev) => ({ ...prev, Location: true }));
+    setForm((prev) => ({
+      ...prev,
+      Location: ward && province ? `${ward.name}, ${province.name}` : "",
+    }));
   };
 
   /* ── Avatar: chọn file → preview ngay, lưu File object ── */
@@ -445,7 +552,25 @@ export default function ProfileEdit() {
     try {
       setSendingOtp(true);
       setMsg(null);
-      await authService.sendRegisterOtp({ email: String(form.Email || "").trim() });
+      const normalizedEmail = String(form.Email || "").trim();
+
+      try {
+        await authService.sendRegisterOtp({ email: normalizedEmail });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const sendMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyRegisteredMessage(sendMessage)) {
+          throw err;
+        }
+
+        await authService.resendRegisterOtp({ email: normalizedEmail });
+      }
+
       setOtpStage("sent");
       setOtpCode("");
       setVerifiedEmail("");
@@ -477,10 +602,23 @@ export default function ProfileEdit() {
     try {
       setVerifyingOtp(true);
       setMsg(null);
-      await authService.verifyRegisterOtp({
-        email: String(form.Email || "").trim(),
-        otp: String(otpCode || "").trim(),
-      });
+      try {
+        await authService.verifyRegisterOtp({
+          email: String(form.Email || "").trim(),
+          otp: String(otpCode || "").trim(),
+        });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const verifyMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyVerifiedMessage(verifyMessage)) {
+          throw err;
+        }
+      }
       setOtpStage("verified");
       setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
       setBackendRequiresEmailVerification(false);
@@ -569,11 +707,6 @@ export default function ProfileEdit() {
       const storedUser = getStoredUser() || {};
       setStoredUser({
         ...storedUser,
-        bio: String(form.Bio || "").trim(),
-        cooperationNotes: String(form.CooperationNotes || "")
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
       });
       setInitialEmail(String(form.Email || "").trim());
       setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
@@ -830,50 +963,64 @@ export default function ProfileEdit() {
               </FormField>
 
               <FormField label="Địa chỉ / Khu vực" required error={touched.Location && errs.Location}>
-                <Input name="Location" value={form.Location} onChange={handle} onBlur={handleBlur}
-                  placeholder="Số nhà, đường, quận, thành phố" hasError={!!(touched.Location && errs.Location)} />
-              </FormField>
-
-              <FormField label="Giới thiệu khách hàng" hint="Mô tả ngắn về khách hàng hoặc doanh nghiệp.">
-                <textarea
-                  name="Bio"
-                  value={form.Bio ?? ""}
-                  onChange={handle}
-                  onBlur={handleBlur}
-                  placeholder="Ví dụ: Khách hàng chuyên các đơn hàng thời trang công sở, ưu tiên chất lượng ổn định và tiến độ rõ ràng."
-                  style={{
-                    width: "100%",
-                    minHeight: 110,
-                    padding: ".75rem .9rem",
-                    border: `1.5px solid ${T.border}`,
-                    borderRadius: 8,
-                    fontSize: ".88rem",
-                    background: T.white,
-                    color: T.text,
-                    resize: "vertical",
-                  }}
-                />
-              </FormField>
-
-              <FormField label="Ghi chú hợp tác" hint="Mỗi dòng là một ghi chú hiển thị ở trang hồ sơ.">
-                <textarea
-                  name="CooperationNotes"
-                  value={form.CooperationNotes ?? ""}
-                  onChange={handle}
-                  onBlur={handleBlur}
-                  placeholder={"Ưu tiên cập nhật tiến độ theo từng giai đoạn.\nTheo dõi lịch sử tương tác để hỗ trợ báo giá nhanh hơn."}
-                  style={{
-                    width: "100%",
-                    minHeight: 130,
-                    padding: ".75rem .9rem",
-                    border: `1.5px solid ${T.border}`,
-                    borderRadius: 8,
-                    fontSize: ".88rem",
-                    background: T.white,
-                    color: T.text,
-                    resize: "vertical",
-                  }}
-                />
+                <div style={{ display: "grid", gap: ".75rem" }}>
+                  <select
+                    value={selectedProvinceCode}
+                    onChange={handleProvinceChange}
+                    disabled={loadingProvinces}
+                    style={{
+                      width: "100%",
+                      padding: ".65rem .9rem",
+                      border: `1.5px solid ${touched.Location && errs.Location ? T.red : T.border}`,
+                      borderRadius: 8,
+                      fontSize: ".88rem",
+                      background: T.white,
+                      color: T.text,
+                    }}
+                  >
+                    <option value="">{loadingProvinces ? "Đang tải tỉnh/thành..." : "Chọn tỉnh/thành"}</option>
+                    {provinces.map((province) => (
+                      <option key={province.code} value={province.code}>
+                        {province.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedWardCode}
+                    onChange={handleWardChange}
+                    disabled={!selectedProvinceCode || loadingWards}
+                    style={{
+                      width: "100%",
+                      padding: ".65rem .9rem",
+                      border: `1.5px solid ${touched.Location && errs.Location ? T.red : T.border}`,
+                      borderRadius: 8,
+                      fontSize: ".88rem",
+                      background: !selectedProvinceCode ? T.sand : T.white,
+                      color: T.text,
+                    }}
+                  >
+                    <option value="">
+                      {!selectedProvinceCode
+                        ? "Chọn tỉnh/thành trước"
+                        : loadingWards
+                          ? "Đang tải phường/xã..."
+                          : "Chọn phường/xã"}
+                    </option>
+                    {wards.map((ward) => (
+                      <option key={ward.code} value={ward.code}>
+                        {ward.name}
+                      </option>
+                    ))}
+                  </select>
+                  {form.Location ? (
+                    <div style={{ fontSize: ".74rem", color: T.textMid }}>
+                      Khu vực đã chọn: <strong>{form.Location}</strong>
+                    </div>
+                  ) : null}
+                  {locationOptionsError ? (
+                    <div style={{ fontSize: ".73rem", color: T.red }}>{locationOptionsError}</div>
+                  ) : null}
+                </div>
               </FormField>
 
             </CardSection>

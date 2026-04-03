@@ -116,10 +116,10 @@ export const CATEGORIES = [
 
 // Homepage section data
 export const STATS = [
-  { val: "10+", sub: "Năm kinh nghiệm" },
-  { val: "200+", sub: "Công nhân lành nghề" },
-  { val: "500+", sub: "Đơn hàng mỗi tháng" },
-  { val: "98%", sub: "Khách hàng hài lòng" },
+  { val: "Đơn hàng", sub: "Theo dõi trạng thái tập trung" },
+  { val: "Sản xuất", sub: "Phối hợp theo từng công đoạn" },
+  { val: "Chất lượng", sub: "Ghi nhận và kiểm tra minh bạch" },
+  { val: "Tiến độ", sub: "Cập nhật xuyên suốt quy trình" },
 ];
 
 export const PRODUCTS = [
@@ -146,7 +146,7 @@ export const STEPS = [
 ];
 
 export const PROCESS_CARDS = [
-  { rng: "01-02", title: "Tư vấn & Báo giá", desc: "Tiếp nhận yêu cầu, tư vấn chi tiết và gửi báo giá minh bạch trong 24h.", icon: "💬" },
+  { rng: "01-02", title: "Tư vấn & Báo giá", desc: "Tiếp nhận yêu cầu, làm rõ phạm vi công việc và trao đổi phương án phù hợp trong thời gian làm việc.", icon: "💬" },
   { rng: "03-04", title: "Thiết kế & Sản xuất", desc: "Duyệt mẫu, cắt vải, may thành phẩm theo tiêu chuẩn kỹ thuật đã thỏa thuận.", icon: "✂️" },
-  { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "Kiểm tra 100% sản phẩm trước khi đóng gói và giao hàng đúng tiến độ.", icon: "🚚" },
+  { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "Kiểm tra thành phẩm trước khi đóng gói và bàn giao theo tiến độ đã thống nhất.", icon: "🚚" },
 ];

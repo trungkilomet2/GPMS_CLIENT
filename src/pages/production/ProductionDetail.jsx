@@ -196,14 +196,12 @@ export default function ProductionDetail() {
           return;
         }
 
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
-        if (!fallback) setError(`Không tìm thấy đơn sản xuất #${id}.`);
+        setProduction(null);
+        setError(`Không tìm thấy đơn sản xuất #${id}.`);
       } catch (_err) {
         if (!active) return;
         setError("Không thể tải chi tiết đơn sản xuất.");
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
+        setProduction(null);
       } finally {
         if (active) setLoading(false);
       }

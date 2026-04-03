@@ -13,9 +13,9 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  getAllowedManagerRoles,
+  getDirectManagerRoleLabel,
   getManagerRoleHint,
-  getSystemRoleLabel,
+  isEligibleDirectManager,
   isManagerRequired,
   pickPrimarySystemRole,
 } from "@/lib/orgHierarchy";
@@ -53,9 +53,8 @@ export default function EmployeeUpdate() {
       try {
         const [employee, managerResponse] = await Promise.all([
           WorkerService.getEmployeeById(id),
-          WorkerService.getEmployeeDirectory({
+          WorkerService.getManagerDirectory({
             pageSize: 100,
-            includeHidden: true,
           }),
         ]);
 
@@ -100,17 +99,10 @@ export default function EmployeeUpdate() {
     };
   }, [id]);
 
-  const allowedManagerRoles = useMemo(
-    () => getAllowedManagerRoles(form.role),
-    [form.role]
-  );
-
   const availableManagers = useMemo(
     () =>
-      managerOptions.filter((employee) =>
-        employee.roles.some((role) => allowedManagerRoles.includes(role))
-      ),
-    [allowedManagerRoles, managerOptions]
+      managerOptions.filter((employee) => isEligibleDirectManager(employee, form.role)),
+    [form.role, managerOptions]
   );
   useEffect(() => {
     if (!form.managerId) return;
@@ -205,7 +197,7 @@ export default function EmployeeUpdate() {
               </Link>
               <h1 className="employee-create-hero__title">Cập nhật thông tin nhân viên</h1>
               <p className="employee-create-hero__subtitle">
-                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Worker.
+                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo sơ đồ Chủ xưởng / Quản lý sản xuất / Nhân viên.
               </p>
             </div>
 
@@ -293,7 +285,7 @@ export default function EmployeeUpdate() {
                       </option>
                       {availableManagers.map((manager) => (
                         <option key={manager.id} value={manager.id}>
-                          {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                          {manager.fullName} - {getDirectManagerRoleLabel(manager, form.role)}
                         </option>
                       ))}
                     </select>
@@ -305,7 +297,7 @@ export default function EmployeeUpdate() {
                 {form.role === "Worker" ? (
                   <div className="employee-create-banner">
                     <span>
-                      Chuyên môn của worker đã được tách sang màn riêng để hỗ trợ chọn nhiều skill cùng lúc.
+                      Chuyên môn của nhân viên đã được tách sang màn riêng để hỗ trợ chọn nhiều kỹ năng cùng lúc.
                       {" "}
                       <Link to={`/employees/${id}/skills`} className="employee-create-inline-link">
                         Mở màn gán skill

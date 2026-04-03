@@ -3,17 +3,20 @@ import { Link, useLocation } from "react-router-dom";
 import {
   BriefcaseBusiness,
   CircleAlert,
+  Lock,
   LoaderCircle,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
+  Unlock,
   UserRoundCheck,
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
+import { getSystemRoleLabel, pickPrimarySystemRole } from "@/lib/orgHierarchy";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
@@ -30,6 +33,11 @@ const STATUS_MAP = {
 
 const ROLE_GROUPS = {
   management: ["Owner", "PM", "Admin"],
+};
+
+const VIEW_MODE_ROLE_FILTERS = {
+  management: ["Owner", "PM", "Admin"],
+  workers: ["Worker"],
 };
 
 function getInitials(name = "") {
@@ -118,6 +126,8 @@ export default function EmployeeList() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [statusActionId, setStatusActionId] = useState(null);
   const [reloadSeed, setReloadSeed] = useState(0);
   const viewMode = location.pathname.includes("/employees/management")
     ? "management"
@@ -170,6 +180,60 @@ export default function EmployeeList() {
     setReloadSeed((current) => current + 1);
   };
 
+  const handleToggleEmployeeStatus = async (employee) => {
+    if (!isOwner || !employee?.id || statusActionId === employee.id) {
+      return;
+    }
+
+    const isActive = employee.status === "active";
+    const confirmed = window.confirm(
+      isActive
+        ? `Bạn có chắc muốn vô hiệu hóa tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
+        : `Bạn có chắc muốn kích hoạt lại tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
+    );
+
+    if (!confirmed) return;
+
+    setStatusActionId(employee.id);
+    setNotice("");
+
+    try {
+      if (isActive) {
+        await WorkerService.disableEmployeeAccount(employee.id);
+      } else {
+        await WorkerService.enableEmployeeAccount(employee.id);
+      }
+
+      setEmployees((current) =>
+        current.map((item) =>
+          item.id === employee.id
+            ? {
+                ...item,
+                status: isActive ? "inactive" : "active",
+                statusId: isActive ? 2 : 1,
+              }
+            : item
+        )
+      );
+      setNotice(
+        isActive
+          ? `Đã vô hiệu hóa tài khoản ${employee.fullName || employee.userName}.`
+          : `Đã kích hoạt lại tài khoản ${employee.fullName || employee.userName}.`
+      );
+    } catch (err) {
+      setNotice(
+        getEmployeeModuleErrorMessage(
+          err,
+          isActive
+            ? "Không thể vô hiệu hóa tài khoản nhân viên. Vui lòng thử lại."
+            : "Không thể kích hoạt lại tài khoản nhân viên. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setStatusActionId(null);
+    }
+  };
+
   const clearFilters = () => {
     setSearch("");
     setRoleFilter("all");
@@ -212,7 +276,8 @@ export default function EmployeeList() {
       );
       const matchSearch =
         !keyword || searchableText.includes(keyword);
-      const matchRole = roleFilter === "all" || employee.roles.includes(roleFilter);
+      const employeePrimaryRole = pickPrimarySystemRole(employee.roles);
+      const matchRole = roleFilter === "all" || employeePrimaryRole === roleFilter;
       const matchSpecialty =
         specialtyFilter === "all" || (Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.includes(specialtyFilter));
       const matchStatus = statusFilter === "all" || employee.status === statusFilter;
@@ -234,13 +299,15 @@ export default function EmployeeList() {
 
   const roleOptions = useMemo(() => {
     const optionsMap = new Map();
+    const allowedRolesForView = VIEW_MODE_ROLE_FILTERS[viewMode] ?? null;
 
     scopedEmployees.forEach((employee) => {
-      employee.roles.forEach((role, index) => {
-        if (!optionsMap.has(role)) {
-          optionsMap.set(role, employee.roleLabels?.[index] || role);
-        }
-      });
+      const primaryRole = pickPrimarySystemRole(employee.roles);
+      if (!primaryRole) return;
+      if (allowedRolesForView && !allowedRolesForView.includes(primaryRole)) return;
+      if (!optionsMap.has(primaryRole)) {
+        optionsMap.set(primaryRole, getSystemRoleLabel(primaryRole));
+      }
     });
 
     return [
@@ -249,7 +316,7 @@ export default function EmployeeList() {
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
-  }, [scopedEmployees]);
+  }, [scopedEmployees, viewMode]);
 
   const specialtyOptions = useMemo(() => {
     const optionsMap = new Map();
@@ -337,6 +404,12 @@ export default function EmployeeList() {
           <p className="employee-summary-note">
             Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.
           </p>
+
+          {notice ? (
+            <div className="employee-create-banner">
+              <span>{notice}</span>
+            </div>
+          ) : null}
 
           <div className="employee-filter-card">
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]">
@@ -548,9 +621,33 @@ export default function EmployeeList() {
                           <span className={statusConfig.className}>{statusConfig.label}</span>
                         </td>
                         <td className="employee-table-td employee-table-td--action px-5 py-5 align-middle text-center">
-                          <Link to={`/employees/${employee.id}`} className="employee-action-btn">
-                            Xem chi tiết
-                          </Link>
+                          <div className="flex flex-wrap items-center justify-center gap-2">
+                            <Link to={`/employees/${employee.id}`} className="employee-action-btn">
+                              Xem chi tiết
+                            </Link>
+                            {isOwner ? (
+                              <button
+                                type="button"
+                                className="employee-action-btn"
+                                onClick={() => handleToggleEmployeeStatus(employee)}
+                                disabled={statusActionId === employee.id}
+                              >
+                                {statusActionId === employee.id ? (
+                                  employee.status === "active" ? "Đang khóa..." : "Đang kích hoạt..."
+                                ) : employee.status === "active" ? (
+                                  <>
+                                    <Lock size={14} />
+                                    <span>Vô hiệu hóa</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Unlock size={14} />
+                                    <span>Kích hoạt</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );

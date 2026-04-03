@@ -104,6 +104,29 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
+function isEmailAlreadyVerifiedMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được xác thực trước đó") ||
+    message.includes("email da duoc xac thuc truoc do") ||
+    message.includes("email already verified") ||
+    message.includes("already verified")
+  );
+}
+
+function isEmailAlreadyRegisteredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được đăng ký") ||
+    message.includes("email da duoc dang ky") ||
+    message.includes("email already registered") ||
+    message.includes("email already exists") ||
+    message.includes("already exists")
+  );
+}
+
 function isGenericEntitySaveError(value) {
   const message = String(value ?? "").trim().toLowerCase();
   if (!message) return false;
@@ -177,7 +200,13 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
-        setInitialEmail(profile?.emailFromServer ? (profile?.email || "") : "");
+        const resolvedEmail = String(profile?.email || "").trim();
+        const emailVerified = profile?.emailVerified === true;
+        setInitialEmail(profile?.emailFromServer ? resolvedEmail : "");
+        setVerifiedEmail(emailVerified ? resolvedEmail.toLowerCase() : "");
+        setOtpStage(emailVerified && resolvedEmail ? "verified" : "idle");
+        setBackendRequiresEmailVerification(false);
+        setOtpCode("");
         setAvatarPreview(profile?.avatarUrl || storedUser?.avatarUrl || "");
       } catch (e) {
         if (!mounted) return;
@@ -284,7 +313,25 @@ export default function InternalProfileEdit() {
     try {
       setSendingOtp(true);
       setMessage(null);
-      await authService.sendRegisterOtp({ email: String(form.email || "").trim() });
+      const normalizedEmail = String(form.email || "").trim();
+
+      try {
+        await authService.sendRegisterOtp({ email: normalizedEmail });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const sendMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyRegisteredMessage(sendMessage)) {
+          throw err;
+        }
+
+        await authService.resendRegisterOtp({ email: normalizedEmail });
+      }
+
       setOtpStage("sent");
       setOtpCode("");
       setVerifiedEmail("");
@@ -316,10 +363,23 @@ export default function InternalProfileEdit() {
     try {
       setVerifyingOtp(true);
       setMessage(null);
-      await authService.verifyRegisterOtp({
-        email: String(form.email || "").trim(),
-        otp: String(otpCode || "").trim(),
-      });
+      try {
+        await authService.verifyRegisterOtp({
+          email: String(form.email || "").trim(),
+          otp: String(otpCode || "").trim(),
+        });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const verifyMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyVerifiedMessage(verifyMessage)) {
+          throw err;
+        }
+      }
       setOtpStage("verified");
       setVerifiedEmail(String(form.email || "").trim().toLowerCase());
       setBackendRequiresEmailVerification(false);

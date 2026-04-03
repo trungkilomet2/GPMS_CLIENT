@@ -44,6 +44,7 @@ export default function AdminUserList() {
   const [notice, setNotice] = useState(location.state?.notice || "");
   const [noticeTone, setNoticeTone] = useState(location.state?.notice ? "success" : "info");
   const [disablingId, setDisablingId] = useState(null);
+  const [enablingId, setEnablingId] = useState(null);
   const [reloadSeed, setReloadSeed] = useState(0);
 
   useEffect(() => {
@@ -216,6 +217,44 @@ export default function AdminUserList() {
     }
   };
 
+  const handleEnableUser = async (user) => {
+    if (!user?.id || user.status === "active" || enablingId === user.id) {
+      return;
+    }
+
+    const shouldEnable = window.confirm(
+      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "tài khoản này"} không?`
+    );
+
+    if (!shouldEnable) return;
+
+    setEnablingId(user.id);
+    setNotice("");
+
+    try {
+      await AdminUserService.enableUser(user.id);
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id
+            ? { ...item, status: "active", statusId: 1 }
+            : item
+        )
+      );
+      setNotice(`Đã kích hoạt lại tài khoản ${user.fullName || user.userName}.`);
+      setNoticeTone("success");
+    } catch (err) {
+      setNotice(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể kích hoạt lại tài khoản. Vui lòng thử lại."
+        )
+      );
+      setNoticeTone("warning");
+    } finally {
+      setEnablingId(null);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="admin-page">
@@ -229,6 +268,10 @@ export default function AdminUserList() {
             </div>
 
             <div className="admin-hero__actions">
+              <Link to="/admin/users/active" className="admin-btn admin-btn--secondary">
+                <UserRoundCheck size={18} />
+                <span>Kích hoạt tài khoản</span>
+              </Link>
               <Link to="/admin/users/create" className="admin-btn admin-btn--primary">
                 <Plus size={18} />
                 <span>Tạo tài khoản</span>
@@ -437,14 +480,16 @@ export default function AdminUserList() {
                             <button
                               type="button"
                               className="admin-link-btn admin-link-btn--secondary"
-                              onClick={() => handleDisableUser(user)}
-                              disabled={user.status === "inactive" || disablingId === user.id}
+                              onClick={() => (user.status === "active" ? handleDisableUser(user) : handleEnableUser(user))}
+                              disabled={
+                                user.status === "active"
+                                  ? disablingId === user.id
+                                  : enablingId === user.id
+                              }
                             >
-                              {disablingId === user.id
-                                ? "Đang khóa..."
-                                : user.status === "inactive"
-                                  ? "Đã khóa"
-                                  : "Khóa"}
+                              {user.status === "active"
+                                ? (disablingId === user.id ? "Đang khóa..." : "Khóa")
+                                : (enablingId === user.id ? "Đang kích hoạt..." : "Kích hoạt")}
                             </button>
                           </div>
                         </td>

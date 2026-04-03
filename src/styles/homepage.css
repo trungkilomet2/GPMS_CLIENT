@@ -264,7 +264,8 @@ body {
   animation: ddIn .18s ease both;
 }
 
-.cat-panel a {
+.cat-panel a,
+.cat-panel button {
   display: flex;
   align-items: center;
   gap: .6rem;
@@ -275,19 +276,30 @@ body {
   font-weight: 500;
   border-bottom: 1px solid rgba(255, 255, 255, .06);
   transition: all .15s;
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
 }
 
-.cat-panel a:last-child {
+.cat-panel a:last-child,
+.cat-panel button:last-child {
   border-bottom: none;
 }
 
-.cat-panel a:hover {
+.cat-panel a:hover,
+.cat-panel button:hover {
   background: rgba(30, 110, 67, .45);
   color: var(--green-accent);
   padding-left: 1.5rem;
 }
 
-.cat-panel a::before {
+.cat-panel a::before,
+.cat-panel button::before {
   content: "›";
   color: var(--green-mid);
   font-weight: 800;

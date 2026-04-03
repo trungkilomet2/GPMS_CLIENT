@@ -4,6 +4,7 @@ import { C, NAV_MENU, CATEGORIES, SvgIcon } from "../lib/constants";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { AUTH_NAV_TREE } from "@/lib/navigation";
 import { getStoredUser, removeAuthItem } from "@/lib/authStorage";
+import { PUBLIC_SITE_CONTENT } from "@/lib/publicSiteContent";
 import "@/styles/homepage.css";
 
 const ICON_CART = "M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM5.1 4H2V2H0v2h2l3.6 7.59L4.25 14C4.09 14.31 4 14.65 4 15c0 1.1.9 2 2 2h14v-2H6.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.46 4H5.1z";
@@ -82,7 +83,7 @@ export default function Header() {
     }, 120);
   };
 
-  const defaultLandingPath = user ? getPostLoginPath(user.role) : "/home";
+  const brandHomePath = "/home";
   const isGuestItemActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
@@ -93,7 +94,7 @@ export default function Header() {
         <div className="header-top-inner">
 
           {/* Logo */}
-          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate(defaultLandingPath)}>
+          <div className="header-logo" style={{ cursor: "pointer" }} onClick={() => navigate(brandHomePath)}>
             <div style={{ display: "flex", alignItems: "center", gap: ".5rem" }}>
               <div style={{ width: 32, height: 32, background: C.green, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>
                 🧵
@@ -108,20 +109,19 @@ export default function Header() {
           {/* Contact — chỉ hiện khi chưa login */}
           {!user && (
             <div className="header-contact-area" style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-              <button className="header-contact-btn">
-                <div className="header-contact-icon">✉️</div>
+              {PUBLIC_SITE_CONTENT.guestHeaderActions.map((action) => (
+                <button
+                  key={action.label}
+                  className="header-contact-btn"
+                  onClick={() => navigate(action.path)}
+                >
+                <div className="header-contact-icon">{action.icon}</div>
                 <div>
-                  <div className="header-contact-label">Email Us</div>
-                  <div className="header-contact-value">info@garmentpro.vn</div>
+                  <div className="header-contact-label">{action.label}</div>
+                  <div className="header-contact-value">{action.value}</div>
                 </div>
               </button>
-              <button className="header-contact-btn">
-                <div className="header-contact-icon">📞</div>
-                <div>
-                  <div className="header-contact-label">Call Us</div>
-                  <div className="header-contact-value">(+84) 123 456 789</div>
-                </div>
-              </button>
+              ))}
             </div>
           )}
 
@@ -210,12 +210,21 @@ export default function Header() {
           {!user && (
             <div style={{ position: "relative" }} onClick={e => { e.stopPropagation(); setCatOpen(o => !o); setOpenMenu(null); }}>
               <button className="nav-categories-btn">
-                <span style={{ fontSize: "1rem" }}>☰</span> All Categories
+                <span style={{ fontSize: "1rem" }}>☰</span> Danh mục dịch vụ
               </button>
               {catOpen && (
                 <div className="cat-panel" onClick={e => e.stopPropagation()}>
                   {CATEGORIES.map(c => (
-                    <a key={c} href="#" onClick={e => { e.preventDefault(); setCatOpen(false); }}>{c}</a>
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        setCatOpen(false);
+                        navigate("/services");
+                      }}
+                    >
+                      {c}
+                    </button>
                   ))}
                 </div>
               )}

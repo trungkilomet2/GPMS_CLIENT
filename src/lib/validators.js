@@ -1,7 +1,7 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^(?=.{3,30}$)[A-Za-z0-9._-]+$/;
 const PHONE_REGEX = /^(0|\+84)(3|5|7|8|9)\d{8}$/;
-const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 
 function isSwaggerPlaceholder(value) {
@@ -81,7 +81,7 @@ export function validateLocation(value) {
 export function validateAvatarFile(file) {
   if (!file) return "";
   if (!IMAGE_MIME_TYPES.includes(file.type)) {
-    return "Ảnh đại diện chỉ hỗ trợ JPG, PNG, GIF hoặc WEBP";
+    return "Ảnh đại diện chỉ hỗ trợ JPG, PNG hoặc WEBP";
   }
   if (file.size > MAX_AVATAR_SIZE) {
     return "Ảnh đại diện không được vượt quá 5MB";

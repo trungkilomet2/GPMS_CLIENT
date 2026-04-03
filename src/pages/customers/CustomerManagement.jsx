@@ -19,6 +19,12 @@ function formatNumber(value) {
   return new Intl.NumberFormat("vi-VN").format(parsed);
 }
 
+function formatCurrency(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return "-";
+  return `${new Intl.NumberFormat("vi-VN").format(parsed)} VNĐ`;
+}
+
 function getInitials(name = "") {
   return name
     .split(" ")
@@ -444,7 +450,7 @@ export default function CustomerManagement() {
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thông tin</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thông số</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Số lượng</th>
-                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">CPU</th>
+                        <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Đơn giá</th>
                         <th className="px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Thời gian</th>
                         <th className="px-5 py-4 text-center text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Trạng thái</th>
                       </tr>
@@ -482,7 +488,7 @@ export default function CustomerManagement() {
                             <div className="mt-1">{[order.size, order.color].filter(Boolean).join(" • ") || "-"}</div>
                           </td>
                           <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatNumber(order.quantity)}</td>
-                          <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatNumber(order.cpu)}</td>
+                          <td className="px-5 py-4 text-sm font-semibold text-slate-700">{formatCurrency(order.cpu)}</td>
                           <td className="px-5 py-4 text-sm text-slate-600">
                             <div>Bắt đầu: {formatDate(order.startDate)}</div>
                             <div className="mt-1">Kết thúc: {formatDate(order.endDate)}</div>

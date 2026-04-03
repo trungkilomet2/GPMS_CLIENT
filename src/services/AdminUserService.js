@@ -217,6 +217,15 @@ const parseFetchPayload = async (response) => {
   }
 };
 
+const flattenValidationErrors = (errors) => {
+  if (!errors || typeof errors !== "object") return [];
+
+  return Object.values(errors)
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+};
+
 const mapRoleIdsToKeys = (value) => {
   if (Array.isArray(value)) {
     return unique(
@@ -427,7 +436,12 @@ export function getAdminUserErrorMessage(error, fallbackMessage) {
     return "Bạn không có quyền truy cập chức năng admin này.";
   }
 
-  return error?.response?.data?.message || error?.response?.data?.title || fallbackMessage;
+  const validationMessages = flattenValidationErrors(error?.response?.data?.errors);
+  if (validationMessages.length > 0) {
+    return validationMessages.join(" ");
+  }
+
+  return error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.title || fallbackMessage;
 }
 
 export function getAdminSupportedRoleOptions() {
@@ -448,7 +462,10 @@ export function getAdminRoleProfile(roleKey) {
 async function fetchAdminUserDetail(id) {
   const rawResponse = await axiosClient.get(API_ENDPOINTS.USER.ADMIN_USER_DETAIL(id));
   const response = parseApiPayload(rawResponse);
-  const normalizedUser = normalizeAdminUser(response?.data ?? response);
+  const normalizedUser = {
+    ...normalizeAdminUser(response?.data ?? response),
+    detailAvailable: true,
+  };
 
   return normalizedUser;
 }
@@ -472,18 +489,28 @@ const AdminUserService = {
         filterQuery: String(id),
       });
 
-      const foundInFilteredResult = filteredUsers.data.find(
-        (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
-      );
+        const foundInFilteredResult = filteredUsers.data.find(
+          (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
+        );
 
       if (foundInFilteredResult) {
-        return foundInFilteredResult;
+          return {
+            ...foundInFilteredResult,
+            detailAvailable: false,
+          };
       }
 
       const fullDirectory = await fetchAdminUserPages();
-      return fullDirectory.data.find(
+      const foundInDirectory = fullDirectory.data.find(
         (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
-      ) || null;
+      );
+
+      return foundInDirectory
+        ? {
+            ...foundInDirectory,
+            detailAvailable: false,
+          }
+        : null;
     }
   },
 
@@ -538,6 +565,11 @@ const AdminUserService = {
     }
 
     return response;
+  },
+
+  async enableUser(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ENABLE_USER(id), null);
+    return parseApiPayload(rawResponse);
   },
 
   async updateUser(id, payload = {}) {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, Sparkles, UserRoundCog } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { getSystemRoleLabel } from "@/lib/orgHierarchy";
+import { canAssignSpecialties, getSystemRoleLabel } from "@/lib/orgHierarchy";
 import WorkerRoleService, { getWorkerRoleErrorMessage } from "@/services/WorkerRoleService";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
@@ -74,7 +74,7 @@ export default function EmployeeSkillAssignment() {
     };
   }, [id]);
 
-  const isWorker = employee?.roles?.includes("Worker");
+  const canAssignEmployeeSpecialties = canAssignSpecialties(employee?.roles ?? employee?.role ?? "");
 
   const selectedSkills = useMemo(
     () => skillOptions.filter((skill) => selectedIds.includes(skill.id)),
@@ -103,15 +103,10 @@ export default function EmployeeSkillAssignment() {
     event.preventDefault();
 
     if (!employee) return;
-    if (!isWorker) {
-      setSubmitError("Chỉ có thể gán worker skill cho nhân viên có vai trò Worker.");
+    if (!canAssignEmployeeSpecialties) {
+      setSubmitError("Chỉ có thể gán chuyên môn cho tài khoản có vai trò Quản lý sản xuất hoặc Nhân viên.");
       return;
     }
-    if (selectedIds.length === 0) {
-      setSubmitError("Vui lòng chọn ít nhất 1 skill cho worker.");
-      return;
-    }
-
     setSaving(true);
     setSubmitError("");
 
@@ -125,7 +120,7 @@ export default function EmployeeSkillAssignment() {
       setSubmitError(
         getEmployeeModuleErrorMessage(
           err,
-          "Không thể cập nhật worker skill. Vui lòng thử lại."
+          "Không thể cập nhật chuyên môn. Vui lòng thử lại."
         )
       );
     } finally {
@@ -143,9 +138,9 @@ export default function EmployeeSkillAssignment() {
                 <ArrowLeft size={20} />
                 <span>Quay lại hồ sơ nhân viên</span>
               </Link>
-              <h1 className="employee-create-hero__title">Gán skill cho worker</h1>
+              <h1 className="employee-create-hero__title">Gán chuyên môn cho nhân viên</h1>
               <p className="employee-create-hero__subtitle">
-                Mỗi worker có thể có nhiều skill. Chọn theo dạng tick để gán nhanh chuyên môn thao tác cho nhân viên.
+                Mỗi nhân viên có thể có nhiều chuyên môn. Chọn theo dạng đánh dấu để gán nhanh chuyên môn thao tác.
               </p>
             </div>
 
@@ -157,10 +152,10 @@ export default function EmployeeSkillAssignment() {
                 type="submit"
                 form="employee-skill-form"
                 className="employee-create-btn employee-create-btn--primary"
-                disabled={saving || loading || !isWorker}
+                disabled={saving || loading || !canAssignEmployeeSpecialties}
               >
                 {saving ? <LoaderCircle size={18} className="employee-create-btn__spin" /> : null}
-                <span>{saving ? "Đang lưu..." : "Lưu skill"}</span>
+                <span>{saving ? "Đang lưu..." : "Lưu chuyên môn"}</span>
               </button>
             </div>
           </div>
@@ -169,7 +164,7 @@ export default function EmployeeSkillAssignment() {
             <div className="employee-create-card">
               <div className="employee-create-banner">
                 <LoaderCircle size={18} className="employee-create-btn__spin" />
-                <span>Đang tải hồ sơ worker và danh mục skill...</span>
+                <span>Đang tải hồ sơ nhân viên và danh mục chuyên môn...</span>
               </div>
             </div>
           ) : error ? (
@@ -183,9 +178,9 @@ export default function EmployeeSkillAssignment() {
             <form id="employee-skill-form" onSubmit={handleSubmit} className="employee-create-single">
               <section className="employee-create-card">
                 <div className="employee-create-card__header">
-                  <h2 className="employee-create-card__title">Thông tin gán skill</h2>
+                  <h2 className="employee-create-card__title">Thông tin gán chuyên môn</h2>
                   <p className="employee-create-card__subtitle">
-                    Tick những kỹ năng worker có thể đảm nhiệm. Màn này được tách riêng để quản lý nhiều skill dễ hơn.
+                    Đánh dấu những chuyên môn nhân viên có thể đảm nhiệm. Có thể bỏ chọn toàn bộ nếu cần xóa hết chuyên môn hiện có.
                   </p>
                 </div>
 
@@ -205,25 +200,25 @@ export default function EmployeeSkillAssignment() {
                   <div className="employee-skill-assignment__stats">
                     <div className="employee-skill-assignment__stat">
                       <strong>{selectedIds.length}</strong>
-                      <span>skill đã chọn</span>
+                      <span>chuyên môn đã chọn</span>
                     </div>
                     <div className="employee-skill-assignment__stat">
                       <strong>{skillOptions.length}</strong>
-                      <span>skill khả dụng</span>
+                      <span>chuyên môn khả dụng</span>
                     </div>
                   </div>
                 </div>
 
                 {location.state?.fromCreate ? (
                   <div className="employee-create-banner">
-                    <span>Tài khoản worker đã tạo xong. Bây giờ bạn chỉ cần tick các skill phù hợp rồi lưu.</span>
+                    <span>Tài khoản nhân viên đã tạo xong. Bây giờ bạn chỉ cần chọn các chuyên môn phù hợp rồi lưu.</span>
                   </div>
                 ) : null}
 
-                {!isWorker ? (
+                {!canAssignEmployeeSpecialties ? (
                   <div className="employee-create-banner employee-create-banner--error">
                     <CircleAlert size={18} />
-                    <span>Nhân viên này hiện không mang vai trò Worker nên không thể gán worker skill.</span>
+                    <span>Tài khoản này hiện không mang vai trò Quản lý sản xuất hoặc Nhân viên nên không thể gán chuyên môn.</span>
                   </div>
                 ) : null}
 
@@ -238,7 +233,7 @@ export default function EmployeeSkillAssignment() {
                   </button>
 
                   <Link to="/worker-roles/create" className="employee-create-inline-link">
-                    Thêm skill mới
+                    Thêm chuyên môn mới
                   </Link>
                 </div>
 
@@ -246,12 +241,12 @@ export default function EmployeeSkillAssignment() {
                   <table className="employee-skill-assignment__table">
                     <thead>
                       <tr>
-                        <th>Kỹ năng</th>
+                        <th>Chuyên môn</th>
                         <th>Mô tả</th>
                         <th className="employee-skill-assignment__tick-head">
                           <span className="employee-skill-assignment__tick-badge">
                             <Sparkles size={16} />
-                            <span>Gán</span>
+                            <span>Chọn</span>
                           </span>
                         </th>
                       </tr>
@@ -260,7 +255,7 @@ export default function EmployeeSkillAssignment() {
                       {skillOptions.length === 0 ? (
                         <tr>
                           <td colSpan={3}>
-                            <div className="employee-skill-assignment__empty">Chưa có worker skill nào trong danh mục.</div>
+                            <div className="employee-skill-assignment__empty">Chưa có chuyên môn nào trong danh mục.</div>
                           </td>
                         </tr>
                       ) : (
@@ -271,13 +266,13 @@ export default function EmployeeSkillAssignment() {
                             <tr key={skill.id} className={checked ? "is-selected" : ""}>
                               <td>
                                 <div className="employee-skill-assignment__skill-name">{skill.label || skill.name}</div>
-                                <div className="employee-skill-assignment__skill-code">WR-{String(skill.id).padStart(3, "0")}</div>
+                                <div className="employee-skill-assignment__skill-code">CM-{String(skill.id).padStart(3, "0")}</div>
                               </td>
                               <td>
                                 <div className="employee-skill-assignment__skill-desc">
                                   {skill.assignedCount > 0
-                                    ? `${skill.assignedCount} nhân sự đang dùng skill này`
-                                    : "Chưa có nhân sự nào được gán skill này"}
+                                    ? `${skill.assignedCount} nhân sự đang dùng chuyên môn này`
+                                    : "Chưa có nhân sự nào được gán chuyên môn này"}
                                 </div>
                               </td>
                               <td className="employee-skill-assignment__tick-cell">

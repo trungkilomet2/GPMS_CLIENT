@@ -9,6 +9,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/dashboard", label: "Dashboard" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
   { path: "/admin/users", label: "Quản lý user", parent: "/dashboard" },
+  { path: "/admin/users/active", label: "Kích hoạt tài khoản", parent: "/admin/users" },
   { path: "/admin/users/create", label: "Thêm user mới", parent: "/admin/users" },
   {
     path: "/admin/users/:id/edit",

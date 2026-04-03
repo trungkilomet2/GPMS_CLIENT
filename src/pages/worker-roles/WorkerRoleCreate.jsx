@@ -44,7 +44,7 @@ export default function WorkerRoleCreate() {
       await WorkerRoleService.createWorkerRole({ name });
       navigate("/worker-roles");
     } catch (err) {
-      setError(getWorkerRoleErrorMessage(err, "Không thể tạo vai trò thợ mới."));
+      setError(getWorkerRoleErrorMessage(err, "Không thể tạo chuyên môn thợ mới."));
     } finally {
       setSubmitting(false);
     }
@@ -60,9 +60,9 @@ export default function WorkerRoleCreate() {
                 <ArrowLeft size={18} />
                 <span>Quay lại danh sách</span>
               </Link>
-              <h1 className="worker-role-hero__title">Thêm vai trò thợ</h1>
+              <h1 className="worker-role-hero__title">Thêm chuyên môn thợ</h1>
               <p className="worker-role-hero__subtitle">
-                Tạo mới chuyên môn riêng cho worker, không dùng để tạo role hệ thống trong hierarchy Owner / PM / Team Lead / Worker.
+                Tạo mới chuyên môn nghề may cho nhân sự sản xuất, không dùng để tạo vai trò điều hành trong hệ thống.
               </p>
             </div>
           </div>
@@ -70,17 +70,17 @@ export default function WorkerRoleCreate() {
           <div className="worker-role-create-grid">
             <form onSubmit={handleSubmit} className="worker-role-create-card">
               <div className="worker-role-create-card__header">
-                <h2>Thông tin vai trò</h2>
-                <p>Biểu mẫu này chỉ nhận worker skill và tự loại các role hệ thống khỏi danh mục.</p>
+                <h2>Thông tin chuyên môn</h2>
+                <p>Biểu mẫu này chỉ nhận chuyên môn nghề may và tự loại các vai trò hệ thống khỏi danh mục.</p>
               </div>
 
               <label className="worker-role-create-field">
-                <span className="worker-role-create-field__label">Tên vai trò thợ</span>
+                <span className="worker-role-create-field__label">Tên chuyên môn thợ</span>
                 <PencilLine size={18} className="worker-role-create-field__icon" />
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  placeholder="Ví dụ: Tailor, Quality Control, Sewing Line A..."
+                  placeholder="Ví dụ: Cắt, May, Kiểm hàng..."
                   className="worker-role-create-field__control"
                 />
               </label>
@@ -104,7 +104,7 @@ export default function WorkerRoleCreate() {
                   ) : (
                     <>
                       <Shapes size={18} />
-                      <span>Tạo vai trò thợ</span>
+                      <span>Tạo chuyên môn thợ</span>
                     </>
                   )}
                 </button>
@@ -113,13 +113,13 @@ export default function WorkerRoleCreate() {
 
             <aside className="worker-role-side-card">
               <div className="worker-role-side-card__header">
-                <h2>Vai trò đang có</h2>
-                <p>Một số vai trò chuyên môn đang được sử dụng trong hệ thống.</p>
+                <h2>Chuyên môn hiện có</h2>
+                <p>Một số chuyên môn nghề may đang được sử dụng trong hệ thống.</p>
               </div>
 
               <div className="worker-role-chip-list">
                 {existingRoles.length === 0 ? (
-                  <div className="worker-role-chip-list__empty">Chưa có dữ liệu danh mục vai trò.</div>
+                  <div className="worker-role-chip-list__empty">Chưa có dữ liệu danh mục chuyên môn.</div>
                 ) : (
                   existingRoles.map((role) => (
                     <div key={role.id} className="worker-role-chip">

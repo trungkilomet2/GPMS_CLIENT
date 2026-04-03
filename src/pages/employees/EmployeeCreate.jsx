@@ -13,9 +13,9 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  getAllowedManagerRoles,
+  getDirectManagerRoleLabel,
   getManagerRoleHint,
-  getSystemRoleLabel,
+  isEligibleDirectManager,
   isManagerRequired,
 } from "@/lib/orgHierarchy";
 import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
@@ -46,9 +46,8 @@ export default function EmployeeCreate() {
       setManagerError("");
 
       try {
-        const response = await WorkerService.getEmployeeDirectory({
+        const response = await WorkerService.getManagerDirectory({
           pageSize: 100,
-          includeHidden: true,
         });
         if (!mounted) return;
         setManagerOptions(response?.data ?? []);
@@ -67,17 +66,10 @@ export default function EmployeeCreate() {
     };
   }, []);
 
-  const allowedManagerRoles = useMemo(
-    () => getAllowedManagerRoles(form.role),
-    [form.role]
-  );
-
   const availableManagers = useMemo(
     () =>
-      managerOptions.filter((employee) =>
-        employee.roles.some((role) => allowedManagerRoles.includes(role))
-      ),
-    [allowedManagerRoles, managerOptions]
+      managerOptions.filter((employee) => isEligibleDirectManager(employee, form.role)),
+    [form.role, managerOptions]
   );
 
   useEffect(() => {
@@ -185,7 +177,7 @@ export default function EmployeeCreate() {
               </Link>
               <h1 className="employee-create-hero__title">Thêm nhân viên mới</h1>
               <p className="employee-create-hero__subtitle">
-                Tạo tài khoản nhân sự theo hierarchy 1 Owner, nhiều PM, mỗi PM quản lý worker của line mình.
+                Tạo tài khoản nhân sự theo sơ đồ quản lý: 1 Chủ xưởng, nhiều Quản lý sản xuất, mỗi Quản lý sản xuất phụ trách nhân viên của line mình.
               </p>
             </div>
 
@@ -259,7 +251,7 @@ export default function EmployeeCreate() {
                   >
                     <option value="">
                       {form.role === "Owner"
-                        ? "Owner không có quản lý trực tiếp"
+                        ? "Chủ xưởng không có quản lý trực tiếp"
                         : managerLoading
                           ? "Đang tải danh sách quản lý..."
                           : availableManagers.length
@@ -268,7 +260,7 @@ export default function EmployeeCreate() {
                     </option>
                     {availableManagers.map((manager) => (
                       <option key={manager.id} value={manager.id}>
-                        {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                        {manager.fullName} - {getDirectManagerRoleLabel(manager, form.role)}
                       </option>
                     ))}
                   </select>
@@ -283,7 +275,7 @@ export default function EmployeeCreate() {
 
               {form.role === "Worker" ? (
                 <div className="employee-create-banner">
-                  <span>Chuyên môn của worker sẽ được gán ở màn riêng sau khi tạo xong tài khoản, hỗ trợ chọn nhiều skill cùng lúc.</span>
+                  <span>Chuyên môn của nhân viên sẽ được gán ở màn riêng sau khi tạo xong tài khoản, hỗ trợ chọn nhiều kỹ năng cùng lúc.</span>
                 </div>
               ) : null}
 

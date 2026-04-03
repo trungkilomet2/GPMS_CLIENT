@@ -45,9 +45,9 @@ export default function ServicesPage() {
         description="GPMS cùng xưởng may tổ chức toàn bộ quy trình từ tư vấn, phát triển mẫu, triển khai sản xuất đến kiểm hàng và giao nhận."
         image="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1600&q=80"
         metrics={[
-          { value: "24h", label: "Phản hồi brief và báo giá" },
-          { value: "3 mô hình", label: "CMT, FOB, ODM linh hoạt" },
-          { value: "100%", label: "Theo dõi tiến độ theo công đoạn" },
+          { value: "Theo nhu cầu", label: "Tiếp nhận theo từng loại đơn hàng" },
+          { value: "3 mô hình", label: "CMT, FOB, phát triển mẫu" },
+          { value: "Theo công đoạn", label: "Theo dõi tiến độ sản xuất" },
         ]}
       />
 

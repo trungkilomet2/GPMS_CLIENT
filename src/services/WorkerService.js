@@ -274,6 +274,20 @@ const WorkerService = {
     };
   },
 
+  async getManagerDirectory(options = {}) {
+    const users = await fetchEmployeePages(API_ENDPOINTS.USER.LIST, {
+      ...options,
+      includeHidden: true,
+    });
+
+    return {
+      data: users,
+      pageIndex: 0,
+      pageSize: users.length,
+      recordCount: users.length,
+    };
+  },
+
   async getEmployeesByPmId(params, options = {}) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES_BY_PM_ID,
@@ -317,6 +331,16 @@ const WorkerService = {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.ASSIGN_WORKER_SKILL(id), {
       skillIds: skillIds.map(Number),
     });
+    return parseApiPayload(rawResponse);
+  },
+
+  async disableEmployeeAccount(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_DISABLE_USER(id), null);
+    return parseApiPayload(rawResponse);
+  },
+
+  async enableEmployeeAccount(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ENABLE_USER(id), null);
     return parseApiPayload(rawResponse);
   },
 };

@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import ProfileEdit from "@/pages/profile/ProfileEdit";
 import { userService } from "@/services/userService";
 import { authService } from "@/services/authService";
+import { locationService } from "@/services/locationService";
 
 const mockNavigate = vi.fn();
 
@@ -28,7 +29,15 @@ vi.mock("@/services/userService", () => ({
 vi.mock("@/services/authService", () => ({
   authService: {
     sendRegisterOtp: vi.fn(),
+    resendRegisterOtp: vi.fn(),
     verifyRegisterOtp: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/locationService", () => ({
+  locationService: {
+    getProvinces: vi.fn(),
+    getWardsByProvinceCode: vi.fn(),
   },
 }));
 
@@ -48,6 +57,7 @@ const baseStoredUser = {
 const baseProfile = {
   ...baseStoredUser,
   emailFromServer: true,
+  emailVerified: true,
   bio: "",
   cooperationNotes: [],
 };
@@ -79,20 +89,20 @@ describe("ProfileEdit", () => {
     mockNavigate.mockReset();
     seedStoredUser();
     userService.getProfile.mockResolvedValue(baseProfile);
+    locationService.getProvinces.mockResolvedValue([
+      { code: 1, name: "Ha Noi" },
+      { code: 79, name: "TP Ho Chi Minh" },
+    ]);
+    locationService.getWardsByProvinceCode.mockResolvedValue([
+      { code: 1001, name: "Phuong Ben Nghe" },
+      { code: 1002, name: "Phuong Da Kao" },
+    ]);
   });
 
   it("saves profile successfully and redirects to /profile", async () => {
     userService.updateProfile.mockResolvedValue({ otpRequired: false, data: {} });
 
     const { container } = await renderPage();
-
-    fireEvent.change(container.querySelector('textarea[name="Bio"]'), {
-      target: { value: "Khach hang uu tien chat luong." },
-    });
-
-    fireEvent.change(container.querySelector('textarea[name="CooperationNotes"]'), {
-      target: { value: "Cap nhat tien do hang tuan" },
-    });
 
     fireEvent.click(container.querySelector('button[type="submit"]'));
 
@@ -103,10 +113,6 @@ describe("ProfileEdit", () => {
     expect(authService.sendRegisterOtp).not.toHaveBeenCalled();
     expect(userService.getProfile).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/Lưu hồ sơ thành công!/i)).toBeInTheDocument();
-
-    const savedUser = JSON.parse(localStorage.getItem("user"));
-    expect(savedUser.bio).toBe("Khach hang uu tien chat luong.");
-    expect(savedUser.cooperationNotes).toEqual(["Cap nhat tien do hang tuan"]);
 
     await waitFor(
       () => {
@@ -156,5 +162,78 @@ describe("ProfileEdit", () => {
     });
 
     expect(userService.updateProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows verified email status when profile data says the email was already verified", async () => {
+    await renderPage();
+
+    expect(screen.getByText("Đã xác minh")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Email hiện tại đã được xác minh\. Bạn có thể lưu thay đổi hồ sơ\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("treats 'already verified' as a successful OTP verification on profile edit", async () => {
+    authService.verifyRegisterOtp.mockRejectedValue({
+      response: {
+        data: {
+          message: "Email đã được xác thực trước đó",
+        },
+      },
+    });
+
+    const { container } = await renderPage();
+
+    fireEvent.change(container.querySelector('input[name="Email"]'), {
+      target: { value: "newmail@example.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Nhập mã OTP"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Xác minh" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Đã xác minh")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Email hiện tại đã được xác minh\. Bạn có thể lưu thay đổi hồ sơ\./i)
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to resend OTP when the email is already registered", async () => {
+    authService.sendRegisterOtp.mockRejectedValue({
+      response: {
+        data: {
+          message: "Email đã được đăng ký",
+        },
+      },
+    });
+    authService.resendRegisterOtp.mockResolvedValue({ message: "otp-sent" });
+
+    await renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Gửi lại OTP" }));
+
+    await waitFor(() => {
+      expect(authService.sendRegisterOtp).toHaveBeenCalledTimes(1);
+      expect(authService.resendRegisterOtp).toHaveBeenCalledTimes(1);
+      expect(screen.getByPlaceholderText("Nhập mã OTP")).toBeInTheDocument();
+    });
+  });
+
+  it("loads province options and lets the user pick a ward", async () => {
+    const { container } = await renderPage();
+    const selects = container.querySelectorAll("select");
+
+    fireEvent.change(selects[0], { target: { value: "79" } });
+
+    await waitFor(() => {
+      expect(locationService.getWardsByProvinceCode).toHaveBeenCalledWith("79");
+    });
+
+    fireEvent.change(selects[1], { target: { value: "1001" } });
+
+    expect(screen.getByText(/Khu vực đã chọn:/i)).toHaveTextContent("Phuong Ben Nghe, TP Ho Chi Minh");
   });
 });

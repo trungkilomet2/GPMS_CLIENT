@@ -39,7 +39,7 @@ export default function Hero() {
           <h1 className="hero-title-green">Sản xuất xưởng may</h1>
 
           <p className="hero-desc">
-            Giải pháp quản lý đơn hàng, sản xuất và chất lượng cho xưởng may hiện đại.
+            Giải pháp quản lý đơn hàng, tiến độ sản xuất và kiểm soát chất lượng cho xưởng may tại Hà Nội.
           </p>
 
           <div className="hero-actions">

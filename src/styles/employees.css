@@ -375,7 +375,7 @@
 
 .employee-table-th--person,
 .employee-table-td--person {
-  width: 17%;
+  width: 16%;
 }
 
 .employee-table-th--username,
@@ -385,7 +385,7 @@
 
 .employee-table-th--role,
 .employee-table-td--role {
-  width: 17%;
+  width: 20%;
 }
 
 .employee-table-th--specialty,
@@ -395,12 +395,12 @@
 
 .employee-table-th--phone,
 .employee-table-td--phone {
-  width: 10%;
+  width: 9%;
 }
 
 .employee-table-th--email,
 .employee-table-td--email {
-  width: 18%;
+  width: 16%;
 }
 
 .employee-table-th--status,
@@ -410,7 +410,7 @@
 
 .employee-table-th--action,
 .employee-table-td--action {
-  width: 14%;
+  width: 13%;
 }
 
 .employee-table-td {
@@ -466,16 +466,20 @@
   color: #2c4539;
   font-weight: 600;
   font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 
 .employee-role-cell__secondary {
   color: #70847a;
   font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 .employee-table-td--email {
   line-height: 1.65;
-  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
 }
 
 .employee-table-td--phone,
