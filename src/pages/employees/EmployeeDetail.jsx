@@ -425,12 +425,12 @@ export default function EmployeeDetail() {
                     ) : null}
                   </div>
 
-                  <div className="employee-detail-role-block">
-                    <div className="employee-detail-role-label">Hierarchy</div>
-                    <div className="employee-detail-role-pills">
-                      <span className="employee-detail-machine-pill">{employee.hierarchyTag || "Chưa phân loại"}</span>
+                    <div className="employee-detail-role-block">
+                    <div className="employee-detail-role-label">Tuyến quản lý</div>
+                      <div className="employee-detail-role-pills">
+                        <span className="employee-detail-machine-pill">{employee.hierarchyTag || "Chưa phân loại"}</span>
+                      </div>
                     </div>
-                  </div>
                 </div>
                 </section>
               </div>

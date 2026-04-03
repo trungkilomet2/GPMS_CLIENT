@@ -162,9 +162,9 @@ export function canAssignSpecialties(roleValue = "") {
 export function getRoleHierarchyTag(role = "") {
   switch (role) {
     case "PM":
-      return "Cấp quản lý sản xuất";
+      return "Quản lý sản xuất";
     case "Worker":
-      return "Cấp tác nghiệp";
+      return "Nhân viên sản xuất";
     default:
       return "Chưa phân loại";
   }

@@ -55,7 +55,7 @@ function getMemberSummary(members = []) {
 export default function WorkerRoleList() {
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
-  const isOwner = primaryRole === "owner";
+  const canCreateWorkerRole = primaryRole === "owner" || primaryRole === "pm";
   const [roles, setRoles] = useState([]);
   const [search, setSearch] = useState("");
   const [usageFilter, setUsageFilter] = useState("all");
@@ -127,7 +127,7 @@ export default function WorkerRoleList() {
               </p>
             </div>
 
-            {isOwner ? (
+            {canCreateWorkerRole ? (
               <Link to="/worker-roles/create" className="worker-role-hero__action">
                 <Plus size={18} />
                 <span>Thêm chuyên môn thợ</span>
