@@ -122,7 +122,6 @@ export default function WorkerSidebar() {
           {!collapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || defaultName}</div>
-              <div className="dashboard-sidebar__user-role">{roleLabel}</div>
             </div>
           )}
         </NavLink>

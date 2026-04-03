@@ -168,7 +168,6 @@ export default function Sidebar() {
           {!collapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{user?.role || "Owner / PM"}</div>
             </div>
           )}
         </NavLink>
