@@ -110,6 +110,24 @@ function mergeRoles(baseRoles, employeeRoles) {
     }));
 }
 
+function normalizeSkillName(name = "") {
+  return String(name ?? "").trim().toLowerCase();
+}
+
+function getEmployeeSkillNames(employee = {}) {
+  const skillNames = Array.isArray(employee.workerSkillNames)
+    ? employee.workerSkillNames
+    : [employee.workerSkill].filter(Boolean);
+
+  return Array.from(
+    new Set(
+      skillNames
+        .map((skillName) => String(skillName ?? "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 const WorkerRoleService = {
   async getWorkerRoles(options = {}) {
     const rolesFromApi = await fetchWorkerRolePages(options);
@@ -124,17 +142,24 @@ const WorkerRoleService = {
       employees = [];
     }
 
-    const employeeRoles = employees
-      .filter((employee) => isWorkerSkillName(employee.workerSkill))
-      .map((employee, index) => ({
-        id: rolesFromApi.length + index + 1,
-        name: employee.workerSkill,
-      }));
+    const employeeRoles = employees.flatMap((employee, index) =>
+      getEmployeeSkillNames(employee)
+        .filter((skillName) => isWorkerSkillName(skillName))
+        .map((skillName, skillIndex) => ({
+          id: rolesFromApi.length + index + skillIndex + 1,
+          name: skillName,
+        }))
+    );
 
     const roles = mergeRoles(rolesFromApi, employeeRoles);
 
     return roles.map((role) => {
-      const members = employees.filter((employee) => employee.workerSkill === role.name);
+      const normalizedRoleName = normalizeSkillName(role.name);
+      const members = employees.filter((employee) =>
+        getEmployeeSkillNames(employee).some(
+          (skillName) => normalizeSkillName(skillName) === normalizedRoleName
+        )
+      );
 
       return {
         ...role,

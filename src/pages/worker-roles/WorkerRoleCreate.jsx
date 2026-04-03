@@ -124,7 +124,7 @@ export default function WorkerRoleCreate() {
                   existingRoles.map((role) => (
                     <div key={role.id} className="worker-role-chip">
                       <div className="worker-role-chip__name">{role.label}</div>
-                      <div className="worker-role-chip__meta">WR-{String(role.id).padStart(3, "0")}</div>
+                      <div className="worker-role-chip__meta">CM-{String(role.id).padStart(3, "0")}</div>
                     </div>
                   ))
                 )}

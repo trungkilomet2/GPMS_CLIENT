@@ -212,7 +212,7 @@ export default function WorkerRoleList() {
                   <tbody>
                     {filteredRoles.map((role) => (
                       <tr key={role.id}>
-                        <td className="font-semibold text-slate-800">WR-{String(role.id).padStart(3, "0")}</td>
+                        <td className="font-semibold text-slate-800">CM-{String(role.id).padStart(3, "0")}</td>
                         <td>
                           <div className="worker-role-table__primary">{role.name}</div>
                         </td>
