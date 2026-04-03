@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from "react-router-dom";
-import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2, CreditCard } from "lucide-react";
+import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2, CreditCard, Filter, CheckCircle2, AlertCircle } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
 import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
 import { getErrorMessage } from "@/utils/errorUtils";
@@ -35,6 +35,7 @@ export default function PayrollDetail() {
   const [isPaying, setIsPaying] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all"); // 'all', 'paid', 'unpaid'
 
   useEffect(() => {
     if (location.state?.logs) return;
@@ -64,7 +65,7 @@ export default function PayrollDetail() {
 
   const handlePaymentAll = async (workerLogs) => {
     if (!workerLogs?.length) return;
-    
+
     // Filter out already paid logs if possible
     const unpaidLogs = workerLogs.filter(log => !log.paidAt);
     if (unpaidLogs.length === 0 && workerLogs.some(l => l.paidAt)) {
@@ -88,7 +89,7 @@ export default function PayrollDetail() {
         return acc;
       }, {});
 
-      const promises = Object.entries(groups).map(([partId, logIds]) => 
+      const promises = Object.entries(groups).map(([partId, logIds]) =>
         ProductionPartService.completePayment(partId, { workLogIds: logIds })
       );
 
@@ -107,7 +108,16 @@ export default function PayrollDetail() {
     return getWorkerMonthlyDetail(logs, workerId, month, year);
   }, [logs, workerId, month, year]);
 
+  const filteredLogs = useMemo(() => {
+    if (statusFilter === "all") return workerLogs;
+    return workerLogs.filter(log => {
+      const isPaid = log.isPayment || !!log.paidAt;
+      return statusFilter === "paid" ? isPaid : !isPaid;
+    });
+  }, [workerLogs, statusFilter]);
+
   const stats = useMemo(() => {
+    // Thống kê chung vẫn giữ nguyên theo cả tháng để PM nắm được tổng quan
     const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
     const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
     const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
@@ -117,11 +127,11 @@ export default function PayrollDetail() {
     return { totalQty, uniquePartCount, totalSalary, workerName, workerAvatar };
   }, [workerLogs, workerId]);
 
-  const totalPages = Math.ceil(workerLogs.length / pageSize);
+  const totalPages = Math.ceil(filteredLogs.length / pageSize);
   const currentLogs = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return workerLogs.slice(start, start + pageSize);
-  }, [workerLogs, currentPage, pageSize]);
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -145,25 +155,25 @@ export default function PayrollDetail() {
               >
                 <ArrowLeft size={18} />
               </button>
-               <div className="flex items-center gap-4">
-                 {stats.workerAvatar ? (
-                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-sm ring-1 ring-slate-100">
-                     <img src={stats.workerAvatar} alt={stats.workerName} className="h-full w-full object-cover" />
-                   </div>
-                 ) : (
-                   <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-black uppercase text-emerald-700 shadow-sm ring-1 ring-emerald-200">
-                     {stats.workerName.charAt(0)}
-                   </div>
-                 )}
-                 <div className="flex flex-col gap-1">
-                   <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                     Chi tiết lương: {stats.workerName}
-                   </h1>
-                    <p className="text-slate-600 text-sm">
-                      Kỳ lương: Tháng {month}/{year}
-                    </p>
+              <div className="flex items-center gap-4">
+                {stats.workerAvatar ? (
+                  <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-2xl border-2 border-white shadow-sm ring-1 ring-slate-100">
+                    <img src={stats.workerAvatar} alt={stats.workerName} className="h-full w-full object-cover" />
                   </div>
+                ) : (
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-xl font-black uppercase text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                    {stats.workerName.charAt(0)}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    Chi tiết lương: {stats.workerName}
+                  </h1>
+                  <p className="text-slate-600 text-sm">
+                    Kỳ lương: Tháng {month}/{year}
+                  </p>
                 </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -228,10 +238,36 @@ export default function PayrollDetail() {
           </div>
 
           <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm min-h-[300px] relative">
-            <div className="leave-table-card__header">
-              <div className="flex items-center gap-2">
+            <div className="leave-table-card__header flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-slate-600">
                 <Info size={16} className="text-slate-400" />
                 <h2 className="leave-table-card__title">Danh sách công đoạn đã làm trong tháng</h2>
+              </div>
+              
+              <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-2 px-2 text-slate-400">
+                  <Filter size={14} />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Lọc trạng thái:</span>
+                </div>
+                <div className="flex gap-1">
+                  {[
+                    { id: 'all', label: 'Tất cả' },
+                    { id: 'paid', label: 'Đã thanh toán' },
+                    { id: 'unpaid', label: 'Chờ thanh toán' }
+                  ].map((btn) => (
+                    <button
+                      key={btn.id}
+                      onClick={() => { setStatusFilter(btn.id); setCurrentPage(1); }}
+                      className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-lg transition-all ${
+                        statusFilter === btn.id
+                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
+                        : 'text-slate-500 hover:bg-white/50'
+                      }`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -256,6 +292,7 @@ export default function PayrollDetail() {
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn giá</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số lượng</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Trạng thái</th>
                       <th className="px-6 py-4 text-right font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thành tiền</th>
                     </tr>
                   </thead>
@@ -277,20 +314,17 @@ export default function PayrollDetail() {
                           </td>
                           <td className="px-6 py-5">
                             <div className="font-extrabold text-slate-900 line-clamp-1 italic text-sm">{log.orderName}</div>
-                            <Link 
-                               to={`/production/${log.productionId}`}
-                               state={{ from: location.pathname }}
-                               className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1 opacity-70 hover:opacity-100"
+                            <Link
+                              to={`/production/${log.productionId}`}
+                              state={{ from: location.pathname }}
+                              className="text-[10px] text-emerald-600 hover:text-emerald-800 font-black uppercase tracking-widest transition-all hover:translate-x-1 inline-flex items-center gap-1 opacity-70 hover:opacity-100"
                             >
-                               #PR-{log.productionId}
-                               <ArrowLeft size={10} className="rotate-180" />
+                              #PR-{log.productionId}
+                              <ArrowLeft size={10} className="rotate-180" />
                             </Link>
                           </td>
                           <td className="px-6 py-5">
                             <div className="font-bold text-slate-700">{log.partName}</div>
-                            {log.paidAt && (
-                              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-black uppercase tracking-tighter mt-1 inline-block">Đã thanh toán</span>
-                            )}
                           </td>
                           <td className="px-6 py-5 text-center text-slate-600 font-black">
                             {Number(log.cpu).toLocaleString("vi-VN")}
@@ -299,6 +333,19 @@ export default function PayrollDetail() {
                             <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl bg-blue-50/50 border border-blue-100 font-black text-blue-700 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-200 transition-all duration-300 transform group-hover:scale-110">
                               {log.quantity}
                             </span>
+                          </td>
+                          <td className="px-6 py-5 text-center whitespace-nowrap">
+                            {log.isPayment || log.paidAt ? (
+                              <div className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 font-black text-[10px] uppercase shadow-sm">
+                                <CheckCircle2 size={12} />
+                                Đã thanh toán
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-xl border border-amber-100 font-black text-[10px] uppercase shadow-sm">
+                                <AlertCircle size={12} />
+                                Chờ thanh toán
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-5 text-right font-black text-emerald-700 text-base">
                             {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className="text-[10px] opacity-50 ml-0.5">VND</span>
@@ -309,23 +356,23 @@ export default function PayrollDetail() {
                   </tbody>
                   <tfoot className="bg-slate-50/80 font-black">
                     <tr>
-                      <td colSpan={5} className="px-6 py-4 text-right text-slate-400 uppercase tracking-widest text-[10px]">Tổng cộng thu nhập</td>
+                      <td colSpan={6} className="px-6 py-4 text-right text-slate-400 uppercase tracking-widest text-[10px]">Tổng cộng thu nhập (Trên kết quả lọc)</td>
                       <td className="px-6 py-4 text-right text-emerald-800 text-lg">
-                        {stats.totalSalary.toLocaleString("vi-VN")} VND
+                        {filteredLogs.reduce((sum, log) => sum + (log.quantity * log.cpu), 0).toLocaleString("vi-VN")} VND
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               )}
             </div>
-            {workerLogs.length > 0 && !loading && !error && (
+            {filteredLogs.length > 0 && !loading && !error && (
               <div className="p-6 border-t border-slate-100 bg-slate-50/30">
-                <Pagination 
-                   currentPage={currentPage}
-                   totalPages={totalPages}
-                   onPageChange={setCurrentPage}
-                   totalCount={workerLogs.length}
-                   pageSize={pageSize}
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalCount={filteredLogs.length}
+                  pageSize={pageSize}
                 />
               </div>
             )}
@@ -333,15 +380,17 @@ export default function PayrollDetail() {
         </div>
       </div>
 
-      <ConfirmModal 
+      <ConfirmModal
         isOpen={isConfirmOpen}
         title="Xác nhận thanh toán lương"
+        primaryLabel="Xác nhận thanh toán"
+        confirmIcon={CreditCard}
         description={`Bạn có chắc chắn muốn thanh toán tổng cộng ${(workerLogs.reduce((sum, l) => sum + (l.quantity * l.cpu), 0)).toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
         onConfirm={confirmPaymentAll}
         onClose={() => setIsConfirmOpen(false)}
       />
 
-      <SuccessModal 
+      <SuccessModal
         isOpen={isSuccessOpen}
         title="Thanh toán thành công"
         description={`Đã xác nhận thanh toán cho toàn bộ công đoạn trong tháng của ${stats.workerName}.`}
