@@ -23,7 +23,7 @@ function getPmName(item) {
     item?.pmName ??
     item?.pm?.name ??
     item?.pm?.fullName ??
-    (pmId ? `PM #${pmId}` : "-")
+    (pmId ? `Người Quản lý #${pmId}` : "-")
   );
 }
 
@@ -257,7 +257,7 @@ export default function ProductionList() {
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn sản xuất</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn hàng</th>
                     <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên đơn</th>
-                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">PM quản lý</th>
+                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Người quản lý</th>
                     <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Công đoạn</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>

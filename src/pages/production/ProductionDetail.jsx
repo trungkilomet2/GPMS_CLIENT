@@ -1,6 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Info, Package, FileText, Download, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft, Edit, Plus, Users, LayoutList, History,
+  Trash2, AlertTriangle, CheckCircle, Send, RotateCcw,
+  Eye, FileText, Settings, Hammer, Scissors, Package, Download, Info
+} from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
 import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
@@ -134,7 +138,7 @@ export default function ProductionDetail() {
   const isPM = hasAnyRole(roleValue, ["pm", "manager"]);
   const isWorker = hasAnyRole(roleValue, ["worker", "kcs", "team leader"]);
   const currentUserId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
-  const isAssignedPM = isPM && String(currentUserId) === String(production?.pmId);
+  const isAssignedPM = isOwner || (isPM && String(currentUserId) === String(production?.pmId));
   const customerId = getOrderCustomerId(production?.order);
   const statusName = production?.status;
   const isPendingApproval = statusName === "Chờ Xét Duyệt";
@@ -167,7 +171,7 @@ export default function ProductionDetail() {
         pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
         pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
         pmId: payload.pm?.id ?? payload.pmId ?? null,
-        pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
+        pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `Người Quản lý #${payload.pmId}` : (payload.pm?.id ? `Người Quản lý #${payload.pm.id}` : "")),
         note: payload.note ?? payload.productionNote ?? "",
         order: {
           ...order,
@@ -555,14 +559,21 @@ export default function ProductionDetail() {
 
   const confirmSubmitPlan = async () => {
     try {
-      await ProductionService.submitProductionPlan(production.productionId);
-      toast.success("Đã gửi duyệt kế hoạch.");
+      // Vì không còn API submit, Owners sẽ gọi trực tiếp Approve.
+      // Nếu là PM, họ sẽ phải liên hệ Owners hoặc chờ Owners tự Approve khi lưu kế hoạch.
+      if (isOwner) {
+        await ProductionService.approveProductionPlan(production.productionId);
+        toast.success("Kế hoạch đã được phê duyệt tự động.");
+      } else {
+        toast.info("Vui lòng liên hệ Chủ xưởng để phê duyệt kế hoạch.");
+      }
+
       setIsSubmitPlanConfirmOpen(false);
       setTimeout(() => {
         window.location.reload();
       }, 1500);
     } catch (err) {
-      toast.error("Không thể gửi duyệt kế hoạch.");
+      toast.error("Không thể xử lý yêu cầu.");
     }
   };
 
@@ -644,7 +655,7 @@ export default function ProductionDetail() {
                   >
                     {steps.length > 0 ? "Chỉnh sửa công đoạn" : "Thiết kế công đoạn"}
                   </Link>
-                  {steps.length > 0 && (
+                  {steps.length > 0 && !isOwner && (
                     <button type="button"
                       onClick={handleSubmitPlan}
                       className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-700 shadow-md"
@@ -684,7 +695,7 @@ export default function ProductionDetail() {
                 </button>
               )}
 
-              {(isInProduction || isAccepted) && (() => {
+              {(isInProduction || isAccepted) && !allStepsCompleted && (() => {
                 const user = getStoredUser();
                 const userId = String(user?.id || user?.userId || user?.accountId || "").trim().toLowerCase();
                 const userName = (user?.fullName || user?.name || user?.userName || "").toLowerCase().trim();
@@ -727,7 +738,7 @@ export default function ProductionDetail() {
                 return null;
               })()}
 
-              {(isPM || isOwner) && isInProduction && (
+              {(isPM || isOwner) && isInProduction && !allStepsCompleted && (
                 <Link
                   to={`/production-plan/assign/${production.productionId}`}
                   state={{ production, product: { ...order, productName: order.orderName }, steps }}
@@ -749,7 +760,7 @@ export default function ProductionDetail() {
             <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
               <DetailRow label="Mã đơn sản xuất" value={`#PR-${production.productionId}`} />
               <DetailRow label="Trạng thái" value={production.status} />
-              <DetailRow label="PM quản lý" value={production.pmName || (production.pmId ? `PM #${production.pmId}` : "-")} />
+              <DetailRow label="Người quản lý" value={production.pmName || (production.pmId ? `Người Quản lý #${production.pmId}` : "-")} />
             </div>
 
 
@@ -1065,6 +1076,8 @@ export default function ProductionDetail() {
         description="Bạn có chắc chắn muốn chấp nhận đơn sản xuất này?"
         onConfirm={confirmApproveProduction}
         onClose={() => setIsApproveOrderConfirmOpen(false)}
+        primaryLabel="Xác nhận duyệt"
+        confirmIcon={CheckCircle}
       />
 
       <ConfirmModal
@@ -1073,6 +1086,8 @@ export default function ProductionDetail() {
         description="Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này? Sau khi duyệt, kế hoạch sẽ chuyển sang trạng thái sản xuất."
         onConfirm={confirmApprovePlan}
         onClose={() => setIsApprovePlanConfirmOpen(false)}
+        primaryLabel="Duyệt kế hoạch"
+        confirmIcon={CheckCircle}
       />
 
       <ConfirmModal
@@ -1081,6 +1096,8 @@ export default function ProductionDetail() {
         description="Bạn có chắc chắn muốn yêu cầu PM chỉnh sửa lại các công đoạn trong kế hoạch này?"
         onConfirm={confirmRequestPlanUpdate}
         onClose={() => setIsRequestPlanUpdateConfirmOpen(false)}
+        primaryLabel="Xác nhận yêu cầu"
+        confirmIcon={RotateCcw}
       />
 
       <ConfirmModal
@@ -1089,6 +1106,8 @@ export default function ProductionDetail() {
         description="Bạn có chắc chắn muốn gửi kế hoạch sản xuất này cho chủ xưởng xét duyệt?"
         onConfirm={confirmSubmitPlan}
         onClose={() => setIsSubmitPlanConfirmOpen(false)}
+        primaryLabel="Gửi duyệt"
+        confirmIcon={Send}
       />
     </OwnerLayout>
   );

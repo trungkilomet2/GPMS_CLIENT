@@ -378,7 +378,7 @@ export default function Orders({
                       Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th is-sortable cursor-pointer w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
-                      Ngày dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
+                      Ngày kết thúc dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-32 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
                     <th className="leave-table-th w-24 px-2 py-4 text-right text-xs font-semibold uppercase tracking-wide">Thao tác</th>

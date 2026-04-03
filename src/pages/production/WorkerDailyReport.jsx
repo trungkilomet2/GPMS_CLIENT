@@ -111,7 +111,7 @@ export default function WorkerDailyReport() {
   const plan = location.state?.plan || null;
   const productInfo = plan?.product || assignment?.product || null;
   const maxQty = productInfo?.quantity ? Number(productInfo.quantity) : null;
-  
+
   const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
   const currentUser = getStoredUser() || {};
   const currentWorkerIdSet = new Set(
@@ -129,10 +129,10 @@ export default function WorkerDailyReport() {
     if (!step) return false;
     const statusLabel = getPlanStatusLabel(step.statusName ?? step.status ?? step.statusId ?? "");
     const normalized = String(statusLabel || "").toLowerCase().trim();
-    
-    const isHidden = 
-      normalized.includes("đã hoàn thành") || 
-      normalized.includes("hoàn thành") || 
+
+    const isHidden =
+      normalized.includes("đã hoàn thành") ||
+      normalized.includes("hoàn thành") ||
       normalized.includes("chờ nghiệm thu") ||
       normalized === "da hoan thanh" ||
       normalized === "hoan thanh" ||
@@ -168,11 +168,11 @@ export default function WorkerDailyReport() {
     : (assignment
       ? (isStepAssignedToCurrentWorker(assignment, currentWorkerIdSet, currentWorkerNameSet)
         ? [{
-           ...assignment,
-           status: assignment?.status,
-           statusName: assignment?.statusName,
-           statusId: assignment?.statusId
-          }]
+          ...assignment,
+          status: assignment?.status,
+          statusName: assignment?.statusName,
+          statusId: assignment?.statusId
+        }]
         : [])
       : MOCK_TASKS);
 
@@ -247,8 +247,12 @@ export default function WorkerDailyReport() {
   );
 
   const handleChange = (id, field, value) => {
+    let nextValue = value;
+    if (field === "quantity") {
+      nextValue = String(value).replace(/[^0-9]/g, "");
+    }
     setDraftRows((prev) =>
-      Array.isArray(prev) ? prev.map((row) => (row.id === id ? { ...row, [field]: value } : row)) : prev
+      Array.isArray(prev) ? prev.map((row) => (row.id === id ? { ...row, [field]: nextValue } : row)) : prev
     );
   };
 
@@ -702,8 +706,8 @@ export default function WorkerDailyReport() {
                   )}
                   {displayedRows.length > 0 && (
                     <tr className="bg-slate-50/50">
-                      <td colSpan={5} className="px-3 py-4 font-bold text-slate-700 text-right">TỔNG CỘNG:</td>
-                      <td className="px-3 py-4 text-center font-bold text-emerald-700 text-lg">
+                      <td colSpan={4} className="px-3 py-4 font-bold text-slate-700 text-right">TỔNG CỘNG:</td>
+                      <td colSpan={2} className="px-3 py-4 text-center font-bold text-emerald-700 text-lg whitespace-nowrap">
                         {totalAmount.toLocaleString("vi-VN")} đ
                       </td>
                     </tr>

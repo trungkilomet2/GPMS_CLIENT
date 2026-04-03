@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical, Save, LogOut, CheckCircle } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
@@ -357,19 +357,21 @@ export default function ProductionPlan() {
     const next = [...rows];
     const [movedRow] = next.splice(draggedIndex, 1);
     next.splice(index, 0, movedRow);
-    
+
     setRows(next);
     setDraggedIndex(null);
     setSelectedIndex(index);
-    
+
     // Optional: save order to draft
     // savePlan();
   };
 
   const isAssignedPM = useMemo(() => {
+    if (isOwner) return true;
     if (!selectedProduction?.pmId) return false;
-    return isPM && String(currentUser?.userId ?? currentUser?.id) === String(selectedProduction.pmId);
-  }, [isPM, currentUser, selectedProduction]);
+    const currentUserId = String(currentUser?.userId ?? currentUser?.id ?? currentUser?.accountId);
+    return isPM && currentUserId === String(selectedProduction.pmId);
+  }, [isPM, isOwner, currentUser, selectedProduction]);
 
   const totalCpu = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.cpu) || 0), 0),
@@ -757,7 +759,6 @@ export default function ProductionPlan() {
       const productionId = Number(selectedProductionId);
       const payload = rows.map((row) => ({
         productionId: productionId,
-        // Nếu ppsId > 2000 thì là ID ảo của Frontend, gửi 0 cho Backend tạo mới
         partId: (row.ppsId && Number(row.ppsId) < 2000) ? Number(row.ppsId) : 0,
         partName: row?.partName || "",
         startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
@@ -765,18 +766,48 @@ export default function ProductionPlan() {
         cpu: Number(row?.cpu || 0),
       }));
 
-      // Debug: Log payload to see what's being sent
-      console.log("Saving Production Parts:", { parts: payload });
+      // Split into new and existing parts
+      const newParts = payload.filter((p) => p.partId === 0);
+      const existingParts = payload.filter((p) => p.partId > 0);
 
-      await ProductionPartService.createParts(productionId, { parts: payload });
+      // 1. Create new parts if any
+      if (newParts.length > 0) {
+        await ProductionPartService.createParts(productionId, { parts: newParts });
+      }
+
+      // 2. Update existing parts if any
+      if (existingParts.length > 0) {
+        await Promise.all(
+          existingParts.map((p) => ProductionPartService.updatePart(p.partId, p))
+        );
+      }
+
       setHasExistingParts(true);
-      toast.success(hasExistingParts ? "Đã cập nhật kế hoạch sản xuất thành công!" : "Đã lưu kế hoạch sản xuất thành công!");
+
+      let finalMsg = hasExistingParts ? "Đã cập nhật kế hoạch sản xuất thành công!" : "Đã lưu kế hoạch sản xuất thành công!";
+
+      if (isOwner) {
+        try {
+          const currentStatus = selectedProduction?.status;
+          // Only auto-approve if not already in production
+          if (currentStatus !== "Đang Sản Xuất") {
+            // Directly approve for Owners (skipping submit)
+            await ProductionService.approveProductionPlan(productionId);
+            finalMsg = "Đã lưu và phê duyệt kế hoạch tự động!";
+            setSelectedProduction(prev => prev ? { ...prev, status: "Đang Sản Xuất" } : prev);
+          }
+        } catch (autoErr) {
+          console.error("Auto approval failed:", autoErr);
+        }
+      }
+
+      toast.success(finalMsg);
       setIsSuccessModalOpen(true);
       savePlan();
     } catch (error) {
       console.error("Save Error:", error);
       const errMsg = getErrorMessage(error, "Lưu công đoạn thất bại.");
-      
+
       toast.error(errMsg);
       setSavePartsMessage({ type: "error", text: `Chi tiết lỗi: ${errMsg}` });
     } finally {
@@ -836,7 +867,11 @@ export default function ProductionPlan() {
   };
 
   const handleFormChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    let nextValue = value;
+    if (field === "cpu") {
+      nextValue = value.replace(/[^0-9]/g, "");
+    }
+    setForm((prev) => ({ ...prev, [field]: nextValue }));
   };
 
   const handleSaveStep = () => {
@@ -862,8 +897,8 @@ export default function ProductionPlan() {
       return;
     }
 
-    const isDuplicate = rows.some((row, idx) => 
-      idx !== editingIndex && 
+    const isDuplicate = rows.some((row, idx) =>
+      idx !== editingIndex &&
       (row.partName || "").trim().toLowerCase() === name.toLowerCase()
     );
     if (isDuplicate) {
@@ -1471,6 +1506,8 @@ export default function ProductionPlan() {
         description="Hệ thống nhận thấy đơn sản xuất này đã có công đoạn. Việc lưu lại sẽ ghi đè và cập nhật danh sách công đoạn hiện tại. Bạn có chắc chắn muốn tiếp tục không?"
         onConfirm={() => saveSteps(true)}
         onClose={() => setIsConfirmSaveOpen(false)}
+        primaryLabel="Xác nhận cập nhật"
+        confirmIcon={Save}
       />
       <ConfirmModal
         isOpen={isConfirmDeleteOpen}
@@ -1478,6 +1515,8 @@ export default function ProductionPlan() {
         description={`Bạn có chắc chắn muốn xóa mẫu thiết kế "${templateToDelete?.label}" không? Hành động này không thể hoàn tác.`}
         onConfirm={confirmDeleteTemplate}
         onClose={() => setIsConfirmDeleteOpen(false)}
+        primaryLabel="Xác nhận xóa"
+        confirmIcon={Trash2}
       />
 
       {isSaveTemplateModalOpen && (
@@ -1565,6 +1604,8 @@ export default function ProductionPlan() {
           setIsConfirmDeleteStepOpen(false);
           setStepToDeleteIndex(null);
         }}
+        primaryLabel="Xác nhận xóa"
+        confirmIcon={Trash2}
       />
 
       <ConfirmModal
@@ -1573,6 +1614,9 @@ export default function ProductionPlan() {
         description="Bạn có các thay đổi chưa được lưu trong kế hoạch này. Bạn có chắc chắn muốn thoát và mất các thay đổi này không?"
         onConfirm={() => navigate(`/production/${selectedProductionId}`)}
         onClose={() => setIsConfirmCancelOpen(false)}
+        primaryLabel="Xác nhận thoát"
+        secondaryLabel="Quay lại"
+        confirmIcon={LogOut}
       />
       <ConfirmModal
         isOpen={isConfirmApplyOpen}
@@ -1583,6 +1627,8 @@ export default function ProductionPlan() {
           setIsConfirmApplyOpen(false);
           setApplyTarget(null);
         }}
+        primaryLabel="Xác nhận áp dụng"
+        confirmIcon={CheckCircle}
       />
     </OwnerLayout>
   );
