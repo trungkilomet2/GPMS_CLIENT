@@ -113,6 +113,16 @@ export default function EmployeeSkillAssignment() {
     try {
       await WorkerService.assignWorkerSkill(id, selectedIds);
 
+      if (location.state?.fromCreate) {
+        navigate("/employees/workers", {
+          state: {
+            notice: `Đã tạo nhân viên ${employee?.fullName || employee?.userName || ""} và cập nhật chuyên môn thành công.`,
+            noticeTone: "success",
+          },
+        });
+        return;
+      }
+
       navigate(`/employees/${id}`, {
         state: { skillsUpdated: true },
       });
@@ -211,7 +221,10 @@ export default function EmployeeSkillAssignment() {
 
                 {location.state?.fromCreate ? (
                   <div className="employee-create-banner">
-                    <span>Tài khoản nhân viên đã tạo xong. Bây giờ bạn chỉ cần chọn các chuyên môn phù hợp rồi lưu.</span>
+                    <span>
+                      {location.state?.notice ||
+                        "Tài khoản nhân viên đã tạo xong. Bây giờ bạn chỉ cần chọn các chuyên môn phù hợp rồi lưu."}
+                    </span>
                   </div>
                 ) : null}
 

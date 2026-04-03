@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BriefcaseBusiness,
   CircleAlert,
@@ -116,6 +116,7 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 
 export default function EmployeeList() {
   const location = useLocation();
+  const navigate = useNavigate();
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
   const isOwner = primaryRole === "owner";
@@ -127,6 +128,7 @@ export default function EmployeeList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [noticeTone, setNoticeTone] = useState("success");
   const [statusActionId, setStatusActionId] = useState(null);
   const [reloadSeed, setReloadSeed] = useState(0);
   const viewMode = location.pathname.includes("/employees/management")
@@ -169,12 +171,21 @@ export default function EmployeeList() {
       }
     };
 
-    fetchEmployees();
+      fetchEmployees();
 
     return () => {
       mounted = false;
     };
   }, [reloadSeed]);
+
+  useEffect(() => {
+    if (!location.state?.notice) return;
+
+    setNotice(location.state.notice);
+    setNoticeTone(location.state.noticeTone === "error" ? "error" : "success");
+
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.state, navigate]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
@@ -196,6 +207,7 @@ export default function EmployeeList() {
 
     setStatusActionId(employee.id);
     setNotice("");
+    setNoticeTone("success");
 
     try {
       if (isActive) {
@@ -220,6 +232,7 @@ export default function EmployeeList() {
           ? `Đã vô hiệu hóa tài khoản ${employee.fullName || employee.userName}.`
           : `Đã kích hoạt lại tài khoản ${employee.fullName || employee.userName}.`
       );
+      setNoticeTone("success");
     } catch (err) {
       setNotice(
         getEmployeeModuleErrorMessage(
@@ -229,6 +242,7 @@ export default function EmployeeList() {
             : "Không thể kích hoạt lại tài khoản nhân viên. Vui lòng thử lại."
         )
       );
+      setNoticeTone("error");
     } finally {
       setStatusActionId(null);
     }
@@ -406,7 +420,13 @@ export default function EmployeeList() {
           </p>
 
           {notice ? (
-            <div className="employee-create-banner">
+            <div
+              className={`employee-inline-banner ${
+                noticeTone === "error"
+                  ? "employee-inline-banner--error"
+                  : "employee-inline-banner--success"
+              }`}
+            >
               <span>{notice}</span>
             </div>
           ) : null}

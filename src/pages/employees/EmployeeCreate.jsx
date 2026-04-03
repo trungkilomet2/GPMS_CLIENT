@@ -148,12 +148,21 @@ export default function EmployeeCreate() {
       const createdId = createdEmployee?.data?.id ?? createdEmployee?.id ?? null;
       if (form.role === "Worker" && createdId != null) {
         navigate(`/employees/${createdId}/skills`, {
-          state: { fromCreate: true },
+          state: {
+            fromCreate: true,
+            notice: `Đã tạo tài khoản nhân viên ${normalizedFullName} thành công. Hãy gán chuyên môn phù hợp trước khi hoàn tất.`,
+            noticeTone: "success",
+          },
         });
         return;
       }
 
-      navigate("/employees");
+      navigate("/employees/management", {
+        state: {
+          notice: `Đã tạo tài khoản quản lý ${normalizedFullName} thành công.`,
+          noticeTone: "success",
+        },
+      });
     } catch (error) {
       const message = getEmployeeModuleErrorMessage(
         error,
