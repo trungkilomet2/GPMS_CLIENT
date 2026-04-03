@@ -329,7 +329,7 @@ export default function OrderDetail() {
                             )}
                             {canModerate && (
                                 <>
-                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && canAccept && (
+                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && !isCompleted && canAccept && (
                                         <button type="button"
                                             disabled={isUpdatingStatus}
                                             onClick={() => {
@@ -341,7 +341,7 @@ export default function OrderDetail() {
                                             Chấp nhận
                                         </button>
                                     )}
-                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && (
+                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && !isCompleted && (
                                         <button type="button"
                                             disabled={isUpdatingStatus}
                                             onClick={() => {
@@ -353,7 +353,7 @@ export default function OrderDetail() {
                                             Từ chối
                                         </button>
                                     )}
-                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && canRequestModification && (
+                                    {!isRejected && !isAccepted && !isProcessing && !isCanceled && !isCompleted && canRequestModification && (
                                         <button type="button"
                                             disabled={isUpdatingStatus}
                                             onClick={() => {
