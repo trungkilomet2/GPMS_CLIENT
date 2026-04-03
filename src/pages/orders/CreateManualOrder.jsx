@@ -26,8 +26,8 @@ export default function CreateManualOrder() {
     type: '',
     size: '',
     color: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: new Date().toLocaleDateString('sv-SE'),
+    endDate: new Date().toLocaleDateString('sv-SE'),
     quantity: '',
     cpu: '',
     note: '',
@@ -83,8 +83,7 @@ export default function CreateManualOrder() {
     if (!orderData.startDate) {
       newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
     } else {
-      const today = new Date();
-      const todayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().split('T')[0];
+      const todayStr = new Date().toLocaleDateString('sv-SE');
       if (orderData.startDate < todayStr) {
         newErrors.startDate = 'Ngày bắt đầu không được trước ngày hiện tại';
       }
@@ -93,6 +92,30 @@ export default function CreateManualOrder() {
       newErrors.endDate = 'Vui lòng chọn ngày kết thúc';
     } else if (orderData.startDate && new Date(orderData.startDate) > new Date(orderData.endDate)) {
       newErrors.endDate = 'Ngày kết thúc không được trước ngày bắt đầu';
+    }
+
+    // MATERIALS VALIDATION
+    if (materials.length > 0) {
+      const materialErrors = [];
+      materials.forEach((m, idx) => {
+        const mErrs = {};
+        if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
+        if (!m.materialName?.trim()) {
+          mErrs.materialName = 'Tên vật liệu là bắt buộc';
+        }
+        if (!m.value || isNaN(m.value) || Number(m.value) <= 0) {
+          mErrs.value = 'Số lượng phải lớn hơn 0';
+        }
+        if (!m.uom?.trim()) {
+          mErrs.uom = 'Đơn vị tính là bắt buộc';
+        }
+        if (Object.keys(mErrs).length > 0) {
+          materialErrors[idx] = mErrs;
+        }
+      });
+      if (materialErrors.length > 0) {
+        newErrors.materialsList = materialErrors;
+      }
     }
 
     setErrors(newErrors);
@@ -115,7 +138,10 @@ export default function CreateManualOrder() {
   };
 
   const handleOrderChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === 'quantity' || name === 'cpu') {
+      value = value.replace(/[^0-9]/g, '');
+    }
     const finalValue = (name === 'quantity' || name === 'cpu')
       ? (value === '' ? '' : Number(value))
       : value;
@@ -149,12 +175,9 @@ export default function CreateManualOrder() {
       note: materialFormData.note?.trim() || '',
     };
 
-    let targetIndex = editingIndex;
+    const targetIndex = editingIndex !== null ? editingIndex : materials.length;
     if (editingIndex === null) {
-      setMaterials((prev) => {
-        targetIndex = prev.length;
-        return [...prev, pendingMaterial];
-      });
+      setMaterials((prev) => [...prev, pendingMaterial]);
     } else {
       setMaterials((prev) => {
         const updated = [...prev];
@@ -168,12 +191,11 @@ export default function CreateManualOrder() {
     }
     if (errors.materialsList && errors.materialsList[targetIndex]) {
       setErrors((prev) => {
-        const newMaterialsList = prev.materialsList ? { ...prev.materialsList } : {};
-        if (targetIndex !== null) delete newMaterialsList[targetIndex];
+        const newMaterialsList = { ...prev.materialsList };
+        delete newMaterialsList[targetIndex];
         return { ...prev, materialsList: newMaterialsList };
       });
     }
-
     setIsModalOpen(false);
 
     if (pendingMaterial.imageFile) {
@@ -183,16 +205,22 @@ export default function CreateManualOrder() {
         if (imageUrl) {
           setMaterials((prev) => {
             const updated = [...prev];
-            const idx = targetIndex;
-            if (updated[idx]) {
-              updated[idx] = {
-                ...updated[idx],
+            if (updated[targetIndex]) {
+              updated[targetIndex] = {
+                ...updated[targetIndex],
                 image: imageUrl,
                 imageFile: null,
                 imagePreview: imageUrl,
               };
             }
             return updated;
+          });
+          // Also clear error if it was set during upload
+          setErrors((prev) => {
+            if (!prev.materialsList || !prev.materialsList[targetIndex]) return prev;
+            const newMaterialsList = { ...prev.materialsList };
+            delete newMaterialsList[targetIndex];
+            return { ...prev, materialsList: newMaterialsList };
           });
         }
       } catch {

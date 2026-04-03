@@ -14,6 +14,9 @@ const ProductionPartService = {
   updateAssignWorker(partId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.UPDATE_ASSIGN_WORKERS(partId), payload);
   },
+  updatePart(partId, payload) {
+    return axiosClient.put(API_ENDPOINTS.PRODUCTION_PART.UPDATE_PART(partId), payload);
+  },
   createWorkLog(partId, payload) {
     return axiosClient.post(API_ENDPOINTS.PRODUCTION_PART.CREATE_WORK_LOGS(partId), payload);
   },

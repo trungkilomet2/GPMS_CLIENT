@@ -1,4 +1,4 @@
-﻿import { lazy } from "react";
+import { lazy } from "react";
 import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
 import RoleRouteGuard from "@/routes/RoleRouteGuard";
@@ -38,6 +38,7 @@ const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBoo
 const WorkerCuttingBookDetail = lazy(() => import("@/pages/production/WorkerCuttingBookDetail"));
 const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
+const ProductionPartHistory = lazy(() => import("@/pages/production/ProductionPartHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
 const CustomerManagement = lazy(() => import("@/pages/customers/CustomerManagement"));
 const EmployeeDirectory = lazy(() => import("@/pages/employees/EmployeeDirectory"));
@@ -117,6 +118,7 @@ export const routes = [
   { path: "/worker/leave-requests", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequests />) },
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
   { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
+  { path: "/production/part/:partId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
   { path: "/leave-requests", element: guardByRoles(["Owner", "PM"], <LeaveRequests />) },
   { path: "/customers", element: guardByRoles(["Owner"], <CustomerManagement />) },
   { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },

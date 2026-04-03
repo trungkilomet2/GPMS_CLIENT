@@ -62,11 +62,21 @@ const ORDER_STATUS_NORMALIZE_MAP = {
   "in production": "Đang sản xuất",
   production: "Đang sản xuất",
   "in progress": "Đang sản xuất",
+
+  "đã hoàn thành": "Đã hoàn thành",
+  "da hoan thanh": "Đã hoàn thành",
+  "hoàn thành": "Đã hoàn thành",
+  "hoan thanh": "Đã hoàn thành",
 };
 
 export function normalizeOrderStatus(status) {
-  const normalized = String(status ?? "").trim().toLowerCase();
+  const normalized = String(status ?? "").normalize('NFC').trim().toLowerCase();
   if (!normalized) return "";
+
+  if (normalized.includes('hoàn thành') || normalized.includes('hoan thanh') || normalized.includes('completed') || normalized.includes('success') || normalized.includes('done')) {
+    return "Đã hoàn thành";
+  }
+
   return ORDER_STATUS_NORMALIZE_MAP[normalized] || status;
 }
 
@@ -87,6 +97,7 @@ export const ORDER_STATUS_STYLES_DETAIL = {
   "Đã hủy": "bg-gray-100 text-gray-700 border border-gray-200",
   "Đã chấp nhận": "bg-emerald-600 text-white",
   "Đang sản xuất": "bg-purple-600 text-white",
+  "Đã hoàn thành": "bg-indigo-600 text-white",
   default: "bg-gray-100 text-gray-700",
 };
 
@@ -97,6 +108,7 @@ const ORDER_STATUS_STYLES_LOWER = {
     "đã chấp nhận": ORDER_STATUS_STYLES_LIST["Đã chấp nhận"],
     "đã từ chối": ORDER_STATUS_STYLES_LIST["Đã từ chối"],
     "đã hủy": ORDER_STATUS_STYLES_LIST["Đã hủy"],
+    "đã hoàn thành": "bg-indigo-50 text-indigo-700 border-indigo-200",
   },
   detail: {
     "chờ xét duyệt": ORDER_STATUS_STYLES_DETAIL["Chờ xét duyệt"],
@@ -104,6 +116,7 @@ const ORDER_STATUS_STYLES_LOWER = {
     "đã chấp nhận": ORDER_STATUS_STYLES_DETAIL["Đã chấp nhận"],
     "đã từ chối": ORDER_STATUS_STYLES_DETAIL["Đã từ chối"],
     "đã hủy": ORDER_STATUS_STYLES_DETAIL["Đã hủy"],
+    "đã hoàn thành": ORDER_STATUS_STYLES_DETAIL["Đã hoàn thành"],
   },
 };
 

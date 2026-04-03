@@ -5,9 +5,12 @@ import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, UserCheck, FileText, Download, Package } from "lucide-react";
 import { toast } from 'react-toastify';
+import { getErrorMessage } from "@/utils/errorUtils";
 import OrderService from "@/services/OrderService";
 import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
+import DesignTemplatesSection from "@/components/orders/DesignTemplatesSection";
+import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
 import { userService } from "@/services/userService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import { normalizeOrderStatus, getOrderStatusLabel } from "@/lib/orders/status";
@@ -44,12 +47,15 @@ export default function CreateProduction() {
 
   const [form, setForm] = useState({
     pmId: "",
-    productionNote: "",
+    productionNote: ""
   });
+  const [managerCountMap, setManagerCountMap] = useState({});
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState("");
   const [customerProfile, setCustomerProfile] = useState(null);
   const customerId = getOrderCustomerId(order);
 
@@ -144,10 +150,16 @@ export default function CreateProduction() {
           }
         }
 
-        // Collect IDs of people who are set as managerId for at least one person
-        const managedBySet = new Set(
-          allEmployees.map(emp => emp.managerId != null ? String(emp.managerId) : null).filter(Boolean)
-        );
+        // Count how many people each person manages
+        const managerCountMap = allEmployees.reduce((acc, emp) => {
+          if (emp.managerId) {
+            const mId = String(emp.managerId);
+            acc[mId] = (acc[mId] || 0) + 1;
+          }
+          return acc;
+        }, {});
+
+        const managedBySet = new Set(Object.keys(managerCountMap));
 
         const pmRoles = ["PM", "Manager", "Owner"];
         let pms = allEmployees.filter((item) => {
@@ -169,8 +181,13 @@ export default function CreateProduction() {
 
         if (!active) return;
         const currentUserId = String(currentUser?.userId ?? currentUser?.id ?? "");
-        const finalPms = pms.filter((pm) => String(pm.id) !== currentUserId);
+        const finalPms = pms.map(pm => ({
+          ...pm,
+          managedCount: managerCountMap[String(pm.id)] || 0
+        })).filter((pm) => String(pm.id) !== currentUserId);
+
         setPmUsers(finalPms);
+        setManagerCountMap(managerCountMap);
         setPmError(null);
       } catch (_err) {
         if (!active) return;
@@ -378,11 +395,6 @@ export default function CreateProduction() {
     ["Ngày kết thúc", formatOrderDate(order?.endDate)],
   ]), [order]);
 
-  const templates = order?.templates ?? order?.template ?? order?.files ?? [];
-  const softTemplates = templates.filter((t) => {
-    const type = (t.type ?? "").toString().toLowerCase();
-    return type.includes("soft") || !!t.file || !!t.url;
-  });
   const normalizedStatus = normalizeOrderStatus(order?.status);
   const isAccepted = getOrderStatusLabel(normalizedStatus) === "Đã Chấp Nhận";
 
@@ -413,6 +425,14 @@ export default function CreateProduction() {
       return;
     }
     if (!validate()) return;
+
+    // Kiểm tra xem PM được chọn có quản lý thợ nào không
+    const pmIdVal = String(form.pmId);
+    const workerCount = managerCountMap[pmIdVal] || 0;
+    if (workerCount === 0) {
+      toast.error("Không thể giao việc cho người quản lý này vì người quản lý này không quản lý thợ may nào.");
+      return;
+    }
 
     const payload = {
       id: 0,
@@ -445,8 +465,7 @@ export default function CreateProduction() {
       setShowSuccess(true);
     } catch (err) {
       console.error("Create production error:", err?.response?.data ?? err);
-      const errorMessage = err?.response?.data?.message || err?.response?.data?.title || "Không thể tạo đơn sản xuất. Vui lòng thử lại.";
-      toast.error(errorMessage);
+      toast.error(getErrorMessage(err, "Không thể tạo đơn sản xuất. Vui lòng thử lại."));
     } finally {
       setIsSubmitting(false);
     }
@@ -508,7 +527,7 @@ export default function CreateProduction() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   Tạo đơn sản xuất cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý cho đơn sản xuất.</p>
+                <p className="text-slate-600">Thiết lập người quản lý cho đơn sản xuất.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -566,7 +585,7 @@ export default function CreateProduction() {
                   )}
 
                   <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">PM quản lý</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Người quản lý</label>
                     <select
                       name="pmId"
                       value={form.pmId}
@@ -574,15 +593,15 @@ export default function CreateProduction() {
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                       disabled={loadingPM}
                     >
-                      <option value="">{loadingPM ? "Đang tải danh sách PM..." : "Chọn PM"}</option>
+                      <option value="">{loadingPM ? "Đang tải danh sách người quản lý..." : "Chọn người quản lý"}</option>
                       {pmUsers.map((pm) => (
                         <option key={pm.id} value={pm.id}>
-                          {pm.fullName || pm.userName || `PM #${pm.id}`}
+                          {pm.fullName || pm.userName || `PM #${pm.id}`} ({pm.managedCount} công nhân)
                         </option>
                       ))}
-                      {currentUser && hasAnyRole(currentUser.role, ["Owner"]) && (
-                        <option value={currentUser.userId}>
-                          Giao việc cho tôi ({currentUser.fullName || currentUser.name || currentUser.userName})
+                      {currentUser && (hasAnyRole(roleValue, ["Owner"]) || hasAnyRole(roleValue, ["Admin"])) && (
+                        <option value={currentUser.userId ?? currentUser.id}>
+                          Giao việc cho tôi ({currentUser.fullName || currentUser.userName}) ({managerCountMap[String(currentUser.userId ?? currentUser.id)] || 0} công nhân)
                         </option>
                       )}
                     </select>
@@ -619,15 +638,28 @@ export default function CreateProduction() {
                   Thông tin đơn hàng
                 </div>
                 <div className="p-5 grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center border-b border-slate-100">
-                  <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm">
+                  <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
                     {order?.image ? (
-                      <img src={order.image} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        className="w-full h-full cursor-zoom-in"
+                        onClick={() => {
+                          setZoomImageUrl(order.image);
+                          setIsImageModalOpen(true);
+                        }}
+                        title="Click để zoom ảnh"
+                      >
+                        <img src={order.image} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-[10px] text-white font-semibold">Click để zoom</span>
+                        </div>
+                      </button>
                     ) : (
                       <span className="text-[11px] text-slate-400">-</span>
                     )}
                   </div>
                   <div className="text-xs text-slate-500 leading-relaxed">
-                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho PM quản lý.
+                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho người quản lý.
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
@@ -671,42 +703,24 @@ export default function CreateProduction() {
               )}
 
               <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
-                <div>
-                  <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Mẫu thiết kế</h2>
-                  <div className="space-y-2">
-                    {softTemplates.length > 0 ? (
-                      softTemplates.map((file, idx) => {
-                        const fileName = file.templateName ?? file.name ?? `File ${idx + 1}`;
-                        const fileUrl = file.file ?? file.url ?? "";
-                        return (
-                          <div key={idx} className="flex items-center justify-between rounded-xl border border-slate-100 p-3 transition hover:border-emerald-200">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <FileText size={18} className="text-emerald-600 shrink-0" />
-                              <div className="overflow-hidden">
-                                <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
-                                {file.size && <p className="text-[10px] text-slate-400 font-bold uppercase">{file.size}</p>}
-                              </div>
-                            </div>
-                            {fileUrl ? (
-                              <a href={fileUrl} download target="_blank" rel="noreferrer" className="text-slate-400 hover:text-emerald-600">
-                                <Download size={16} />
-                              </a>
-                            ) : (
-                              <span className="text-[10px] text-slate-400">Không có link</span>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <p className="text-center py-4 text-slate-400 text-[11px] italic">Không có file thiết kế</p>
-                    )}
-                  </div>
-                </div>
+                <DesignTemplatesSection
+                  templates={order?.templates ?? order?.template ?? order?.files ?? []}
+                  title="Mẫu thiết kế"
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <OrderImageZoomModal
+        isOpen={isImageModalOpen}
+        imageUrl={zoomImageUrl}
+        onClose={() => {
+          setIsImageModalOpen(false);
+          setZoomImageUrl("");
+        }}
+      />
     </OwnerLayout>
   );
 }

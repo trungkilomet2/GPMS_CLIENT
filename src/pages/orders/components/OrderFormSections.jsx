@@ -397,6 +397,11 @@ export function OrderInput({
           name={name}
           value={value ?? ''}
           onChange={onChange}
+          onKeyDown={(e) => {
+            if ((name === 'quantity' || name === 'cpu') && (e.key === '.' || e.key === ',')) {
+              e.preventDefault();
+            }
+          }}
           placeholder={placeholder}
           readOnly={readOnly}
           className={`block w-full border rounded-xl px-4 ${suffix ? 'pr-16' : 'pr-4'} py-2.5 text-sm transition-all outline-none
