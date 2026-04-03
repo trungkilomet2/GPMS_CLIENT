@@ -10,6 +10,8 @@ export default function ConfirmModal({
   secondaryLabel = "Hủy",
   onConfirm,
   onClose,
+  confirmIcon: ConfirmIcon = Trash2,
+  showConfirmIcon = true,
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -49,7 +51,7 @@ export default function ConfirmModal({
             {secondaryLabel}
           </button>
           <button type="button" className="gpms-modal__btn gpms-modal__btn--primary" onClick={onConfirm}>
-            <Trash2 size={18} />
+            {showConfirmIcon && ConfirmIcon && <ConfirmIcon size={18} />}
             {primaryLabel}
           </button>
         </div>

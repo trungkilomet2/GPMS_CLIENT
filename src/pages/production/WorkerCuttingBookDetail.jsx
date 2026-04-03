@@ -142,30 +142,54 @@ export default function WorkerCuttingBookDetail() {
 
   const validateRecord = () => {
     const errs = {};
-    if (!hasValue(record.color)) errs.color = "Vui lòng nhập màu.";
 
+    // --- MÀU SẮC ---
+    if (!hasValue(record.color)) {
+      errs.color = "Vui lòng nhập màu.";
+    } else if (String(record.color).length > 30) {
+      errs.color = "Màu sắc tối đa 30 ký tự.";
+    }
+
+    // --- SỐ M/KG ---
     const mPk = Number(record.meterPerKg);
-    if (!hasValue(record.meterPerKg)) errs.meterPerKg = "Nhập số m/kg.";
-    else if (isNaN(mPk) || mPk <= 0) errs.meterPerKg = "Phải là số dương.";
-    else if (mPk > 1000) errs.meterPerKg = "Tối đa 1000.";
+    if (!hasValue(record.meterPerKg)) {
+      errs.meterPerKg = "Nhập số m/kg.";
+    } else if (isNaN(mPk) || mPk <= 0) {
+      errs.meterPerKg = "Phải là số dương.";
+    } else if (mPk > 1000) {
+      errs.meterPerKg = "Tối đa 1000.";
+    } else if (String(record.meterPerKg).length > 10) {
+      errs.meterPerKg = "Số quá dài (Tối đa 10 ký tự).";
+    }
 
+    // --- SỐ LỚP ---
     const ly = Number(record.layer);
-    if (!hasValue(record.layer)) errs.layer = "Nhập số lớp.";
-    else if (isNaN(ly) || ly <= 0) errs.layer = "Phải là số dương.";
-    else if (ly > 1000) errs.layer = "Tối đa 1000.";
+    if (!hasValue(record.layer)) {
+      errs.layer = "Nhập số lớp.";
+    } else if (isNaN(ly) || ly <= 0) {
+      errs.layer = "Phải là số dương.";
+    } else if (ly > 1000) {
+      errs.layer = "Tối đa 1000.";
+    } else if (String(record.layer).length > 10) {
+      errs.layer = "Số quá dài.";
+    }
 
+    // --- SẢN LƯỢNG ---
     const qty = Number(record.productQty);
-    if (!hasValue(record.productQty)) errs.productQty = "Nhập sản lượng.";
-    else if (isNaN(qty) || qty <= 0) errs.productQty = "Phải là số dương.";
-    else if (qty > 100000) errs.productQty = "Sản lượng quá lớn.";
+    if (!hasValue(record.productQty)) {
+      errs.productQty = "Nhập sản lượng.";
+    } else if (isNaN(qty) || qty <= 0) {
+      errs.productQty = "Phải là số dương.";
+    } else if (qty > 1000000) {
+      errs.productQty = "Tối đa 1.000.000 cái.";
+    } else if (String(record.productQty).length > 10) {
+      errs.productQty = "Dữ liệu quá dài.";
+    }
 
-    if (Object.keys(errs).length === 0 && (
-      String(record.meterPerKg).length > 10 ||
-      String(record.layer).length > 10 ||
-      String(record.productQty).length > 10 ||
-      String(record.color).length > 50
-    )) {
-      toast.warning("Dữ liệu nhập quá dài.");
+    // --- GHI CHÚ (Optional check) ---
+    if (record.note && record.note.length > 200) {
+      // Note usually has its own area, but check it in validate anyway
+      toast.warning("Ghi chú tối đa 200 ký tự.");
       return false;
     }
 
@@ -232,11 +256,11 @@ export default function WorkerCuttingBookDetail() {
               onClick={() => {
                 const pId = notebook?.productionId || meta.productionId;
                 if (pId) {
-                  navigate("/worker/cutting-book", { 
-                    state: { 
+                  navigate("/worker/cutting-book", {
+                    state: {
                       productionId: pId,
-                      productionName: meta.productionName 
-                    } 
+                      productionName: meta.productionName
+                    }
                   });
                 } else {
                   navigate("/worker/cutting-book");
@@ -290,7 +314,7 @@ export default function WorkerCuttingBookDetail() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-slate-600">
               <ClipboardCheck size={16} />
-              <h2 className="text-xs font-bold uppercase tracking-widest">Ghi log sản lượng</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest">Ghi sản lượng</h2>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -307,7 +331,7 @@ export default function WorkerCuttingBookDetail() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-slate-600 mb-4">
             <ClipboardCheck size={16} />
-            <h2 className="text-xs font-bold uppercase tracking-widest">Lịch sử ghi log</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest">Lịch sử ghi</h2>
           </div>
           {records.length > 0 ? (
             <div className="overflow-x-auto">
@@ -371,12 +395,46 @@ export default function WorkerCuttingBookDetail() {
             </div>
             <div className="space-y-5">
               <div className="grid grid-cols-2 gap-4">
-                <ModalField label="Màu sắc" value={record.color} onChange={(v) => updateRecord("color", v)} error={recordErrors.color} placeholder="Ví dụ: Đen" />
-                <ModalField label="Số m/kg" value={record.meterPerKg} onChange={(v) => updateRecord("meterPerKg", v)} error={recordErrors.meterPerKg} placeholder="65" />
-                <ModalField label="Số lớp vải" value={record.layer} onChange={(v) => updateRecord("layer", v)} error={recordErrors.layer} placeholder="10" />
-                <ModalField label="Sản lượng (Cái)" value={record.productQty} onChange={(v) => updateRecord("productQty", v)} error={recordErrors.productQty} placeholder="400" />
+                <ModalField
+                  label="MÀU SẮC"
+                  value={record.color}
+                  onChange={(v) => updateRecord("color", v)}
+                  error={recordErrors.color}
+                  placeholder="Ví dụ: Đen"
+                  maxLength={30}
+                />
+                <ModalField
+                  label="SỐ M/KG"
+                  value={record.meterPerKg}
+                  onChange={(v) => updateRecord("meterPerKg", v)}
+                  error={recordErrors.meterPerKg}
+                  placeholder="65"
+                  maxLength={10}
+                />
+                <ModalField
+                  label="SỐ LỚP VẢI"
+                  value={record.layer}
+                  onChange={(v) => updateRecord("layer", v)}
+                  error={recordErrors.layer}
+                  placeholder="10"
+                  maxLength={10}
+                />
+                <ModalField
+                  label="SẢN LƯỢNG (CÁI)"
+                  value={record.productQty}
+                  onChange={(v) => updateRecord("productQty", v)}
+                  error={recordErrors.productQty}
+                  placeholder="400"
+                  maxLength={10}
+                />
               </div>
-              <ModalTextarea label="Ghi chú thêm" value={record.note} onChange={(v) => updateRecord("note", v)} placeholder="Nhập ghi chú nếu có..." />
+              <ModalTextarea
+                label="GHI CHÚ THÊM"
+                value={record.note}
+                onChange={(v) => updateRecord("note", v)}
+                placeholder="Nhập ghi chú nếu có..."
+                maxLength={200}
+              />
             </div>
             <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-50">
               <button
@@ -419,34 +477,56 @@ function Field({ label, value, onChange, disabled, compact }) {
   );
 }
 
-function ModalField({ label, value, onChange, disabled, error, placeholder }) {
+function ModalField({ label, value, onChange, disabled, error, placeholder, maxLength }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all ${error ? "border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10" : "border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
-          } disabled:bg-slate-100`}
-      />
-      {error && <span className="text-[10px] font-bold text-rose-500">{error}</span>}
+      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          className={`w-full rounded-2xl border px-4 py-3 text-sm font-semibold outline-none transition-all ${error ? "border-rose-300 bg-rose-50/30 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
+              : "border-slate-200 bg-slate-50/50 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+            } disabled:bg-slate-100 placeholder:text-slate-300 placeholder:font-normal`}
+        />
+        {maxLength && value && (
+          <div className="absolute right-3 top-[-10px] bg-white px-1 text-[9px] font-bold text-slate-300">
+            {value.length}/{maxLength}
+          </div>
+        )}
+      </div>
+      {error && (
+        <div className="flex items-center gap-1.5 px-1 py-0.5 animate-in slide-in-from-top-1 duration-200">
+          <div className="w-1 h-1 rounded-full bg-rose-500" />
+          <span className="text-[10px] font-bold text-rose-500">{error}</span>
+        </div>
+      )}
     </label>
   );
 }
 
-function ModalTextarea({ label, value, onChange, disabled, placeholder }) {
+function ModalTextarea({ label, value, onChange, disabled, placeholder, maxLength }) {
   return (
     <label className="flex flex-col gap-2">
-      <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">{label}</span>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</span>
+        {maxLength && (
+          <span className={`text-[10px] font-bold ${value?.length >= maxLength ? 'text-rose-500' : 'text-slate-300'}`}>
+            {value?.length || 0}/{maxLength}
+          </span>
+        )}
+      </div>
       <textarea
         rows={3}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 disabled:bg-slate-100 transition-all"
+        maxLength={maxLength}
+        className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm font-medium outline-none focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:bg-slate-100 transition-all placeholder:text-slate-300"
       />
     </label>
   );
