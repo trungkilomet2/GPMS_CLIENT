@@ -97,7 +97,7 @@ export default function AdminUserList() {
     });
 
     const nextOptions = [
-      { value: "all", label: "Tất cả vai trò" },
+      { value: "all", label: "Tất cả" },
       ...Array.from(optionsMap.entries())
         .sort(([, leftLabel], [, rightLabel]) => leftLabel.localeCompare(rightLabel, "vi"))
         .map(([value, label]) => ({ value, label })),
@@ -339,7 +339,7 @@ export default function AdminUserList() {
                   onChange={(event) => setStatusFilter(event.target.value)}
                   className="admin-field__control"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   {Object.entries(ADMIN_STATUS_META).map(([value, meta]) => (
                     <option key={value} value={value}>
                       {meta.label}

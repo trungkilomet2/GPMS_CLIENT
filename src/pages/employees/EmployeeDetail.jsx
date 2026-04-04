@@ -50,6 +50,7 @@ function getInitials(name = "") {
 export default function EmployeeDetail() {
   const { id } = useParams();
   const location = useLocation();
+  const backTarget = location.state?.from || "/employees";
   const currentUser = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const isOwner = primaryRole === "owner";
@@ -245,7 +246,7 @@ export default function EmployeeDetail() {
         <div className="employee-detail-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-detail-hero">
             <div className="employee-detail-hero__heading">
-              <Link to="/employees" className="employee-detail-hero__back">
+              <Link to={backTarget} className="employee-detail-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại danh sách</span>
               </Link>

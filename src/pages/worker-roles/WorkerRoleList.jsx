@@ -164,7 +164,7 @@ export default function WorkerRoleList() {
                   onChange={(event) => setUsageFilter(event.target.value)}
                   className="worker-role-filter-field__control"
                 >
-                  <option value="all">Tất cả chuyên môn</option>
+                  <option value="all">Tất cả</option>
                   <option value="used">Đang sử dụng</option>
                   <option value="unused">Chưa gán</option>
                 </select>

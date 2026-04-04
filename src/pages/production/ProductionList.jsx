@@ -286,7 +286,7 @@ export default function ProductionList() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   <option value="Chờ Xét Duyệt">Chờ Xét Duyệt</option>
                   <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
                   <option value="Đang Sản Xuất">Đang Sản Xuất</option>

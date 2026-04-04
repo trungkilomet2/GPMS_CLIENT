@@ -326,7 +326,7 @@ export default function EmployeeList() {
     });
 
     return [
-      { value: "all", label: "Tất cả vai trò" },
+      { value: "all", label: "Tất cả" },
       ...Array.from(optionsMap.entries())
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
@@ -343,7 +343,7 @@ export default function EmployeeList() {
     });
 
     return [
-      { value: "all", label: "Tất cả chuyên môn" },
+      { value: "all", label: "Tất cả" },
       ...Array.from(optionsMap.entries())
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
@@ -421,10 +421,6 @@ export default function EmployeeList() {
             />
           </div>
 
-          <p className="employee-summary-note">
-            Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.
-          </p>
-
           {notice ? (
             <div
               className={`employee-inline-banner ${
@@ -490,7 +486,7 @@ export default function EmployeeList() {
                   onChange={(event) => setStatusFilter(event.target.value)}
                   className="employee-filter-field__control"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   <option value="active">Đang hoạt động</option>
                   <option value="inactive">Ngừng hoạt động</option>
                 </select>
@@ -648,7 +644,11 @@ export default function EmployeeList() {
                         </td>
                         <td className="employee-table-td employee-table-td--action px-5 py-5 align-middle text-center">
                           <div className="flex flex-wrap items-center justify-center gap-2">
-                            <Link to={`/employees/${employee.id}`} className="employee-action-btn">
+                            <Link
+                              to={`/employees/${employee.id}`}
+                              state={{ from: `${location.pathname}${location.search}` }}
+                              className="employee-action-btn"
+                            >
                               Xem chi tiết
                             </Link>
                             {isOwner ? (
