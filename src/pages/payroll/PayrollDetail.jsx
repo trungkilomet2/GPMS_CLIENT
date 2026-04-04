@@ -38,7 +38,7 @@ export default function PayrollDetail() {
   const [statusFilter, setStatusFilter] = useState("all"); // 'all', 'paid', 'unpaid'
 
   useEffect(() => {
-    if (location.state?.logs) return;
+    if (location.state?.logs && refreshKey === 0) return;
 
     let active = true;
     const loadData = async () => {
@@ -350,7 +350,7 @@ export default function PayrollDetail() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {currentLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-20 text-center text-slate-500">
+                        <td colSpan={7} className="py-20 text-center text-slate-500">
                           Không tìm thấy dữ liệu báo cáo chi tiết cho thợ này.
                         </td>
                       </tr>

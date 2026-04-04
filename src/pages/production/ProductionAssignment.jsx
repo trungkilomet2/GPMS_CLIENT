@@ -18,7 +18,7 @@ export default function ProductionAssignment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const incoming = location.state ?? {};
+  const incoming = useMemo(() => location.state || null, [location.state]);
   const [selectedProductionId, setSelectedProductionId] = useState(() => {
     if (incoming?.production?.productionId) return String(incoming.production.productionId);
     return id ? String(id) : "";
@@ -128,33 +128,54 @@ export default function ProductionAssignment() {
   }, [selectedProductionId]);
 
   const rows = useMemo(() => {
-    const sourceSteps = Array.isArray(incoming?.steps) && incoming.steps.length > 0
-      ? incoming.steps
-      : PLAN_STEPS;
+    // Priority: 1. Data passed from previous page, 2. Real parts from API, 3. Fallback mock
+    let sourceSteps = PLAN_STEPS;
+    
+    if (incoming && Array.isArray(incoming?.steps) && incoming.steps.length > 0) {
+      sourceSteps = incoming.steps;
+    } else if (backendParts.length > 0) {
+      // Convert backendParts format to match internal row format
+      sourceSteps = backendParts.map(p => ({
+        partName: p.partName || p.name,
+        cpu: p.cpu,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        realPartId: p.id
+      }));
+    }
 
     // Create a pool of backend parts to track which ones have been matched
     const availableBackendParts = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
 
     return sourceSteps.map((row, index) => {
-      // 1. Try to match by exact name first
-      let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
-
-      // 2. If no name match, fallback to the same index (assuming order is preserved)
-      if (matchIdx === -1) {
-        matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
-      }
-
+      // Match with real backend IDs
       let realPart = null;
-      if (matchIdx !== -1) {
-        realPart = availableBackendParts[matchIdx];
-        // Remove the matched part so it can't be matched twice
-        availableBackendParts.splice(matchIdx, 1);
+      
+      // If we already have realPartId from the mapping above
+      if (row.realPartId) {
+        const foundIdx = availableBackendParts.findIndex(p => p.id === row.realPartId);
+        if (foundIdx !== -1) {
+          realPart = availableBackendParts[foundIdx];
+          availableBackendParts.splice(foundIdx, 1);
+        }
+      } else {
+        // Match by exact name first
+        let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
+        // Fallback to the same index
+        if (matchIdx === -1) {
+          matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
+        }
+
+        if (matchIdx !== -1) {
+          realPart = availableBackendParts[matchIdx];
+          availableBackendParts.splice(matchIdx, 1);
+        }
       }
 
       return {
         ...row,
-        ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
-        realPartId: realPart?.id ?? null,
+        ppId: realPart?.id ?? (2000 + index),
+        realPartId: realPart?.id ?? row.realPartId ?? null,
         statusName: realPart?.statusName || getPlanStatusLabel(realPart?.statusId),
         statusId: realPart?.statusId,
         productionId: selectedProduction ? selectedProduction.productionId : null,
@@ -209,13 +230,22 @@ export default function ProductionAssignment() {
       || selectedProduction?.product?.startDate || "2026-01-01";
     const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
       || selectedProduction?.product?.endDate || "2026-12-31";
-    const pm = selectedProduction?.pm || {};
     const currentUser = getStoredUser();
-    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
-    const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
+
+    // Check permissions more robustly (handle string/array and case-insensitive)
+    const getRolesArr = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.map(v => String(v).toLowerCase());
+      return [String(val).toLowerCase()];
+    };
+    const userRoles = getRolesArr(currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "");
+    const isOwner = userRoles.some(r => ["owner", "admin"].includes(r));
     setIsOwnerView(isOwner);
 
-    if (!pmId) {
+    // Owner always sees everything, PM only sees their workers
+    if (isOwner) {
+      // Owner View: Ignore pmId check for loading the list
+    } else if (!pmId) {
       setWorkerError("Không tìm thấy thông tin PM quản lý đơn sản xuất này.");
       return;
     }
@@ -225,23 +255,11 @@ export default function ProductionAssignment() {
       WorkerService.getEmployeeDirectory()
         .then((res) => {
           const allEmployees = res?.data || [];
-          // Filter only active workers/PMs (exclude Admin, Customer, inactive)
+          // Filter only active workers/PMs (exclude Customer, inactive)
           const eligible = allEmployees.filter(emp => {
             if (emp.status !== "active") return false;
             const sysRole = (emp.primarySystemRole || "").toLowerCase();
-            if (["admin", "customer"].includes(sysRole)) return false;
-
-            // If the production is assigned directly to the owner, show all workers
-            const assignedPmIsOwner = isOwner && String(pmId) === String(currentUser?.id);
-            if (assignedPmIsOwner) return true;
-
-            // Otherwise, only keep the PM assigned to this production, their workers, or other owners
-            const isAssignedPm = String(emp.id) === String(pmId);
-            const isWorkerOfAssignedPm = String(emp.managerId) === String(pmId);
-            const isCurrentOwner = sysRole === "owner";
-
-            if (!isAssignedPm && !isWorkerOfAssignedPm && !isCurrentOwner) return false;
-
+            if (sysRole === "customer") return false;
             return true;
           });
 
@@ -256,11 +274,12 @@ export default function ProductionAssignment() {
             managerName: emp.managerName || "",
           }));
 
-          // Inject Owner if not in list
-          if (currentUser?.id && !mapped.some(w => String(w.id) === String(currentUser.id))) {
+          // Inject Owner if not in list (check both .id and .userId)
+          const currentUserId = currentUser?.id || currentUser?.userId || localStorage.getItem("userId");
+          if (currentUserId && !mapped.some(w => String(w.id) === String(currentUserId))) {
             mapped.push({
-              id: String(currentUser.id),
-              fullName: currentUser.fullName || currentUser.name || "Chủ xưởng",
+              id: String(currentUserId),
+              fullName: currentUser.fullName || currentUser.userName || "Chủ xưởng (Bạn)",
               status: "ready",
               frequentSteps: [],
               leaveDate: "",
@@ -270,24 +289,45 @@ export default function ProductionAssignment() {
             });
           }
 
-          // Active managers: all distinct managerIds that are assigned to someone
+          // Filter out managers from Workers list to use as group headers, 
+          // BUT keep them if they are selectable workers as well.
           const activeManagerIds = new Set(mapped.filter(w => w.managerId).map(w => String(w.managerId)));
 
-          // Build groups by managerId
           const groupMap = new Map();
           const ungrouped = [];
 
+          // Create a special priority group for Owners/Admins
+          const OWNER_GROUP_KEY = "OWNER_GROUP";
+          groupMap.set(OWNER_GROUP_KEY, {
+            managerId: OWNER_GROUP_KEY,
+            managerName: "Chủ xưởng",
+            workers: []
+          });
+
           mapped.forEach(w => {
+            const roleLower = (w.role || "").toLowerCase();
+            const fullNameLower = (w.fullName || "").toLowerCase();
+            const currentUserId = currentUser?.id || currentUser?.userId || localStorage.getItem("userId");
+
+            // Comprehensive check for Owner: by role keywords OR if it's the current logged in user
+            const isMe = currentUserId && String(w.id) === String(currentUserId);
+            const isOwnerRole = roleLower.includes("chủ") ||
+              roleLower.includes("owner") ||
+              roleLower.includes("admin") ||
+              fullNameLower.includes("tổng tài") ||
+              isMe;
+
+            // If it's an owner or the current user, put them in the priority group
+            if (isOwnerRole) {
+              groupMap.get(OWNER_GROUP_KEY).workers.push(w);
+              return;
+            }
+
             let mgrKey = w.managerId ? String(w.managerId) : null;
 
             // If the worker is a manager themselves (their ID manages others), force them into their own group
             if (activeManagerIds.has(String(w.id))) {
               mgrKey = String(w.id);
-            }
-
-            // Owner should never be grouped under anyone
-            if (w.role === "Chủ xưởng" || w.role === "Owner" || w.role === "owner") {
-              mgrKey = null;
             }
 
             if (mgrKey) {
@@ -305,14 +345,18 @@ export default function ProductionAssignment() {
             }
           });
 
-          // Sort groups: PM of production first, then others
-          const groups = Array.from(groupMap.values()).sort((a, b) => {
-            if (a.managerId === String(pmId)) return -1;
-            if (b.managerId === String(pmId)) return 1;
-            return a.managerName.localeCompare(b.managerName);
-          });
+          // Sort groups: Priority Owner group first, then PM of production, then others
+          const finalGroups = Array.from(groupMap.values())
+            .filter(g => g.workers.length > 0)
+            .sort((a, b) => {
+              if (a.managerId === OWNER_GROUP_KEY) return -1;
+              if (b.managerId === OWNER_GROUP_KEY) return 1;
+              if (a.managerId === String(pmId)) return -1;
+              if (b.managerId === String(pmId)) return 1;
+              return (a.managerName || "").localeCompare(b.managerName || "");
+            });
 
-          setWorkerGroups(groups);
+          setWorkerGroups(finalGroups);
           setUngroupedWorkers(ungrouped);
           setWorkers(mapped);
         })
@@ -637,7 +681,11 @@ export default function ProductionAssignment() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  const isWorkerPath = location.pathname.startsWith("/worker/");
+                  const basePath = isWorkerPath ? "/worker/production" : "/production";
+                  navigate(`${basePath}/${selectedProductionId}`);
+                }}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -679,7 +727,7 @@ export default function ProductionAssignment() {
             </div>
           )}
 
-          {!incoming?.production && (
+          {!incoming?.production && !fetchedProduction && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800 shadow-sm flex items-center gap-3">
               <Info size={18} />
               <span>Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.</span>
@@ -841,9 +889,6 @@ export default function ProductionAssignment() {
                                 <div className="mt-1 text-sm text-slate-500">
                                   Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                                 </div>
-                                <div className="mt-1 text-sm text-slate-500">
-                                  {(row.startDate || "-").replace("T", " ").slice(0, 16)} → {(row.endDate || "-").replace("T", " ").slice(0, 16)}
-                                </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
                                     {selectedLabels.map((label) => (
@@ -946,7 +991,7 @@ export default function ProductionAssignment() {
                                 )}
                                 {isOnLeave ? (
                                   <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                    Nghỉ {(worker.leaveDate || "").replace("T", " ").slice(0, 16)}
+                                    Nghỉ
                                   </span>
                                 ) : (
                                   <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">

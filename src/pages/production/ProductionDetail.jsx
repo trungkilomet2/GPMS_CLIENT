@@ -584,8 +584,12 @@ export default function ProductionDetail() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <button onClick={() => navigate(location.state?.from || '/production')}
-                className="cursor-pointer mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
+              <button
+                onClick={() => {
+                  const isWorkerPath = location.pathname.startsWith("/worker/");
+                  navigate(isWorkerPath ? "/worker/production-plan" : "/production");
+                }}
+                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
               </button>

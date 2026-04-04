@@ -243,6 +243,7 @@ export default function ProductionPlan() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const incoming = useMemo(() => location.state || null, [location.state]);
   const currentUser = useMemo(() => getStoredUser() || {}, []);
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
   const isOwner = hasAnyRole(roleValue, ["owner", "admin"]);
@@ -263,8 +264,8 @@ export default function ProductionPlan() {
   const [applyTarget, setApplyTarget] = useState(null);
 
   const [rows, setRows] = useState(() => {
-    if (location.state?.steps && Array.isArray(location.state.steps) && location.state.steps.length > 0) {
-      const initial = location.state.steps.map((s, idx) => ({
+    if (incoming && Array.isArray(incoming.steps) && incoming.steps.length > 0) {
+      const initial = incoming.steps.map((s, idx) => ({
         ppId: 2000 + idx,
         productionId: Number(initialProductionId),
         partName: s.partName,
@@ -746,6 +747,17 @@ export default function ProductionPlan() {
       return;
     }
 
+    // Comprehensive check for CPU range: 100 - 10,000,000
+    const invalidStep = rows.find(r => {
+      const val = Number(r.cpu);
+      return isNaN(val) || val < 100 || val > 10000000;
+    });
+
+    if (invalidStep) {
+      toast.error(`Công đoạn "${invalidStep.partName}" có giá không hợp lệ (Phải từ 100 đến 10.000.000 VNĐ).`);
+      return;
+    }
+
     // Show warning if parts exist and it's NOT a forced save
     if (hasExistingParts && !force) {
       setIsConfirmSaveOpen(true);
@@ -888,12 +900,12 @@ export default function ProductionPlan() {
       setFormError("Tên công đoạn không được dài quá 100 ký tự.");
       return;
     }
-    if (form.cpu === "" || Number(form.cpu) < 0 || isNaN(Number(form.cpu))) {
-      setFormError("Giá/SP phải là số hợp lệ lớn hơn hoặc bằng 0.");
+    if (form.cpu === "" || Number(form.cpu) < 100 || isNaN(Number(form.cpu))) {
+      setFormError("Giá/SP phải từ 100 đến 10.000.000 VNĐ.");
       return;
     }
-    if (Number(form.cpu) > 100000000) {
-      setFormError("Giá/SP không được vượt quá 100.000.000 VNĐ.");
+    if (Number(form.cpu) > 10000000) {
+      setFormError("Giá/SP không vượt quá 10.000.000 VNĐ.");
       return;
     }
 
@@ -989,7 +1001,7 @@ export default function ProductionPlan() {
         ppId: 2000 + index,
         productionId: selectedProductionId ? Number(selectedProductionId) : null,
         partName: step.partName,
-        cpu: step.cpu ? String(step.cpu) : "",
+        cpu: "", // Do not generate price when applying templates
         startDate: baseStart,
         endDate: baseEnd,
         ppsId: "",
@@ -1017,7 +1029,7 @@ export default function ProductionPlan() {
         ppId: 2000 + index,
         productionId: selectedProductionId ? Number(selectedProductionId) : null,
         partName: step.partName,
-        cpu: step.cpu ? String(step.cpu) : "",
+        cpu: "", // Do not generate price when applying templates
         startDate: baseStart,
         endDate: baseEnd,
         ppsId: "",
@@ -1059,7 +1071,11 @@ export default function ProductionPlan() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={handleCancelPlan}
+                onClick={() => {
+                  const isWorkerPath = location.pathname.startsWith("/worker/");
+                  const basePath = isWorkerPath ? "/worker/production" : "/production";
+                  navigate(`${basePath}/${selectedProductionId}`);
+                }}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
@@ -1422,7 +1438,11 @@ export default function ProductionPlan() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigate(`/production/${selectedProductionId}`)}
+                onClick={() => {
+                  const isWorkerPath = location.pathname.startsWith("/worker/");
+                  const basePath = isWorkerPath ? "/worker/production" : "/production";
+                  navigate(`${basePath}/${selectedProductionId}`);
+                }}
                 className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
               >
                 Hủy
