@@ -50,7 +50,6 @@ export const API_ENDPOINTS = {
     ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
     APPROVE_PLAN: (id) => `${BASE_URL}/api/Production/production/approve/production-plan/${id}`,
     NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
-    SUBMIT_PLAN: (id) => `${BASE_URL}/api/Production/production/submit/production-plan/${id}`,
     OUTPUT_HISTORY_WORKER: (workerId) => `${BASE_URL}/api/Production/production/output/history/worker/${workerId}`,
     OUTPUT_HISTORY_ALL: `${BASE_URL}/api/Production/production/output/history/workers`,
     COMPLETE: (id) => `${BASE_URL}/api/Production/production/complete/${id}`,
@@ -60,13 +59,14 @@ export const API_ENDPOINTS = {
       `${BASE_URL}/api/ProductionPart/production/get-list-parts/${productionId}`,
     CREATE_PARTS: (productionId) =>
       `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
+    UPDATE_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/update/${id}`,
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
     UPDATE_ASSIGN_WORKERS: (id) =>
       `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
     CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
     UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
     GET_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
-    CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/${partId}`,
+    CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/create/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
     COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,

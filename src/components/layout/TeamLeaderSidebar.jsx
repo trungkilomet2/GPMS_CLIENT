@@ -112,7 +112,6 @@ export default function TeamLeaderSidebar() {
           {!collapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Tổ trưởng"}</div>
-              <div className="dashboard-sidebar__user-role">Team Leader</div>
             </div>
           )}
         </NavLink>

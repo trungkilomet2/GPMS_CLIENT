@@ -158,7 +158,7 @@ export default function ProductionPartHistory() {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {logs.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-20 text-center text-slate-500 italic">
+                        <td colSpan={6} className="py-20 text-center text-slate-500 italic">
                           Chưa có thợ nào báo cáo sản lượng cho công đoạn này.
                         </td>
                       </tr>

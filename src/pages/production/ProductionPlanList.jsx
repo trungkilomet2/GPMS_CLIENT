@@ -16,7 +16,7 @@ import "@/styles/leave.css";
 
 export default function ProductionPlanList() {
   const location = useLocation();
-  const { isWorker, roleValue } = useAuth();
+  const { isWorker, roleValue, currentUserId } = useAuth();
   const primaryRole = getPrimaryWorkspaceRole(roleValue);
   const isWorkerRoute = location.pathname.startsWith("/worker/");
   const isWorkerView = primaryRole === "worker";
@@ -26,6 +26,14 @@ export default function ProductionPlanList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [involvedProdIds, setInvolvedProdIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`involved_plans_${currentUserId}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [partCounts, setPartCounts] = useState({});
   const pageSize = 10;
 
@@ -34,6 +42,9 @@ export default function ProductionPlanList() {
   const plans = useMemo(() => {
     return productions
       .filter((item) => {
+        // Filter for Workers: only show involved orders
+        if (isWorker && !involvedProdIds.has(item.productionId)) return false;
+
         const sid = Number(item?.statusId ?? item?.status ?? 0);
         const name = getProductionStatusLabel(item?.statusName ?? item?.status ?? item?.statusId ?? "");
         // Exclude Chờ Xét Duyệt (1) and Từ Chối (2)
@@ -108,60 +119,84 @@ export default function ProductionPlanList() {
   useEffect(() => {
     let isMounted = true;
 
-    const fetchPartCounts = async () => {
-      const productionIds = [...new Set(plans.map((item) => item.productionId).filter(Boolean))];
-      const pendingIds = productionIds.filter((id) => partCounts[id] === undefined);
+    const discoverAllInvolvement = async () => {
+      const allIds = productions.map((p) => p.productionId).filter(Boolean);
+      const pendingIds = allIds.filter((id) => partCounts[id] === undefined);
 
-      if (pendingIds.length === 0) {
-        return;
-      }
+      if (pendingIds.length === 0) return;
 
-      const results = await Promise.all(
-        pendingIds.map(async (productionId) => {
-          try {
-            const response = await ProductionPartService.getPartsByProduction(productionId, {
-              PageIndex: 0,
-              PageSize: 100,
-              SortColumn: "Name",
-              SortOrder: "ASC",
-            }).catch(() => ProductionPartService.getPartsByProduction(productionId, { PageSize: 500 }));
-            const payload = response?.data;
-            const list =
-              payload?.data ??
-              payload?.items ??
-              payload?.list ??
-              payload?.results ??
-              (Array.isArray(payload) ? payload : []);
-            const total =
-              typeof payload?.recordCount === "number"
-                ? payload.recordCount
-                : Array.isArray(list)
-                  ? list.length
-                  : 0;
-            return [productionId, total];
-          } catch (error) {
-            return [productionId, 0];
-          }
-        })
-      );
+      const chunkSize = 5;
+      for (let i = 0; i < pendingIds.length; i += chunkSize) {
+        if (!isMounted) break;
+        const chunk = pendingIds.slice(i, i + chunkSize);
 
-      if (!isMounted) return;
+        const results = await Promise.all(
+          chunk.map(async (productionId) => {
+            try {
+              const response = await ProductionPartService.getPartsByProduction(productionId, { PageSize: 100 });
+              const payload = response?.data?.data ?? response?.data ?? [];
+              const list = Array.isArray(payload) ? payload : [];
 
-      setPartCounts((prev) => {
-        const next = { ...prev };
-        results.forEach(([productionId, total]) => {
-          next[productionId] = total;
+              const uid = String(currentUserId);
+              const isUserInvolved = list.some((part) => {
+                const workers = [
+                  ...(Array.isArray(part.workerIds) ? part.workerIds : []),
+                  ...(Array.isArray(part.assignedWorkers) ? part.assignedWorkers : []),
+                  ...(Array.isArray(part.assignees) ? part.assignees : []),
+                  ...(Array.isArray(part.workers) ? part.workers : []),
+                  part.workerId,
+                  part.userId,
+                ].filter(Boolean);
+
+                return workers.some((w) => {
+                  const wid = typeof w === "object" ? w.id || w.workerId || w.userId || w.accountId : w;
+                  return String(wid) === uid;
+                });
+              });
+
+              const total = list.length;
+              return { productionId, total, isUserInvolved };
+            } catch (error) {
+              return { productionId, total: 0, isUserInvolved: false };
+            }
+          })
+        );
+
+        if (!isMounted) break;
+
+        setPartCounts((prev) => {
+          const next = { ...prev };
+          results.forEach((r) => {
+            next[r.productionId] = r.total;
+          });
+          return next;
         });
-        return next;
-      });
+
+        if (isWorker) {
+          setInvolvedProdIds((prev) => {
+            const next = new Set(prev);
+            let changed = false;
+            results.forEach((r) => {
+              if (r.isUserInvolved && !next.has(r.productionId)) {
+                next.add(r.productionId);
+                changed = true;
+              }
+            });
+            if (changed && currentUserId) {
+              localStorage.setItem(`involved_plans_${currentUserId}`, JSON.stringify([...next]));
+            }
+            return next;
+          });
+        }
+      }
     };
 
-    fetchPartCounts();
+    if (productions.length > 0) discoverAllInvolvement();
 
     return () => {
       isMounted = false;
     };
-  }, [partCounts, plans]);
+  }, [productions, partCounts, isWorker, currentUserId]);
 
   return (
     <LayoutComponent>

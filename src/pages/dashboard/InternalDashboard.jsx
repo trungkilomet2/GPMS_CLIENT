@@ -1,4 +1,4 @@
-﻿import { createElement } from "react";
+import { createElement } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, BriefcaseBusiness, ClipboardList, ContactRound, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
@@ -78,7 +78,18 @@ export default function InternalDashboard() {
             <div className="internal-dashboard-hero__account">
               <div className="internal-dashboard-hero__label">Tài khoản hiện tại</div>
               <div className="internal-dashboard-hero__name">{user.fullName || user.name || user.userName}</div>
-              <div className="internal-dashboard-hero__role">{roleLabels.join(", ") || "Người dùng nội bộ"}</div>
+              <div className="internal-dashboard-hero__role">
+                {roles
+                  .map((r) => {
+                    const lowered = r.toLowerCase();
+                    if (lowered === "owner") return "Chủ xưởng";
+                    if (lowered === "pm") return "Quản lý sản xuất";
+                    if (lowered === "admin") return "Quản trị viên";
+                    if (lowered === "worker") return "Nhân viên";
+                    return r;
+                  })
+                  .join(", ") || "Người dùng nội bộ"}
+              </div>
             </div>
           </section>
 
