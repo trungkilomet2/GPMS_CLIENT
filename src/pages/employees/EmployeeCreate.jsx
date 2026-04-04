@@ -186,7 +186,7 @@ export default function EmployeeCreate() {
               </Link>
               <h1 className="employee-create-hero__title">Thêm nhân viên mới</h1>
               <p className="employee-create-hero__subtitle">
-                Tạo tài khoản nhân sự theo sơ đồ quản lý: 1 Chủ xưởng, nhiều Quản lý sản xuất, mỗi Quản lý sản xuất phụ trách nhân viên của line mình.
+                Tạo tài khoản nhân sự theo sơ đồ quản lý của xưởng: Chủ xưởng quản lý Quản lý sản xuất, và Quản lý sản xuất phụ trách nhân viên trực thuộc.
               </p>
             </div>
 
@@ -281,12 +281,6 @@ export default function EmployeeCreate() {
               <div className="employee-create-banner">
                 <span>{getManagerRoleHint(form.role)}</span>
               </div>
-
-              {form.role === "Worker" ? (
-                <div className="employee-create-banner">
-                  <span>Chuyên môn của nhân viên sẽ được gán ở màn riêng sau khi tạo xong tài khoản, hỗ trợ chọn nhiều kỹ năng cùng lúc.</span>
-                </div>
-              ) : null}
 
               {managerError ? (
                 <div className="employee-create-banner employee-create-banner--error">

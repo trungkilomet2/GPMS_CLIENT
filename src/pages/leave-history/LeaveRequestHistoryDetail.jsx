@@ -175,7 +175,7 @@ export default function LeaveRequestHistoryDetail() {
                     </Link>
                     <div className="hidden h-7 w-px bg-white/20 sm:block" />
                     <div>
-                      <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80">Leave Request History</div>
+                      <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80">Lịch sử nghỉ phép</div>
                       <h1 className="mt-1 text-[1.75rem] font-bold leading-tight">Chi tiết lịch sử đơn nghỉ</h1>
                     </div>
                   </div>
@@ -247,7 +247,7 @@ export default function LeaveRequestHistoryDetail() {
 
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
-                      <DetailItem icon={FileText} label="Mã người gửi" value={leave.userId ? `USER-${leave.userId}` : ""} />
+                      <DetailItem icon={FileText} label="Mã nhân viên gửi đơn" value={leave.userId ? `NV-${leave.userId}` : ""} />
                     </div>
 
                     {leave.denyContent ? (

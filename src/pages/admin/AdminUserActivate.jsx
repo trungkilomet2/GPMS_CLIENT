@@ -39,7 +39,7 @@ export default function AdminUserActivate() {
         setError(
           getAdminUserErrorMessage(
             err,
-            "Không tải được danh sách user cần kích hoạt. Vui lòng thử lại."
+            "Không tải được danh sách tài khoản cần kích hoạt. Vui lòng thử lại."
           )
         );
       } finally {
@@ -74,7 +74,7 @@ export default function AdminUserActivate() {
     }
 
     const shouldEnable = window.confirm(
-      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "user này"} không?`
+      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "tài khoản này"} không?`
     );
 
     if (!shouldEnable) return;
@@ -114,7 +114,7 @@ export default function AdminUserActivate() {
             <div className="admin-hero__heading">
               <Link to="/admin/users" className="admin-hero__back">
                 <ArrowLeft size={18} />
-                <span>Quay lại danh sách user</span>
+                <span>Quay lại danh sách tài khoản</span>
               </Link>
               <h1 className="admin-hero__title">Kích hoạt tài khoản</h1>
               <p className="admin-hero__subtitle">
@@ -139,15 +139,15 @@ export default function AdminUserActivate() {
           ) : null}
 
           <div className="admin-stats-grid">
-            <AdminStatCard icon={UserRoundCheck} label="Có thể kích hoạt" value={stats.total} meta="Bao gồm inactive, suspended, locked, invited" tone="primary" />
-            <AdminStatCard icon={UserRoundCheck} label="Ngừng hoạt động" value={stats.inactive} meta="Tài khoản bị disable từ admin" tone="warning" />
+            <AdminStatCard icon={UserRoundCheck} label="Có thể kích hoạt" value={stats.total} meta="Bao gồm các trạng thái ngừng hoạt động, tạm khóa và chờ kích hoạt" tone="primary" />
+            <AdminStatCard icon={UserRoundCheck} label="Ngừng hoạt động" value={stats.inactive} meta="Tài khoản bị vô hiệu hóa từ quản trị" tone="warning" />
             <AdminStatCard icon={CircleAlert} label="Tạm khóa" value={stats.suspended} meta="Cần rà soát trước khi mở lại" tone="danger" />
           </div>
 
           <div className="admin-table-card">
             <div className="admin-table-card__header">
               <div>
-                <h2 className="admin-card__title">Danh sách user chờ kích hoạt</h2>
+                <h2 className="admin-card__title">Danh sách tài khoản chờ kích hoạt</h2>
                 <p className="admin-card__subtitle">
                   Chỉ hiển thị các tài khoản chưa ở trạng thái hoạt động để admin xử lý nhanh.
                 </p>
@@ -158,8 +158,8 @@ export default function AdminUserActivate() {
               {loading ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
-                    <strong>Đang tải danh sách user...</strong>
-                    <span>Dữ liệu đang được đồng bộ từ backend.</span>
+                    <strong>Đang tải danh sách tài khoản...</strong>
+                    <span>Dữ liệu đang được đồng bộ từ hệ thống.</span>
                   </div>
                   <div className="admin-state__actions">
                     <LoaderCircle size={20} className="animate-spin" />
@@ -168,7 +168,7 @@ export default function AdminUserActivate() {
               ) : error ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
-                    <strong>Không tải được danh sách user</strong>
+                    <strong>Không tải được danh sách tài khoản</strong>
                     <span>{error}</span>
                   </div>
                   <div className="admin-state__actions">
@@ -210,7 +210,7 @@ export default function AdminUserActivate() {
                             </div>
                             <div>
                               <div className="admin-table__primary">{user.fullName}</div>
-                              <div className="admin-table__secondary">@{user.userName || "chua-co-username"}</div>
+                              <div className="admin-table__secondary">@{user.userName || "chua-co-ten-dang-nhap"}</div>
                               <div className="admin-table__secondary admin-table__stacked-meta">{user.email || "Chưa cập nhật email"}</div>
                             </div>
                           </div>
@@ -220,7 +220,7 @@ export default function AdminUserActivate() {
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
                           </div>
                           <div className="admin-table__secondary">
-                            {user.roleDescription || "Chưa có mô tả vai trò từ backend."}
+                            {user.roleDescription || "Chưa có mô tả vai trò từ hệ thống."}
                           </div>
                         </td>
                         <td>

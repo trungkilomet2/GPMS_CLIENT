@@ -18,7 +18,7 @@ import {
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
-import { canAssignSpecialties } from "@/lib/orgHierarchy";
+import { canAssignSpecialties, getRoleHierarchyTag, getSystemRoleLabel } from "@/lib/orgHierarchy";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
 import "@/styles/employee-detail.css";
@@ -53,6 +53,7 @@ export default function EmployeeDetail() {
   const currentUser = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const isOwner = primaryRole === "owner";
+  const isPm = primaryRole === "pm";
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -210,7 +211,21 @@ export default function EmployeeDetail() {
   };
 
   const statusConfig = employee ? STATUS_MAP[employee.status] ?? STATUS_MAP.active : STATUS_MAP.active;
-  const roles = useMemo(() => employee?.roleLabels ?? [], [employee]);
+  const roles = useMemo(() => {
+    const labels = Array.isArray(employee?.roleLabels) ? employee.roleLabels.filter(Boolean) : [];
+    if (labels.length) {
+      return labels.map((role) => getSystemRoleLabel(role));
+    }
+
+    const rawRoles = Array.isArray(employee?.roles)
+      ? employee.roles
+      : String(employee?.role ?? "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    return rawRoles.map((role) => getSystemRoleLabel(role));
+  }, [employee]);
   const canEditSpecialties = canAssignSpecialties(employee?.roles ?? employee?.role ?? "");
   const workerSkillLabels = useMemo(
     () =>
@@ -338,7 +353,9 @@ export default function EmployeeDetail() {
                 <div className="employee-detail-profile__name">{employee.fullName}</div>
                 <div className="employee-detail-profile__meta">
                   <span className={statusConfig.className}>{statusConfig.label}</span>
-                  <span className="employee-detail-profile__username">@{employee.userName || "chua-cap-nhat"}</span>
+                  <span className="employee-detail-profile__username">
+                    {employee.userName ? `@${employee.userName}` : "Chưa có tên đăng nhập"}
+                  </span>
                 </div>
                 </section>
 
@@ -417,7 +434,7 @@ export default function EmployeeDetail() {
                         <span className="employee-detail-role-empty">Chưa cập nhật chuyên môn</span>
                       )}
                     </div>
-                    {isOwner && canEditSpecialties ? (
+                    {((isOwner || isPm) && canEditSpecialties) ? (
                       <Link to={`/employees/${id}/skills`} className="employee-detail-btn employee-detail-btn--secondary">
                         <PencilLine size={16} />
                         <span>Gán chuyên môn</span>
@@ -428,7 +445,9 @@ export default function EmployeeDetail() {
                     <div className="employee-detail-role-block">
                     <div className="employee-detail-role-label">Tuyến quản lý</div>
                       <div className="employee-detail-role-pills">
-                        <span className="employee-detail-machine-pill">{employee.hierarchyTag || "Chưa phân loại"}</span>
+                        <span className="employee-detail-machine-pill">
+                          {employee.hierarchyTag || getRoleHierarchyTag(employee?.roles?.[0] || employee?.role) || "Chưa phân loại"}
+                        </span>
                       </div>
                     </div>
                 </div>

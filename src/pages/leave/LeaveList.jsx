@@ -263,7 +263,6 @@ export default function LeaveList() {
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
-                  <option value="cancel_requested">Chờ hủy</option>
                   <option value="cancelled">Đã hủy</option>
                 </select>
               </label>

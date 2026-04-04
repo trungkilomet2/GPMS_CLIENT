@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   BriefcaseBusiness,
   CircleAlert,
   Lock,
@@ -32,11 +33,11 @@ const STATUS_MAP = {
 };
 
 const ROLE_GROUPS = {
-  management: ["Owner", "PM", "Admin"],
+  management: ["PM"],
 };
 
 const VIEW_MODE_ROLE_FILTERS = {
-  management: ["Owner", "PM", "Admin"],
+  management: ["PM"],
   workers: ["Worker"],
 };
 
@@ -363,10 +364,10 @@ export default function EmployeeList() {
         : "Danh sách nhân viên";
   const pageSubtitle =
     viewMode === "management"
-      ? "Quản lý và theo dõi thông tin nhân sự có vai trò quản lý trong hệ thống."
+      ? "Theo dõi danh sách quản lý sản xuất đang phụ trách nhân sự trong xưởng."
       : viewMode === "workers"
-        ? "Theo dõi riêng nhóm worker và chuyên môn thợ trong hệ thống."
-        : "Theo dõi nhân sự nội bộ theo hierarchy Owner, PM, Worker và chuyên môn thợ.";
+        ? "Theo dõi riêng nhóm nhân viên sản xuất và chuyên môn thợ trong hệ thống."
+        : "Theo dõi toàn bộ nhân sự nội bộ theo vai trò hệ thống và chuyên môn thợ.";
   const tableTitle =
     viewMode === "management"
       ? "Nhóm quản lý"
@@ -375,15 +376,20 @@ export default function EmployeeList() {
         : "Nhân sự trong xưởng";
   const tableSubtitle =
     viewMode === "management"
-      ? "Danh sách các tài khoản quản lý và vai trò điều hành hiện có."
+      ? "Danh sách các tài khoản quản lý sản xuất hiện có trong xưởng."
       : viewMode === "workers"
-        ? "Danh sách worker, chuyên môn thợ và tuyến quản lý hiện có."
+        ? "Danh sách nhân viên sản xuất, chuyên môn thợ và tuyến quản lý hiện có."
         : "Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.";
 
   return (
     <DashboardLayout>
       <div className="employee-page">
         <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+          <Link to="/employees" className="employee-back">
+            <ArrowLeft size={18} />
+            <span>Quay lại danh sách nhân viên</span>
+          </Link>
+
           <div className="employee-hero">
             <div>
               <h1 className="employee-hero__title">{pageTitle}</h1>
@@ -401,7 +407,7 @@ export default function EmployeeList() {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
             <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
-            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Chủ xưởng và quản lý sản xuất" tone="warning" />
+            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Danh sách quản lý sản xuất trong xưởng" tone="warning" />
             <SummaryCard
               icon={Sparkles}
               label="Có chuyên môn"

@@ -14,6 +14,7 @@ const InternalDashboard = lazy(() => import("@/pages/dashboard/InternalDashboard
 // AUTH
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
 
 // ORDERS
 const OrdersList = lazy(() => import("@/pages/orders/OrderHistory"));
@@ -87,6 +88,7 @@ export const routes = [
   // AUTH
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
 
   // ORDERS
   { path: "/orders", element: guardByRoles(["Owner", "Customer"], <OrdersList />) },

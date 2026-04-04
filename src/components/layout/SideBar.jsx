@@ -16,17 +16,18 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
-  { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false },
-  { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false },
+  { to: "/admin/users", label: "Quản lý tài khoản", icon: Users, disabled: false },
+  { to: "/admin/logs", label: "Nhật ký hệ thống", icon: ClipboardList, disabled: false },
   { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false },
 ];
 
 const OPERATION_NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
+  { to: "/dashboard", label: "Bảng điều khiển", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
@@ -87,6 +88,9 @@ export default function Sidebar() {
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
   const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
+  const userRoleLabel = splitRoles(user?.role)
+    .map((role) => getSystemRoleLabel(role))
+    .join(", ");
 
   useEffect(() => {
     try {
@@ -168,7 +172,7 @@ export default function Sidebar() {
           {!collapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{user?.role || "Owner / PM"}</div>
+              <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
             </div>
           )}
         </NavLink>

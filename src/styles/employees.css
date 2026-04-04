@@ -17,6 +17,16 @@
   padding: 0;
 }
 
+.employee-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  text-decoration: none;
+  font-weight: 700;
+  color: #1f6b42;
+}
+
 .employee-hero__eyebrow {
   margin: 0;
   color: #1e6e43;

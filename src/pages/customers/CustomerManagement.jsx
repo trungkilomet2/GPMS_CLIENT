@@ -43,17 +43,17 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
   };
 
   return (
-    <div className={`rounded-[1.75rem] border p-5 shadow-sm ${toneMap[tone] ?? toneMap.emerald}`}>
+    <div className={`rounded-[1.5rem] border px-5 py-4 shadow-sm ${toneMap[tone] ?? toneMap.emerald}`}>
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <div className="mt-2 text-3xl font-bold">{value}</div>
+          <div className="mt-2 text-3xl font-bold leading-none">{value}</div>
         </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
           <Icon size={22} />
         </div>
       </div>
-      <p className="mt-4 text-sm text-slate-600">{meta}</p>
+      <p className="mt-3 min-h-[3rem] text-sm leading-6 text-slate-600">{meta}</p>
     </div>
   );
 }
@@ -238,23 +238,40 @@ export default function CustomerManagement() {
     <DashboardLayout>
       <div className="min-h-full bg-[#f4f7f5]">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-          <section className="rounded-[2rem] bg-gradient-to-r from-[#103c25] via-[#1b5f39] to-[#25784a] px-6 py-7 text-white shadow-xl sm:px-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <section className="rounded-[2rem] bg-gradient-to-r from-[#103c25] via-[#1b5f39] to-[#25784a] px-6 py-6 text-white shadow-xl sm:px-8">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
               <div className="max-w-3xl">
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/80">Quản lý khách hàng</p>
-                <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Danh sách khách hàng và đơn hàng theo khách</h1>
-                <p className="mt-3 text-sm text-emerald-50/85 sm:text-base">
-                  Theo dõi nhanh thông tin khách hàng và toàn bộ đơn hàng của từng khách trong cùng một màn quản lý.
+                <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100/85">
+                  Quản lý khách hàng
+                </div>
+                <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-[2.6rem]">
+                  Khách hàng và đơn hàng trong một màn hình
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/85 sm:text-base">
+                  Tra cứu nhanh khách hàng, xem thông tin liên hệ và theo dõi toàn bộ đơn hàng liên quan mà không phải chuyển màn liên tục.
                 </p>
               </div>
-              <div className="grid gap-3 text-sm sm:grid-cols-2">
-                <div className="flex min-h-[6.75rem] flex-col justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                  <div className="min-h-[2.5rem] text-emerald-100/80">Khách đang hiển thị</div>
-                  <div className="mt-1 text-2xl font-bold leading-none">{customerStats.totalOnPage}</div>
+              <div className="grid gap-3 text-sm md:grid-cols-3 xl:min-w-[34rem]">
+                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/75">Khách đang hiển thị</div>
+                  <div className="mt-3 text-3xl font-bold leading-none">{customerStats.totalOnPage}</div>
+                  <div className="mt-2 text-sm text-emerald-50/75">Theo trang và bộ lọc hiện tại</div>
                 </div>
-                <div className="flex min-h-[6.75rem] flex-col justify-between rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                  <div className="min-h-[2.5rem] text-emerald-100/80">Đơn của khách đang chọn</div>
-                  <div className="mt-1 text-2xl font-bold leading-none">{orderRecordCount}</div>
+                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/75">Đơn của khách đang chọn</div>
+                  <div className="mt-3 text-3xl font-bold leading-none">{orderRecordCount}</div>
+                  <div className="mt-2 text-sm text-emerald-50/75">
+                    {selectedCustomer ? selectedCustomer.fullName : "Chưa chọn khách hàng"}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-100/75">Khách đang xem</div>
+                  <div className="mt-3 truncate text-lg font-bold leading-snug">
+                    {selectedCustomer?.fullName || "Chưa chọn khách hàng"}
+                  </div>
+                  <div className="mt-2 truncate text-sm text-emerald-50/75">
+                    {selectedCustomer?.email || selectedCustomer?.phoneNumber || "Chưa có thông tin liên hệ"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -264,8 +281,8 @@ export default function CustomerManagement() {
             <SummaryCard
               icon={Users}
               label="Khách hàng"
-              value={customerRecordCount}
-              meta="Tổng số khách theo bộ lọc hiện tại."
+              value={customerStats.totalOnPage}
+              meta="Số khách đang hiển thị ở trang hiện tại sau khi áp dụng bộ lọc."
               tone="emerald"
             />
             <SummaryCard

@@ -1,6 +1,7 @@
 import { createElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  ArrowLeft,
   CircleAlert,
   LoaderCircle,
   Plus,
@@ -42,14 +43,9 @@ function UsageBadge({ assignedCount }) {
   );
 }
 
-function getMemberSummary(members = []) {
-  if (members.length === 0) return "Chưa có nhân sự được gán";
-  if (members.length <= 2) return members.map((member) => member.fullName).join(", ");
-
-  return `${members
-    .slice(0, 2)
-    .map((member) => member.fullName)
-    .join(", ")} và ${members.length - 2} người khác`;
+function getMemberTooltip(members = []) {
+  if (members.length === 0) return "";
+  return members.map((member) => member.fullName).join(", ");
 }
 
 export default function WorkerRoleList() {
@@ -119,6 +115,11 @@ export default function WorkerRoleList() {
     <DashboardLayout>
       <div className="worker-role-page">
         <div className="worker-role-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+          <Link to="/employees" className="worker-role-back">
+            <ArrowLeft size={18} />
+            <span>Quay lại danh sách nhân viên</span>
+          </Link>
+
           <div className="worker-role-hero">
             <div>
               <h1 className="worker-role-hero__title">Danh sách chuyên môn thợ</h1>
@@ -150,7 +151,7 @@ export default function WorkerRoleList() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tìm theo tên chuyên môn hoặc tên hiển thị..."
+                  placeholder="Tìm theo tên chuyên môn..."
                   className="worker-role-filter-field__control"
                 />
               </label>
@@ -201,8 +202,7 @@ export default function WorkerRoleList() {
                 <table className="worker-role-table min-w-full">
                   <thead>
                     <tr>
-                      <th>Tên chuyên môn gốc</th>
-                      <th>Tên hiển thị</th>
+                      <th>Tên chuyên môn</th>
                       <th>Số nhân sự</th>
                       <th>Nhân sự được gán</th>
                       <th className="text-center">Tình trạng</th>
@@ -212,11 +212,33 @@ export default function WorkerRoleList() {
                     {filteredRoles.map((role) => (
                       <tr key={role.id}>
                         <td>
-                          <div className="worker-role-table__primary">{role.name}</div>
+                          <div className="worker-role-table__primary">{role.label || role.name}</div>
+                          {role.label && role.name && role.label !== role.name ? (
+                            <div className="worker-role-table__secondary">{role.name}</div>
+                          ) : null}
                         </td>
-                        <td>{role.label}</td>
                         <td>{role.assignedCount}</td>
-                        <td>{getMemberSummary(role.members)}</td>
+                        <td title={getMemberTooltip(role.members)}>
+                          {role.members.length === 0 ? (
+                            <span className="text-sm text-slate-500">Chưa có nhân sự được gán</span>
+                          ) : (
+                            <div className="flex max-w-[24rem] flex-wrap gap-2">
+                              {role.members.slice(0, 2).map((member) => (
+                                <span
+                                  key={`${role.id}-${member.id ?? member.fullName}`}
+                                  className="inline-flex max-w-full items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+                                >
+                                  <span className="truncate">{member.fullName}</span>
+                                </span>
+                              ))}
+                              {role.members.length > 2 ? (
+                                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                  +{role.members.length - 2} khác
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
                         <td className="text-center">
                           <UsageBadge assignedCount={role.assignedCount} />
                         </td>

@@ -11,7 +11,7 @@ const ROLE_CATALOG = [
     label: "Quản trị hệ thống",
     shortLabel: "Toàn quyền hệ thống",
     tone: "danger",
-    description: "Quản lý user, phân quyền và cấu hình hệ thống.",
+    description: "Quản lý tài khoản, phân quyền và cấu hình hệ thống.",
   },
   {
     key: "Owner",
@@ -196,7 +196,7 @@ const getRoleMeta = (roleKey = "") => {
     label: getSystemRoleLabel(trimmedKey),
     shortLabel: getSystemRoleLabel(trimmedKey),
     tone: "info",
-    description: "Vai trò này chưa có hồ sơ permission preview trong web admin.",
+    description: "Vai trò này chưa có phần xem nhanh quyền trong màn quản trị.",
   };
 };
 
@@ -336,7 +336,7 @@ const normalizeAdminUser = (item = {}) => {
     roleLabel: roleMeta?.label || "Chưa đồng bộ vai trò",
     roleTone: roleMeta?.tone || "info",
     roleShortLabel: roleMeta?.shortLabel || "Chưa có vai trò",
-    roleDescription: roleMeta?.description || "API danh sách tài khoản chưa trả thông tin vai trò cho tài khoản này.",
+    roleDescription: roleMeta?.description || "Danh sách tài khoản hiện chưa trả đủ thông tin vai trò cho tài khoản này.",
     grantedPermissionCount: roleMeta?.permissions ? countGrantedPermissions(roleMeta) : 0,
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
@@ -517,13 +517,14 @@ const AdminUserService = {
   async createUser(payload) {
     const roleMeta = ROLE_KEY_MAP[String(payload?.roleKey ?? "").trim()];
     if (!roleMeta) {
-      throw new Error("Unsupported role");
+      throw new Error("Vai trò này hiện chưa được hỗ trợ.");
     }
 
     const createPayload = {
       userName: String(payload?.userName ?? "").trim(),
       password: String(payload?.password ?? ""),
       fullName: String(payload?.fullName ?? "").trim(),
+      roleId: roleMeta.roleId,
       roleIds: [roleMeta.roleId],
     };
 
@@ -625,7 +626,7 @@ const AdminUserService = {
       .filter((roleId) => Number.isFinite(roleId));
 
     if (!normalizedRoleIds.length) {
-      throw new Error("Không có role hợp lệ để gán cho user.");
+      throw new Error("Không có vai trò hợp lệ để gán cho tài khoản.");
     }
 
     const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ASSIGN_ROLES(id), {

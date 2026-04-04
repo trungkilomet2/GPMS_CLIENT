@@ -263,7 +263,7 @@ export default function AdminUserList() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Quản lý tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Rà soát dữ liệu tài khoản mà backend đang trả về, nhận diện chỗ nào đã đủ dùng và chỗ nào còn thiếu để quản trị ổn định.
+                Rà soát dữ liệu tài khoản mà hệ thống đang trả về, nhận diện chỗ nào đã đủ dùng và chỗ nào còn thiếu để quản trị ổn định.
               </p>
             </div>
 
@@ -290,7 +290,7 @@ export default function AdminUserList() {
           {fallbackCount > 0 ? (
             <AdminBanner
               title={`${fallbackCount} tài khoản đang hiển thị từ dữ liệu danh sách`}
-              description="Backend chưa trả được thông tin chi tiết đầy đủ cho một số tài khoản, nên web đang tạm dùng dữ liệu từ danh sách. Đây là dấu hiệu nên bổ sung hoặc sửa ổn định endpoint chi tiết."
+              description="Hệ thống chưa trả được thông tin chi tiết đầy đủ cho một số tài khoản, nên web đang tạm dùng dữ liệu từ danh sách. Đây là dấu hiệu nên bổ sung hoặc làm ổn định phần chi tiết."
               tone="warning"
             />
           ) : null}
@@ -310,7 +310,7 @@ export default function AdminUserList() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tên, username, email, bộ phận..."
+                  placeholder="Tên, tên đăng nhập, email, bộ phận..."
                   className="admin-field__control"
                 />
               </label>
@@ -381,7 +381,7 @@ export default function AdminUserList() {
                 <div className="admin-state">
                   <div className="admin-state__content">
                     <strong>Đang tải danh sách tài khoản...</strong>
-                    <span>Dữ liệu quản trị đang được đồng bộ từ backend.</span>
+                    <span>Dữ liệu quản trị đang được đồng bộ từ hệ thống.</span>
                   </div>
                   <div className="admin-state__actions">
                     <LoaderCircle size={20} className="animate-spin" />
@@ -437,7 +437,9 @@ export default function AdminUserList() {
                             </div>
                             <div>
                               <div className="admin-table__primary">{user.fullName}</div>
-                              <div className="admin-table__secondary">@{user.userName || "chua-co-username"}</div>
+                              <div className="admin-table__secondary">
+                                {user.userName ? `@${user.userName}` : "Chưa có tên đăng nhập"}
+                              </div>
                               <div className="admin-table__secondary admin-table__stacked-meta">
                                 {user.email || "Chưa cập nhật email"}
                               </div>
@@ -452,7 +454,7 @@ export default function AdminUserList() {
                             ) : null}
                           </div>
                           <div className="admin-table__secondary">
-                            {user.roleDescription || "Chưa có mô tả vai trò từ backend."}
+                            {user.roleDescription || "Chưa có mô tả vai trò."}
                           </div>
                         </td>
                         <td>
@@ -463,7 +465,7 @@ export default function AdminUserList() {
                         <td>
                           <div className="admin-table__primary">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</div>
                           <div className="admin-table__secondary">
-                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `ID: ${user.id ?? "Chưa có"}`}
+                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `Mã tài khoản: ${user.id ?? "Chưa có"}`}
                           </div>
                           <div className="admin-table__secondary admin-table__stacked-meta">
                             {[user.phoneNumber, user.location].filter(Boolean).join(" · ") || "Chưa có số điện thoại hoặc địa điểm"}

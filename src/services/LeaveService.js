@@ -75,10 +75,9 @@ const mapStatusToApi = (status) => {
     approved: "Approved",
     rejected: "Denied",
     cancelled: "Cancelled",
-    cancel_requested: "CancelRequested",
   };
 
-  return statusMap[normalized] ?? status;
+  return statusMap[normalized];
 };
 
 const normalizeLeaveQueryParams = (params) => {
@@ -87,7 +86,13 @@ const normalizeLeaveQueryParams = (params) => {
   const nextParams = { ...params };
 
   if ("Status" in nextParams) {
-    nextParams.Status = mapStatusToApi(nextParams.Status);
+    const mappedStatus = mapStatusToApi(nextParams.Status);
+
+    if (mappedStatus) {
+      nextParams.Status = mappedStatus;
+    } else {
+      delete nextParams.Status;
+    }
   }
 
   return nextParams;

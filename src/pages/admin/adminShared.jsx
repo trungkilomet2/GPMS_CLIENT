@@ -64,14 +64,14 @@ export function validateAdminUserForm(rawForm) {
   const form = sanitizeAdminUserForm(rawForm);
   const nextErrors = {
     fullName: form.fullName ? "" : "Vui lòng nhập họ và tên.",
-    userName: form.userName ? "" : "Vui lòng nhập username.",
+    userName: form.userName ? "" : "Vui lòng nhập tên đăng nhập.",
     email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
       ? ""
       : "Email chưa đúng định dạng.",
     phoneNumber: form.phoneNumber ? "" : "Vui lòng nhập số điện thoại.",
     department: form.department ? "" : "Vui lòng nhập bộ phận.",
     title: form.title ? "" : "Vui lòng nhập chức danh.",
-    roleKey: form.roleKey ? "" : "Vui lòng chọn role.",
+    roleKey: form.roleKey ? "" : "Vui lòng chọn vai trò.",
     status: form.status ? "" : "Vui lòng chọn trạng thái.",
   };
 
