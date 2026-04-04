@@ -290,7 +290,7 @@ export default function AdminUserList() {
           {fallbackCount > 0 ? (
             <AdminBanner
               title={`${fallbackCount} tài khoản đang hiển thị từ dữ liệu danh sách`}
-              description="Hệ thống chưa trả được thông tin chi tiết đầy đủ cho một số tài khoản, nên web đang tạm dùng dữ liệu từ danh sách. Đây là dấu hiệu nên bổ sung hoặc làm ổn định phần chi tiết."
+              description="Hệ thống chưa trả được thông tin chi tiết đầy đủ cho một số tài khoản, nên màn hình đang tạm dùng dữ liệu từ danh sách. Đây là dấu hiệu nên bổ sung hoặc làm ổn định phần chi tiết."
               tone="warning"
             />
           ) : null}

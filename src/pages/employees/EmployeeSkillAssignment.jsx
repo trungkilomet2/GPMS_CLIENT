@@ -257,7 +257,7 @@ export default function EmployeeSkillAssignment() {
                     <div>
                       <div className="employee-skill-assignment__worker-name">{employee?.fullName || "Chưa cập nhật"}</div>
                       <div className="employee-skill-assignment__worker-meta">
-                        @{employee?.userName || "chua-cap-nhat"} • {getSystemRoleLabel(employee?.primarySystemRole || "") || "Chưa cập nhật"}
+                        {employee?.userName ? `@${employee.userName}` : "Chưa có tên đăng nhập"} • {getSystemRoleLabel(employee?.primarySystemRole || "") || "Chưa cập nhật"}
                       </div>
                     </div>
                   </div>

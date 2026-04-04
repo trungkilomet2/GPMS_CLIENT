@@ -250,7 +250,7 @@ export default function AdminSystemLog() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Dùng nhật ký thật từ hệ thống để kiểm tra lỗi vận hành, cảnh báo hạ tầng và những phần ràng buộc còn thiếu hoặc chưa kiểm tra chặt.
+                Dùng nhật ký thật từ hệ thống để kiểm tra lỗi vận hành, cảnh báo hạ tầng và những phần còn thiếu kiểm tra hoặc ràng buộc.
               </p>
             </div>
 
@@ -498,7 +498,7 @@ export default function AdminSystemLog() {
 
                   {selectedLog.messageTemplate ? (
                     <div className="admin-log-detail__section">
-                      <strong>Mẫu nội dung</strong>
+                      <strong>Mẫu thông điệp</strong>
                       <div className="admin-log-detail__code">{selectedLog.messageTemplate}</div>
                     </div>
                   ) : null}

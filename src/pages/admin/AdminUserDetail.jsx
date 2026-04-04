@@ -207,15 +207,15 @@ export default function AdminUserDetail() {
           </div>
 
           {notice ? (
-            <AdminBanner title={notice} description="Phần nhật ký bên dưới hiện vẫn là dữ liệu mẫu." tone={noticeTone} />
+            <AdminBanner title={notice} description="Thông tin đã được cập nhật và đồng bộ lên màn hình này." tone={noticeTone} />
           ) : null}
 
           {!loading && !error && user ? (
           <AdminBanner
-              title={user.detailAvailable === false ? "Hồ sơ tài khoản đang tạm dựng từ dữ liệu danh sách." : "Hồ sơ tài khoản đang đọc từ màn chi tiết."}
+              title={user.detailAvailable === false ? "Hồ sơ tài khoản đang hiển thị theo dữ liệu danh sách." : "Hồ sơ tài khoản đang hiển thị theo dữ liệu chi tiết."}
               description={user.detailAvailable === false
-                ? "Màn chi tiết hiện chưa trả được dữ liệu cho tài khoản này, nên web đang tạm dùng dữ liệu từ danh sách quản trị."
-                : "Thông tin liên hệ, ảnh đại diện, trạng thái, vai trò và chuyên môn thợ đang lấy trực tiếp từ hệ thống."}
+                ? "Hệ thống chưa trả đủ dữ liệu chi tiết cho tài khoản này, nên màn hình đang dùng tạm dữ liệu từ danh sách quản trị."
+                : "Thông tin liên hệ, ảnh đại diện, trạng thái, vai trò và chuyên môn đang lấy trực tiếp từ hệ thống."}
               tone="info"
             />
           ) : null}
@@ -343,7 +343,7 @@ export default function AdminUserDetail() {
 
                   <div className="admin-note-box">
                     <strong>{permissionProfile?.label || "Chưa đồng bộ vai trò"}</strong>
-                      <p>{permissionProfile?.description || "Hệ thống hiện chưa trả vai trò cho tài khoản này, nên web chưa thể hiển thị phần quyền tương ứng."}</p>
+                      <p>{permissionProfile?.description || "Hệ thống hiện chưa trả vai trò cho tài khoản này, nên màn hình chưa thể hiển thị phần quyền tương ứng."}</p>
                   </div>
 
                   <div className="mt-4 admin-info-list">
@@ -379,7 +379,7 @@ export default function AdminUserDetail() {
                 <section className="admin-card">
                   <div className="admin-card__header">
                     <div>
-                    <h2 className="admin-card__title">Hoạt động hệ thống gần đây</h2>
+                    <h2 className="admin-card__title">Hoạt động gần đây</h2>
                     <p className="admin-card__subtitle">Những thay đổi hoặc sự kiện gần nhất liên quan tới tài khoản này, nếu có.</p>
                     </div>
                     <Link to={`/admin/logs?relatedTo=${user.id}`} className="admin-link-btn admin-link-btn--secondary">

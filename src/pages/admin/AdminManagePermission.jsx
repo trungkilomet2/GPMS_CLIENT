@@ -317,7 +317,6 @@ export default function AdminManagePermission() {
               icon={ShieldCheck}
               label="Số vai trò"
               value={roleOptions.length}
-              meta="Các vai trò nội bộ đang được web theo dõi"
               meta="Các vai trò nội bộ đang được hệ thống theo dõi"
               tone="primary"
             />
@@ -344,7 +343,7 @@ export default function AdminManagePermission() {
                   ? "Không tải được từ hệ thống"
                   : permissionCount > 0
                     ? "Hệ thống đã trả dữ liệu quyền"
-                    : "Chưa có bản ghi nào để web hiển thị"
+                    : "Chưa có bản ghi nào để màn phân quyền hiển thị"
               }
               tone={permissionCount > 0 ? "success" : "danger"}
             />
@@ -393,10 +392,10 @@ export default function AdminManagePermission() {
           <div className="admin-grid admin-grid--permissions">
             <section className="admin-card">
               <div className="admin-card__header">
-                <div>
-                  <h2 className="admin-card__title">Ma trận quyền theo vai trò</h2>
-                  <p className="admin-card__subtitle">
-                    Bật hoặc tắt từng quyền hệ thống đang trả về cho vai trò đã chọn. Thay đổi được lưu trực tiếp theo dữ liệu hiện có.
+                  <div>
+                    <h2 className="admin-card__title">Ma trận quyền theo vai trò</h2>
+                    <p className="admin-card__subtitle">
+                    Bật hoặc tắt từng quyền đang có cho vai trò đã chọn. Thay đổi sẽ được lưu trực tiếp vào hệ thống.
                   </p>
                 </div>
               </div>
@@ -601,7 +600,7 @@ export default function AdminManagePermission() {
                 <div className="admin-card__header">
                   <div>
                     <h2 className="admin-card__title">Bảng nghiệp vụ liên quan</h2>
-                    <p className="admin-card__subtitle">Các bảng có thể bị ảnh hưởng khi role này tham gia quy trình nghiệp vụ.</p>
+                    <p className="admin-card__subtitle">Các bảng có thể bị ảnh hưởng khi vai trò này tham gia quy trình nghiệp vụ.</p>
                   </div>
                 </div>
 

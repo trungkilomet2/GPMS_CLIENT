@@ -108,7 +108,7 @@ export default function AdminUserCreate() {
               </Link>
               <h1 className="admin-hero__title">Thêm tài khoản mới</h1>
               <p className="admin-hero__subtitle">
-                Tạo tài khoản mới và gán vai trò ngay từ bước khởi tạo.
+                Tạo tài khoản mới và gán vai trò phù hợp ngay từ đầu.
               </p>
             </div>
 
@@ -134,7 +134,7 @@ export default function AdminUserCreate() {
                 <div className="admin-card__header">
                   <div>
                     <h2 className="admin-card__title">Thông tin tài khoản</h2>
-                    <p className="admin-card__subtitle">Hiện hệ thống hỗ trợ tạo tài khoản với họ tên, tên đăng nhập, mật khẩu và vai trò.</p>
+                    <p className="admin-card__subtitle">Nhập các thông tin cơ bản để tạo tài khoản và gán vai trò phù hợp.</p>
                   </div>
                 </div>
 
@@ -176,8 +176,8 @@ export default function AdminUserCreate() {
 
                 <div className="mt-4">
                   <AdminBanner
-                    title="Các trường liên hệ, xác thực hai lớp và ghi chú hiện chưa có trong phần tạo tài khoản."
-                    description="Khi hệ thống bổ sung phần chi tiết hoặc cập nhật tài khoản đầy đủ hơn, mình có thể nối tiếp các trường đó vào form quản trị này."
+                    title="Phần tạo tài khoản hiện chỉ gồm các thông tin cơ bản."
+                    description="Những thông tin liên hệ và các thiết lập bổ sung có thể cập nhật sau trong màn chi tiết tài khoản."
                     tone="info"
                   />
                 </div>
@@ -195,7 +195,7 @@ export default function AdminUserCreate() {
                 <div className="admin-card__header">
                   <div>
                     <h2 className="admin-card__title">Quyền theo vai trò</h2>
-                    <p className="admin-card__subtitle">Xem nhanh các quyền hiện đang gắn với vai trò đã chọn.</p>
+                    <p className="admin-card__subtitle">Xem nhanh phạm vi quyền tương ứng với vai trò đang chọn.</p>
                   </div>
                 </div>
 
@@ -209,7 +209,7 @@ export default function AdminUserCreate() {
                   <div className="admin-preview-list__item">
                     <strong>Phạm vi quyền</strong>
                     <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
-                      <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} quyền hiện đang được hiển thị` : "Vai trò này hiện chưa có dữ liệu quyền tương ứng"}</span>
+                      <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} quyền đang được áp dụng` : "Vai trò này hiện chưa có dữ liệu quyền tương ứng"}</span>
                   </div>
                   <div className="admin-preview-list__item">
                       <strong>Mô tả vai trò</strong>
@@ -221,7 +221,7 @@ export default function AdminUserCreate() {
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Checklist cấp quyền</h2>
+                    <h2 className="admin-card__title">Các bước kiểm tra</h2>
                     <p className="admin-card__subtitle">Các bước quản trị viên nên xác nhận trước khi cấp tài khoản mới.</p>
                   </div>
                 </div>

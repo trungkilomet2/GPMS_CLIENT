@@ -387,7 +387,7 @@ export default function AdminUserUpdate() {
               </Link>
               <h1 className="admin-hero__title">Cập nhật tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Cập nhật hồ sơ, ảnh đại diện và vai trò hệ thống của tài khoản khi cần điều chỉnh quyền truy cập.
+                Cập nhật hồ sơ, ảnh đại diện và vai trò của tài khoản khi cần điều chỉnh quyền truy cập.
               </p>
             </div>
 
@@ -539,11 +539,11 @@ export default function AdminUserUpdate() {
                   </div>
 
                   <div className="mt-4">
-                    <AdminBanner
-                      title="Màn cập nhật đang đồng bộ trực tiếp với hệ thống."
-                      description="Hồ sơ hiện tại được tải từ phần chi tiết của quản trị, thông tin cơ bản được lưu trực tiếp lên hệ thống, và vai trò mới sẽ được gán lại sau khi lưu thành công."
-                      tone="info"
-                    />
+                  <AdminBanner
+                    title="Màn cập nhật đang đồng bộ trực tiếp với hệ thống."
+                    description="Hồ sơ hiện tại được tải từ phần chi tiết quản trị, thông tin cơ bản sẽ được lưu trực tiếp lên hệ thống, và vai trò mới sẽ được gán lại sau khi lưu thành công."
+                    tone="info"
+                  />
                   </div>
 
                   {submitNotice ? (
@@ -567,11 +567,11 @@ export default function AdminUserUpdate() {
               <div className="flex flex-col gap-6">
                 <section className="admin-card">
                   <div className="admin-card__header">
-                    <div>
-                      <h2 className="admin-card__title">Quyền theo vai trò đang chọn</h2>
-                      <p className="admin-card__subtitle">Xem nhanh phần quyền web sẽ hiển thị theo vai trò mới.</p>
-                    </div>
+                  <div>
+                    <h2 className="admin-card__title">Quyền theo vai trò đang chọn</h2>
+                    <p className="admin-card__subtitle">Xem nhanh phần quyền hệ thống đang gắn với vai trò mới.</p>
                   </div>
+                </div>
 
                   <div className="admin-preview-list">
                     <div className="admin-preview-list__item">
@@ -583,7 +583,7 @@ export default function AdminUserUpdate() {
                     <div className="admin-preview-list__item">
                       <strong>Thông tin quyền</strong>
                       <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
-                      <span>{permissionProfile?.description || "Vai trò này chưa có dữ liệu quyền tương ứng trên web."}</span>
+                      <span>{permissionProfile?.description || "Vai trò này chưa có dữ liệu quyền tương ứng trên hệ thống."}</span>
                     </div>
                     <div className="admin-preview-list__item">
                       <strong>Chuyên môn thợ hiện tại</strong>
