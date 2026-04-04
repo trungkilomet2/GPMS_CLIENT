@@ -80,8 +80,16 @@ export default function PayrollDetail() {
     setIsConfirmOpen(false);
     try {
       setIsPaying(true);
+      
+      // Filter ONLY unpaid logs before grouping
+      const unpaidLogs = workerLogs.filter(l => !(l.isPayment || !!l.paidAt));
+      if (unpaidLogs.length === 0) {
+        toast.info("Không có công đoạn mới nào cần thanh toán.");
+        return;
+      }
+
       // Group logically by partId
-      const groups = workerLogs.reduce((acc, log) => {
+      const groups = unpaidLogs.reduce((acc, log) => {
         const pId = log.partId;
         if (!pId) return acc;
         if (!acc[pId]) acc[pId] = [];
@@ -117,14 +125,23 @@ export default function PayrollDetail() {
   }, [workerLogs, statusFilter]);
 
   const stats = useMemo(() => {
-    // Thống kê chung vẫn giữ nguyên theo cả tháng để PM nắm được tổng quan
     const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
     const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
+    
+    // Total Salary in Month
     const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
+    
+    const totalPaid = workerLogs.reduce((sum, log) => {
+      const isPaid = log.isPayment || !!log.paidAt;
+      return isPaid ? sum + (log.quantity || 0) * (log.cpu || 0) : sum;
+    }, 0);
+    
+    const totalUnpaid = totalSalary - totalPaid;
+
     const firstLog = workerLogs[0];
     const workerName = firstLog?.workerFullName || firstLog?.workerName || workerId;
     const workerAvatar = firstLog?.workerAvatar || null;
-    return { totalQty, uniquePartCount, totalSalary, workerName, workerAvatar };
+    return { totalQty, uniquePartCount, totalSalary, totalPaid, totalUnpaid, workerName, workerAvatar };
   }, [workerLogs, workerId]);
 
   const totalPages = Math.ceil(filteredLogs.length / pageSize);
@@ -201,7 +218,7 @@ export default function PayrollDetail() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="group relative overflow-hidden rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-100">
@@ -210,10 +227,44 @@ export default function PayrollDetail() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Tổng thu nhập tháng</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-slate-900">
+                    <span className="text-2xl font-black text-slate-900">
                       {stats.totalSalary.toLocaleString("vi-VN")}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">VND</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500 text-white shadow-lg shadow-sky-100">
+                  <CheckCircle2 size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Đã thanh toán</p>
+                  <div className="flex items-baseline gap-1 border-b border-sky-50">
+                    <span className="text-2xl font-black text-sky-700">
+                      {stats.totalPaid.toLocaleString("vi-VN")}
+                    </span>
+                    <span className="text-[10px] font-bold text-sky-400 uppercase">VND</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-3xl border border-amber-100 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-lg shadow-amber-100">
+                  <AlertCircle size={22} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Chờ thanh toán</p>
+                  <div className="flex items-baseline gap-1 border-b border-amber-50">
+                    <span className="text-2xl font-black text-amber-700">
+                      {stats.totalUnpaid.toLocaleString("vi-VN")}
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-400 uppercase">VND</span>
                   </div>
                 </div>
               </div>
@@ -225,9 +276,9 @@ export default function PayrollDetail() {
                   <Package size={22} />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số công đoạn hoàn thành</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Số công đoạn</p>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-slate-900">
+                    <span className="text-2xl font-black text-slate-900">
                       {stats.uniquePartCount}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Công đoạn</span>
@@ -385,7 +436,7 @@ export default function PayrollDetail() {
         title="Xác nhận thanh toán lương"
         primaryLabel="Xác nhận thanh toán"
         confirmIcon={CreditCard}
-        description={`Bạn có chắc chắn muốn thanh toán tổng cộng ${(workerLogs.reduce((sum, l) => sum + (l.quantity * l.cpu), 0)).toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
+        description={`Bạn có chắc chắn muốn thanh toán tổng số tiền chờ thanh toán là: ${stats.totalUnpaid.toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
         onConfirm={confirmPaymentAll}
         onClose={() => setIsConfirmOpen(false)}
       />
