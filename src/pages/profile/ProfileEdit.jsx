@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/services/authService";
 import { locationService } from "@/services/locationService";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import Header from "@/components/Header";
 import {
   normalizeSpaces,
