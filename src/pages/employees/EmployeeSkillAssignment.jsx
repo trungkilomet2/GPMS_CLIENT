@@ -40,6 +40,8 @@ export default function EmployeeSkillAssignment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const backTarget = location.state?.from || "/employees";
+  const detailState = { from: backTarget };
   const currentUser = getStoredUser();
   const currentPrimaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const [loading, setLoading] = useState(true);
@@ -176,6 +178,7 @@ export default function EmployeeSkillAssignment() {
 
       navigate(`/employees/${id}`, {
         state: {
+          ...detailState,
           skillsUpdated: true,
           updatedWorkerSkillNames,
           updatedWorkerSkillLabels,
@@ -199,7 +202,7 @@ export default function EmployeeSkillAssignment() {
         <div className="employee-create-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-create-hero">
             <div className="employee-create-hero__heading">
-              <Link to={`/employees/${id}`} className="employee-create-hero__back">
+              <Link to={`/employees/${id}`} state={detailState} className="employee-create-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại hồ sơ nhân viên</span>
               </Link>
@@ -210,7 +213,11 @@ export default function EmployeeSkillAssignment() {
             </div>
 
             <div className="employee-create-hero__actions">
-              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate(`/employees/${id}`)}>
+              <button
+                type="button"
+                className="employee-create-btn employee-create-btn--ghost"
+                onClick={() => navigate(`/employees/${id}`, { state: detailState })}
+              >
                 Hủy
               </button>
               <button

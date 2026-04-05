@@ -279,7 +279,11 @@ export default function EmployeeDetail() {
                         : "Kích hoạt tài khoản"}
                   </span>
                 </button>
-                <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
+                <Link
+                  to={`/employees/${id}/edit`}
+                  state={{ from: backTarget }}
+                  className="employee-detail-btn"
+                >
                   <Pencil size={18} />
                   <span>Sửa hồ sơ</span>
                 </Link>
@@ -317,7 +321,7 @@ export default function EmployeeDetail() {
                   </button>
                 ) : null}
                 <Link
-                  to="/employees"
+                  to={backTarget}
                   className="employee-detail-state-btn employee-detail-state-btn--secondary"
                 >
                   Quay lại danh sách
@@ -436,7 +440,11 @@ export default function EmployeeDetail() {
                       )}
                     </div>
                     {((isOwner || isPm) && canEditSpecialties) ? (
-                      <Link to={`/employees/${id}/skills`} className="employee-detail-btn employee-detail-btn--secondary">
+                      <Link
+                        to={`/employees/${id}/skills`}
+                        state={{ from: backTarget }}
+                        className="employee-detail-btn employee-detail-btn--secondary"
+                      >
                         <PencilLine size={16} />
                         <span>Gán chuyên môn</span>
                       </Link>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -23,9 +23,13 @@ import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerS
 import "@/styles/employee-create.css";
 
 export default function EmployeeCreate() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const backTarget = location.state?.from || "/employees";
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [notice, setNotice] = useState(location.state?.notice || "");
+  const [noticeTone, setNoticeTone] = useState(location.state?.noticeTone === "error" ? "error" : "success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [managerOptions, setManagerOptions] = useState([]);
   const [managerLoading, setManagerLoading] = useState(true);
@@ -37,6 +41,14 @@ export default function EmployeeCreate() {
     role: "PM",
     managerId: "",
   });
+
+  useEffect(() => {
+    if (!location.state?.notice) return;
+
+    setNotice(location.state.notice);
+    setNoticeTone(location.state.noticeTone === "error" ? "error" : "success");
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -134,6 +146,14 @@ export default function EmployeeCreate() {
       return;
     }
 
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn thêm tài khoản ${normalizedFullName || "nhân viên này"} không?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
@@ -146,6 +166,7 @@ export default function EmployeeCreate() {
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
       });
       const createdId = createdEmployee?.data?.id ?? createdEmployee?.id ?? null;
+
       if (form.role === "Worker" && createdId != null) {
         navigate(`/employees/${createdId}/skills`, {
           state: {
@@ -180,7 +201,7 @@ export default function EmployeeCreate() {
         <div className="employee-create-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-create-hero">
             <div className="employee-create-hero__heading">
-              <Link to="/employees" className="employee-create-hero__back">
+              <Link to={backTarget} className="employee-create-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại danh sách</span>
               </Link>
@@ -191,7 +212,7 @@ export default function EmployeeCreate() {
             </div>
 
             <div className="employee-create-hero__actions">
-              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate("/employees")}>
+              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate(backTarget)}>
                 Hủy
               </button>
               <button
@@ -286,6 +307,16 @@ export default function EmployeeCreate() {
                 <div className="employee-create-banner employee-create-banner--error">
                   <CircleAlert size={18} />
                   <span>{managerError}</span>
+                </div>
+              ) : null}
+
+              {notice ? (
+                <div
+                  className={`employee-create-banner ${
+                    noticeTone === "error" ? "employee-create-banner--error" : ""
+                  }`}
+                >
+                  <span>{notice}</span>
                 </div>
               ) : null}
 

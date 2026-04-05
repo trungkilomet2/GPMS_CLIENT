@@ -118,6 +118,7 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 export default function EmployeeList() {
   const location = useLocation();
   const navigate = useNavigate();
+  const currentListPath = `${location.pathname}${location.search}`;
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
   const isOwner = primaryRole === "owner";
@@ -356,6 +357,7 @@ export default function EmployeeList() {
     specialtyFilter !== "all" ||
     statusFilter !== "all";
   const hasAnyEmployee = scopedEmployees.length > 0;
+  const showRoleFilter = viewMode !== "management";
   const pageTitle =
     viewMode === "management"
       ? "Danh sách quản lý"
@@ -397,7 +399,11 @@ export default function EmployeeList() {
             </div>
 
             {isOwner ? (
-              <Link to="/employees/create" className="employee-hero__action">
+              <Link
+                to="/employees/create"
+                state={{ from: currentListPath }}
+                className="employee-hero__action"
+              >
                 <Plus size={18} />
                 <span>Thêm nhân viên</span>
               </Link>
@@ -434,7 +440,13 @@ export default function EmployeeList() {
           ) : null}
 
           <div className="employee-filter-card">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]">
+            <div
+              className={
+                showRoleFilter
+                  ? "grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]"
+                  : "grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_auto]"
+              }
+            >
               <label className="employee-filter-field employee-filter-field--search">
                 <span className="employee-filter-field__label">Tìm kiếm nhân viên</span>
                 <Search size={18} className="employee-filter-field__icon" />
@@ -446,21 +458,23 @@ export default function EmployeeList() {
                 />
               </label>
 
-              <label className="employee-filter-field">
-                <span className="employee-filter-field__label">Vai trò hệ thống</span>
-                <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
-                <select
-                  value={roleFilter}
-                  onChange={(event) => setRoleFilter(event.target.value)}
-                  className="employee-filter-field__control"
-                >
-                  {roleOptions.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {showRoleFilter ? (
+                <label className="employee-filter-field">
+                  <span className="employee-filter-field__label">Vai trò hệ thống</span>
+                  <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
+                  <select
+                    value={roleFilter}
+                    onChange={(event) => setRoleFilter(event.target.value)}
+                    className="employee-filter-field__control"
+                  >
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               <label className="employee-filter-field">
                 <span className="employee-filter-field__label">Chuyên môn</span>
@@ -571,6 +585,7 @@ export default function EmployeeList() {
                     ) : isOwner ? (
                       <Link
                         to="/employees/create"
+                        state={{ from: currentListPath }}
                         className="employee-state-btn employee-state-btn--primary"
                       >
                         Thêm nhân viên

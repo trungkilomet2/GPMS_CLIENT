@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -24,8 +24,14 @@ import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerS
 import "@/styles/employee-create.css";
 
 export default function EmployeeUpdate() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
+  const backTarget = location.state?.from || "/employees";
+  const detailTarget = {
+    pathname: `/employees/${id}`,
+  };
+  const detailState = { from: backTarget };
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -172,7 +178,7 @@ export default function EmployeeUpdate() {
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
       });
 
-      navigate(`/employees/${id}`);
+      navigate(detailTarget.pathname, { state: detailState });
     } catch (err) {
       setSubmitError(
         getEmployeeModuleErrorMessage(
@@ -191,7 +197,7 @@ export default function EmployeeUpdate() {
         <div className="employee-create-shell mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-create-hero">
             <div className="employee-create-hero__heading">
-              <Link to={`/employees/${id}`} className="employee-create-hero__back">
+              <Link to={detailTarget.pathname} state={detailState} className="employee-create-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại chi tiết</span>
               </Link>
@@ -202,7 +208,11 @@ export default function EmployeeUpdate() {
             </div>
 
             <div className="employee-create-hero__actions">
-              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate(`/employees/${id}`)}>
+              <button
+                type="button"
+                className="employee-create-btn employee-create-btn--ghost"
+                onClick={() => navigate(detailTarget.pathname, { state: detailState })}
+              >
                 Hủy
               </button>
               <button
