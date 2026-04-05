@@ -6,6 +6,8 @@ const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    //TrungNT add 03-06-26 : Chặn HTML cảnh báo cho phép api truy cập qua ngrok
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
