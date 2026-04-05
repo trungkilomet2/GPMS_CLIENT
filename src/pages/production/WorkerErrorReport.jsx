@@ -32,6 +32,18 @@ const toList = (payload) => {
   return [];
 };
 
+const formatToDateTimeLocal = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+};
+
 const mapPart = (part, fallbackProductionId) => ({
   id: part?.id ?? part?.partId ?? null,
   productionId:
@@ -69,6 +81,7 @@ export default function WorkerErrorReport() {
       endDate: assignment?.endDate ?? "",
       errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
+      happenAt: assignment?.happenAt ?? "",
     };
   }, [assignment]);
 
@@ -83,7 +96,7 @@ export default function WorkerErrorReport() {
     title: "",
     description: "",
     quantity: "",
-    happenAt: "",
+    happenAt: formatToDateTimeLocal(normalizedAssignment?.happenAt || new Date().toISOString()),
     repairWorker: "",
   });
 
@@ -273,11 +286,33 @@ export default function WorkerErrorReport() {
         setLoadingEmployees(true);
         const res = await ProductionPartService.getIssueWorkers(partId);
         if (!active) return;
-        const list = res?.data?.data ?? res?.data ?? [];
-        setEmployees(Array.isArray(list) ? list : []);
+        
+        // Axios interceptor returns response.data, so res might be the payload or the array
+        const payload = res; 
+        const list = toList(payload);
+        
+        if (list.length === 0) {
+          console.warn("API returned empty worker list for part:", partId);
+          setEmployees([]);
+          toast.info("Công đoạn này chưa có thợ được phân công.");
+          return;
+        }
+
+        const normalized = list.map(emp => {
+          const info = emp.worker || emp.workerInfo || emp.user || emp.account || emp;
+          const id = (info.id !== undefined && info.id !== null) ? String(info.id) : 
+                     (info.userId || info.workerId || info.uId || String(Math.random()));
+          const name = info.fullName || info.workerName || info.userName || info.name || "N/A";
+          return { id, fullName: name };
+        });
+        
+        setEmployees(normalized);
       } catch (err) {
-        console.error("Lỗi tải danh sách thợ cho công đoạn:", err);
-        if (active) setEmployees([]);
+        console.error("Lỗi tải danh sách thợ:", err);
+        if (active) {
+          setEmployees([]);
+          toast.error("Không thể tải danh sách thợ của công đoạn này.");
+        }
       } finally {
         if (active) setLoadingEmployees(false);
       }
@@ -448,6 +483,10 @@ export default function WorkerErrorReport() {
       setSubmitError("Vui lòng chọn công đoạn tương ứng với loại lỗi.");
       return;
     }
+    if (employees.length === 0 && !loadingEmployees) {
+      setSubmitError("Công đoạn này chưa được phân công thợ, không thể báo cáo lỗi.");
+      return;
+    }
     if (!title) {
       const titleLabel = typeNum === 3 ? "mô tả chi tiết lỗi" : "tiêu đề lỗi";
       setSubmitError(`Vui lòng nhập ${titleLabel}.`);
@@ -544,7 +583,10 @@ export default function WorkerErrorReport() {
             <button
               type="submit"
               form="error-report-form"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting || 
+                (form.partId && employees.length === 0 && !loadingEmployees)
+              }
               className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Send size={16} /> {isSubmitting ? "Đang gửi..." : "Gửi báo cáo"}
@@ -564,7 +606,11 @@ export default function WorkerErrorReport() {
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isProductionLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
                     <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
@@ -597,7 +643,11 @@ export default function WorkerErrorReport() {
                     value={form.partId}
                     onChange={(event) => handleChange("partId", event.target.value)}
                     disabled={!form.productionId || isPartLocked}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
+                      isPartLocked
+                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    }`}
                   >
                     <option value="">Chọn công đoạn...</option>
                     {parts.map((item) => (
@@ -627,8 +677,8 @@ export default function WorkerErrorReport() {
                   <input
                     type="datetime-local"
                     value={form.happenAt}
-                    onChange={(event) => handleChange("happenAt", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    readOnly
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 outline-none cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -659,8 +709,14 @@ export default function WorkerErrorReport() {
                       </option>
                     ))}
                   </select>
-                  {loadingEmployees && (
+                  {loadingEmployees ? (
                     <div className="mt-1 text-xs text-slate-400">Đang tải danh sách thợ...</div>
+                  ) : (
+                    employees.length === 0 && form.partId && (
+                      <div className="mt-1 text-xs text-amber-600 font-medium italic">
+                        * Công đoạn này chưa có thợ được phân công.
+                      </div>
+                    )
                   )}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Navigate, useNavigate, Link } from "react-router-dom";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { getStoredUser } from "@/lib/authStorage";
@@ -25,6 +25,17 @@ const initialValues = {
   agree: false,
 };
 
+function isEmailAlreadyVerifiedMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được xác thực trước đó") ||
+    message.includes("email da duoc xac thuc truoc do") ||
+    message.includes("email already verified") ||
+    message.includes("already verified")
+  );
+}
+
 export default function RegisterPage() {
   const storedUser = getStoredUser();
   const navigate = useNavigate();
@@ -37,6 +48,8 @@ export default function RegisterPage() {
   const [submitError, setSubmitError] = useState("");
   const [successOpen, setSuccessOpen] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
+  const submitLockRef = useRef(false);
 
   if (storedUser) {
     return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
@@ -114,19 +127,28 @@ export default function RegisterPage() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     const nextValue = type === "checkbox" ? checked : value;
-    const nextForm = {
-      ...formData,
-      [name]: nextValue,
-    };
+    const shouldResetOtp = name === "email" && otpSent;
+    const nextForm = shouldResetOtp
+      ? {
+          ...formData,
+          [name]: nextValue,
+          otp: "",
+        }
+      : {
+          ...formData,
+          [name]: nextValue,
+        };
 
     setFormData(nextForm);
     setSubmitError("");
-    if (name === "email" && otpSent) {
+    if (shouldResetOtp) {
       setOtpSent(false);
+      setVerifiedEmail("");
     }
     setErrors((prev) => ({
       ...prev,
       [name]: validateField(name, nextValue, nextForm),
+      ...(shouldResetOtp ? { otp: "" } : {}),
       ...(name === "password"
         ? { confirmPassword: validateField("confirmPassword", nextForm.confirmPassword, nextForm) }
         : {}),
@@ -147,9 +169,11 @@ export default function RegisterPage() {
   });
 
   const handleSendOtp = async () => {
+    if (submitLockRef.current) return;
     if (!validateForm({ includeOtp: false })) return;
 
     try {
+      submitLockRef.current = true;
       setLoading(true);
 
       await authService.sendRegisterOtp({
@@ -157,6 +181,7 @@ export default function RegisterPage() {
       });
 
       setOtpSent(true);
+      setVerifiedEmail("");
       setSubmitError("");
       setFormData((prev) => ({ ...prev, otp: "" }));
       setErrors((prev) => ({ ...prev, otp: "" }));
@@ -168,21 +193,26 @@ export default function RegisterPage() {
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
       }
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };
 
   const handleResendOtp = async () => {
+    if (submitLockRef.current) return;
     if (!validateForm({ includeOtp: false })) return;
 
     try {
+      submitLockRef.current = true;
       setLoading(true);
 
       await authService.resendRegisterOtp({
         email: formData.email.trim(),
       });
 
+      setVerifiedEmail("");
       setSubmitError("");
+      setFormData((prev) => ({ ...prev, otp: "" }));
       setErrors((prev) => ({ ...prev, otp: "" }));
     } catch (error) {
       const errData = error?.response?.data ?? {};
@@ -192,20 +222,40 @@ export default function RegisterPage() {
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
       }
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };
 
   const handleVerifyAndRegister = async () => {
+    if (submitLockRef.current) return;
     if (!validateForm({ includeOtp: true })) return;
 
     try {
+      submitLockRef.current = true;
       setLoading(true);
+      const normalizedEmail = formData.email.trim();
 
-      await authService.verifyRegisterOtp({
-        email: formData.email.trim(),
-        otp: formData.otp.trim(),
-      });
+      if (verifiedEmail !== normalizedEmail) {
+        try {
+          await authService.verifyRegisterOtp({
+            email: normalizedEmail,
+            otp: formData.otp.trim(),
+          });
+        } catch (error) {
+          const errData = error?.response?.data ?? {};
+          const verifyMessage =
+            errData?.message ||
+            errData?.detail ||
+            errData?.title ||
+            "";
+
+          if (!isEmailAlreadyVerifiedMessage(verifyMessage)) {
+            throw error;
+          }
+        }
+        setVerifiedEmail(normalizedEmail);
+      }
 
       await authService.register(buildRegisterPayload());
 
@@ -219,6 +269,7 @@ export default function RegisterPage() {
         setErrors((prev) => ({ ...prev, ...fieldErrors }));
       }
     } finally {
+      submitLockRef.current = false;
       setLoading(false);
     }
   };

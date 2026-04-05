@@ -42,6 +42,34 @@ const normalizeEmployeeStatus = (value, statusId) => {
 
 const HIDDEN_DIRECTORY_ROLES = ["Admin", "Customer"];
 
+const unique = (values = []) => Array.from(new Set(values.filter(Boolean)));
+
+const extractNamesFromCollection = (collection = []) => {
+  if (!Array.isArray(collection)) return [];
+
+  return unique(
+    collection
+      .map((item) => {
+        if (item == null) return "";
+        if (typeof item === "string" || typeof item === "number") return String(item).trim();
+        if (typeof item === "object") {
+          return String(
+            item.name ??
+            item.role ??
+            item.roleName ??
+            item.skillName ??
+            item.workerSkillName ??
+            item.label ??
+            item.value ??
+            ""
+          ).trim();
+        }
+        return "";
+      })
+      .filter(Boolean)
+  );
+};
+
 const shouldHideFromEmployeeDirectory = (employee = {}) => {
   const roles = Array.isArray(employee.roles) ? employee.roles : [];
   return roles.some((role) => HIDDEN_DIRECTORY_ROLES.includes(role));
@@ -50,10 +78,12 @@ const shouldHideFromEmployeeDirectory = (employee = {}) => {
 const normalizeEmployee = (item = {}) => {
   const roles = splitRoles(item.role ?? item.roles ?? item.roleName ?? item.roleNames ?? "");
   const role = roles.join(", ");
-  const workerSkillCandidates = splitRoles(
-    item.workerSkill ?? item.workerRole ?? item.workerSkills ?? item.workerRoles ?? ""
-  );
-  const workerSkillNames = Array.from(new Set(workerSkillCandidates.filter(Boolean)));
+  const workerSkillNames = unique([
+    ...extractNamesFromCollection(item.workerSkills),
+    ...extractNamesFromCollection(item.workerRoles),
+    ...splitRoles(item.workerSkill),
+    ...splitRoles(item.workerRole),
+  ]);
   const workerRole = workerSkillNames[0] ?? "";
   const primarySystemRole = pickPrimarySystemRole(role);
   const managerRoles = getAllowedManagerRoles(primarySystemRole);
@@ -274,6 +304,20 @@ const WorkerService = {
     };
   },
 
+  async getManagerDirectory(options = {}) {
+    const users = await fetchEmployeePages(API_ENDPOINTS.USER.LIST, {
+      ...options,
+      includeHidden: true,
+    });
+
+    return {
+      data: users,
+      pageIndex: 0,
+      pageSize: users.length,
+      recordCount: users.length,
+    };
+  },
+
   async getEmployeesByPmId(params, options = {}) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES_BY_PM_ID,
@@ -310,6 +354,23 @@ const WorkerService = {
 
   async updateEmployee(id, payload) {
     const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.UPDATE(id), payload);
+    return parseApiPayload(rawResponse);
+  },
+
+  async assignWorkerSkill(id, skillIds = []) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.WORKER.ASSIGN_WORKER_SKILL(id), {
+      skillIds: skillIds.map(Number),
+    });
+    return parseApiPayload(rawResponse);
+  },
+
+  async disableEmployeeAccount(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_DISABLE_USER(id), null);
+    return parseApiPayload(rawResponse);
+  },
+
+  async enableEmployeeAccount(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ENABLE_USER(id), null);
     return parseApiPayload(rawResponse);
   },
 };

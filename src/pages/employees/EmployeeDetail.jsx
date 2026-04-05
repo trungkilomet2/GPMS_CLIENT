@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BriefcaseBusiness,
   CircleAlert,
+  Lock,
   LoaderCircle,
   MapPin,
   Mail,
@@ -11,11 +12,13 @@ import {
   Phone,
   Pencil,
   ShieldCheck,
+  Unlock,
   UserRound,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
+import { canAssignSpecialties, getRoleHierarchyTag, getSystemRoleLabel } from "@/lib/orgHierarchy";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employee-create.css";
 import "@/styles/employee-detail.css";
@@ -24,6 +27,15 @@ const STATUS_MAP = {
   active: { label: "Đang hoạt động", className: "employee-detail-pill employee-detail-pill--success" },
   inactive: { label: "Ngừng hoạt động", className: "employee-detail-pill employee-detail-pill--warning" },
 };
+
+function pickPreferredItems(primary = [], fallback = []) {
+  const primaryItems = Array.isArray(primary) ? primary : [];
+  const fallbackItems = Array.isArray(fallback) ? fallback : [];
+
+  if (!primaryItems.length) return fallbackItems;
+  if (!fallbackItems.length) return primaryItems;
+  return primaryItems;
+}
 
 function getInitials(name = "") {
   return name
@@ -38,13 +50,17 @@ function getInitials(name = "") {
 export default function EmployeeDetail() {
   const { id } = useParams();
   const location = useLocation();
+  const backTarget = location.state?.from || "/employees";
   const currentUser = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(currentUser?.role);
   const isOwner = primaryRole === "owner";
+  const isPm = primaryRole === "pm";
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [statusActionLoading, setStatusActionLoading] = useState(false);
   const [reloadSeed, setReloadSeed] = useState(0);
 
   useEffect(() => {
@@ -111,13 +127,9 @@ export default function EmployeeDetail() {
           workerSkillLabel:
             sourceEmployee.workerSkillLabel || directoryEmployee?.workerSkillLabel || "",
           workerSkillNames:
-            sourceEmployee.workerSkillNames?.length
-              ? sourceEmployee.workerSkillNames
-              : directoryEmployee?.workerSkillNames ?? [],
+            pickPreferredItems(sourceEmployee.workerSkillNames, directoryEmployee?.workerSkillNames),
           workerSkillLabels:
-            sourceEmployee.workerSkillLabels?.length
-              ? sourceEmployee.workerSkillLabels
-              : directoryEmployee?.workerSkillLabels ?? [],
+            pickPreferredItems(sourceEmployee.workerSkillLabels, directoryEmployee?.workerSkillLabels),
           role: sourceEmployee.role || directoryEmployee?.role || "",
           roles: sourceEmployee.roles?.length ? sourceEmployee.roles : directoryEmployee?.roles ?? [],
           roleLabels:
@@ -147,16 +159,85 @@ export default function EmployeeDetail() {
     setReloadSeed((current) => current + 1);
   };
 
+  const handleToggleEmployeeStatus = async () => {
+    if (!isOwner || !employee?.id || statusActionLoading) {
+      return;
+    }
+
+    const isActive = employee.status === "active";
+    const confirmed = window.confirm(
+      isActive
+        ? `Bạn có chắc muốn vô hiệu hóa tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
+        : `Bạn có chắc muốn kích hoạt lại tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
+    );
+
+    if (!confirmed) return;
+
+    setStatusActionLoading(true);
+    setNotice("");
+
+    try {
+      if (isActive) {
+        await WorkerService.disableEmployeeAccount(employee.id);
+      } else {
+        await WorkerService.enableEmployeeAccount(employee.id);
+      }
+
+      setEmployee((current) =>
+        current
+          ? {
+              ...current,
+              status: isActive ? "inactive" : "active",
+              statusId: isActive ? 2 : 1,
+            }
+          : current
+      );
+      setNotice(
+        isActive
+          ? `Đã vô hiệu hóa tài khoản ${employee.fullName || employee.userName}.`
+          : `Đã kích hoạt lại tài khoản ${employee.fullName || employee.userName}.`
+      );
+    } catch (err) {
+      setNotice(
+        getEmployeeModuleErrorMessage(
+          err,
+          isActive
+            ? "Không thể vô hiệu hóa tài khoản nhân viên. Vui lòng thử lại."
+            : "Không thể kích hoạt lại tài khoản nhân viên. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setStatusActionLoading(false);
+    }
+  };
+
   const statusConfig = employee ? STATUS_MAP[employee.status] ?? STATUS_MAP.active : STATUS_MAP.active;
-  const roles = useMemo(() => employee?.roleLabels ?? [], [employee]);
+  const roles = useMemo(() => {
+    const labels = Array.isArray(employee?.roleLabels) ? employee.roleLabels.filter(Boolean) : [];
+    if (labels.length) {
+      return labels.map((role) => getSystemRoleLabel(role));
+    }
+
+    const rawRoles = Array.isArray(employee?.roles)
+      ? employee.roles
+      : String(employee?.role ?? "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    return rawRoles.map((role) => getSystemRoleLabel(role));
+  }, [employee]);
+  const canEditSpecialties = canAssignSpecialties(employee?.roles ?? employee?.role ?? "");
   const workerSkillLabels = useMemo(
     () =>
-      employee?.workerSkillLabels?.length
+      Array.isArray(location.state?.updatedWorkerSkillLabels)
+        ? location.state.updatedWorkerSkillLabels
+        : employee?.workerSkillLabels?.length
         ? employee.workerSkillLabels
         : employee?.workerSkillLabel
           ? [employee.workerSkillLabel]
           : [],
-    [employee]
+    [employee, location.state]
   );
 
   return (
@@ -165,7 +246,7 @@ export default function EmployeeDetail() {
         <div className="employee-detail-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-detail-hero">
             <div className="employee-detail-hero__heading">
-              <Link to="/employees" className="employee-detail-hero__back">
+              <Link to={backTarget} className="employee-detail-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại danh sách</span>
               </Link>
@@ -174,10 +255,39 @@ export default function EmployeeDetail() {
             </div>
 
             {isOwner ? (
-              <Link to={`/employees/${id}/edit`} className="employee-detail-btn">
-                <Pencil size={18} />
-                <span>Sửa hồ sơ</span>
-              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="employee-detail-btn employee-detail-btn--secondary"
+                  onClick={handleToggleEmployeeStatus}
+                  disabled={statusActionLoading || !employee}
+                >
+                  {statusActionLoading ? (
+                    <LoaderCircle size={18} className="employee-create-btn__spin" />
+                  ) : employee?.status === "active" ? (
+                    <Lock size={18} />
+                  ) : (
+                    <Unlock size={18} />
+                  )}
+                  <span>
+                    {statusActionLoading
+                      ? employee?.status === "active"
+                        ? "Đang khóa..."
+                        : "Đang kích hoạt..."
+                      : employee?.status === "active"
+                        ? "Vô hiệu hóa tài khoản"
+                        : "Kích hoạt tài khoản"}
+                  </span>
+                </button>
+                <Link
+                  to={`/employees/${id}/edit`}
+                  state={{ from: backTarget }}
+                  className="employee-detail-btn"
+                >
+                  <Pencil size={18} />
+                  <span>Sửa hồ sơ</span>
+                </Link>
+              </div>
             ) : null}
           </div>
 
@@ -211,7 +321,7 @@ export default function EmployeeDetail() {
                   </button>
                 ) : null}
                 <Link
-                  to="/employees"
+                  to={backTarget}
                   className="employee-detail-state-btn employee-detail-state-btn--secondary"
                 >
                   Quay lại danh sách
@@ -220,9 +330,15 @@ export default function EmployeeDetail() {
             </div>
           ) : employee ? (
             <>
+              {notice ? (
+                <div className="employee-detail-inline-banner">
+                  {notice}
+                </div>
+              ) : null}
+
               {location.state?.skillsUpdated ? (
                 <div className="employee-detail-inline-banner employee-detail-inline-banner--success">
-                  Danh sách skill của worker đã được cập nhật.
+                  Danh sách chuyên môn đã được cập nhật.
                 </div>
               ) : null}
 
@@ -242,7 +358,9 @@ export default function EmployeeDetail() {
                 <div className="employee-detail-profile__name">{employee.fullName}</div>
                 <div className="employee-detail-profile__meta">
                   <span className={statusConfig.className}>{statusConfig.label}</span>
-                  <span className="employee-detail-profile__username">@{employee.userName || "chua-cap-nhat"}</span>
+                  <span className="employee-detail-profile__username">
+                    {employee.userName ? `@${employee.userName}` : "Chưa có tên đăng nhập"}
+                  </span>
                 </div>
                 </section>
 
@@ -321,20 +439,26 @@ export default function EmployeeDetail() {
                         <span className="employee-detail-role-empty">Chưa cập nhật chuyên môn</span>
                       )}
                     </div>
-                    {isOwner && employee.roles?.includes("Worker") ? (
-                      <Link to={`/employees/${id}/skills`} className="employee-detail-btn employee-detail-btn--secondary">
+                    {((isOwner || isPm) && canEditSpecialties) ? (
+                      <Link
+                        to={`/employees/${id}/skills`}
+                        state={{ from: backTarget }}
+                        className="employee-detail-btn employee-detail-btn--secondary"
+                      >
                         <PencilLine size={16} />
-                        <span>Gán skill</span>
+                        <span>Gán chuyên môn</span>
                       </Link>
                     ) : null}
                   </div>
 
-                  <div className="employee-detail-role-block">
-                    <div className="employee-detail-role-label">Hierarchy</div>
-                    <div className="employee-detail-role-pills">
-                      <span className="employee-detail-machine-pill">{employee.hierarchyTag || "Chưa phân loại"}</span>
+                    <div className="employee-detail-role-block">
+                    <div className="employee-detail-role-label">Tuyến quản lý</div>
+                      <div className="employee-detail-role-pills">
+                        <span className="employee-detail-machine-pill">
+                          {employee.hierarchyTag || getRoleHierarchyTag(employee?.roles?.[0] || employee?.role) || "Chưa phân loại"}
+                        </span>
+                      </div>
                     </div>
-                  </div>
                 </div>
                 </section>
               </div>

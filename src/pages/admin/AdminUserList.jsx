@@ -44,6 +44,7 @@ export default function AdminUserList() {
   const [notice, setNotice] = useState(location.state?.notice || "");
   const [noticeTone, setNoticeTone] = useState(location.state?.notice ? "success" : "info");
   const [disablingId, setDisablingId] = useState(null);
+  const [enablingId, setEnablingId] = useState(null);
   const [reloadSeed, setReloadSeed] = useState(0);
 
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function AdminUserList() {
         setError(
           getAdminUserErrorMessage(
             err,
-            "Không tải được danh sách user admin. Vui lòng thử lại."
+            "Không tải được danh sách tài khoản. Vui lòng thử lại."
           )
         );
       } finally {
@@ -96,14 +97,14 @@ export default function AdminUserList() {
     });
 
     const nextOptions = [
-      { value: "all", label: "Tất cả role" },
+      { value: "all", label: "Tất cả" },
       ...Array.from(optionsMap.entries())
         .sort(([, leftLabel], [, rightLabel]) => leftLabel.localeCompare(rightLabel, "vi"))
         .map(([value, label]) => ({ value, label })),
     ];
 
     if (users.some((user) => !user.hasKnownRole)) {
-      nextOptions.push({ value: "unknown", label: "Chưa đồng bộ role" });
+      nextOptions.push({ value: "unknown", label: "Chưa đồng bộ vai trò" });
     }
 
     return nextOptions;
@@ -180,7 +181,7 @@ export default function AdminUserList() {
     }
 
     const shouldDisable = window.confirm(
-      `Bạn có chắc muốn vô hiệu hóa tài khoản của ${user.fullName || user.userName || "user này"} không?`
+      `Bạn có chắc muốn vô hiệu hóa tài khoản của ${user.fullName || user.userName || "tài khoản này"} không?`
     );
 
     if (!shouldDisable) return;
@@ -201,18 +202,56 @@ export default function AdminUserList() {
             : item
         )
       );
-      setNotice(`Đã vô hiệu hóa user ${user.fullName || user.userName}.`);
+      setNotice(`Đã vô hiệu hóa tài khoản ${user.fullName || user.userName}.`);
       setNoticeTone("success");
     } catch (err) {
       setNotice(
         getAdminUserErrorMessage(
           err,
-          "Không thể vô hiệu hóa user. Vui lòng thử lại."
+          "Không thể vô hiệu hóa tài khoản. Vui lòng thử lại."
         )
       );
       setNoticeTone("warning");
     } finally {
       setDisablingId(null);
+    }
+  };
+
+  const handleEnableUser = async (user) => {
+    if (!user?.id || user.status === "active" || enablingId === user.id) {
+      return;
+    }
+
+    const shouldEnable = window.confirm(
+      `Bạn có chắc muốn kích hoạt lại tài khoản của ${user.fullName || user.userName || "tài khoản này"} không?`
+    );
+
+    if (!shouldEnable) return;
+
+    setEnablingId(user.id);
+    setNotice("");
+
+    try {
+      await AdminUserService.enableUser(user.id);
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id
+            ? { ...item, status: "active", statusId: 1 }
+            : item
+        )
+      );
+      setNotice(`Đã kích hoạt lại tài khoản ${user.fullName || user.userName}.`);
+      setNoticeTone("success");
+    } catch (err) {
+      setNotice(
+        getAdminUserErrorMessage(
+          err,
+          "Không thể kích hoạt lại tài khoản. Vui lòng thử lại."
+        )
+      );
+      setNoticeTone("warning");
+    } finally {
+      setEnablingId(null);
     }
   };
 
@@ -224,11 +263,15 @@ export default function AdminUserList() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Quản lý tài khoản</h1>
               <p className="admin-hero__subtitle">
-                Rà soát dữ liệu user mà backend đang trả về, nhận diện chỗ nào đã đủ dùng và chỗ nào còn thiếu để quản trị ổn định.
+                Rà soát dữ liệu tài khoản mà hệ thống đang trả về, nhận diện chỗ nào đã đủ dùng và chỗ nào còn thiếu để quản trị ổn định.
               </p>
             </div>
 
             <div className="admin-hero__actions">
+              <Link to="/admin/users/active" className="admin-btn admin-btn--secondary">
+                <UserRoundCheck size={18} />
+                <span>Kích hoạt tài khoản</span>
+              </Link>
               <Link to="/admin/users/create" className="admin-btn admin-btn--primary">
                 <Plus size={18} />
                 <span>Tạo tài khoản</span>
@@ -247,7 +290,7 @@ export default function AdminUserList() {
           {fallbackCount > 0 ? (
             <AdminBanner
               title={`${fallbackCount} tài khoản đang hiển thị từ dữ liệu danh sách`}
-              description="Backend chưa trả được detail đầy đủ cho một số user, nên web đang fallback từ user-list. Đây là dấu hiệu nên bổ sung hoặc sửa ổn định endpoint detail."
+              description="Hệ thống chưa trả được thông tin chi tiết đầy đủ cho một số tài khoản, nên màn hình đang tạm dùng dữ liệu từ danh sách. Đây là dấu hiệu nên bổ sung hoặc làm ổn định phần chi tiết."
               tone="warning"
             />
           ) : null}
@@ -255,25 +298,25 @@ export default function AdminUserList() {
           <div className="admin-stats-grid">
             <AdminStatCard icon={Users} label="Tổng tài khoản" value={stats.total} meta={`Đồng bộ gần nhất: ${latestSyncAt}`} tone="primary" />
             <AdminStatCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Có thể đăng nhập và sử dụng hệ thống" tone="success" />
-            <AdminStatCard icon={KeyRound} label="Vai trò nhạy cảm" value={stats.privileged} meta="Admin và Owner cần được rà soát định kỳ" tone="warning" />
-            <AdminStatCard icon={ShieldAlert} label="Cần kiểm tra" value={stats.needsReview} meta={`${stats.missingRole} thiếu role, ${fallbackCount} thiếu detail`} tone="danger" />
+            <AdminStatCard icon={KeyRound} label="Vai trò nhạy cảm" value={stats.privileged} meta="Quản trị hệ thống và Chủ xưởng cần được rà soát định kỳ" tone="warning" />
+            <AdminStatCard icon={ShieldAlert} label="Cần kiểm tra" value={stats.needsReview} meta={`${stats.missingRole} thiếu vai trò, ${fallbackCount} thiếu thông tin chi tiết`} tone="danger" />
           </div>
 
           <div className="admin-filter-card">
             <div className="admin-filter-grid">
               <label className="admin-field">
-                <span className="admin-field__label">Tìm kiếm user</span>
+                <span className="admin-field__label">Tìm kiếm tài khoản</span>
                 <Search size={18} className="admin-field__icon" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Tên, username, email, bộ phận..."
+                  placeholder="Tên, tên đăng nhập, email, bộ phận..."
                   className="admin-field__control"
                 />
               </label>
 
               <label className="admin-field">
-                <span className="admin-field__label">Role</span>
+                <span className="admin-field__label">Vai trò</span>
                 <BriefcaseBusiness size={18} className="admin-field__icon" />
                 <select
                   value={roleFilter}
@@ -296,7 +339,7 @@ export default function AdminUserList() {
                   onChange={(event) => setStatusFilter(event.target.value)}
                   className="admin-field__control"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   {Object.entries(ADMIN_STATUS_META).map(([value, meta]) => (
                     <option key={value} value={value}>
                       {meta.label}
@@ -337,8 +380,8 @@ export default function AdminUserList() {
               {loading ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
-                    <strong>Đang tải danh sách user...</strong>
-                    <span>Dữ liệu admin đang được đồng bộ từ backend.</span>
+                    <strong>Đang tải danh sách tài khoản...</strong>
+                    <span>Dữ liệu quản trị đang được đồng bộ từ hệ thống.</span>
                   </div>
                   <div className="admin-state__actions">
                     <LoaderCircle size={20} className="animate-spin" />
@@ -347,7 +390,7 @@ export default function AdminUserList() {
               ) : error ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
-                    <strong>Không tải được danh sách user</strong>
+                    <strong>Không tải được danh sách tài khoản</strong>
                     <span>{error}</span>
                   </div>
                   <div className="admin-state__actions">
@@ -360,7 +403,7 @@ export default function AdminUserList() {
               ) : filteredUsers.length === 0 ? (
                 <div className="admin-state">
                   <div className="admin-state__content">
-                    <strong>Không có user nào phù hợp với bộ lọc hiện tại</strong>
+                    <strong>Không có tài khoản nào phù hợp với bộ lọc hiện tại</strong>
                     <span>Thử nới điều kiện tìm kiếm hoặc xóa bộ lọc để quay lại danh sách đầy đủ.</span>
                   </div>
                   <div className="admin-state__actions">
@@ -394,7 +437,9 @@ export default function AdminUserList() {
                             </div>
                             <div>
                               <div className="admin-table__primary">{user.fullName}</div>
-                              <div className="admin-table__secondary">@{user.userName || "chua-co-username"}</div>
+                              <div className="admin-table__secondary">
+                                {user.userName ? `@${user.userName}` : "Chưa có tên đăng nhập"}
+                              </div>
                               <div className="admin-table__secondary admin-table__stacked-meta">
                                 {user.email || "Chưa cập nhật email"}
                               </div>
@@ -405,11 +450,11 @@ export default function AdminUserList() {
                           <div className="admin-chips">
                             <AdminRoleBadge tone={user.roleTone}>{user.roleLabel}</AdminRoleBadge>
                             {!user.hasKnownRole ? (
-                              <span className="admin-badge admin-badge--tone-warning">Chưa đồng bộ</span>
+                              <span className="admin-badge admin-badge--tone-warning">Chưa đồng bộ vai trò</span>
                             ) : null}
                           </div>
                           <div className="admin-table__secondary">
-                            {user.roleDescription || "Chưa có mô tả vai trò từ backend."}
+                            {user.roleDescription || "Chưa có mô tả vai trò."}
                           </div>
                         </td>
                         <td>
@@ -420,7 +465,7 @@ export default function AdminUserList() {
                         <td>
                           <div className="admin-table__primary">{formatAdminDateTime(user.updatedAt || user.createdAt || user.lastLogin)}</div>
                           <div className="admin-table__secondary">
-                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `ID: ${user.id ?? "Chưa có"}`}
+                            {user.detailAvailable === false ? "Đang dùng dữ liệu tạm từ danh sách" : `Mã tài khoản: ${user.id ?? "Chưa có"}`}
                           </div>
                           <div className="admin-table__secondary admin-table__stacked-meta">
                             {[user.phoneNumber, user.location].filter(Boolean).join(" · ") || "Chưa có số điện thoại hoặc địa điểm"}
@@ -437,14 +482,16 @@ export default function AdminUserList() {
                             <button
                               type="button"
                               className="admin-link-btn admin-link-btn--secondary"
-                              onClick={() => handleDisableUser(user)}
-                              disabled={user.status === "inactive" || disablingId === user.id}
+                              onClick={() => (user.status === "active" ? handleDisableUser(user) : handleEnableUser(user))}
+                              disabled={
+                                user.status === "active"
+                                  ? disablingId === user.id
+                                  : enablingId === user.id
+                              }
                             >
-                              {disablingId === user.id
-                                ? "Đang khóa..."
-                                : user.status === "inactive"
-                                  ? "Đã khóa"
-                                  : "Khóa"}
+                              {user.status === "active"
+                                ? (disablingId === user.id ? "Đang khóa..." : "Khóa")
+                                : (enablingId === user.id ? "Đang kích hoạt..." : "Kích hoạt")}
                             </button>
                           </div>
                         </td>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle, RotateCcw } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -124,7 +124,7 @@ export default function ProductionPlanDetail() {
             pStartDate: detailPayload?.startDate ?? order?.startDate ?? "-",
             pEndDate: detailPayload?.endDate ?? order?.endDate ?? "-",
             status: statusLabel,
-            pmName: pm?.name || pm?.fullName || (pm?.id ? `PM #${pm.id}` : "-"),
+            pmName: pm?.name || pm?.fullName || (pm?.id ? `Người quản lý #${pm.id}` : "-"),
           },
           product: {
             productCode: order?.type ?? (order?.id ? `ORD-${order.id}` : "-"),
@@ -165,7 +165,6 @@ export default function ProductionPlanDetail() {
       if (!id) return;
       try {
         const productionId = Number(id);
-        // Fetch a large enough batch to enable frontend-side pagination
         const partsRes = await ProductionPartService.getPartsByProduction(productionId, {
           PageIndex: 0,
           PageSize: 100,
@@ -261,50 +260,6 @@ export default function ProductionPlanDetail() {
     return { completed, total, percent };
   }, [plan, totalParts]);
 
-  const resolveHasCuttingNotebook = async (productionId) => {
-    if (!Number.isFinite(Number(productionId))) return false;
-    if (plan?.production?.hasCuttingNotebook) return true;
-
-    try {
-      const notebookRes = await CuttingNotebookService.getByProduction(productionId);
-      const payload = notebookRes?.data ?? notebookRes ?? {};
-      const notebookList = Array.isArray(payload?.data)
-        ? payload.data
-        : Array.isArray(payload)
-          ? payload
-          : [];
-      if (notebookList.length > 0) return true;
-    } catch { /* skip */ }
-
-    try {
-      const detailRes = await ProductionService.getProductionDetail(productionId);
-      const detailPayload = detailRes?.data?.data ?? detailRes?.data ?? {};
-      if (detectHasCuttingNotebook(detailPayload)) return true;
-    } catch { /* skip */ }
-
-    try {
-      const pageSize = 100;
-      const maxPages = 20;
-      let pIdx = 0;
-      while (pIdx < maxPages) {
-        const listRes = await ProductionService.getProductionList({
-          PageIndex: pIdx,
-          PageSize: pageSize,
-          SortColumn: "Name",
-          SortOrder: "ASC",
-        });
-        const rows = listRes?.data?.data ?? listRes?.data ?? [];
-        if (rows.length === 0) break;
-        const matched = rows.find(item => String(item?.productionId ?? item?.id) === String(productionId));
-        if (matched) return detectHasCuttingNotebook(matched);
-        if (rows.length < pageSize) break;
-        pIdx++;
-      }
-    } catch { /* skip */ }
-
-    return false;
-  };
-
   const handleOpenCuttingBook = async () => {
     if (!plan?.production?.productionId || checkingCuttingBook) return;
     setCheckingCuttingBook(true);
@@ -350,6 +305,39 @@ export default function ProductionPlanDetail() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBaoLoi = async (row) => {
+    if (!row.assignedWorkers || row.assignedWorkers.length === 0) {
+      toast.info("Công đoạn này chưa có thợ được phân công, không thể báo cáo lỗi.");
+      return;
+    }
+
+    try {
+      const res = await ProductionPartService.getWorkLogs(row.partId);
+      const logs = res?.data?.data || res?.data || [];
+      if (!Array.isArray(logs) || logs.length === 0) {
+        toast.info("Công đoạn này chưa có báo cáo sản lượng, không thể báo cáo lỗi.");
+        return;
+      }
+    } catch (err) {
+      console.error("Error checking work logs:", err);
+    }
+
+    navigate("/worker/error-report", {
+      state: {
+        assignment: {
+          partId: row.partId,
+          productionId: plan?.production?.productionId,
+          orderName: plan?.production?.orderName,
+          partName: row.partName,
+          startDate: row.startDate,
+          endDate: row.endDate,
+          errorType: 0,
+          happenAt: new Date().toISOString(),
+        },
+      },
+    });
   };
 
   if (loading && !plan) {
@@ -491,7 +479,7 @@ export default function ProductionPlanDetail() {
                 <InfoBadge label="Mã sản xuất" value={`#PR-${plan?.production?.productionId || ""}`} />
                 <InfoBadge label="Mã đơn hàng" value={`#ĐH-${plan?.production?.orderId || ""}`} />
                 <InfoBadge label="Tên đơn hàng" value={plan?.production?.orderName} />
-                <InfoBadge label="Quản lý dự án" value={plan?.production?.pmName} />
+                <InfoBadge label="Người quản lý" value={plan?.production?.pmName} />
                 <InfoBadge label="Thời gian" value={`${plan?.production?.pStartDate || ""} - ${plan?.production?.pEndDate || ""}`} />
                 <InfoBadge label="Trạng thái" value={plan?.production?.status} isStatus />
               </div>
@@ -545,48 +533,50 @@ export default function ProductionPlanDetail() {
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
-              <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
-                    <Link
-                      to={`/production/${plan?.production?.productionId}/errors`}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết
-                    </Link>
+            {!isWorker && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Tổng hợp tiến độ</div>
+                <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số lượng lỗi được báo cáo</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-lg font-bold text-slate-900">{reportedErrorCount}</span>
+                      <Link
+                        to={`/production/${plan?.production?.productionId}/errors`}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết
+                      </Link>
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
-                  <div className="mt-1 text-lg font-bold text-slate-900">
-                    {progressSummary.completed}/{progressSummary.total}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất làm việc</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">{progressSummary.percent}%</div>
                   </div>
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Số công đoạn hoàn thành</div>
+                    <div className="mt-1 text-lg font-bold text-slate-900">
+                      {progressSummary.completed}/{progressSummary.total}
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      (X là số công đoạn hoàn thành · N là tổng số công đoạn)
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
-                  <div className="mt-1">
-                    <Link
-                      to="/worker/daily-report"
-                      state={{ plan: { production: plan?.production, steps: plan?.steps } }}
-                      className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                    >
-                      Xem chi tiết sản lượng nhân viên
-                    </Link>
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+                    <div className="text-[11px] font-semibold uppercase text-slate-400">Hiệu suất nhân viên</div>
+                    <div className="mt-1">
+                      <Link
+                        to="/worker/daily-report"
+                        state={{ plan: { production: plan?.production, steps: plan?.steps } }}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                      >
+                        Xem chi tiết sản lượng nhân viên
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
@@ -607,8 +597,6 @@ export default function ProductionPlanDetail() {
                       <th className="px-4 py-3 text-left">STT</th>
                       <th className="px-4 py-3 text-left">Tên công đoạn</th>
                       <th className="px-4 py-3 text-left">Thợ được giao</th>
-                      <th className="px-4 py-3 text-left">Bắt đầu</th>
-                      <th className="px-4 py-3 text-left">Kết thúc</th>
                       <th className="px-4 py-3 text-right">Giá/SP</th>
                       <th className="px-4 py-3 text-center">Trạng thái</th>
                       <th className="px-4 py-3 text-center">Thao tác</th>
@@ -639,8 +627,6 @@ export default function ProductionPlanDetail() {
                             <span className="text-slate-300 italic text-[11px]">Chưa giao</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.startDate)}</td>
-                        <td className="px-4 py-3 text-slate-600 text-[11px] leading-tight">{formatDateTime(row.endDate)}</td>
                         <td className="px-4 py-3 text-right font-black text-slate-900 whitespace-nowrap">
                           {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} đ` : "-"}
                         </td>
@@ -656,29 +642,19 @@ export default function ProductionPlanDetail() {
                           })()}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Link
-                            to="/worker/error-report"
-                            state={{
-                              assignment: {
-                                partId: row.partId,
-                                productionId: plan?.production?.productionId,
-                                orderName: plan?.production?.orderName,
-                                partName: row.partName,
-                                startDate: row.startDate,
-                                endDate: row.endDate,
-                                errorType: 0,
-                              },
-                            }}
-                            className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100"
+                          <button
+                            type="button"
+                            onClick={() => handleBaoLoi(row)}
+                            className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-semibold text-rose-700 transition hover:bg-rose-100 cursor-pointer"
                           >
                             Báo lỗi
-                          </Link>
+                          </button>
                         </td>
                       </tr>
                     ))}
                     {pageData.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="py-10 text-center text-slate-500">
+                        <td colSpan={6} className="py-10 text-center text-slate-500">
                           Chưa có công đoạn.
                         </td>
                       </tr>
@@ -708,6 +684,8 @@ export default function ProductionPlanDetail() {
         description="Bạn có chắc chắn muốn chấp nhận kế hoạch sản xuất này? Sau khi duyệt, kế hoạch sẽ chuyển sang trạng thái sản xuất."
         onConfirm={confirmApprovePlan}
         onClose={() => setIsApproveConfirmOpen(false)}
+        primaryLabel="Duyệt kế hoạch"
+        confirmIcon={CheckCircle}
       />
 
       <ConfirmModal
@@ -716,6 +694,8 @@ export default function ProductionPlanDetail() {
         description="Bạn có chắc chắn muốn yêu cầu chỉnh sửa lại các công đoạn trong kế hoạch này?"
         onConfirm={confirmRequestUpdate}
         onClose={() => setIsRequestUpdateConfirmOpen(false)}
+        primaryLabel="Xác nhận yêu cầu"
+        confirmIcon={RotateCcw}
       />
     </OwnerLayout>
   );

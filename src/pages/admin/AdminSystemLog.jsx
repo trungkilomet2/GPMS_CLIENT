@@ -82,8 +82,8 @@ function getLevelLabel(level = "") {
   const normalized = String(level).toLowerCase();
   if (normalized === "error") return "Lỗi";
   if (normalized === "warning") return "Cảnh báo";
-  if (normalized === "debug") return "Debug";
-  if (normalized === "trace") return "Trace";
+  if (normalized === "debug") return "Gỡ lỗi";
+  if (normalized === "trace") return "Theo vết";
   return level || "Thông tin";
 }
 
@@ -93,6 +93,15 @@ function getLevelTone(level = "") {
   if (normalized === "warning") return "warning";
   if (normalized === "debug" || normalized === "trace") return "info";
   return "success";
+}
+
+function isErrorLevel(level = "") {
+  const normalized = String(level).toLowerCase();
+  return ["error", "critical", "fatal"].includes(normalized);
+}
+
+function isWarningLevel(level = "") {
+  return String(level).toLowerCase() === "warning";
 }
 
 export default function AdminSystemLog() {
@@ -108,7 +117,7 @@ export default function AdminSystemLog() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const levelOptions = useMemo(() => ["all", "Information", "Warning", "Error"], []);
+  const levelOptions = useMemo(() => ["all", "Warning", "Error"], []);
 
   const loadLogs = async ({
     keepSelection = true,
@@ -141,7 +150,7 @@ export default function AdminSystemLog() {
       setError(
         nextError?.response?.data?.detail ||
         nextError?.response?.data?.message ||
-        "Không thể tải nhật ký hệ thống từ backend."
+        "Không thể tải nhật ký hệ thống từ máy chủ."
       );
     } finally {
       setIsLoading(false);
@@ -159,6 +168,7 @@ export default function AdminSystemLog() {
 
     return logs.filter((log) => {
       const logTime = new Date(log.timestamp).getTime();
+      const isSupportedLevel = isWarningLevel(log.level) || isErrorLevel(log.level);
       const searchableText = normalizeSearchText([
         log.message,
         log.messageTemplate,
@@ -171,11 +181,16 @@ export default function AdminSystemLog() {
       ].filter(Boolean).join(" "));
 
       const searchMatch = !keyword || searchableText.includes(keyword);
-      const levelMatch = levelFilter === "all" || String(log.level).toLowerCase() === String(levelFilter).toLowerCase();
+      const levelMatch =
+        levelFilter === "all"
+          ? isSupportedLevel
+          : levelFilter === "Warning"
+            ? isWarningLevel(log.level)
+            : isErrorLevel(log.level);
       const fromMatch = fromDate == null || (!Number.isNaN(logTime) && logTime >= fromDate);
       const toMatch = toDate == null || (!Number.isNaN(logTime) && logTime <= toDate);
 
-      return searchMatch && levelMatch && fromMatch && toMatch;
+      return isSupportedLevel && searchMatch && levelMatch && fromMatch && toMatch;
     });
   }, [fromTimestamp, levelFilter, logs, search, toTimestamp]);
 
@@ -187,8 +202,8 @@ export default function AdminSystemLog() {
   const stats = useMemo(
     () => ({
       total: filteredLogs.length,
-      errors: filteredLogs.filter((log) => String(log.level).toLowerCase() === "error").length,
-      warnings: filteredLogs.filter((log) => String(log.level).toLowerCase() === "warning").length,
+      errors: filteredLogs.filter((log) => isErrorLevel(log.level)).length,
+      warnings: filteredLogs.filter((log) => isWarningLevel(log.level)).length,
       exceptions: filteredLogs.filter((log) => Boolean(log.exception)).length,
     }),
     [filteredLogs]
@@ -235,7 +250,7 @@ export default function AdminSystemLog() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Dùng log thật từ backend để kiểm tra lỗi vận hành, warning hạ tầng và những phần contract còn thiếu hoặc chưa validate chặt.
+                Dùng nhật ký thật từ hệ thống để kiểm tra lỗi vận hành, cảnh báo hạ tầng và những phần còn thiếu kiểm tra hoặc ràng buộc.
               </p>
             </div>
 
@@ -247,7 +262,7 @@ export default function AdminSystemLog() {
                 disabled={isLoading}
               >
                 <RefreshCcw size={18} />
-                Làm mới log
+                Làm mới nhật ký
               </button>
             </div>
           </div>
@@ -255,33 +270,33 @@ export default function AdminSystemLog() {
           <AdminBanner
             title={
               isLoading
-                ? "Đang tải nhật ký hệ thống từ backend."
+                ? "Đang tải nhật ký hệ thống từ máy chủ."
                 : error
-                  ? "Không thể tải dữ liệu log."
-                  : `Đã tải ${recordCount} log, đang hiển thị ${filteredLogs.length} log sau khi lọc.`
+                  ? "Không thể tải dữ liệu nhật ký."
+                  : `Đã tải ${recordCount} bản ghi, đang hiển thị ${filteredLogs.length} bản ghi sau khi lọc.`
             }
             description={
               error ||
-              "Màn này đang đọc trực tiếp từ API log thật, ưu tiên hiển thị rõ các lỗi và cảnh báo để Admin xử lý nhanh."
+              "Màn này đang đọc trực tiếp từ nhật ký thật của hệ thống, ưu tiên hiển thị rõ các lỗi và cảnh báo để quản trị viên xử lý nhanh."
             }
             tone={error ? "warning" : stats.errors > 0 ? "warning" : "success"}
           />
 
           <div className="admin-stats-grid">
-            <AdminStatCard icon={ClipboardList} label="Tổng bản ghi" value={isLoading ? "..." : stats.total} meta="Tổng số log backend trả về theo bộ lọc hiện tại" tone="primary" />
-            <AdminStatCard icon={ShieldAlert} label="Log lỗi" value={isLoading ? "..." : stats.errors} meta="Các bản ghi mức Error trong trang đang xem" tone="danger" />
-            <AdminStatCard icon={AlertTriangle} label="Cảnh báo" value={isLoading ? "..." : stats.warnings} meta="Các bản ghi mức Warning trong trang đang xem" tone="warning" />
-            <AdminStatCard icon={ShieldCheck} label="Có exception" value={isLoading ? "..." : stats.exceptions} meta="Log có stack trace hoặc lỗi DB đi kèm" tone="info" />
+            <AdminStatCard icon={ClipboardList} label="Tổng bản ghi" value={isLoading ? "..." : stats.total} meta="Tổng số nhật ký máy chủ trả về theo bộ lọc hiện tại" tone="primary" />
+            <AdminStatCard icon={ShieldAlert} label="Bản ghi lỗi" value={isLoading ? "..." : stats.errors} meta="Các bản ghi mức lỗi trong trang đang xem" tone="danger" />
+            <AdminStatCard icon={AlertTriangle} label="Cảnh báo" value={isLoading ? "..." : stats.warnings} meta="Các bản ghi mức cảnh báo trong trang đang xem" tone="warning" />
+            <AdminStatCard icon={ShieldCheck} label="Có ngoại lệ" value={isLoading ? "..." : stats.exceptions} meta="Nhật ký có vết lỗi hoặc lỗi cơ sở dữ liệu đi kèm" tone="info" />
           </div>
 
           <div className="admin-filter-card">
             <div className="admin-filter-grid admin-filter-grid--logs">
               <label className="admin-field admin-field--plain">
-                <span className="admin-field__label">Tìm trong log</span>
+                <span className="admin-field__label">Tìm trong nhật ký</span>
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Message, request path, action, lỗi..."
+                  placeholder="Nội dung, đường dẫn yêu cầu, thao tác, lỗi..."
                   className="admin-field__control"
                 />
               </label>
@@ -320,7 +335,7 @@ export default function AdminSystemLog() {
               <div className="admin-filter-actions">
                 <div className="admin-filter-info">
                   <ClipboardList size={16} />
-                  <span>{filteredLogs.length} log phù hợp</span>
+                  <span>{filteredLogs.length} bản ghi phù hợp</span>
                 </div>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={applyFilters}>
                   Áp dụng
@@ -336,11 +351,11 @@ export default function AdminSystemLog() {
             <section className="admin-table-card">
               <div className="admin-table-card__header">
                 <div>
-                  <h2 className="admin-card__title">Danh sách log</h2>
-                  <p className="admin-card__subtitle">Quét nhanh theo thời gian, mức độ và request path.</p>
+                  <h2 className="admin-card__title">Danh sách nhật ký</h2>
+                  <p className="admin-card__subtitle">Quét nhanh theo thời gian, mức độ và đường dẫn yêu cầu.</p>
                 </div>
                 <div className="admin-inline-summary">
-                  <span className="admin-inline-summary__item">{filteredLogs.length} log phù hợp</span>
+                  <span className="admin-inline-summary__item">{filteredLogs.length} bản ghi phù hợp</span>
                   <span className="admin-inline-summary__item">{stats.errors} lỗi</span>
                 </div>
               </div>
@@ -349,8 +364,8 @@ export default function AdminSystemLog() {
                 {!isLoading && filteredLogs.length === 0 ? (
                   <div className="admin-state">
                     <div className="admin-state__content">
-                      <strong>Không có log phù hợp</strong>
-                      <span>Thử đổi thời gian, từ khóa hoặc mức độ để xem thêm dữ liệu từ backend.</span>
+                      <strong>Không có nhật ký phù hợp</strong>
+                      <span>Thử đổi thời gian, từ khóa hoặc mức độ để xem thêm dữ liệu từ hệ thống.</span>
                     </div>
                   </div>
                 ) : (
@@ -359,7 +374,7 @@ export default function AdminSystemLog() {
                       <tr>
                         <th>Thời gian</th>
                         <th>Mức độ</th>
-                        <th>Request path</th>
+                        <th>Đường dẫn yêu cầu</th>
                         <th>Nội dung</th>
                         <th>Nguồn</th>
                       </tr>
@@ -383,17 +398,17 @@ export default function AdminSystemLog() {
                             </td>
                             <td>
                               <div className="admin-table__primary admin-table__text-wrap">
-                                {log.requestPath || "Chưa có RequestPath"}
+                                {log.requestPath || "Chưa có đường dẫn yêu cầu"}
                               </div>
                             </td>
                             <td>
                               <div className="admin-table__primary admin-table__text-wrap">
-                                {log.message || "Không có message"}
+                                {log.message || "Không có nội dung"}
                               </div>
                             </td>
                             <td>
                               <div className="admin-table__secondary admin-table__text-wrap">
-                                {log.sourceContext || "Chưa có SourceContext"}
+                                {log.sourceContext || "Chưa có nguồn ghi nhận"}
                               </div>
                             </td>
                           </tr>
@@ -406,7 +421,7 @@ export default function AdminSystemLog() {
 
               <div className="admin-table-card__header admin-table-card__footer">
                 <div className="admin-card__subtitle">
-                  Trang {currentPage}/{totalPages} • Tối đa {pageSize} log mỗi trang
+                  Trang {currentPage}/{totalPages} • Tối đa {pageSize} bản ghi mỗi trang
                 </div>
                 <div className="admin-table__actions">
                   <button
@@ -432,15 +447,15 @@ export default function AdminSystemLog() {
             <aside className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Chi tiết log</h2>
-                  <p className="admin-card__subtitle">Chọn một dòng bên trái để xem đầy đủ message, request và exception.</p>
+                  <h2 className="admin-card__title">Chi tiết nhật ký</h2>
+                  <p className="admin-card__subtitle">Chọn một dòng bên trái để xem đầy đủ nội dung, yêu cầu và ngoại lệ.</p>
                 </div>
               </div>
 
               {!selectedLog ? (
                 <div className="admin-state admin-state--compact">
                   <div className="admin-state__content">
-                    <strong>Chưa có log nào được chọn</strong>
+                    <strong>Chưa có bản ghi nào được chọn</strong>
                     <span>Chọn một dòng trong bảng để xem chi tiết tại đây.</span>
                   </div>
                 </div>
@@ -457,47 +472,47 @@ export default function AdminSystemLog() {
                   </div>
 
                   <div className="admin-log-detail__section">
-                    <strong>Request path</strong>
-                    <span>{selectedLog.requestPath || "Chưa có RequestPath"}</span>
+                    <strong>Đường dẫn yêu cầu</strong>
+                    <span>{selectedLog.requestPath || "Chưa có đường dẫn yêu cầu"}</span>
                   </div>
 
                   <div className="admin-log-detail__section">
-                    <strong>Action</strong>
-                    <span>{selectedLog.actionName || "Chưa có ActionName"}</span>
+                    <strong>Thao tác</strong>
+                    <span>{selectedLog.actionName || "Chưa có tên thao tác"}</span>
                   </div>
 
                   <div className="admin-log-detail__section">
-                    <strong>Source</strong>
-                    <span>{selectedLog.sourceContext || "Chưa có SourceContext"}</span>
+                    <strong>Nguồn</strong>
+                    <span>{selectedLog.sourceContext || "Chưa có nguồn ghi nhận"}</span>
                   </div>
 
                   <div className="admin-log-detail__section">
-                    <strong>Request ID</strong>
-                    <span>{selectedLog.requestId || "Chưa có RequestId"}</span>
+                    <strong>Mã yêu cầu</strong>
+                    <span>{selectedLog.requestId || "Chưa có mã yêu cầu"}</span>
                   </div>
 
                   <div className="admin-log-detail__section">
                     <strong>Nội dung log</strong>
-                    <div className="admin-log-detail__message">{selectedLog.message || "Không có message."}</div>
+                        <div className="admin-log-detail__message">{selectedLog.message || "Không có nội dung."}</div>
                   </div>
 
                   {selectedLog.messageTemplate ? (
                     <div className="admin-log-detail__section">
-                      <strong>Message template</strong>
+                      <strong>Mẫu thông điệp</strong>
                       <div className="admin-log-detail__code">{selectedLog.messageTemplate}</div>
                     </div>
                   ) : null}
 
                   {selectedLog.exception ? (
                     <div className="admin-log-detail__section">
-                      <strong>Exception</strong>
+                      <strong>Ngoại lệ</strong>
                       <pre className="admin-log-detail__exception">{selectedLog.exception}</pre>
                     </div>
                   ) : null}
 
                   {selectedLog.properties ? (
                     <div className="admin-log-detail__section">
-                      <strong>Properties gốc</strong>
+                      <strong>Thuộc tính gốc</strong>
                       <div className="admin-log-detail__code admin-log-detail__code--scroll">
                         <FileText size={16} />
                         <span>{selectedLog.properties}</span>

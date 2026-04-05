@@ -1,14 +1,17 @@
 import { useEffect } from "react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import "@/styles/SuccessModal.css";
 
 export default function ConfirmModal({
   isOpen,
   title = "Xác nhận",
-  description = "Bạn có chắc chắn muốn thực hiện hành động này?",
-  primaryLabel = "Xác nhận",
+  description = "Bạn có chắc chắn muốn thực hiện hành động này? Hành động này không thể hoàn tác.",
+  primaryLabel = "Xác nhận xóa",
   secondaryLabel = "Hủy",
   onConfirm,
   onClose,
+  confirmIcon: ConfirmIcon = Trash2,
+  showConfirmIcon = true,
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -36,9 +39,10 @@ export default function ConfirmModal({
           ×
         </button>
 
-        <div className="gpms-modal__icon gpms-modal__icon--warning" aria-hidden="true" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>
-          ?
+        <div className="gpms-modal__icon gpms-modal__icon--danger" aria-hidden="true">
+          <AlertTriangle size={28} strokeWidth={2.5} />
         </div>
+        
         <h3 className="gpms-modal__title">{title}</h3>
         {description ? <p className="gpms-modal__desc">{description}</p> : null}
 
@@ -47,6 +51,7 @@ export default function ConfirmModal({
             {secondaryLabel}
           </button>
           <button type="button" className="gpms-modal__btn gpms-modal__btn--primary" onClick={onConfirm}>
+            {showConfirmIcon && ConfirmIcon && <ConfirmIcon size={18} />}
             {primaryLabel}
           </button>
         </div>

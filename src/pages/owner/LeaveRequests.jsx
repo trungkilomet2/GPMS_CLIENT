@@ -96,6 +96,18 @@ function toIsoFromLocalDateTime(value) {
   return parsed.toISOString();
 }
 
+function toLocalDateKey(value) {
+  return String(value ?? "").split("T")[0];
+}
+
+function getTodayLocalDateKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+}
+
 function shouldShowApprover(leave) {
   return Boolean(leave?.approvedByName) && leave?.status !== "pending";
 }
@@ -206,6 +218,11 @@ export default function LeaveRequests() {
 
     if (new Date(fromDate).getTime() > new Date(toDate).getTime()) {
       setError("Thời gian bắt đầu nghỉ không được lớn hơn thời gian kết thúc.");
+      return;
+    }
+
+    if (toLocalDateKey(fromDate) < getTodayLocalDateKey()) {
+      setError("Ngày bắt đầu nghỉ không được ở quá khứ.");
       return;
     }
 
@@ -343,12 +360,11 @@ export default function LeaveRequests() {
                       setPage(1);
                     }}
                     className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  >
+                >
                   <option value="all">Tất cả</option>
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
-                  <option value="cancel_requested">Chờ hủy</option>
                   <option value="cancelled">Đã hủy</option>
                 </select>
               </label>

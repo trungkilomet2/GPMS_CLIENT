@@ -8,6 +8,7 @@ import { getStoredUser } from '@/lib/authStorage';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
@@ -57,6 +58,13 @@ export default function EditOrder() {
     const [orderImagePreview, setOrderImagePreview] = useState('');
     const [templateItems, setTemplateItems] = useState([]);
     const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState({
+        show: false,
+        type: null,
+        index: null,
+        title: '',
+        desc: ''
+    });
     const [initialState, setInitialState] = useState(null);
 
     const normalizeMaterial = (m = {}) => {
@@ -215,8 +223,7 @@ export default function EditOrder() {
         if (!orderData.startDate) {
             newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
         } else {
-            const today = new Date();
-            const todayStr = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString().split('T')[0];
+            const todayStr = new Date().toLocaleDateString('sv-SE');
             // Only validate if it's a NEW date or if the original date was also in the future
             if (orderData.startDate < todayStr) {
                 newErrors.startDate = 'Ngày bắt đầu không được trước ngày hiện tại';
@@ -255,7 +262,7 @@ export default function EditOrder() {
             const materialErrors = [];
             materials.forEach((m, idx) => {
                 const mErrs = {};
-                if (!m.image) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
+                if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
                 if (!m.materialName?.trim()) {
                     mErrs.materialName = 'Tên vật liệu là bắt buộc';
                 } else if (m.materialName.trim().length > 150) {
@@ -297,7 +304,10 @@ export default function EditOrder() {
     };
 
     const handleOrderChange = (e) => {
-        const { name, value } = e.target;
+        let { name, value } = e.target;
+        if (name === 'quantity' || name === 'cpu') {
+            value = value.replace(/[^0-9]/g, '');
+        }
         const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
             ? (value === '' ? '' : Number(value))
             : value;
@@ -332,12 +342,9 @@ export default function EditOrder() {
             note: materialFormData.note?.trim() || '',
         };
 
-        let targetIndex = editingIndex;
+        const targetIndex = editingIndex !== null ? editingIndex : materials.length;
         if (editingIndex === null) {
-            setMaterials((prev) => {
-                targetIndex = prev.length;
-                return [...prev, pendingMaterial];
-            });
+            setMaterials((prev) => [...prev, pendingMaterial]);
         } else {
             setMaterials((prev) => {
                 const updated = [...prev];
@@ -347,10 +354,10 @@ export default function EditOrder() {
         }
 
         // Clear error for this material if any
-        if (errors.materialsList) {
+        if (errors.materialsList && errors.materialsList[targetIndex]) {
             setErrors((prev) => {
-                const newMaterialsList = prev.materialsList ? { ...prev.materialsList } : {};
-                if (targetIndex !== null) delete newMaterialsList[targetIndex];
+                const newMaterialsList = { ...prev.materialsList };
+                delete newMaterialsList[targetIndex];
                 return { ...prev, materialsList: newMaterialsList };
             });
         }
@@ -376,6 +383,13 @@ export default function EditOrder() {
                             };
                         }
                         return updated;
+                    });
+                    // Also clear error if it was set during upload
+                    setErrors((prev) => {
+                        if (!prev.materialsList || !prev.materialsList[targetIndex]) return prev;
+                        const newMaterialsList = { ...prev.materialsList };
+                        delete newMaterialsList[targetIndex];
+                        return { ...prev, materialsList: newMaterialsList };
                     });
                 }
             } catch {
@@ -418,15 +432,21 @@ export default function EditOrder() {
             const lower = file.name.toLowerCase();
             const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
             const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
-            if (isAllowed && isSizeOk) {
+            const isNameOk = file.name.length <= 255;
+
+            if (isAllowed && isSizeOk && isNameOk) {
                 valid.push(file);
             } else {
-                invalid.push(file.name);
+                let reason = "Định dạng không hỗ trợ";
+                if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
+                else if (!isNameOk) reason = "Tên file quá 255 ký tự";
+                
+                invalid.push(`${file.name} (${reason})`);
             }
         });
 
         if (invalid.length > 0) {
-            toast.error(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+            toast.error(invalid.join(', '));
         }
 
         if (valid.length > 0) {
@@ -453,7 +473,52 @@ export default function EditOrder() {
     };
 
     const removeTemplateItem = (index) => {
-        setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+        setDeleteConfirm({
+            show: true,
+            type: 'template',
+            index: index,
+            title: 'Xác nhận xóa mẫu thiết kế',
+            desc: 'Bạn có chắc chắn muốn xóa mẫu thiết kế này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+        });
+    };
+
+    const handleDeleteMaterial = (index) => {
+        setDeleteConfirm({
+            show: true,
+            type: 'material',
+            index: index,
+            title: 'Xác nhận xóa vật liệu',
+            desc: 'Bạn có chắc chắn muốn xóa vật liệu này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+        });
+    };
+
+    const executeDelete = () => {
+        const { type, index } = deleteConfirm;
+        if (type === 'template') {
+            setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+        } else if (type === 'material') {
+            setMaterials((prev) => prev.filter((_, i) => i !== index));
+            if (errors.materialsList) {
+                setErrors((prev) => {
+                    const newMaterialsList = { ...prev.materialsList };
+                    delete newMaterialsList[index];
+                    
+                    // Shift subsequent errors back
+                    const adjustedList = {};
+                    Object.keys(newMaterialsList).forEach(key => {
+                        const k = parseInt(key);
+                        if (k > index) {
+                            adjustedList[k - 1] = newMaterialsList[key];
+                        } else {
+                            adjustedList[k] = newMaterialsList[key];
+                        }
+                    });
+                    
+                    return { ...prev, materialsList: adjustedList };
+                });
+            }
+        }
+        setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
     };
 
     const translateError = (msg) => {
@@ -464,29 +529,6 @@ export default function EditOrder() {
             'One or more validation errors occurred.': 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại',
         };
         return dictionary[msg] || msg;
-    };
-
-    const handleDeleteMaterial = (index) => {
-        setMaterials((prev) => prev.filter((_, i) => i !== index));
-        if (errors.materialsList) {
-            setErrors((prev) => {
-                const newMaterialsList = { ...prev.materialsList };
-                delete newMaterialsList[index];
-                
-                // Shift subsequent errors back
-                const adjustedList = {};
-                Object.keys(newMaterialsList).forEach(key => {
-                    const k = parseInt(key);
-                    if (k > index) {
-                        adjustedList[k - 1] = newMaterialsList[key];
-                    } else {
-                        adjustedList[k] = newMaterialsList[key];
-                    }
-                });
-                
-                return { ...prev, materialsList: adjustedList };
-            });
-        }
     };
 
     const isDataChanged = () => {
@@ -736,6 +778,14 @@ export default function EditOrder() {
                             setIsSuccessOpen(false);
                             navigate(`/orders/detail/${id}`);
                         }}
+                    />
+
+                    <ConfirmModal
+                        isOpen={deleteConfirm.show}
+                        title={deleteConfirm.title}
+                        description={deleteConfirm.desc}
+                        onConfirm={executeDelete}
+                        onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
                     />
                 </div>
             </div>

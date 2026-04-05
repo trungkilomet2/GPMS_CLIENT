@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Search, Users, Check, AlertTriangle, Info } from "lucide-react";
+import { ArrowLeft, Search, Users, Check, AlertTriangle, Info, Save, Send, ChevronDown, ChevronRight } from "lucide-react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import { getStoredUser } from "@/lib/authStorage";
@@ -9,6 +9,7 @@ import "@/styles/leave.css";
 
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
+import WorkerService from "@/services/WorkerService";
 import { toast } from "react-toastify";
 import ConfirmModal from "@/components/ConfirmModal";
 import { getPlanStatusLabel, STATUS_STYLES } from "@/utils/statusUtils";
@@ -17,12 +18,15 @@ export default function ProductionAssignment() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const incoming = location.state ?? {};
+  const incoming = useMemo(() => location.state || null, [location.state]);
   const [selectedProductionId, setSelectedProductionId] = useState(() => {
     if (incoming?.production?.productionId) return String(incoming.production.productionId);
     return id ? String(id) : "";
   });
   const [workers, setWorkers] = useState([]);
+  const [workerGroups, setWorkerGroups] = useState([]); // Groups of workers by manager
+  const [ungroupedWorkers, setUngroupedWorkers] = useState([]); // Standalone workers
+  const [collapsedGroups, setCollapsedGroups] = useState({}); // Track collapsed state of groups
   const [workerError, setWorkerError] = useState(null);
   const [assignments, setAssignments] = useState({});
   const [workerQuery, setWorkerQuery] = useState("");
@@ -36,6 +40,7 @@ export default function ProductionAssignment() {
   const [backendParts, setBackendParts] = useState([]); // Real parts with real IDs from backend
   const [initialAssignments, setInitialAssignments] = useState({}); // To track changes
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isOwnerView, setIsOwnerView] = useState(false);
   const loadingWorkers = workers.length === 0 && !workerError;
 
   // Fetch production detail from API when pmId is missing (from incoming state or directly by URL)
@@ -59,7 +64,7 @@ export default function ProductionAssignment() {
         pStartDate: payload.startDate ?? order.startDate ?? null,
         pEndDate: payload.endDate ?? order.endDate ?? null,
         status: payload.statusName || payload.status,
-        pmName: pm.fullName || pm.name || (pm.id ? `PM #${pm.id}` : "-"),
+        pmName: pm.fullName || pm.name || (pm.id ? `Người Quản lý #${pm.id}` : "-"),
         product: {
           productCode: order.id ? `PRD-${order.id}` : "PRD-UNKNOWN",
           productName: order.orderName,
@@ -123,33 +128,54 @@ export default function ProductionAssignment() {
   }, [selectedProductionId]);
 
   const rows = useMemo(() => {
-    const sourceSteps = Array.isArray(incoming?.steps) && incoming.steps.length > 0
-      ? incoming.steps
-      : PLAN_STEPS;
-      
+    // Priority: 1. Data passed from previous page, 2. Real parts from API, 3. Fallback mock
+    let sourceSteps = PLAN_STEPS;
+    
+    if (incoming && Array.isArray(incoming?.steps) && incoming.steps.length > 0) {
+      sourceSteps = incoming.steps;
+    } else if (backendParts.length > 0) {
+      // Convert backendParts format to match internal row format
+      sourceSteps = backendParts.map(p => ({
+        partName: p.partName || p.name,
+        cpu: p.cpu,
+        startDate: p.startDate,
+        endDate: p.endDate,
+        realPartId: p.id
+      }));
+    }
+
     // Create a pool of backend parts to track which ones have been matched
     const availableBackendParts = backendParts.map((p, idx) => ({ ...p, originalIndex: idx }));
 
     return sourceSteps.map((row, index) => {
-      // 1. Try to match by exact name first
-      let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
-      
-      // 2. If no name match, fallback to the same index (assuming order is preserved)
-      if (matchIdx === -1) {
-         matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
-      }
-
+      // Match with real backend IDs
       let realPart = null;
-      if (matchIdx !== -1) {
-        realPart = availableBackendParts[matchIdx];
-        // Remove the matched part so it can't be matched twice
-        availableBackendParts.splice(matchIdx, 1);
+      
+      // If we already have realPartId from the mapping above
+      if (row.realPartId) {
+        const foundIdx = availableBackendParts.findIndex(p => p.id === row.realPartId);
+        if (foundIdx !== -1) {
+          realPart = availableBackendParts[foundIdx];
+          availableBackendParts.splice(foundIdx, 1);
+        }
+      } else {
+        // Match by exact name first
+        let matchIdx = availableBackendParts.findIndex(p => p.partName === row.partName || p.name === row.partName);
+        // Fallback to the same index
+        if (matchIdx === -1) {
+          matchIdx = availableBackendParts.findIndex(p => p.originalIndex === index);
+        }
+
+        if (matchIdx !== -1) {
+          realPart = availableBackendParts[matchIdx];
+          availableBackendParts.splice(matchIdx, 1);
+        }
       }
 
       return {
         ...row,
-        ppId: realPart?.id ?? (2000 + index), // Use real backend ID if available
-        realPartId: realPart?.id ?? null,
+        ppId: realPart?.id ?? (2000 + index),
+        realPartId: realPart?.id ?? row.realPartId ?? null,
         statusName: realPart?.statusName || getPlanStatusLabel(realPart?.statusId),
         statusId: realPart?.statusId,
         productionId: selectedProduction ? selectedProduction.productionId : null,
@@ -199,73 +225,193 @@ export default function ProductionAssignment() {
 
   useEffect(() => {
     if (!selectedProductionId) return;
-    // pmId can be at pmId (top-level), pm.id (nested), or fallback
     const pmId = selectedProduction?.pmId || selectedProduction?.pm?.id || null;
     const fromDate = selectedProduction?.pStartDate || selectedProduction?.startDate
       || selectedProduction?.product?.startDate || "2026-01-01";
     const toDate = selectedProduction?.pEndDate || selectedProduction?.endDate
       || selectedProduction?.product?.endDate || "2026-12-31";
-    if (!pmId) {
+    const currentUser = getStoredUser();
+
+    // Check permissions more robustly (handle string/array and case-insensitive)
+    const getRolesArr = (val) => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.map(v => String(v).toLowerCase());
+      return [String(val).toLowerCase()];
+    };
+    const userRoles = getRolesArr(currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "");
+    const isOwner = userRoles.some(r => ["owner", "admin"].includes(r));
+    setIsOwnerView(isOwner);
+
+    // Owner always sees everything, PM only sees their workers
+    if (isOwner) {
+      // Owner View: Ignore pmId check for loading the list
+    } else if (!pmId) {
       setWorkerError("Không tìm thấy thông tin PM quản lý đơn sản xuất này.");
       return;
     }
-    ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
-      .then((res) => {
-        const list = res?.data?.data || res?.data || res || [];
-        if (Array.isArray(list)) {
-          const pm = selectedProduction?.pm || {};
-          const mapped = list.map((w) => {
-            const info = w.workerInfo || w || {};
-            const skills = Array.isArray(w.workerSkillInfo)
-              ? w.workerSkillInfo.map(s => s.skillName)
-              : (w.frequentSteps || []);
-            const lrInfo = Array.isArray(w.workerLrInfo) ? w.workerLrInfo : [];
-            const hasLeave = lrInfo.length > 0;
-            const leaveDate = hasLeave ? (lrInfo[0]?.fromDate || lrInfo[0]?.startDate || lrInfo[0]?.leaveDate || "") : "";
 
-            return {
-              id: String(info.workerId || info.id || ""),
-              fullName: info.workerName || info.fullName || info.userName || "No name",
-              status: hasLeave ? "leave" : (w.statusId === 2 ? "leave" : "ready"),
-              frequentSteps: skills,
-              leaveDate: leaveDate || w.leaveDate || "",
-              role: w.role || "Worker",
-            };
-          }).filter(w => w.id !== "");
+    if (isOwner) {
+      // Owner: fetch ALL employees and group by manager
+      WorkerService.getEmployeeDirectory()
+        .then((res) => {
+          const allEmployees = res?.data || [];
+          // Filter only active workers/PMs (exclude Customer, inactive)
+          const eligible = allEmployees.filter(emp => {
+            if (emp.status !== "active") return false;
+            const sysRole = (emp.primarySystemRole || "").toLowerCase();
+            if (sysRole === "customer") return false;
+            return true;
+          });
 
-          // Inject PM managing this production if not in list
-          if (pm.id && !mapped.some(w => String(w.id) === String(pm.id))) {
+          const mapped = eligible.map(emp => ({
+            id: String(emp.id),
+            fullName: emp.fullName || emp.userName || "No name",
+            status: "ready",
+            frequentSteps: emp.workerSkillLabels || emp.workerSkillNames || [],
+            leaveDate: "",
+            role: emp.primaryRoleLabel || emp.primarySystemRole || "Thợ may",
+            managerId: emp.managerId ?? null,
+            managerName: emp.managerName || "",
+          }));
+
+          // Inject Owner if not in list (check both .id and .userId)
+          const currentUserId = currentUser?.id || currentUser?.userId || localStorage.getItem("userId");
+          if (currentUserId && !mapped.some(w => String(w.id) === String(currentUserId))) {
             mapped.push({
-              id: String(pm.id),
-              fullName: pm.fullName || pm.name || `PM #${pm.id}`,
+              id: String(currentUserId),
+              fullName: currentUser.fullName || currentUser.userName || "Chủ xưởng (Bạn)",
               status: "ready",
               frequentSteps: [],
               leaveDate: "",
-              role: "PM",
+              role: "Chủ xưởng",
+              managerId: null,
+              managerName: "",
             });
           }
 
-          // Inject current user if they are Owner and not in list
-          const currentUser = getStoredUser();
-          const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
-          const isOwner = hasAnyRole(roleValue, ["Owner", "Admin"]);
-          if (isOwner && currentUser?.id && !mapped.some(w => String(w.id) === String(currentUser.id))) {
-            mapped.push({
-              id: String(currentUser.id),
-              fullName: currentUser.fullName || currentUser.name || "Owner",
-              status: "ready",
-              frequentSteps: [],
-              leaveDate: "",
-              role: "Owner",
-            });
-          }
+          // Filter out managers from Workers list to use as group headers, 
+          // BUT keep them if they are selectable workers as well.
+          const activeManagerIds = new Set(mapped.filter(w => w.managerId).map(w => String(w.managerId)));
 
+          const groupMap = new Map();
+          const ungrouped = [];
+
+          // Create a special priority group for Owners/Admins
+          const OWNER_GROUP_KEY = "OWNER_GROUP";
+          groupMap.set(OWNER_GROUP_KEY, {
+            managerId: OWNER_GROUP_KEY,
+            managerName: "Chủ xưởng",
+            workers: []
+          });
+
+          mapped.forEach(w => {
+            const roleLower = (w.role || "").toLowerCase();
+            const fullNameLower = (w.fullName || "").toLowerCase();
+            const currentUserId = currentUser?.id || currentUser?.userId || localStorage.getItem("userId");
+
+            // Comprehensive check for Owner: by role keywords OR if it's the current logged in user
+            const isMe = currentUserId && String(w.id) === String(currentUserId);
+            const isOwnerRole = roleLower.includes("chủ") ||
+              roleLower.includes("owner") ||
+              roleLower.includes("admin") ||
+              fullNameLower.includes("tổng tài") ||
+              isMe;
+
+            // If it's an owner or the current user, put them in the priority group
+            if (isOwnerRole) {
+              groupMap.get(OWNER_GROUP_KEY).workers.push(w);
+              return;
+            }
+
+            let mgrKey = w.managerId ? String(w.managerId) : null;
+
+            // If the worker is a manager themselves (their ID manages others), force them into their own group
+            if (activeManagerIds.has(String(w.id))) {
+              mgrKey = String(w.id);
+            }
+
+            if (mgrKey) {
+              let mgrLabel = w.managerName;
+              if (!mgrLabel) {
+                const manager = allEmployees.find(e => String(e.id) === mgrKey);
+                mgrLabel = manager ? (manager.fullName || manager.userName) : `Quản lý #${mgrKey}`;
+              }
+              if (!groupMap.has(mgrKey)) {
+                groupMap.set(mgrKey, { managerId: mgrKey, managerName: mgrLabel, workers: [] });
+              }
+              groupMap.get(mgrKey).workers.push(w);
+            } else {
+              ungrouped.push(w);
+            }
+          });
+
+          // Sort groups: Priority Owner group first, then PM of production, then others
+          const finalGroups = Array.from(groupMap.values())
+            .filter(g => g.workers.length > 0)
+            .sort((a, b) => {
+              if (a.managerId === OWNER_GROUP_KEY) return -1;
+              if (b.managerId === OWNER_GROUP_KEY) return 1;
+              if (a.managerId === String(pmId)) return -1;
+              if (b.managerId === String(pmId)) return 1;
+              return (a.managerName || "").localeCompare(b.managerName || "");
+            });
+
+          setWorkerGroups(finalGroups);
+          setUngroupedWorkers(ungrouped);
           setWorkers(mapped);
-        }
-      })
-      .catch((err) => {
-        setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi tải danh sách thợ");
-      });
+        })
+        .catch((err) => {
+          setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi tải danh sách nhân viên");
+        });
+    } else {
+      // PM: use existing assign-workers API
+      ProductionPartService.getAssignWorkers({ PMId: pmId, fromDate, toDate })
+        .then((res) => {
+          const list = res?.data?.data || res?.data || res || [];
+          if (Array.isArray(list)) {
+            const mapped = list.map((w) => {
+              const info = w.workerInfo || w || {};
+              const skills = Array.isArray(w.workerSkillInfo)
+                ? w.workerSkillInfo.map(s => s.skillName)
+                : (w.frequentSteps || []);
+              const lrInfo = Array.isArray(w.workerLrInfo) ? w.workerLrInfo : [];
+              const hasLeave = lrInfo.length > 0;
+              const leaveDate = hasLeave ? (lrInfo[0]?.fromDate || lrInfo[0]?.startDate || lrInfo[0]?.leaveDate || "") : "";
+
+              let roleLabel = w.role || "Nhân viên";
+              if (roleLabel.toLowerCase() === "worker") roleLabel = "Nhân viên";
+              if (roleLabel.toLowerCase() === "pm") roleLabel = "Quản lý sản xuất";
+
+              return {
+                id: String(info.workerId || info.id || ""),
+                fullName: info.workerName || info.fullName || info.userName || "No name",
+                status: hasLeave ? "leave" : (w.statusId === 2 ? "leave" : "ready"),
+                frequentSteps: skills,
+                leaveDate: leaveDate || w.leaveDate || "",
+                role: roleLabel,
+              };
+            }).filter(w => w.id !== "");
+
+            // Inject PM managing this production if not in list
+            if (pm.id && !mapped.some(w => String(w.id) === String(pm.id))) {
+              mapped.push({
+                id: String(pm.id),
+                fullName: pm.fullName || pm.name || `PM #${pm.id}`,
+                status: "ready",
+                frequentSteps: [],
+                leaveDate: "",
+                role: "Quản lý sản xuất", // Translated from "PM"
+              });
+            }
+
+            setWorkerGroups([]);
+            setWorkers(mapped);
+          }
+        })
+        .catch((err) => {
+          setWorkerError(err?.response?.data?.detail || err?.response?.data?.message || err?.message || "Lỗi tải danh sách thợ");
+        });
+    }
   }, [selectedProductionId, selectedProduction]);
 
   useEffect(() => {
@@ -280,24 +426,24 @@ export default function ProductionAssignment() {
       rows.forEach((row, index) => {
         const existing = next[row.ppId]?.workerIds || [];
         if (existing.length > 0) return;
-        
+
         // 1. Match by realPartId
         let matchIdx = pool.findIndex(p => p.id === row.realPartId);
-        
+
         // 2. Match by exact name
         if (matchIdx === -1) {
-            matchIdx = pool.findIndex(p => p.partName === row.partName || p.name === row.partName);
+          matchIdx = pool.findIndex(p => p.partName === row.partName || p.name === row.partName);
         }
-        
+
         // 3. Match by original preserved index
         if (matchIdx === -1) {
-            matchIdx = pool.findIndex(p => p.originalIndex === index);
+          matchIdx = pool.findIndex(p => p.originalIndex === index);
         }
 
         let realPart = null;
         if (matchIdx !== -1) {
-            realPart = pool[matchIdx];
-            pool.splice(matchIdx, 1);
+          realPart = pool[matchIdx];
+          pool.splice(matchIdx, 1);
         }
 
         const initialIds = extractAssignedWorkerIds(realPart, workers);
@@ -336,6 +482,7 @@ export default function ProductionAssignment() {
         status: worker.status || "ready",
         leaveDate: worker.leaveDate || "",
         frequentSteps: Array.isArray(worker.frequentSteps) ? worker.frequentSteps : [],
+        role: worker.role || "",
       })),
     [workers]
   );
@@ -470,13 +617,13 @@ export default function ProductionAssignment() {
           console.warn("Row skipped because realPartId is null:", row.partName);
           return false;
         }
-        
+
         const currentIds = [...(assignments[row.ppId]?.workerIds || [])].sort().join(',');
         const originalIds = [...(initialAssignments[row.ppId]?.workerIds || [])].sort().join(',');
-        
+
         const isDirty = currentIds !== originalIds;
         console.log(`Row: ${row.partName} | realPartId: ${row.realPartId} | Current: [${currentIds}] | Original: [${originalIds}] | isDirty: ${isDirty}`);
-        
+
         return isDirty;
       });
 
@@ -510,7 +657,7 @@ export default function ProductionAssignment() {
       }
 
       toast.success("Lưu dữ liệu phân công thành công!");
-      
+
       // Update initial state to match current assignments
       const updatedBase = {};
       Object.keys(assignments).forEach(key => {
@@ -534,15 +681,19 @@ export default function ProductionAssignment() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  const isWorkerPath = location.pathname.startsWith("/worker/");
+                  const basePath = isWorkerPath ? "/worker/production" : "/production";
+                  navigate(`${basePath}/${selectedProductionId}`);
+                }}
                 className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
               >
                 <ArrowLeft size={18} />
               </button>
               <div className="flex flex-col gap-2">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  {Object.values(initialAssignments).some(v => v.workerIds.length > 0) 
-                    ? "Chỉnh sửa phân công" 
+                  {Object.values(initialAssignments).some(v => v.workerIds.length > 0)
+                    ? "Chỉnh sửa phân công"
                     : "Phân công lao động"}
                 </h1>
                 <p className="text-slate-600">Phân công theo công đoạn đã lập trong kế hoạch sản xuất.</p>
@@ -570,13 +721,13 @@ export default function ProductionAssignment() {
               <div className="grid grid-cols-2 gap-3 text-sm text-slate-700 sm:grid-cols-4">
                 <InfoItem label="Đơn sản xuất" value={selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"} />
                 <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId || selectedProduction.order?.id || selectedProduction.order?.orderId || "-"}` : "-"} />
-                <InfoItem label="PM" value={selectedProduction?.pmName || "-"} />
+                <InfoItem label="Người quản lý" value={selectedProduction?.pmName || "-"} />
                 <InfoItem label="Trạng thái" value={selectedProduction?.status || "-"} />
               </div>
             </div>
           )}
 
-          {!incoming?.production && (
+          {!incoming?.production && !fetchedProduction && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800 shadow-sm flex items-center gap-3">
               <Info size={18} />
               <span>Vui lòng mở phân công từ <b>Chi tiết kế hoạch sản xuất</b> để tự động lấy dữ liệu công đoạn.</span>
@@ -738,9 +889,6 @@ export default function ProductionAssignment() {
                                 <div className="mt-1 text-sm text-slate-500">
                                   Đơn giá: {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VND` : "-"}
                                 </div>
-                                <div className="mt-1 text-sm text-slate-500">
-                                  {(row.startDate || "-").replace("T", " ").slice(0, 16)} → {(row.endDate || "-").replace("T", " ").slice(0, 16)}
-                                </div>
                                 {selectedLabels.length > 0 && (
                                   <div className="mt-2 flex flex-wrap gap-1">
                                     {selectedLabels.map((label) => (
@@ -801,15 +949,86 @@ export default function ProductionAssignment() {
                   ) : (
                     (() => {
                       const selectedIds = assignments[activeRow.ppId]?.workerIds || [];
-                      const visibleWorkers = filteredWorkers.filter((worker) =>
-                        showSelectedOnly ? selectedIds.includes(worker.id) : true
-                      );
-                      const isLocked = 
-                        activeRow?.statusName === "Hoàn Thành" || 
-                        activeRow?.statusName === "Đã Hoàn Thành" || 
+                      const isLocked =
+                        activeRow?.statusName === "Hoàn Thành" ||
+                        activeRow?.statusName === "Đã Hoàn Thành" ||
                         activeRow?.statusName === "Chờ Nghiệm Thu" ||
                         activeRow?.statusId === 3 || activeRow?.statusId === "3" ||
                         activeRow?.statusId === 4 || activeRow?.statusId === "4";
+
+                      // Render a single worker card
+                      const renderWorkerCard = (worker) => {
+                        const checked = selectedIds.includes(worker.id);
+                        const frequentText = worker.frequentSteps?.length
+                          ? worker.frequentSteps.slice(0, 3).join(" • ")
+                          : "";
+                        const isOnLeave = worker.status === "leave";
+                        const isLeaveConflict = isOnLeave && isLeaveDuringRow(worker.leaveDate, activeRow);
+                        const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict && !isLocked;
+                        const workerRole = worker.role || "";
+
+                        return (
+                          <button
+                            type="button"
+                            aria-pressed={checked}
+                            key={`${activeRow.ppId}-${worker.id}`}
+                            onClick={() => toggleWorker(activeRow.ppId, worker.id)}
+                            disabled={!canSelect}
+                            className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-4 text-sm font-semibold transition ${!canSelect
+                              ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                              : checked
+                                ? "cursor-pointer border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                : "cursor-pointer border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"
+                              }`}
+                          >
+                            <div className="min-w-0 text-left">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
+                                {workerRole && (
+                                  <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                    {workerRole}
+                                  </span>
+                                )}
+                                {isOnLeave ? (
+                                  <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                    Nghỉ
+                                  </span>
+                                ) : (
+                                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                    Sẵn sàng
+                                  </span>
+                                )}
+                                {isLeaveConflict && (
+                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                    Trùng ngày công đoạn
+                                  </span>
+                                )}
+                              </div>
+                              {frequentText && (
+                                <div className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                                  {frequentText}
+                                </div>
+                              )}
+                            </div>
+                            {checked ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                Đã chọn <Check size={12} />
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-semibold text-slate-500">Chọn</span>
+                            )}
+                          </button>
+                        );
+                      };
+
+                      // Filter workers based on search query and selected-only filter
+                      const getVisibleWorkers = (workerList) => {
+                        return workerList.filter((worker) => {
+                          const matchQuery = !workerQuery.trim() || worker.label.toLowerCase().includes(workerQuery.trim().toLowerCase());
+                          const matchSelected = !showSelectedOnly || selectedIds.includes(worker.id);
+                          return matchQuery && matchSelected;
+                        });
+                      };
 
                       return (
                         <>
@@ -827,69 +1046,84 @@ export default function ProductionAssignment() {
                             <div className="py-8 text-center text-xs text-slate-500">Đang tải danh sách thợ...</div>
                           ) : workerColumns.length === 0 ? (
                             <div className="py-8 text-center text-xs text-slate-500">Hệ thống chưa có dữ liệu thợ.</div>
-                          ) : visibleWorkers.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-slate-500">Không tìm thấy thợ nào phù hợp.</div>
-                          ) : (
-                            <div className={`max-h-[500px] min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 ${isLocked ? "opacity-60 pointer-events-none grayscale-[20%]" : ""}`}>
-                              {visibleWorkers.map((worker) => {
-                                const checked = selectedIds.includes(worker.id);
-                                const frequentText = worker.frequentSteps.length
-                                  ? worker.frequentSteps.slice(0, 3).join(" • ")
-                                  : "";
-                                const isOnLeave = worker.status === "leave";
-                                const isLeaveConflict = isOnLeave && isLeaveDuringRow(worker.leaveDate, activeRow);
-                                const canSelect = !!selectedProductionId && isEditing && !isLeaveConflict && !isLocked;
-                                
+                          ) : isOwnerView && (workerGroups.length > 0 || ungroupedWorkers.length > 0) ? (
+                            /* Owner view: workers grouped by manager + ungrouped */
+                            <div className={`max-h-[500px] min-h-80 space-y-3 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/50 p-2 ${isLocked ? "opacity-60 pointer-events-none grayscale-[20%]" : ""}`}>
+                              {/* RENDER GROUPS */}
+                              {workerGroups.map((group) => {
+                                const groupWorkerCols = workerColumns.filter(wc => {
+                                  return group.workers.some(gw => String(gw.id) === wc.id);
+                                });
+                                const visibleInGroup = getVisibleWorkers(groupWorkerCols);
+                                if (visibleInGroup.length === 0) return null;
+
+                                const isCollapsed = collapsedGroups[group.managerId] ?? false;
+                                const selectedCountInGroup = visibleInGroup.filter(w => selectedIds.includes(w.id)).length;
+
                                 return (
-                                  <button
-                                    type="button"
-                                    aria-pressed={checked}
-                                    key={`${activeRow.ppId}-${worker.id}`}
-                                    onClick={() => toggleWorker(activeRow.ppId, worker.id)}
-                                    disabled={!canSelect}
-                                    className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-5 text-sm font-semibold transition ${
-                                      !canSelect
-                                        ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
-                                        : checked
-                                          ? "cursor-pointer border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                                          : "cursor-pointer border-slate-100 bg-white text-slate-700 hover:border-emerald-200 hover:bg-emerald-50/40"
-                                    }`}
-                                  >
-                                    <div className="min-w-0 text-left">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <div className="truncate text-sm font-semibold text-slate-800">{worker.label}</div>
-                                        {isOnLeave ? (
-                                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
-                                            Nghỉ {(worker.leaveDate || "").replace("T", " ").slice(0, 16)}
-                                          </span>
-                                        ) : (
-                                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                                            Sẵn sàng
-                                          </span>
-                                        )}
-                                        {isLeaveConflict && (
-                                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
-                                            Trùng ngày công đoạn
-                                          </span>
-                                        )}
+                                  <div key={group.managerId} className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                                    <button
+                                      type="button"
+                                      onClick={() => setCollapsedGroups(prev => ({ ...prev, [group.managerId]: !isCollapsed }))}
+                                      className="flex w-full items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-slate-50 to-white hover:from-slate-100 transition"
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        {isCollapsed ? <ChevronRight size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                                        <Users size={14} className="text-indigo-500" />
+                                        <span className="text-sm font-bold text-slate-700">{group.managerName}</span>
+                                        <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                          {visibleInGroup.length} nhân viên
+                                        </span>
                                       </div>
-                                      {frequentText && (
-                                        <div className="mt-1 truncate text-[11px] font-medium text-slate-500">
-                                          {frequentText}
-                                        </div>
+                                      {selectedCountInGroup > 0 && (
+                                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                          {selectedCountInGroup} đã chọn
+                                        </span>
                                       )}
-                                    </div>
-                                    {checked ? (
-                                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
-                                        Đã chọn <Check size={12} />
-                                      </span>
-                                    ) : (
-                                      <span className="text-[11px] font-semibold text-slate-500">Chọn</span>
+                                    </button>
+                                    {!isCollapsed && (
+                                      <div className="space-y-1.5 p-2 pt-0">
+                                        {visibleInGroup.map(worker => renderWorkerCard(worker))}
+                                      </div>
                                     )}
-                                  </button>
+                                  </div>
                                 );
                               })}
+
+                              {/* RENDER UNGROUPED */}
+                              {(() => {
+                                const ungroupedWorkerCols = workerColumns.filter(wc => {
+                                  return ungroupedWorkers.some(u => String(u.id) === wc.id);
+                                });
+                                const visibleUngrouped = getVisibleWorkers(ungroupedWorkerCols);
+
+                                if (visibleUngrouped.length === 0) return null;
+
+                                return (
+                                  <div className="space-y-1.5 mt-2">
+                                    {workerGroups.length > 0 && (
+                                      <div className="px-2 pb-1 pt-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                                        Nhân sự khác
+                                      </div>
+                                    )}
+                                    {visibleUngrouped.map(worker => renderWorkerCard(worker))}
+                                  </div>
+                                );
+                              })()}
                             </div>
+                          ) : (
+                            /* PM view: flat worker list */
+                            (() => {
+                              const visibleWorkers = getVisibleWorkers(filteredWorkers);
+                              if (visibleWorkers.length === 0) {
+                                return <div className="py-8 text-center text-xs text-slate-500">Không tìm thấy thợ nào phù hợp.</div>;
+                              }
+                              return (
+                                <div className={`max-h-[500px] min-h-80 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 ${isLocked ? "opacity-60 pointer-events-none grayscale-[20%]" : ""}`}>
+                                  {visibleWorkers.map(worker => renderWorkerCard(worker))}
+                                </div>
+                              );
+                            })()
                           )}
                         </>
                       );
@@ -913,6 +1147,8 @@ export default function ProductionAssignment() {
         description="Bạn có chắc chắn muốn lưu các thay đổi phân công lao động cho đơn sản xuất này không?"
         onConfirm={handleSaveAssignments}
         onClose={() => setIsConfirmOpen(false)}
+        primaryLabel="Xác nhận lưu"
+        confirmIcon={Save}
       />
     </OwnerLayout>
   );

@@ -2,13 +2,18 @@ import { matchPath } from "react-router-dom";
 
 export const BREADCRUMB_CONFIG = [
   { path: "/home", label: "Trang chủ" },
+  { path: "/about", label: "Giới thiệu", parent: "/home" },
+  { path: "/services", label: "Dịch vụ", parent: "/home" },
+  { path: "/factory", label: "Xưởng may", parent: "/home" },
+  { path: "/contact", label: "Liên hệ", parent: "/home" },
   { path: "/dashboard", label: "Dashboard" },
   { path: "/orders", label: "Đơn hàng", parent: "/home" },
-  { path: "/admin/users", label: "Quản lý user", parent: "/dashboard" },
-  { path: "/admin/users/create", label: "Thêm user mới", parent: "/admin/users" },
+  { path: "/admin/users", label: "Quản lý tài khoản", parent: "/dashboard" },
+  { path: "/admin/users/active", label: "Kích hoạt tài khoản", parent: "/admin/users" },
+  { path: "/admin/users/create", label: "Thêm tài khoản mới", parent: "/admin/users" },
   {
     path: "/admin/users/:id/edit",
-    label: ({ id }) => `Cập nhật user #${id}`,
+    label: ({ id }) => `Cập nhật tài khoản #${id}`,
     parent: "/admin/users",
   },
   {
@@ -19,6 +24,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/admin/logs", label: "Nhật ký hệ thống", parent: "/dashboard" },
   { path: "/admin/permissions", label: "Quản lý phân quyền", parent: "/dashboard" },
   { path: "/employees", label: "Danh sách nhân viên", parent: "/dashboard" },
+  { path: "/customers", label: "Quản lý khách hàng", parent: "/dashboard" },
   { path: "/employees/management", label: "Nhóm quản lý", parent: "/employees" },
   { path: "/employees/workers", label: "Nhóm nhân viên", parent: "/employees" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },

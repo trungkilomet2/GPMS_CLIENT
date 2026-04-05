@@ -34,6 +34,9 @@ export function getPrimaryWorkspaceRole(roleValue) {
   if (hasAnyRole(roleValue, ["admin"])) return "admin";
   if (hasAnyRole(roleValue, ["owner"])) return "owner";
   if (hasAnyRole(roleValue, ["pm", "project manager"])) return "pm";
+  if (hasAnyRole(roleValue, ["team leader", "teamleader"])) return "teamLeader";
+  if (hasAnyRole(roleValue, ["manager"])) return "manager";
+  if (hasAnyRole(roleValue, ["kcs", "qc", "quality control"])) return "kcs";
   if (hasAnyRole(roleValue, ["worker", "sewer", "tailor"])) {
     return "worker";
   }

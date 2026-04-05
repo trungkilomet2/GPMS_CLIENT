@@ -329,7 +329,7 @@ export default function Orders({
                   }}
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
-                  <option value="">Tất cả trạng thái</option>
+                  <option value="">Tất cả</option>
                   {Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => (
                     <option key={k} value={k}>{v}</option>
                   ))}
@@ -378,7 +378,7 @@ export default function Orders({
                       Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th is-sortable cursor-pointer w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
-                      Ngày dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
+                      Ngày kết thúc dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th w-32 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
                     <th className="leave-table-th w-24 px-2 py-4 text-right text-xs font-semibold uppercase tracking-wide">Thao tác</th>
@@ -444,7 +444,6 @@ export default function Orders({
             />
           )}
         </div>
-        <script src="https://messenger.svc.chative.io/static/v1.0/channels/s90b3b96e-842b-47ac-9482-1335b0ea5141/messenger.js?mode=livechat" defer="defer"></script>
       </div>
     </OwnerLayout>
   );

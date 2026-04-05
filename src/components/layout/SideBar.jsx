@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ListChecks,
   LogOut,
+  ContactRound,
   ShieldCheck,
   Users,
   Wallet,
@@ -15,29 +16,30 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
-  { to: "/admin/users", label: "Quản lý user", icon: Users, disabled: false },
-  { to: "/admin/logs", label: "System log", icon: ClipboardList, disabled: false },
+  { to: "/admin/users", label: "Quản lý tài khoản", icon: Users, disabled: false },
+  { to: "/admin/logs", label: "Nhật ký hệ thống", icon: ClipboardList, disabled: false },
   { to: "/admin/permissions", label: "Phân quyền", icon: ShieldCheck, disabled: false },
 ];
 
 const OPERATION_NAV_ITEMS = [
-  { to: "/dashboard", label: "Dashboard", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
+  { to: "/dashboard", label: "Bảng điều khiển", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
-  { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
+  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
+  { to: "/customers", label: "Khách hàng", icon: ContactRound, disabled: false, allowedRoles: ["Owner"] },
   { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
 ];
 
 function hasRequiredRole(user, allowedRoles) {
   if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return true;
-  const roles = splitRoles(user?.role);
-  return allowedRoles.some((role) => roles.includes(role));
+  return hasAnyRole(user?.role, allowedRoles);
 }
 
 function resolveSidebarItems(user) {
@@ -86,6 +88,9 @@ export default function Sidebar() {
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
   const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
+  const userRoleLabel = splitRoles(user?.role)
+    .map((role) => getSystemRoleLabel(role))
+    .join(", ");
 
   useEffect(() => {
     try {
@@ -167,7 +172,7 @@ export default function Sidebar() {
           {!collapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{user?.role || "Owner / PM"}</div>
+              <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
             </div>
           )}
         </NavLink>

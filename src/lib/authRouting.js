@@ -18,10 +18,16 @@ export function getPostLoginPath(roleValue) {
     case "pm":
       return "/production";
     case "teamLeader":
-      return "/production-plan/production-plan";
+      return "/production-plan";
+    case "manager":
+      return "/worker/assignments";
+    case "kcs":
+      return "/worker/daily-report";
     case "worker":
       return "/worker/production-plan";
+    case "customer":
+      return "/orders";
     default:
-      return hasAnyRole(roles, ["customer"]) ? "/home" : "/home";
+      return hasAnyRole(roles, ["customer"]) ? "/orders" : "/home";
   }
 }

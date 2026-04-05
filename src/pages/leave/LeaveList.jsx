@@ -259,11 +259,10 @@ export default function LeaveList() {
                   }}
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   <option value="pending">Chờ duyệt</option>
                   <option value="approved">Đã duyệt</option>
                   <option value="rejected">Từ chối</option>
-                  <option value="cancel_requested">Chờ hủy</option>
                   <option value="cancelled">Đã hủy</option>
                 </select>
               </label>

@@ -23,7 +23,7 @@ function getPmName(item) {
     item?.pmName ??
     item?.pm?.name ??
     item?.pm?.fullName ??
-    (pmId ? `PM #${pmId}` : "-")
+    (pmId ? `Người Quản lý #${pmId}` : "-")
   );
 }
 
@@ -33,15 +33,36 @@ export default function ProductionList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [onlyMyOrders, setOnlyMyOrders] = useState(true);
+  const [involvedProdIds, setInvolvedProdIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`involved_prods_${currentUserId}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [partCounts, setPartCounts] = useState({});
   const pageSize = 10;
 
 
 
   const baseProductions = useMemo(() => {
-    if (isOwner || !isPm || currentUserId == null) return productions;
-    return productions.filter((item) => String(getPmId(item)) === String(currentUserId));
-  }, [productions, isOwner, isPm, currentUserId]);
+    // Owner sees all, PM sees filtered by default
+    if (isOwner || currentUserId == null) return productions;
+    if (!isPm) return productions;
+
+    // Toggle off: see everything
+    if (!onlyMyOrders) return productions;
+
+    // Toggle on: see only main PM orders or those where you are involved
+    const uid = String(currentUserId);
+    return productions.filter((item) => {
+      const isMainPm = String(getPmId(item)) === uid;
+      const isPartAssignee = involvedProdIds.has(item.productionId);
+      return isMainPm || isPartAssignee;
+    });
+  }, [productions, isOwner, isPm, currentUserId, involvedProdIds, onlyMyOrders]);
 
 
 
@@ -86,33 +107,79 @@ export default function ProductionList() {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchPartCounts = async () => {
-      const productionIds = [...new Set(pageData.map((item) => item.productionId).filter(Boolean))];
-      const pendingIds = productionIds.filter((id) => partCounts[id] === undefined);
+    const discoverAllInvolvement = async () => {
+      // 1. Collect ALL production IDs that aren't discovered yet
+      const allIds = productions.map(p => p.productionId).filter(Boolean);
+      const pendingIds = allIds.filter(id => partCounts[id] === undefined);
+      
       if (pendingIds.length === 0) return;
 
-      const results = await Promise.all(
-        pendingIds.map(async (id) => {
-          try {
-            const res = await ProductionPartService.getPartsByProduction(id, { PageIndex: 0, PageSize: 100 });
-            const list = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
-            const total = list.length;
-            const completed = list.filter(p => p.status === 'Hoàn thành').length;
-            return [id, total > 0 ? `${completed} / ${total}` : "0"];
-          } catch {
-            return [id, "0"];
-          }
-        })
-      );
-      if (isMounted) {
+      // 2. Process in chunks of 5 to avoid overloading the server/browser
+      const chunkSize = 5;
+      for (let i = 0; i < pendingIds.length; i += chunkSize) {
+        if (!isMounted) break;
+        const chunk = pendingIds.slice(i, i + chunkSize);
+        
+        const results = await Promise.all(
+          chunk.map(async (productionId) => {
+            try {
+              const response = await ProductionPartService.getPartsByProduction(productionId, { PageSize: 100 });
+              const payload = response?.data?.data ?? response?.data ?? [];
+              const list = Array.isArray(payload) ? payload : [];
+              
+              const uid = String(currentUserId);
+              const isUserInvolved = list.some(part => {
+                const workers = [
+                  ...(Array.isArray(part.workerIds) ? part.workerIds : []),
+                  ...(Array.isArray(part.assignedWorkers) ? part.assignedWorkers : []),
+                  ...(Array.isArray(part.assignees) ? part.assignees : []),
+                  ...(Array.isArray(part.workers) ? part.workers : []),
+                  part.workerId,
+                  part.userId
+                ].filter(Boolean);
+
+                return workers.some(w => {
+                  const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
+                  return String(wid) === uid;
+                });
+              });
+
+              const completed = list.filter(p => p.status === 'Hoàn thành').length;
+              const display = list.length > 0 ? `${completed} / ${list.length}` : "0";
+              return { productionId, display, isUserInvolved };
+            } catch (error) {
+              return { productionId, display: "0", isUserInvolved: false };
+            }
+          })
+        );
+
+        if (!isMounted) break;
+
+        // Update counts and involvement sets
         setPartCounts((prev) => {
           const next = { ...prev };
-          results.forEach(([id, display]) => { next[id] = display; });
+          results.forEach((r) => { next[r.productionId] = r.display; });
+          return next;
+        });
+
+        setInvolvedProdIds((prev) => {
+          const next = new Set(prev);
+          let changed = false;
+          results.forEach((r) => {
+            if (r.isUserInvolved && !next.has(r.productionId)) {
+              next.add(r.productionId);
+              changed = true;
+            }
+          });
+          if (changed && currentUserId) {
+            localStorage.setItem(`involved_prods_${currentUserId}`, JSON.stringify([...next]));
+          }
           return next;
         });
       }
     };
-    if (pageData.length > 0) fetchPartCounts();
+
+    if (productions.length > 0) discoverAllInvolvement();
     return () => { isMounted = false; };
   }, [pageData, partCounts]);
 
@@ -200,14 +267,14 @@ export default function ProductionList() {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="grid items-end gap-3 lg:grid-cols-[1.3fr_220px_auto]">
+            <div className="grid items-end gap-3 lg:grid-cols-[1.3fr_220px_220px_auto]">
               <label className="relative block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Tìm kiếm</span>
                 <Search className="pointer-events-none absolute left-3 top-[calc(50%+0.8rem)] -translate-y-1/2 text-slate-400" size={18} />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm mã đơn sản xuất, mã đơn, tên đơn, PM..."
+                  placeholder="Tìm mã đơn, đơn sản xuất, đơn hàng, người quản lý..."
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 />
               </label>
@@ -219,17 +286,33 @@ export default function ProductionList() {
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 >
-                  <option value="all">Tất cả trạng thái</option>
+                  <option value="all">Tất cả</option>
                   <option value="Chờ Xét Duyệt">Chờ Xét Duyệt</option>
-                  <option value="Chấp Nhận">Chấp Nhận</option>
                   <option value="Chờ Xét Duyệt Kế Hoạch">Chờ Xét Duyệt Kế Hoạch</option>
-                  <option value="Cần Chỉnh Sửa Kế Hoạch">Cần Chỉnh Sửa Kế Hoạch</option>
                   <option value="Đang Sản Xuất">Đang Sản Xuất</option>
                   <option value="Hoàn Thành">Hoàn Thành</option>
                   <option value="Từ Chối">Từ Chối</option>
                 </select>
               </label>
-              <div className="flex items-center justify-end gap-3">
+              
+              {isPm && !isOwner && (
+                <div className="flex items-center gap-3 h-[45px] pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <div className="relative">
+                      <input 
+                        type="checkbox" 
+                        checked={onlyMyOrders} 
+                        onChange={(e) => setOnlyMyOrders(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </div>
+                    <span className="text-sm font-medium text-slate-600">Chỉ đơn của tôi</span>
+                  </label>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-3 h-[45px] pb-1">
                 {(search || statusFilter !== "all") && (
                   <button
                     type="button"
@@ -257,7 +340,7 @@ export default function ProductionList() {
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn sản xuất</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Đơn hàng</th>
                     <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên đơn</th>
-                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">PM quản lý</th>
+                    <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Người quản lý</th>
                     <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Công đoạn</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -13,10 +13,9 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import {
   EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  USER_STATUS_IDS,
-  getAllowedManagerRoles,
+  getDirectManagerRoleLabel,
   getManagerRoleHint,
-  getSystemRoleLabel,
+  isEligibleDirectManager,
   isManagerRequired,
 } from "@/lib/orgHierarchy";
 import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
@@ -24,9 +23,13 @@ import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerS
 import "@/styles/employee-create.css";
 
 export default function EmployeeCreate() {
+  const location = useLocation();
   const navigate = useNavigate();
+  const backTarget = location.state?.from || "/employees";
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [notice, setNotice] = useState(location.state?.notice || "");
+  const [noticeTone, setNoticeTone] = useState(location.state?.noticeTone === "error" ? "error" : "success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [managerOptions, setManagerOptions] = useState([]);
   const [managerLoading, setManagerLoading] = useState(true);
@@ -36,9 +39,16 @@ export default function EmployeeCreate() {
     password: "",
     fullName: "",
     role: "PM",
-    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
+
+  useEffect(() => {
+    if (!location.state?.notice) return;
+
+    setNotice(location.state.notice);
+    setNoticeTone(location.state.noticeTone === "error" ? "error" : "success");
+    navigate(location.pathname, { replace: true });
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let mounted = true;
@@ -48,9 +58,8 @@ export default function EmployeeCreate() {
       setManagerError("");
 
       try {
-        const response = await WorkerService.getEmployeeDirectory({
+        const response = await WorkerService.getManagerDirectory({
           pageSize: 100,
-          includeHidden: true,
         });
         if (!mounted) return;
         setManagerOptions(response?.data ?? []);
@@ -69,17 +78,10 @@ export default function EmployeeCreate() {
     };
   }, []);
 
-  const allowedManagerRoles = useMemo(
-    () => getAllowedManagerRoles(form.role),
-    [form.role]
-  );
-
   const availableManagers = useMemo(
     () =>
-      managerOptions.filter((employee) =>
-        employee.roles.some((role) => allowedManagerRoles.includes(role))
-      ),
-    [allowedManagerRoles, managerOptions]
+      managerOptions.filter((employee) => isEligibleDirectManager(employee, form.role)),
+    [form.role, managerOptions]
   );
 
   useEffect(() => {
@@ -144,6 +146,14 @@ export default function EmployeeCreate() {
       return;
     }
 
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn thêm tài khoản ${normalizedFullName || "nhân viên này"} không?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError("");
 
@@ -152,20 +162,28 @@ export default function EmployeeCreate() {
         userName: normalizedUserName,
         password: form.password,
         fullName: normalizedFullName,
-        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
         managerId: form.role === "Owner" ? null : Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
-        workerRoleIds: [],
       });
       const createdId = createdEmployee?.data?.id ?? createdEmployee?.id ?? null;
+
       if (form.role === "Worker" && createdId != null) {
         navigate(`/employees/${createdId}/skills`, {
-          state: { fromCreate: true },
+          state: {
+            fromCreate: true,
+            notice: `Đã tạo tài khoản nhân viên ${normalizedFullName} thành công. Hãy gán chuyên môn phù hợp trước khi hoàn tất.`,
+            noticeTone: "success",
+          },
         });
         return;
       }
 
-      navigate("/employees");
+      navigate("/employees/management", {
+        state: {
+          notice: `Đã tạo tài khoản quản lý ${normalizedFullName} thành công.`,
+          noticeTone: "success",
+        },
+      });
     } catch (error) {
       const message = getEmployeeModuleErrorMessage(
         error,
@@ -183,18 +201,18 @@ export default function EmployeeCreate() {
         <div className="employee-create-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-create-hero">
             <div className="employee-create-hero__heading">
-              <Link to="/employees" className="employee-create-hero__back">
+              <Link to={backTarget} className="employee-create-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại danh sách</span>
               </Link>
               <h1 className="employee-create-hero__title">Thêm nhân viên mới</h1>
               <p className="employee-create-hero__subtitle">
-                Tạo tài khoản nhân sự theo hierarchy 1 Owner, nhiều PM, mỗi PM quản lý worker của line mình.
+                Tạo tài khoản nhân sự theo sơ đồ quản lý của xưởng: Chủ xưởng quản lý Quản lý sản xuất, và Quản lý sản xuất phụ trách nhân viên trực thuộc.
               </p>
             </div>
 
             <div className="employee-create-hero__actions">
-              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate("/employees")}>
+              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate(backTarget)}>
                 Hủy
               </button>
               <button
@@ -263,7 +281,7 @@ export default function EmployeeCreate() {
                   >
                     <option value="">
                       {form.role === "Owner"
-                        ? "Owner không có quản lý trực tiếp"
+                        ? "Chủ xưởng không có quản lý trực tiếp"
                         : managerLoading
                           ? "Đang tải danh sách quản lý..."
                           : availableManagers.length
@@ -272,7 +290,7 @@ export default function EmployeeCreate() {
                     </option>
                     {availableManagers.map((manager) => (
                       <option key={manager.id} value={manager.id}>
-                        {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                        {manager.fullName} - {getDirectManagerRoleLabel(manager, form.role)}
                       </option>
                     ))}
                   </select>
@@ -285,16 +303,20 @@ export default function EmployeeCreate() {
                 <span>{getManagerRoleHint(form.role)}</span>
               </div>
 
-              {form.role === "Worker" ? (
-                <div className="employee-create-banner">
-                  <span>Chuyên môn của worker sẽ được gán ở màn riêng sau khi tạo xong tài khoản, hỗ trợ chọn nhiều skill cùng lúc.</span>
-                </div>
-              ) : null}
-
               {managerError ? (
                 <div className="employee-create-banner employee-create-banner--error">
                   <CircleAlert size={18} />
                   <span>{managerError}</span>
+                </div>
+              ) : null}
+
+              {notice ? (
+                <div
+                  className={`employee-create-banner ${
+                    noticeTone === "error" ? "employee-create-banner--error" : ""
+                  }`}
+                >
+                  <span>{notice}</span>
                 </div>
               ) : null}
 

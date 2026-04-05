@@ -17,9 +17,10 @@ export default function OutputHistory() {
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
   const isCustomer = primaryRole === "customer";
+  const isPersonalView = location.pathname.startsWith("/worker");
   const LayoutComponent =
-    primaryRole === "worker"
-      ? WorkerLayout
+    (primaryRole === "worker" || isPersonalView)
+      ? (primaryRole === "worker" ? WorkerLayout : PmOwnerLayout)
       : PmOwnerLayout;
 
   const [outputs, setOutputs] = useState([]);
@@ -46,9 +47,8 @@ export default function OutputHistory() {
     try {
       setLoading(true);
       // Fetch History
-      // Workers see their own; PM/Owner see all.
       const historyRes =
-        primaryRole === "worker"
+        (primaryRole === "worker" || isPersonalView)
           ? await ProductionService.getWorkerOutputHistory(currentUserId)
           : await ProductionService.getOutputHistory();
 
@@ -193,10 +193,10 @@ export default function OutputHistory() {
               </div>
               <div className="flex flex-col gap-1">
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  {primaryRole === "worker" ? "Sản lượng của tôi" : "Lịch sử sản lượng"}
+                  {isPersonalView ? "Sản lượng của tôi" : "Lịch sử sản lượng"}
                 </h1>
                 <p className="text-slate-600 text-sm">
-                  {primaryRole === "worker"
+                  {isPersonalView
                     ? "Theo dõi tiến độ hoàn thành và thu nhập dự kiến của bạn."
                     : "Xem lịch sử submit sản lượng của toàn bộ thợ trong xưởng."}
                 </p>

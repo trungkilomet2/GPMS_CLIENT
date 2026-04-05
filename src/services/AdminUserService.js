@@ -2,6 +2,7 @@ import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { countGrantedPermissions, getPermissionProfiles } from "@/lib/admin/adminMockStore";
+import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 
 const ROLE_CATALOG = [
   {
@@ -10,7 +11,7 @@ const ROLE_CATALOG = [
     label: "Quản trị hệ thống",
     shortLabel: "Toàn quyền hệ thống",
     tone: "danger",
-    description: "Quản lý user, phân quyền và cấu hình hệ thống.",
+    description: "Quản lý tài khoản, phân quyền và cấu hình hệ thống.",
   },
   {
     key: "Owner",
@@ -35,6 +36,14 @@ const ROLE_CATALOG = [
     shortLabel: "Nhân sự vận hành",
     tone: "success",
     description: "Tài khoản nhân viên sản xuất và tác nghiệp hằng ngày.",
+  },
+  {
+    key: "Customer",
+    roleId: 2,
+    label: "Khách hàng",
+    shortLabel: "Khách hàng",
+    tone: "info",
+    description: "Tài khoản khách hàng theo dõi và tạo đơn hàng.",
   },
 ];
 
@@ -184,11 +193,37 @@ const getRoleMeta = (roleKey = "") => {
 
   return ROLE_KEY_MAP[trimmedKey] || {
     key: trimmedKey,
-    label: trimmedKey,
-    shortLabel: trimmedKey,
+    label: getSystemRoleLabel(trimmedKey),
+    shortLabel: getSystemRoleLabel(trimmedKey),
     tone: "info",
-    description: "Vai trò này chưa có hồ sơ permission preview trong web admin.",
+    description: "Vai trò này chưa có phần xem nhanh quyền trong màn quản trị.",
   };
+};
+
+const parseFetchPayload = async (response) => {
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+
+  if (contentType.includes("application/json")) {
+    return response.json().catch(() => ({}));
+  }
+
+  const raw = await response.text().catch(() => "");
+  if (!raw) return {};
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { data: raw };
+  }
+};
+
+const flattenValidationErrors = (errors) => {
+  if (!errors || typeof errors !== "object") return [];
+
+  return Object.values(errors)
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
 };
 
 const mapRoleIdsToKeys = (value) => {
@@ -298,10 +333,10 @@ const normalizeAdminUser = (item = {}) => {
     roleNames,
     roleKeys,
     roleKey: primaryRole,
-    roleLabel: roleMeta?.label || "Chưa đồng bộ role",
+    roleLabel: roleMeta?.label || "Chưa đồng bộ vai trò",
     roleTone: roleMeta?.tone || "info",
-    roleShortLabel: roleMeta?.shortLabel || "Chưa có role",
-    roleDescription: roleMeta?.description || "API user-list chưa trả thông tin role cho user này.",
+    roleShortLabel: roleMeta?.shortLabel || "Chưa có vai trò",
+    roleDescription: roleMeta?.description || "Danh sách tài khoản hiện chưa trả đủ thông tin vai trò cho tài khoản này.",
     grantedPermissionCount: roleMeta?.permissions ? countGrantedPermissions(roleMeta) : 0,
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
@@ -401,7 +436,12 @@ export function getAdminUserErrorMessage(error, fallbackMessage) {
     return "Bạn không có quyền truy cập chức năng admin này.";
   }
 
-  return error?.response?.data?.message || error?.response?.data?.title || fallbackMessage;
+  const validationMessages = flattenValidationErrors(error?.response?.data?.errors);
+  if (validationMessages.length > 0) {
+    return validationMessages.join(" ");
+  }
+
+  return error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.title || fallbackMessage;
 }
 
 export function getAdminSupportedRoleOptions() {
@@ -422,7 +462,10 @@ export function getAdminRoleProfile(roleKey) {
 async function fetchAdminUserDetail(id) {
   const rawResponse = await axiosClient.get(API_ENDPOINTS.USER.ADMIN_USER_DETAIL(id));
   const response = parseApiPayload(rawResponse);
-  const normalizedUser = normalizeAdminUser(response?.data ?? response);
+  const normalizedUser = {
+    ...normalizeAdminUser(response?.data ?? response),
+    detailAvailable: true,
+  };
 
   return normalizedUser;
 }
@@ -446,31 +489,42 @@ const AdminUserService = {
         filterQuery: String(id),
       });
 
-      const foundInFilteredResult = filteredUsers.data.find(
-        (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
-      );
+        const foundInFilteredResult = filteredUsers.data.find(
+          (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
+        );
 
       if (foundInFilteredResult) {
-        return foundInFilteredResult;
+          return {
+            ...foundInFilteredResult,
+            detailAvailable: false,
+          };
       }
 
       const fullDirectory = await fetchAdminUserPages();
-      return fullDirectory.data.find(
+      const foundInDirectory = fullDirectory.data.find(
         (user) => Number(user.id) === normalizedId || String(user.id) === String(id)
-      ) || null;
+      );
+
+      return foundInDirectory
+        ? {
+            ...foundInDirectory,
+            detailAvailable: false,
+          }
+        : null;
     }
   },
 
   async createUser(payload) {
     const roleMeta = ROLE_KEY_MAP[String(payload?.roleKey ?? "").trim()];
     if (!roleMeta) {
-      throw new Error("Unsupported role");
+      throw new Error("Vai trò này hiện chưa được hỗ trợ.");
     }
 
     const createPayload = {
       userName: String(payload?.userName ?? "").trim(),
       password: String(payload?.password ?? ""),
       fullName: String(payload?.fullName ?? "").trim(),
+      roleId: roleMeta.roleId,
       roleIds: [roleMeta.roleId],
     };
 
@@ -514,6 +568,11 @@ const AdminUserService = {
     return response;
   },
 
+  async enableUser(id) {
+    const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ENABLE_USER(id), null);
+    return parseApiPayload(rawResponse);
+  },
+
   async updateUser(id, payload = {}) {
     const formData = new FormData();
 
@@ -544,7 +603,7 @@ const AdminUserService = {
       throw { status: 401 };
     }
 
-    const json = await response.json().catch(() => ({}));
+    const json = await parseFetchPayload(response);
 
     if (!response.ok) {
       throw {
@@ -565,6 +624,10 @@ const AdminUserService = {
     const normalizedRoleIds = unique(roleKeys)
       .map((roleKey) => ROLE_KEY_MAP[String(roleKey ?? "").trim()]?.roleId)
       .filter((roleId) => Number.isFinite(roleId));
+
+    if (!normalizedRoleIds.length) {
+      throw new Error("Không có vai trò hợp lệ để gán cho tài khoản.");
+    }
 
     const rawResponse = await axiosClient.put(API_ENDPOINTS.USER.ADMIN_ASSIGN_ROLES(id), {
       roleIds: normalizedRoleIds,

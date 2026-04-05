@@ -50,6 +50,26 @@ function readAccountStatus(source = {}) {
   };
 }
 
+function readEmailVerificationStatus(source = {}) {
+  const directValue =
+    source.emailVerified ??
+    source.isEmailVerified ??
+    source.isVerifiedEmail ??
+    source.isEmailConfirm ??
+    source.emailConfirmed ??
+    source.isEmailConfirmed ??
+    source.isVerified ??
+    source.verified;
+
+  if (typeof directValue === "boolean") return directValue;
+
+  const normalized = String(directValue ?? "").trim().toLowerCase();
+  if (["true", "1", "verified", "confirmed"].includes(normalized)) return true;
+  if (["false", "0", "unverified", "pending"].includes(normalized)) return false;
+
+  return null;
+}
+
 async function parseResponsePayload(res) {
   const contentType = String(res.headers.get("content-type") || "").toLowerCase();
 
@@ -85,12 +105,14 @@ async function loadProfileAfterLogin(token) {
     const phoneNumber = normalizeServerValue(d.phoneNumber);
     const avatarUrl = normalizeServerValue(d.avartarUrl);
     const location = normalizeServerValue(d.location);
+    const emailVerified = readEmailVerificationStatus(d);
 
     return {
       userId: extractUserIdValue(d),
       fullName,
       name: fullName,
       email,
+      emailVerified,
       phoneNumber,
       phone: phoneNumber,
       role: extractRoleValue(d),
@@ -193,6 +215,7 @@ export const authService = {
       name: profile?.fullName || profile?.name || basicUser.name,
       fullName: profile?.fullName || basicUser.fullName,
       email: profile?.email || "",
+      emailVerified: profile?.emailVerified,
       phoneNumber: profile?.phoneNumber || "",
       phone: profile?.phone || "",
       role: profile?.role || basicUser.role,
@@ -210,6 +233,12 @@ export const authService = {
       name: normalizeServerValue(user.name) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.name,
       fullName: normalizeServerValue(user.fullName) || normalizeServerValue(cached.fullName) || normalizeServerValue(cached.name) || basicUser.fullName,
       email: normalizeServerValue(user.email) || normalizeServerValue(cached.email) || "",
+      emailVerified:
+        typeof user.emailVerified === "boolean"
+          ? user.emailVerified
+          : typeof cached.emailVerified === "boolean"
+            ? cached.emailVerified
+            : null,
       phoneNumber: normalizeServerValue(user.phoneNumber) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
       phone: normalizeServerValue(user.phone) || normalizeServerValue(cached.phoneNumber) || normalizeServerValue(cached.phone) || "",
       location: normalizeServerValue(user.location) || normalizeServerValue(cached.location) || normalizeServerValue(cached.address) || "",

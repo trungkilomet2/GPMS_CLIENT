@@ -10,6 +10,8 @@ import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
 import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import ConfirmModal from '@/components/ConfirmModal';
+import { getPrimaryWorkspaceRole, splitRoles } from '@/lib/internalRoleFlow';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
 
@@ -30,14 +32,23 @@ export default function CreateOrder() {
     const checkProfile = async () => {
       try {
         const profile = await userService.getProfile();
-        const email = profile?.email ?? '';
-        const phone = profile?.phoneNumber ?? profile?.phone ?? '';
-        const address = profile?.location ?? profile?.address ?? '';
+        const roleValue = profile?.role || profile?.roles || '';
+        const roles = splitRoles(roleValue);
+        const primaryRole = getPrimaryWorkspaceRole(roles);
 
+        const { email, phoneNumber, address } = profile || {};
         const missing = [];
-        if (!String(email).trim()) missing.push('email');
-        if (!String(phone).trim()) missing.push('số điện thoại');
-        if (!String(address).trim()) missing.push('địa chỉ');
+        // If Customer, we strictly require Phone and Address as requested. 
+        // Email is handled as secondary or optional here if not mentioned.
+        if (primaryRole === 'customer') {
+          if (!String(phoneNumber || "").trim()) missing.push('số điện thoại');
+          if (!String(address || "").trim()) missing.push('địa chỉ');
+        } else {
+          // Internal staff (Owner, PM) still get the standard full check.
+          if (!String(email || "").trim()) missing.push('email');
+          if (!String(phoneNumber || "").trim()) missing.push('số điện thoại');
+          if (!String(address || "").trim()) missing.push('địa chỉ');
+        }
 
         if (active) setProfileCheck({ checking: false, missing });
       } catch (error) {
@@ -63,8 +74,8 @@ export default function CreateOrder() {
     type: '',
     size: '',
     color: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: new Date().toLocaleDateString('sv-SE'),
+    endDate: new Date().toLocaleDateString('sv-SE'),
     quantity: '',
     cpu: '',
     note: '',
@@ -89,6 +100,13 @@ export default function CreateOrder() {
   const [orderImagePreview, setOrderImagePreview] = useState('');
   const [templateItems, setTemplateItems] = useState([]);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    show: false,
+    type: null,
+    index: null,
+    title: '',
+    desc: ''
+  });
 
   const validateForm = () => {
     const newErrors = {};
@@ -153,11 +171,7 @@ export default function CreateOrder() {
     if (!orderData.startDate) {
       newErrors.startDate = 'Vui lòng chọn ngày bắt đầu';
     } else {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const todayStr = `${yyyy}-${mm}-${dd}`;
+      const todayStr = new Date().toLocaleDateString('sv-SE');
       if (orderData.startDate < todayStr) {
         newErrors.startDate = 'Ngày bắt đầu không được trước ngày hiện tại';
       }
@@ -197,7 +211,7 @@ export default function CreateOrder() {
       const materialErrors = [];
       materials.forEach((m, idx) => {
         const mErrs = {};
-        if (!m.image) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
+        if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
         if (!m.materialName?.trim()) {
           mErrs.materialName = 'Tên vật liệu là bắt buộc';
         } else if (m.materialName.trim().length > 150) {
@@ -243,7 +257,10 @@ export default function CreateOrder() {
   };
 
   const handleOrderChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === 'quantity' || name === 'cpu') {
+      value = value.replace(/[^0-9]/g, '');
+    }
     const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
       ? (value === '' ? '' : Number(value))
       : value;
@@ -278,12 +295,9 @@ export default function CreateOrder() {
       note: materialFormData.note?.trim() || '',
     };
 
-    let targetIndex = editingIndex;
+    const targetIndex = editingIndex !== null ? editingIndex : materials.length;
     if (editingIndex === null) {
-      setMaterials((prev) => {
-        targetIndex = prev.length;
-        return [...prev, pendingMaterial];
-      });
+      setMaterials((prev) => [...prev, pendingMaterial]);
     } else {
       setMaterials((prev) => {
         const updated = [...prev];
@@ -297,8 +311,8 @@ export default function CreateOrder() {
     }
     if (errors.materialsList && errors.materialsList[targetIndex]) {
       setErrors((prev) => {
-        const newMaterialsList = prev.materialsList ? { ...prev.materialsList } : {};
-        if (targetIndex !== null) delete newMaterialsList[targetIndex];
+        const newMaterialsList = { ...prev.materialsList };
+        delete newMaterialsList[targetIndex];
         return { ...prev, materialsList: newMaterialsList };
       });
     }
@@ -312,16 +326,22 @@ export default function CreateOrder() {
         if (imageUrl) {
           setMaterials((prev) => {
             const updated = [...prev];
-            const idx = targetIndex;
-            if (updated[idx]) {
-              updated[idx] = {
-                ...updated[idx],
+            if (updated[targetIndex]) {
+              updated[targetIndex] = {
+                ...updated[targetIndex],
                 image: imageUrl,
                 imageFile: null,
                 imagePreview: imageUrl,
               };
             }
             return updated;
+          });
+          // Also clear error if it was set during upload
+          setErrors((prev) => {
+            if (!prev.materialsList || !prev.materialsList[targetIndex]) return prev;
+            const newMaterialsList = { ...prev.materialsList };
+            delete newMaterialsList[targetIndex];
+            return { ...prev, materialsList: newMaterialsList };
           });
         }
       } catch (error) {
@@ -382,15 +402,21 @@ export default function CreateOrder() {
       const lower = file.name.toLowerCase();
       const isAllowed = ALLOWED_TEMPLATE_EXTENSIONS.some((ext) => lower.endsWith(ext));
       const isSizeOk = file.size <= MAX_TEMPLATE_SIZE;
-      if (isAllowed && isSizeOk) {
+      const isNameOk = file.name.length <= 255;
+
+      if (isAllowed && isSizeOk && isNameOk) {
         valid.push(file);
       } else {
-        invalid.push(file.name);
+        let reason = "Định dạng không hỗ trợ";
+        if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
+        else if (!isNameOk) reason = "Tên file quá 255 ký tự";
+        
+        invalid.push(`${file.name} (${reason})`);
       }
     });
 
     if (invalid.length > 0) {
-      toast.error(`File không hợp lệ (định dạng/size): ${invalid.join(', ')}`);
+      toast.error(invalid.join(', '));
     }
 
     if (valid.length > 0) {
@@ -417,37 +443,59 @@ export default function CreateOrder() {
   };
   
   const removeTemplateItem = (index) => {
-    setTemplateItems((prev) => prev.filter((_, i) => i !== index));
-    if (errors.templates) {
-      setErrors((prev) => {
-        const newTemplates = { ...prev.templates };
-        delete newTemplates[index];
-        const adjusted = {};
-        Object.keys(newTemplates).forEach((key) => {
-          const k = parseInt(key);
-          if (k > index) adjusted[k - 1] = newTemplates[key];
-          else adjusted[k] = newTemplates[key];
-        });
-        return { ...prev, templates: adjusted };
-      });
-    }
+    setDeleteConfirm({
+      show: true,
+      type: 'template',
+      index: index,
+      title: 'Xác nhận xóa mẫu thiết kế',
+      desc: 'Bạn có chắc chắn muốn xóa mẫu thiết kế này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+    });
   };
 
   const handleDeleteMaterial = (index) => {
-    setMaterials((prev) => prev.filter((_, i) => i !== index));
-    if (errors.materialsList) {
-      setErrors((prev) => {
-        const newMaterialsList = { ...prev.materialsList };
-        delete newMaterialsList[index];
-        const adjustedList = {};
-        Object.keys(newMaterialsList).forEach((key) => {
-          const k = parseInt(key);
-          if (k > index) adjustedList[k - 1] = newMaterialsList[key];
-          else adjustedList[k] = newMaterialsList[key];
+    setDeleteConfirm({
+      show: true,
+      type: 'material',
+      index: index,
+      title: 'Xác nhận xóa vật liệu',
+      desc: 'Bạn có chắc chắn muốn xóa vật liệu này không? Hành động này sẽ gỡ bỏ mục này khỏi danh sách đơn hàng và không thể hoàn tác.'
+    });
+  };
+
+  const executeDelete = () => {
+    const { type, index } = deleteConfirm;
+    if (type === 'template') {
+      setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+      if (errors.templates) {
+        setErrors((prev) => {
+          const newTemplates = { ...prev.templates };
+          delete newTemplates[index];
+          const adjusted = {};
+          Object.keys(newTemplates).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjusted[k - 1] = newTemplates[key];
+            else adjusted[k] = newTemplates[key];
+          });
+          return { ...prev, templates: adjusted };
         });
-        return { ...prev, materialsList: adjustedList };
-      });
+      }
+    } else if (type === 'material') {
+      setMaterials((prev) => prev.filter((_, i) => i !== index));
+      if (errors.materialsList) {
+        setErrors((prev) => {
+          const newMaterialsList = { ...prev.materialsList };
+          delete newMaterialsList[index];
+          const adjustedList = {};
+          Object.keys(newMaterialsList).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjustedList[k - 1] = newMaterialsList[key];
+            else adjustedList[k] = newMaterialsList[key];
+          });
+          return { ...prev, materialsList: adjustedList };
+        });
+      }
     }
+    setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
   };
 
   const translateError = (msg) => {
@@ -564,19 +612,23 @@ export default function CreateOrder() {
 
           {!profileCheck.checking && profileCheck.missing.length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="text-amber-500" size={20} />
-                <div>
-                  <div className="mb-1 font-bold text-slate-900">Cần cập nhật thông tin hồ sơ</div>
-                  <div className="text-sm text-slate-600">
-                    Vui lòng cập nhật đầy đủ email, số điện thoại và địa chỉ trước khi tạo đơn hàng.
-                  </div>
+              <div className="flex items-start gap-4">
+                <div className="p-3 rounded-xl bg-amber-50">
+                  <AlertCircle className="text-amber-500" size={24} />
+                </div>
+                <div className="flex-1">
+                  <div className="mb-1 text-lg font-bold text-slate-900">Thông tin tài khoản chưa hoàn thiện</div>
+                  <p className="text-slate-600 leading-relaxed mb-4">
+                    Để đảm bảo việc liên lạc và giao nhận hàng chính xác, vui lòng cập nhật đầy đủ 
+                    <span className="font-bold text-slate-900"> số điện thoại</span> và 
+                    <span className="font-bold text-slate-900"> địa chỉ</span> của bạn.
+                  </p>
                   <button
                     type="button"
                     onClick={() => navigate('/profile/edit')}
-                    className="mt-4 inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-700 shadow-lg shadow-emerald-100"
                   >
-                    Đi đến chỉnh sửa hồ sơ
+                    Cập nhật hồ sơ ngay
                   </button>
                 </div>
               </div>
@@ -661,6 +713,14 @@ export default function CreateOrder() {
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirm.show}
+        title={deleteConfirm.title}
+        description={deleteConfirm.desc}
+        onConfirm={executeDelete}
+        onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+      />
     </OwnerLayout>
   );
 }

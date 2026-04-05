@@ -14,18 +14,118 @@ const parseApiPayload = (rawResponse) => {
   }
 };
 
+const collectProblemDetailsMessages = (data) => {
+  if (!data || typeof data !== "object") return [];
+
+  const messages = [];
+  const errors = data.errors;
+
+  if (errors && typeof errors === "object") {
+    Object.values(errors).forEach((value) => {
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          const normalized = String(item ?? "").trim();
+          if (normalized) messages.push(normalized);
+        });
+        return;
+      }
+
+      const normalized = String(value ?? "").trim();
+      if (normalized) messages.push(normalized);
+    });
+  }
+
+  const detail = String(data.detail ?? "").trim();
+  if (detail) messages.push(detail);
+
+  return [...new Set(messages)];
+};
+
+const LEAVE_ERROR_MESSAGE_MAP = [
+  {
+    test: (message) => message.includes("status must be one of"),
+    value: "Trạng thái lọc không hợp lệ. Vui lòng chọn lại trạng thái nghỉ phép.",
+  },
+  {
+    test: (message) => message.includes("deny reason must not exceed 100 characters"),
+    value: "Lý do từ chối không được vượt quá 100 ký tự.",
+  },
+  {
+    test: (message) => message.includes("reject cancel reason must not exceed 100 characters"),
+    value: "Lý do từ chối yêu cầu hủy không được vượt quá 100 ký tự.",
+  },
+];
+
+const translateLeaveMessage = (message) => {
+  const normalized = String(message ?? "").trim();
+  if (!normalized) return "";
+
+  const lowerCased = normalized.toLowerCase();
+  const mapped = LEAVE_ERROR_MESSAGE_MAP.find((item) => item.test(lowerCased));
+  return mapped?.value ?? normalized;
+};
+
+const mapStatusToApi = (status) => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (!normalized || normalized === "all") return status;
+
+  const statusMap = {
+    pending: "Pending",
+    approved: "Approved",
+    rejected: "Denied",
+    cancelled: "Cancelled",
+  };
+
+  return statusMap[normalized];
+};
+
+const normalizeLeaveQueryParams = (params) => {
+  if (!params || typeof params !== "object") return params;
+
+  const nextParams = { ...params };
+
+  if ("Status" in nextParams) {
+    const mappedStatus = mapStatusToApi(nextParams.Status);
+
+    if (mappedStatus) {
+      nextParams.Status = mappedStatus;
+    } else {
+      delete nextParams.Status;
+    }
+  }
+
+  return nextParams;
+};
+
 export const getLeaveErrorMessage = (error, fallbackMessage) => {
+  const status = error?.response?.status;
+  const responseData = error?.response?.data;
+  const problemMessages = collectProblemDetailsMessages(responseData).map(translateLeaveMessage);
+
   if (error?.response?.status === 403) {
-    return (
-      error?.response?.data?.message ||
-      error?.response?.data?.title ||
+    return translateLeaveMessage(
+      responseData?.message ||
+      responseData?.title ||
       "Bạn không có quyền thực hiện thao tác này."
     );
   }
 
-  return (
-    error?.response?.data?.message ||
-    error?.response?.data?.title ||
+  if (problemMessages.length > 0) {
+    return problemMessages.join(" ");
+  }
+
+  if (status === 400) {
+    return translateLeaveMessage(
+      responseData?.message ||
+      responseData?.title ||
+      "Dữ liệu gửi lên chưa hợp lệ. Vui lòng kiểm tra lại nội dung và thời gian nghỉ."
+    );
+  }
+
+  return translateLeaveMessage(
+    responseData?.message ||
+    responseData?.title ||
     error?.message ||
     fallbackMessage
   );
@@ -109,7 +209,7 @@ const LeaveService = {
   async getLeaveRequests(params) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.LEAVE_REQUEST.GET_LIST,
-      params ? { params } : undefined
+      params ? { params: normalizeLeaveQueryParams(params) } : undefined
     );
     const response = parseApiPayload(rawResponse);
 
@@ -124,7 +224,7 @@ const LeaveService = {
   async getMyLeaveRequests(params) {
     const rawResponse = await axiosClient.get(
       API_ENDPOINTS.LEAVE_REQUEST.GET_MY_HISTORY,
-      params ? { params } : undefined
+      params ? { params: normalizeLeaveQueryParams(params) } : undefined
     );
     const response = parseApiPayload(rawResponse);
     const rawItems = response?.data ?? response?.items ?? response?.records ?? [];

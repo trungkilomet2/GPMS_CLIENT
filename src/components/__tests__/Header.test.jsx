@@ -1,4 +1,4 @@
-﻿import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Header from '@/components/Header';
 
@@ -13,6 +13,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 describe('Header', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockNavigate.mockReset();
+  });
+
   it('shows login/register for guest and navigates to login', () => {
     const { container } = render(
       <MemoryRouter>
@@ -27,21 +32,18 @@ describe('Header', () => {
   });
 
   it('shows user menu when user exists and can logout', () => {
-    sessionStorage.setItem('user', JSON.stringify({ name: 'Tester', email: 't@mail.com' }));
+    localStorage.setItem('user', JSON.stringify({ name: 'Tester', email: 't@mail.com' }));
 
-    const { container } = render(
+    render(
       <MemoryRouter>
         <Header />
       </MemoryRouter>
     );
 
-    const avatarButton = Array.from(container.querySelectorAll('button')).find((b) => b.textContent.includes('Tester'));
-    fireEvent.click(avatarButton);
+    fireEvent.click(screen.getByRole('button', { name: /tester/i }));
+    fireEvent.click(screen.getByRole('link', { name: /đăng xuất/i }));
 
-    const logoutLink = Array.from(container.querySelectorAll('a')).find((a) => a.textContent.includes('Đăng xuất'));
-    fireEvent.click(logoutLink);
-
-    expect(sessionStorage.getItem('user')).toBeNull();
-    expect(mockNavigate).toHaveBeenCalledWith('/home');
+    expect(localStorage.getItem('user')).toBeNull();
+    expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 });

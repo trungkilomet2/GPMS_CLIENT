@@ -1,4 +1,5 @@
-﻿import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
 
 vi.mock('@/layouts/MainLayout', () => ({
@@ -10,17 +11,31 @@ vi.mock('@/components/homepage/Products', () => ({ default: () => <div>Products 
 vi.mock('@/components/homepage/Features', () => ({ default: () => <div>Features Section</div> }));
 vi.mock('@/components/homepage/Process', () => ({ default: () => <div>Process Section</div> }));
 vi.mock('@/components/homepage/CTA', () => ({ default: () => <div>CTA Section</div> }));
+vi.mock('@/services/productService', () => ({
+  productService: {
+    getAll: vi.fn().mockResolvedValue([]),
+  },
+}));
+vi.mock('@/lib/authStorage', () => ({
+  getStoredUser: () => null,
+}));
 
 describe('HomePage', () => {
-  it('renders all homepage sections inside MainLayout', () => {
-    render(<HomePage />);
+  it('renders all homepage sections inside MainLayout', async () => {
+    render(
+      <MemoryRouter initialEntries={['/home']}>
+        <HomePage />
+      </MemoryRouter>
+    );
 
-    expect(screen.getByTestId('main-layout')).toBeInTheDocument();
-    expect(screen.getByText('Hero Section')).toBeInTheDocument();
-    expect(screen.getByText('Intro Section')).toBeInTheDocument();
-    expect(screen.getByText('Products Section')).toBeInTheDocument();
-    expect(screen.getByText('Features Section')).toBeInTheDocument();
-    expect(screen.getByText('Process Section')).toBeInTheDocument();
-    expect(screen.getByText('CTA Section')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('main-layout')).toBeInTheDocument();
+      expect(screen.getByText('Hero Section')).toBeInTheDocument();
+      expect(screen.getByText('Intro Section')).toBeInTheDocument();
+      expect(screen.getByText('Products Section')).toBeInTheDocument();
+      expect(screen.getByText('Features Section')).toBeInTheDocument();
+      expect(screen.getByText('Process Section')).toBeInTheDocument();
+      expect(screen.getByText('CTA Section')).toBeInTheDocument();
+    });
   });
 });

@@ -15,13 +15,13 @@ export default function CTA() {
             Sẵn sàng tối ưu sản xuất cho xưởng may?
           </h2>
           <p className="cta-desc">
-            Tham gia cùng hàng trăm xưởng may đang sử dụng GPMS để nâng cao hiệu quả và minh bạch vận hành.
+            GPMS hỗ trợ xưởng may chuẩn hóa quy trình, theo dõi tiến độ và làm việc rõ ràng hơn với từng đơn hàng.
           </p>
           <div className="cta-actions">
             <button className="btn-white" onClick={() => navigate("/login")}>
               Bắt đầu ngay →
             </button>
-            <button className="btn-outline-white">Tìm hiểu thêm</button>
+            <button className="btn-outline-white" onClick={() => navigate("/services")}>Tìm hiểu thêm</button>
           </div>
         </div>
       </Fade>

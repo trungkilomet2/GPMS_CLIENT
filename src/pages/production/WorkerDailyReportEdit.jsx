@@ -48,8 +48,12 @@ export default function WorkerDailyReportEdit() {
   );
 
   const handleChange = (id, field, value) => {
+    let nextValue = value;
+    if (field === "quantity") {
+      nextValue = String(value).replace(/[^0-9]/g, "");
+    }
     setDraftRows((prev) =>
-      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      prev.map((row) => (row.id === id ? { ...row, [field]: nextValue } : row))
     );
   };
 

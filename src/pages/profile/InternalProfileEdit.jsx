@@ -104,6 +104,58 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
+function isEmailAlreadyVerifiedMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được xác thực trước đó") ||
+    message.includes("email da duoc xac thuc truoc do") ||
+    message.includes("email already verified") ||
+    message.includes("already verified")
+  );
+}
+
+function isEmailAlreadyRegisteredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được đăng ký") ||
+    message.includes("email da duoc dang ky") ||
+    message.includes("email already registered") ||
+    message.includes("email already exists") ||
+    message.includes("already exists")
+  );
+}
+
+function isGenericEntitySaveError(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("an error occurred while saving the entity changes") ||
+    message.includes("see the inner exception for details")
+  );
+}
+
+function getFallbackSaveErrorMessage(errData, fallbackMessage) {
+  const status = Number(errData?.status ?? 0);
+  const detail = String(errData?.detail ?? "").trim();
+  const title = String(errData?.title ?? "").trim();
+  const message = String(fallbackMessage ?? "").trim();
+  const genericMessage = detail || title || message;
+
+  if (status >= 500 && isGenericEntitySaveError(genericMessage)) {
+    return "Không thể lưu hồ sơ do backend trả lỗi nội bộ chung chung. Hãy kiểm tra lại email, số điện thoại hoặc ảnh đại diện rồi thử lại.";
+  }
+
+  return message || "Cập nhật thất bại.";
+}
+
+function resolveOtpStageByEmail(currentEmail = "", verifiedEmail = "") {
+  const normalizedCurrentEmail = String(currentEmail || "").trim().toLowerCase();
+  const normalizedVerifiedEmail = String(verifiedEmail || "").trim().toLowerCase();
+  return normalizedCurrentEmail && normalizedCurrentEmail === normalizedVerifiedEmail ? "verified" : "idle";
+}
+
 export default function InternalProfileEdit() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -154,7 +206,13 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
-        setInitialEmail(profile?.emailFromServer ? (profile?.email || "") : "");
+        const resolvedEmail = String(profile?.email || "").trim();
+        const emailVerified = profile?.emailVerified === true;
+        setInitialEmail(resolvedEmail);
+        setVerifiedEmail(emailVerified || resolvedEmail ? resolvedEmail.toLowerCase() : "");
+        setOtpStage(resolveOtpStageByEmail(resolvedEmail, resolvedEmail));
+        setBackendRequiresEmailVerification(false);
+        setOtpCode("");
         setAvatarPreview(profile?.avatarUrl || storedUser?.avatarUrl || "");
       } catch (e) {
         if (!mounted) return;
@@ -223,10 +281,9 @@ export default function InternalProfileEdit() {
 
     if (name === "email") {
       const normalizedEmail = String(value || "").trim().toLowerCase();
-      if (normalizedEmail !== String(verifiedEmail || "").trim().toLowerCase()) {
-        setOtpStage("idle");
-        setOtpCode("");
-      }
+      const nextStage = resolveOtpStageByEmail(normalizedEmail, verifiedEmail);
+      setOtpStage(nextStage);
+      if (nextStage !== "verified") setOtpCode("");
       setBackendRequiresEmailVerification(normalizedEmail !== normalizedInitialEmail);
     }
   };
@@ -261,7 +318,25 @@ export default function InternalProfileEdit() {
     try {
       setSendingOtp(true);
       setMessage(null);
-      await authService.sendRegisterOtp({ email: String(form.email || "").trim() });
+      const normalizedEmail = String(form.email || "").trim();
+
+      try {
+        await authService.sendRegisterOtp({ email: normalizedEmail });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const sendMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyRegisteredMessage(sendMessage)) {
+          throw err;
+        }
+
+        await authService.resendRegisterOtp({ email: normalizedEmail });
+      }
+
       setOtpStage("sent");
       setOtpCode("");
       setVerifiedEmail("");
@@ -293,10 +368,23 @@ export default function InternalProfileEdit() {
     try {
       setVerifyingOtp(true);
       setMessage(null);
-      await authService.verifyRegisterOtp({
-        email: String(form.email || "").trim(),
-        otp: String(otpCode || "").trim(),
-      });
+      try {
+        await authService.verifyRegisterOtp({
+          email: String(form.email || "").trim(),
+          otp: String(otpCode || "").trim(),
+        });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const verifyMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyVerifiedMessage(verifyMessage)) {
+          throw err;
+        }
+      }
       setOtpStage("verified");
       setVerifiedEmail(String(form.email || "").trim().toLowerCase());
       setBackendRequiresEmailVerification(false);
@@ -361,12 +449,12 @@ export default function InternalProfileEdit() {
       fd.append("Location", normalizeSpaces(form.location));
       fd.append("Email", String(form.email || "").trim());
 
-      const avatarUpload = await buildAvatarFile(
-        avatarFile,
-        avatarPreview,
-        getInitials(form.fullName)
-      );
-      fd.append("AvartarUrl", avatarUpload);
+      if (avatarFile instanceof File) {
+        fd.append("AvartarUrl", avatarFile);
+      } else if (!String(avatarPreview || "").trim()) {
+        const avatarUpload = await buildAvatarFile(null, "", getInitials(form.fullName));
+        fd.append("AvartarUrl", avatarUpload);
+      }
 
       const updateResult = await userService.updateProfile(user?.userId ?? user?.id, fd);
 
@@ -380,18 +468,31 @@ export default function InternalProfileEdit() {
         return;
       }
 
-      await userService.getProfile();
-      setInitialEmail(String(form.email || "").trim());
-      setVerifiedEmail(String(form.email || "").trim().toLowerCase());
+      const refreshedProfile = await userService.getProfile();
+      const nextEmail = String(refreshedProfile?.email || form.email || "").trim();
+      const nextFullName = String(refreshedProfile?.fullName || form.fullName || "");
+      const nextPhoneNumber = String(refreshedProfile?.phoneNumber || form.phoneNumber || "");
+      const nextLocation = String(refreshedProfile?.location || form.location || "");
+
+      setForm({
+        fullName: nextFullName,
+        email: nextEmail,
+        phoneNumber: nextPhoneNumber,
+        location: nextLocation,
+      });
+      setInitialEmail(nextEmail);
+      setVerifiedEmail(nextEmail.toLowerCase());
       setBackendRequiresEmailVerification(false);
+      setOtpStage(nextEmail ? "verified" : "idle");
 
       setMessage({ type: "success", text: "Lưu hồ sơ thành công!" });
       setTimeout(() => navigate("/profile", { state: { refresh: Date.now() } }), 900);
     } catch (err) {
       const errData = err?.response?.data ?? {};
       const mapped = mapApiErrors(errData);
+      const friendlyMessage = getFallbackSaveErrorMessage(errData, mapped.message);
       const shouldPromptVerify =
-        isEmailVerificationRequiredMessage(mapped.message) ||
+        isEmailVerificationRequiredMessage(friendlyMessage) ||
         isEmailVerificationRequiredMessage(errData?.detail);
 
       setServerErrors(mapped.fieldErrors || {});
@@ -410,7 +511,7 @@ export default function InternalProfileEdit() {
           text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
         });
       } else {
-        setMessage({ type: "error", text: mapped.message });
+        setMessage({ type: "error", text: friendlyMessage });
       }
     } finally {
       setSaving(false);
@@ -582,30 +683,36 @@ export default function InternalProfileEdit() {
                           {otpStage === "verified" ? "Đã xác minh" : "Chưa xác minh"}
                         </span>
                       </div>
-                      <div className="mt-1 text-xs font-semibold text-slate-500">
-                        {emailVerificationRequired
-                          ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
-                          : "Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
+                        <div className="mt-1 text-xs font-semibold text-slate-500">
+                          {emailVerificationRequired
+                            ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
+                            : "Email hiện tại đã được xác minh. Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={sendingOtp || verifyingOtp}
-                        className="whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-extrabold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {sendingOtp ? "Đang gửi..." : otpStage === "idle" ? "Gửi mã OTP" : "Gửi lại OTP"}
-                      </button>
-                    </div>
+                    {emailVerificationRequired ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={sendingOtp || verifyingOtp}
+                          className="whitespace-nowrap rounded-xl border border-emerald-200 bg-white px-4 py-2 text-sm font-extrabold text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {sendingOtp ? "Đang gửi..." : otpStage === "sent" ? "Gửi lại OTP" : "Gửi mã OTP"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
 
-                  {(otpStage !== "idle" || emailVerificationRequired) ? (
+                  {emailVerificationRequired ? (
                     <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center">
                       <input
+                        type="text"
+                        name="profileOtpCode"
                         value={otpCode}
                         onChange={(e) => setOtpCode(e.target.value)}
+                        autoComplete="one-time-code"
+                        inputMode="numeric"
                         className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
                         placeholder="Nhập mã OTP"
                       />
@@ -620,7 +727,7 @@ export default function InternalProfileEdit() {
                     </div>
                   ) : null}
 
-                  {otpStage === "verified" ? (
+                  {emailVerificationRequired && otpStage === "verified" ? (
                     <div className="mt-3 text-sm font-extrabold text-emerald-700">
                       Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
                     </div>

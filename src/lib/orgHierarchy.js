@@ -14,10 +14,10 @@ export const USER_STATUS_IDS = {
 };
 
 export const SYSTEM_ROLE_PRIORITY = [
+  "Admin",
   "Owner",
   "PM",
   "Worker",
-  "Admin",
   "Customer",
 ];
 
@@ -101,12 +101,10 @@ export function pickPrimarySystemRole(roleValue = "") {
 
 export function getManagerRoleHint(role = "") {
   switch (role) {
-    case "Owner":
-      return "Không có cấp quản lý trực tiếp trong mô hình 1 xưởng.";
     case "PM":
-      return "Báo cáo trực tiếp cho Owner.";
+      return "Báo cáo trực tiếp cho Chủ xưởng.";
     case "Worker":
-      return "Báo cáo trực tiếp cho PM phụ trách.";
+      return "Báo cáo trực tiếp cho Quản lý sản xuất phụ trách.";
     default:
       return "Chưa xác định tuyến quản lý trực tiếp.";
   }
@@ -114,8 +112,6 @@ export function getManagerRoleHint(role = "") {
 
 export function getAllowedManagerRoles(role = "") {
   switch (role) {
-    case "Owner":
-      return [];
     case "PM":
       return ["Owner"];
     case "Worker":
@@ -129,14 +125,46 @@ export function isManagerRequired(role = "") {
   return getAllowedManagerRoles(role).length > 0;
 }
 
+export function canManageRole(managerRole = "", subordinateRole = "") {
+  const normalizedManagerRole = String(managerRole ?? "").trim();
+  const normalizedSubordinateRole = String(subordinateRole ?? "").trim();
+
+  return getAllowedManagerRoles(normalizedSubordinateRole).includes(normalizedManagerRole);
+}
+
+export function isEligibleDirectManager(employee = {}, subordinateRole = "") {
+  const primaryRole = String(
+    employee?.primarySystemRole ??
+    pickPrimarySystemRole(employee?.role ?? employee?.roles ?? "")
+  ).trim();
+
+  if (!primaryRole) {
+    return false;
+  }
+
+  return canManageRole(primaryRole, subordinateRole);
+}
+
+export function getDirectManagerRole(employee = {}, subordinateRole = "") {
+  const roles = splitRoles(employee?.roles ?? employee?.role ?? employee?.roleName ?? "");
+  return roles.find((role) => canManageRole(role, subordinateRole)) || "";
+}
+
+export function getDirectManagerRoleLabel(employee = {}, subordinateRole = "") {
+  return getSystemRoleLabel(getDirectManagerRole(employee, subordinateRole));
+}
+
+export function canAssignSpecialties(roleValue = "") {
+  const roles = splitRoles(roleValue);
+  return roles.includes("PM") || roles.includes("Worker");
+}
+
 export function getRoleHierarchyTag(role = "") {
   switch (role) {
-    case "Owner":
-      return "Cấp owner";
     case "PM":
-      return "Cấp quản lý sản xuất";
+      return "Quản lý sản xuất";
     case "Worker":
-      return "Cấp tác nghiệp";
+      return "Nhân viên sản xuất";
     default:
       return "Chưa phân loại";
   }

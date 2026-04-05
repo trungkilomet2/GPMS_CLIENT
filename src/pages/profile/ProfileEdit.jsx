@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "@/services/authService";
+import { locationService } from "@/services/locationService";
 import { userService } from "@/services/userService";
 import Header from "@/components/Header";
 import {
@@ -138,6 +139,67 @@ function isEmailVerificationRequiredMessage(value) {
   );
 }
 
+function isEmailAlreadyVerifiedMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được xác thực trước đó") ||
+    message.includes("email da duoc xac thuc truoc do") ||
+    message.includes("email already verified") ||
+    message.includes("already verified")
+  );
+}
+
+function isEmailAlreadyRegisteredMessage(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("email đã được đăng ký") ||
+    message.includes("email da duoc dang ky") ||
+    message.includes("email already registered") ||
+    message.includes("email already exists") ||
+    message.includes("already exists")
+  );
+}
+
+function isGenericEntitySaveError(value) {
+  const message = String(value ?? "").trim().toLowerCase();
+  if (!message) return false;
+  return (
+    message.includes("an error occurred while saving the entity changes") ||
+    message.includes("see the inner exception for details")
+  );
+}
+
+function getFallbackSaveErrorMessage(errData, fallbackMessage) {
+  const status = Number(errData?.status ?? 0);
+  const detail = String(errData?.detail ?? "").trim();
+  const title = String(errData?.title ?? "").trim();
+  const message = String(fallbackMessage ?? "").trim();
+  const genericMessage = detail || title || message;
+
+  if (status >= 500 && isGenericEntitySaveError(genericMessage)) {
+    return "Không thể lưu hồ sơ do backend trả lỗi nội bộ chung chung. Hãy kiểm tra lại email, số điện thoại hoặc ảnh đại diện rồi thử lại.";
+  }
+
+  return message || "Lưu thất bại. Vui lòng thử lại.";
+}
+
+function resolveEmailVerifiedForProfile(data = {}, resolvedEmail = "") {
+  if (!resolvedEmail) return false;
+  if (data.emailVerified === true) return true;
+  if (data.emailVerified === false) return false;
+
+  // Tài khoản khách chỉ có thể đăng ký sau khi xác minh OTP email.
+  return true;
+}
+
+function resolveOtpStageByEmail(currentEmail = "", verifiedEmail = "") {
+  const normalizedCurrentEmail = String(currentEmail || "").trim().toLowerCase();
+  const normalizedVerifiedEmail = String(verifiedEmail || "").trim().toLowerCase();
+  return normalizedCurrentEmail && normalizedCurrentEmail === normalizedVerifiedEmail ? "verified" : "idle";
+}
+
 async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
   if (avatarFile) return avatarFile;
 
@@ -156,8 +218,7 @@ async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
     }
   }
 
-  // Backend currently validates AvartarUrl as required.
-  // Generate a small PNG avatar so user can save profile even without uploading an image.
+  // Fallback only when the user truly has no existing avatar at all.
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 256;
@@ -180,12 +241,30 @@ async function buildAvatarFile(avatarFile, avatarPreview, initials = "") {
 }
 
 /* ─── Input ─── */
-function Input({ name, value, onChange, onBlur, type = "text", placeholder = "", hasError, readOnly = false }) {
+function Input({
+  name,
+  value,
+  onChange,
+  onBlur,
+  type = "text",
+  placeholder = "",
+  hasError,
+  readOnly = false,
+  autoComplete,
+  inputMode,
+}) {
   return (
     <input
       className="pf-input"
-      type={type} name={name} value={value ?? ""} onChange={onChange} onBlur={onBlur} readOnly={readOnly}
+      type={type}
+      name={name}
+      value={value ?? ""}
+      onChange={onChange}
+      onBlur={onBlur}
+      readOnly={readOnly}
       placeholder={placeholder}
+      autoComplete={autoComplete}
+      inputMode={inputMode}
       style={{
         width: "100%", padding: ".65rem .9rem",
         border: `1.5px solid ${hasError ? T.red : T.border}`,
@@ -280,10 +359,6 @@ export default function ProfileEdit() {
     phoneNumber: user?.phoneNumber ?? user?.phone ?? "",
     location: user?.location ?? user?.address ?? "",
     avatarUrl: user?.avatarUrl ?? user?.avartarUrl ?? "",
-    bio: user?.bio ?? "",
-    cooperationNotes: Array.isArray(user?.cooperationNotes)
-      ? user.cooperationNotes.join("\n")
-      : user?.cooperationNotes ?? "",
   });
 
   // ── form fields khớp đúng tên API ──
@@ -293,12 +368,17 @@ export default function ProfileEdit() {
     Email:       "",
     PhoneNumber: "",
     Location:    "",   // tương ứng với "address" hiển thị
-    Bio:         "",
-    CooperationNotes: "",
   });
 
   const [avatarFile,  setAvatarFile]  = useState(null);   // File object gửi lên API
   const [avatarPreview, setAvatarPreview] = useState(null); // URL preview local
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [loadingProvinces, setLoadingProvinces] = useState(false);
+  const [loadingWards, setLoadingWards] = useState(false);
+  const [locationOptionsError, setLocationOptionsError] = useState("");
 
   const [loading,   setLoading]   = useState(true);
   const [saving,    setSaving]    = useState(false);
@@ -339,10 +419,10 @@ export default function ProfileEdit() {
       Email: fallback.email,
       PhoneNumber: fallback.phoneNumber,
       Location: fallback.location,
-      Bio: fallback.bio,
-      CooperationNotes: fallback.cooperationNotes,
     });
-    setInitialEmail("");
+    setInitialEmail(fallback.email || "");
+    setVerifiedEmail(fallback.email ? String(fallback.email).trim().toLowerCase() : "");
+    setOtpStage(fallback.email ? "verified" : "idle");
     if (fallback.avatarUrl) {
       setAvatarPreview(fallback.avatarUrl);
     }
@@ -354,10 +434,14 @@ export default function ProfileEdit() {
           Email:       data.email       ?? data.Email       ?? "",
           PhoneNumber: data.phoneNumber ?? data.PhoneNumber ?? data.phone ?? "",
           Location:    data.location    ?? data.Location    ?? data.address ?? "",
-          Bio:         fallback.bio,
-          CooperationNotes: fallback.cooperationNotes,
         });
-        setInitialEmail(data.emailFromServer ? (data.email ?? data.Email ?? "") : "");
+        const resolvedEmail = String(data.email ?? data.Email ?? "").trim();
+        const emailVerified = resolveEmailVerifiedForProfile(data, resolvedEmail);
+        setInitialEmail(resolvedEmail);
+        setVerifiedEmail(emailVerified || resolvedEmail ? resolvedEmail.toLowerCase() : "");
+        setOtpStage(resolveOtpStageByEmail(resolvedEmail, resolvedEmail));
+        setBackendRequiresEmailVerification(false);
+        setOtpCode("");
         // Nếu đã có avatar URL thì dùng làm preview
         if (data.avartarUrl || data.avatarUrl) {
           setAvatarPreview(data.avartarUrl ?? data.avatarUrl);
@@ -372,6 +456,61 @@ export default function ProfileEdit() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadProvinces = async () => {
+      try {
+        setLoadingProvinces(true);
+        setLocationOptionsError("");
+        const nextProvinces = await locationService.getProvinces();
+        if (!mounted) return;
+        setProvinces(nextProvinces);
+      } catch {
+        if (!mounted) return;
+        setLocationOptionsError("Không thể tải danh sách tỉnh/thành.");
+      } finally {
+        if (mounted) setLoadingProvinces(false);
+      }
+    };
+
+    loadProvinces();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadWards = async () => {
+      if (!selectedProvinceCode) {
+        setWards([]);
+        setSelectedWardCode("");
+        return;
+      }
+
+      try {
+        setLoadingWards(true);
+        setLocationOptionsError("");
+        const nextWards = await locationService.getWardsByProvinceCode(selectedProvinceCode);
+        if (!mounted) return;
+        setWards(nextWards);
+      } catch {
+        if (!mounted) return;
+        setLocationOptionsError("Không thể tải danh sách phường/xã.");
+        setWards([]);
+      } finally {
+        if (mounted) setLoadingWards(false);
+      }
+    };
+
+    loadWards();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedProvinceCode]);
+
   /* ── Field change ── */
   const handle = (e) => {
     const { name, value } = e.target;
@@ -381,10 +520,9 @@ export default function ProfileEdit() {
     }
     if (name === "Email") {
       const normalizedEmail = String(value || "").trim().toLowerCase();
-      if (normalizedEmail !== String(verifiedEmail || "").trim().toLowerCase()) {
-        setOtpStage("idle");
-        setOtpCode("");
-      }
+      const nextStage = resolveOtpStageByEmail(normalizedEmail, verifiedEmail);
+      setOtpStage(nextStage);
+      if (nextStage !== "verified") setOtpCode("");
       setBackendRequiresEmailVerification(normalizedEmail !== normalizedInitialEmail);
     }
   };
@@ -392,6 +530,31 @@ export default function ProfileEdit() {
   const handleBlur = (e) => {
     const { name } = e.target;
     setTouched((prev) => ({ ...prev, [name]: true }));
+  };
+
+  const handleProvinceChange = (e) => {
+    const provinceCode = String(e.target.value || "");
+
+    setSelectedProvinceCode(provinceCode);
+    setSelectedWardCode("");
+    setTouched((prev) => ({ ...prev, Location: true }));
+    setForm((prev) => ({
+      ...prev,
+      Location: "",
+    }));
+  };
+
+  const handleWardChange = (e) => {
+    const wardCode = String(e.target.value || "");
+    const province = provinces.find((item) => String(item.code) === String(selectedProvinceCode));
+    const ward = wards.find((item) => String(item.code) === wardCode);
+
+    setSelectedWardCode(wardCode);
+    setTouched((prev) => ({ ...prev, Location: true }));
+    setForm((prev) => ({
+      ...prev,
+      Location: ward && province ? `${ward.name}, ${province.name}` : "",
+    }));
   };
 
   /* ── Avatar: chọn file → preview ngay, lưu File object ── */
@@ -423,7 +586,25 @@ export default function ProfileEdit() {
     try {
       setSendingOtp(true);
       setMsg(null);
-      await authService.sendRegisterOtp({ email: String(form.Email || "").trim() });
+      const normalizedEmail = String(form.Email || "").trim();
+
+      try {
+        await authService.sendRegisterOtp({ email: normalizedEmail });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const sendMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyRegisteredMessage(sendMessage)) {
+          throw err;
+        }
+
+        await authService.resendRegisterOtp({ email: normalizedEmail });
+      }
+
       setOtpStage("sent");
       setOtpCode("");
       setVerifiedEmail("");
@@ -455,10 +636,23 @@ export default function ProfileEdit() {
     try {
       setVerifyingOtp(true);
       setMsg(null);
-      await authService.verifyRegisterOtp({
-        email: String(form.Email || "").trim(),
-        otp: String(otpCode || "").trim(),
-      });
+      try {
+        await authService.verifyRegisterOtp({
+          email: String(form.Email || "").trim(),
+          otp: String(otpCode || "").trim(),
+        });
+      } catch (err) {
+        const errData = err?.response?.data;
+        const verifyMessage =
+          errData?.message ||
+          errData?.detail ||
+          errData?.title ||
+          "";
+
+        if (!isEmailAlreadyVerifiedMessage(verifyMessage)) {
+          throw err;
+        }
+      }
       setOtpStage("verified");
       setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
       setBackendRequiresEmailVerification(false);
@@ -523,8 +717,12 @@ export default function ProfileEdit() {
       fd.append("Location", normalizeSpaces(form.Location));
       fd.append("Email", form.Email.trim());
 
-      const avatarUpload = await buildAvatarFile(avatarFile, avatarPreview, getInitials(form.FullName));
-      fd.append("AvartarUrl", avatarUpload);
+      if (avatarFile instanceof File) {
+        fd.append("AvartarUrl", avatarFile);
+      } else if (!String(avatarPreview || "").trim()) {
+        const avatarUpload = await buildAvatarFile(null, "", getInitials(form.FullName));
+        fd.append("AvartarUrl", avatarUpload);
+      }
 
       const updateResult = await userService.updateProfile(user.userId ?? user.id, fd);
 
@@ -538,20 +736,35 @@ export default function ProfileEdit() {
         return;
       }
 
-      await userService.getProfile();
+      const refreshedProfile = await userService.getProfile();
+      const nextEmail = String(refreshedProfile?.email || form.Email || "").trim();
+      const nextFullName = String(refreshedProfile?.fullName || form.FullName || "");
+      const nextPhoneNumber = String(refreshedProfile?.phoneNumber || form.PhoneNumber || "");
+      const nextLocation = String(refreshedProfile?.location || form.Location || "");
+
+      setForm({
+        FullName: nextFullName,
+        Email: nextEmail,
+        PhoneNumber: nextPhoneNumber,
+        Location: nextLocation,
+      });
 
       const storedUser = getStoredUser() || {};
       setStoredUser({
         ...storedUser,
-        bio: String(form.Bio || "").trim(),
-        cooperationNotes: String(form.CooperationNotes || "")
-          .split("\n")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        fullName: nextFullName,
+        name: nextFullName,
+        email: nextEmail,
+        emailVerified: true,
+        phoneNumber: nextPhoneNumber,
+        phone: nextPhoneNumber,
+        location: nextLocation,
+        address: nextLocation,
       });
-      setInitialEmail(String(form.Email || "").trim());
-      setVerifiedEmail(String(form.Email || "").trim().toLowerCase());
+      setInitialEmail(nextEmail);
+      setVerifiedEmail(nextEmail.toLowerCase());
       setBackendRequiresEmailVerification(false);
+      setOtpStage(nextEmail ? "verified" : "idle");
       window.dispatchEvent(new Event("auth-change"));
 
       setMsg({ type: "success", text: "Lưu hồ sơ thành công!" });
@@ -559,8 +772,9 @@ export default function ProfileEdit() {
     } catch (err) {
       const errData = err?.response?.data;
       const { message, fieldErrors } = getApiErrorDetails(errData);
+      const friendlyMessage = getFallbackSaveErrorMessage(errData, message);
       const shouldPromptVerify =
-        isEmailVerificationRequiredMessage(message) ||
+        isEmailVerificationRequiredMessage(friendlyMessage) ||
         isEmailVerificationRequiredMessage(errData?.detail);
 
       if (fieldErrors.length > 0) {
@@ -577,7 +791,7 @@ export default function ProfileEdit() {
           text: "Email này chưa được xác thực. Vui lòng gửi mã OTP, xác minh email rồi lưu lại hồ sơ.",
         });
       } else {
-        setMsg({ type: "error", text: message });
+        setMsg({ type: "error", text: friendlyMessage });
       }
     } finally {
       setSaving(false);
@@ -711,48 +925,52 @@ export default function ProfileEdit() {
                         {otpStage === "verified" ? "Đã xác minh" : "Chưa xác minh"}
                       </span>
                     </div>
-                    <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
-                      {emailVerificationRequired
-                        ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
-                        : "Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
+                      <div style={{ fontSize: ".74rem", color: T.textMid, marginTop: ".2rem" }}>
+                        {emailVerificationRequired
+                          ? "Email hiện tại cần được xác minh bằng mã OTP trước khi cập nhật hồ sơ."
+                          : "Email hiện tại đã được xác minh. Nếu bạn đổi email, hệ thống sẽ yêu cầu xác minh bằng mã OTP trước khi lưu."}
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleSendOtp}
-                    disabled={sendingOtp || verifyingOtp}
-                    className="pf-btn-secondary"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      whiteSpace: "nowrap",
-                      background: "transparent",
-                      color: T.mid,
-                      border: `2px solid ${T.base}`,
-                      padding: ".61rem 1rem",
-                      borderRadius: 8,
-                      fontWeight: 700,
-                      fontSize: ".84rem",
-                      cursor: sendingOtp || verifyingOtp ? "not-allowed" : "pointer",
-                      transition: ".15s",
-                      opacity: sendingOtp || verifyingOtp ? .7 : 1,
-                    }}
-                  >
-                    {sendingOtp ? "Đang gửi..." : otpStage === "idle" ? "Gửi mã OTP" : "Gửi lại OTP"}
-                  </button>
+                  {emailVerificationRequired ? (
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={sendingOtp || verifyingOtp}
+                      className="pf-btn-secondary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        whiteSpace: "nowrap",
+                        background: "transparent",
+                        color: T.mid,
+                        border: `2px solid ${T.base}`,
+                        padding: ".61rem 1rem",
+                        borderRadius: 8,
+                        fontWeight: 700,
+                        fontSize: ".84rem",
+                        cursor: sendingOtp || verifyingOtp ? "not-allowed" : "pointer",
+                        transition: ".15s",
+                        opacity: sendingOtp || verifyingOtp ? .7 : 1,
+                      }}
+                    >
+                      {sendingOtp ? "Đang gửi..." : otpStage === "sent" ? "Gửi lại OTP" : "Gửi mã OTP"}
+                    </button>
+                  ) : null}
                 </div>
 
-                {(otpStage !== "idle" || emailVerificationRequired) && (
+                {emailVerificationRequired && (
                   <div style={{ display: "flex", gap: ".6rem", alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ flex: 1, minWidth: 220 }}>
-                      <Input
-                        name="EmailOtp"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="Nhập mã OTP"
-                      />
-                    </div>
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <Input
+                          name="profileOtpCode"
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(e.target.value)}
+                          placeholder="Nhập mã OTP"
+                          autoComplete="one-time-code"
+                          inputMode="numeric"
+                        />
+                      </div>
                     <button
                       type="button"
                       onClick={handleVerifyOtp}
@@ -780,7 +998,7 @@ export default function ProfileEdit() {
                   </div>
                 )}
 
-                {otpStage === "verified" && (
+                {emailVerificationRequired && otpStage === "verified" && (
                   <div style={{ fontSize: ".74rem", fontWeight: 700, color: T.mid }}>
                     Email hiện tại đã được xác minh. Bạn có thể lưu thay đổi hồ sơ.
                   </div>
@@ -803,50 +1021,64 @@ export default function ProfileEdit() {
               </FormField>
 
               <FormField label="Địa chỉ / Khu vực" required error={touched.Location && errs.Location}>
-                <Input name="Location" value={form.Location} onChange={handle} onBlur={handleBlur}
-                  placeholder="Số nhà, đường, quận, thành phố" hasError={!!(touched.Location && errs.Location)} />
-              </FormField>
-
-              <FormField label="Giới thiệu khách hàng" hint="Mô tả ngắn về khách hàng hoặc doanh nghiệp.">
-                <textarea
-                  name="Bio"
-                  value={form.Bio ?? ""}
-                  onChange={handle}
-                  onBlur={handleBlur}
-                  placeholder="Ví dụ: Khách hàng chuyên các đơn hàng thời trang công sở, ưu tiên chất lượng ổn định và tiến độ rõ ràng."
-                  style={{
-                    width: "100%",
-                    minHeight: 110,
-                    padding: ".75rem .9rem",
-                    border: `1.5px solid ${T.border}`,
-                    borderRadius: 8,
-                    fontSize: ".88rem",
-                    background: T.white,
-                    color: T.text,
-                    resize: "vertical",
-                  }}
-                />
-              </FormField>
-
-              <FormField label="Ghi chú hợp tác" hint="Mỗi dòng là một ghi chú hiển thị ở trang hồ sơ.">
-                <textarea
-                  name="CooperationNotes"
-                  value={form.CooperationNotes ?? ""}
-                  onChange={handle}
-                  onBlur={handleBlur}
-                  placeholder={"Ưu tiên cập nhật tiến độ theo từng giai đoạn.\nTheo dõi lịch sử tương tác để hỗ trợ báo giá nhanh hơn."}
-                  style={{
-                    width: "100%",
-                    minHeight: 130,
-                    padding: ".75rem .9rem",
-                    border: `1.5px solid ${T.border}`,
-                    borderRadius: 8,
-                    fontSize: ".88rem",
-                    background: T.white,
-                    color: T.text,
-                    resize: "vertical",
-                  }}
-                />
+                <div style={{ display: "grid", gap: ".75rem" }}>
+                  <select
+                    value={selectedProvinceCode}
+                    onChange={handleProvinceChange}
+                    disabled={loadingProvinces}
+                    style={{
+                      width: "100%",
+                      padding: ".65rem .9rem",
+                      border: `1.5px solid ${touched.Location && errs.Location ? T.red : T.border}`,
+                      borderRadius: 8,
+                      fontSize: ".88rem",
+                      background: T.white,
+                      color: T.text,
+                    }}
+                  >
+                    <option value="">{loadingProvinces ? "Đang tải tỉnh/thành..." : "Chọn tỉnh/thành"}</option>
+                    {provinces.map((province) => (
+                      <option key={province.code} value={province.code}>
+                        {province.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={selectedWardCode}
+                    onChange={handleWardChange}
+                    disabled={!selectedProvinceCode || loadingWards}
+                    style={{
+                      width: "100%",
+                      padding: ".65rem .9rem",
+                      border: `1.5px solid ${touched.Location && errs.Location ? T.red : T.border}`,
+                      borderRadius: 8,
+                      fontSize: ".88rem",
+                      background: !selectedProvinceCode ? T.sand : T.white,
+                      color: T.text,
+                    }}
+                  >
+                    <option value="">
+                      {!selectedProvinceCode
+                        ? "Chọn tỉnh/thành trước"
+                        : loadingWards
+                          ? "Đang tải phường/xã..."
+                          : "Chọn phường/xã"}
+                    </option>
+                    {wards.map((ward) => (
+                      <option key={ward.code} value={ward.code}>
+                        {ward.name}
+                      </option>
+                    ))}
+                  </select>
+                  {form.Location ? (
+                    <div style={{ fontSize: ".74rem", color: T.textMid }}>
+                      Khu vực đã chọn: <strong>{form.Location}</strong>
+                    </div>
+                  ) : null}
+                  {locationOptionsError ? (
+                    <div style={{ fontSize: ".73rem", color: T.red }}>{locationOptionsError}</div>
+                  ) : null}
+                </div>
               </FormField>
 
             </CardSection>

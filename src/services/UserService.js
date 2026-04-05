@@ -83,6 +83,26 @@ function isOtpPendingResponse(payload = {}) {
   return message.includes("otp");
 }
 
+function readEmailVerificationStatus(source = {}) {
+  const directValue =
+    source.emailVerified ??
+    source.isEmailVerified ??
+    source.isVerifiedEmail ??
+    source.isEmailConfirm ??
+    source.emailConfirmed ??
+    source.isEmailConfirmed ??
+    source.isVerified ??
+    source.verified;
+
+  if (typeof directValue === "boolean") return directValue;
+
+  const normalized = String(directValue ?? "").trim().toLowerCase();
+  if (["true", "1", "verified", "confirmed"].includes(normalized)) return true;
+  if (["false", "0", "unverified", "pending"].includes(normalized)) return false;
+
+  return null;
+}
+
 export const userService = {
 
   /**
@@ -117,7 +137,14 @@ export const userService = {
     }
 
     const json = await res.json();
-    if (!res.ok) throw { response: { data: json } };
+    if (!res.ok) {
+      throw {
+        response: {
+          status: res.status,
+          data: json,
+        },
+      };
+    }
 
     // Unwrap data, map đúng field (kể cả typo avartarUrl)
     const d = json.data ?? {};
@@ -144,6 +171,10 @@ export const userService = {
     const serverPhone = normalizeServerValue(d.phoneNumber);
     const serverAvatar = normalizeServerValue(d.avartarUrl);
     const serverLocation = normalizeServerValue(d.location);
+    const emailVerified =
+      readEmailVerificationStatus(d) ??
+      readEmailVerificationStatus(stored) ??
+      readEmailVerificationStatus(cached);
 
     const fullName =
       serverFullName ||
@@ -194,6 +225,7 @@ export const userService = {
       name:        fullName,
       email:       String(email || "").trim(),
       emailFromServer: Boolean(serverEmail),
+      emailVerified,
       phoneNumber: String(phoneNumber || "").trim(),
       phone:       String(phoneNumber || "").trim(),
       avatarUrl:   String(avatarUrl || "").trim(),
@@ -292,6 +324,10 @@ export const userService = {
    */
   async updateProfile(_userId, formData) {
     const endpoint = API_ENDPOINTS.USER.UPDATE_PROFILE;
+    const submittedFullName = normalizeServerValue(formData?.get?.("FullName"));
+    const submittedPhoneNumber = normalizeServerValue(formData?.get?.("PhoneNumber"));
+    const submittedLocation = normalizeServerValue(formData?.get?.("Location"));
+    const submittedEmail = normalizeServerValue(formData?.get?.("Email"));
 
     const res = await fetch(endpoint, {
       method:  "PUT",
@@ -333,20 +369,48 @@ export const userService = {
     // Sync localStorage từ response backend để tránh lệch dữ liệu hiển thị
     const d = json.data ?? {};
     const stored = getStoredUser() || {};
+    const resolvedEmail =
+      normalizeServerValue(d.email) ||
+      submittedEmail ||
+      normalizeServerValue(stored.email);
+    const resolvedFullName =
+      normalizeServerValue(d.fullName) ||
+      submittedFullName ||
+      normalizeServerValue(stored.fullName) ||
+      normalizeServerValue(stored.name);
+    const resolvedPhoneNumber =
+      normalizeServerValue(d.phoneNumber) ||
+      submittedPhoneNumber ||
+      normalizeServerValue(stored.phoneNumber) ||
+      normalizeServerValue(stored.phone);
+    const resolvedLocation =
+      normalizeServerValue(d.location) ||
+      submittedLocation ||
+      normalizeServerValue(stored.location) ||
+      normalizeServerValue(stored.address);
+    const resolvedAvatarUrl =
+      normalizeServerValue(d.avartarUrl) ||
+      normalizeServerValue(stored.avatarUrl);
+    const resolvedEmailVerified =
+      readEmailVerificationStatus(d) ??
+      (resolvedEmail ? true : null) ??
+      readEmailVerificationStatus(stored);
+
     const nextStored = {
       ...stored,
       id:          d.id          ?? stored.id,
       userId:      d.id          ?? stored.userId,
       userName:    d.userName    ?? stored.userName,
-      fullName:    d.fullName    ?? stored.fullName,
-      name:        d.fullName    ?? stored.name,
+      fullName:    resolvedFullName,
+      name:        resolvedFullName,
       role:        extractRoleValue(d) || stored.role,
-      email:       d.email       ?? stored.email,
-      phoneNumber: d.phoneNumber ?? stored.phoneNumber,
-      phone:       d.phoneNumber ?? stored.phone,
-      avatarUrl:   d.avartarUrl  ?? stored.avatarUrl,
-      location:    d.location    ?? stored.location,
-      address:     d.location    ?? stored.address,
+      email:       resolvedEmail,
+      emailVerified: resolvedEmailVerified,
+      phoneNumber: resolvedPhoneNumber,
+      phone:       resolvedPhoneNumber,
+      avatarUrl:   resolvedAvatarUrl,
+      location:    resolvedLocation,
+      address:     resolvedLocation,
       managerId:   d.managerId   ?? stored.managerId ?? null,
       workerSkills: d.workerSkills ?? stored.workerSkills ?? [],
     };

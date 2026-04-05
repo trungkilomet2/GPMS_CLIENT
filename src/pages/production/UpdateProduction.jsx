@@ -140,7 +140,7 @@ export default function UpdateProduction() {
       pStartDate: payload.startDate || payload.pStartDate || order.startDate || "",
       pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
       pmId: payload.pm?.id ?? payload.pmId ?? null,
-      pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
+      pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `Người Quản lý #${payload.pmId}` : (payload.pm?.id ? `Người Quản lý #${payload.pm.id}` : "")),
       note: payload.note ?? payload.productionNote ?? "",
       order: {
         ...order,
@@ -180,14 +180,12 @@ export default function UpdateProduction() {
           setProduction(normalized);
           return;
         }
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
-        if (!fallback) setProductionError(`Không tìm thấy đơn sản xuất #${id}.`);
+        setProduction(null);
+        setProductionError(`Không tìm thấy đơn sản xuất #${id}.`);
       } catch (_err) {
         if (!active) return;
         setProductionError("Không thể tải thông tin đơn sản xuất.");
-        const fallback = MOCK_PRODUCTIONS.find((item) => String(item.productionId) === String(id)) || null;
-        setProduction(fallback);
+        setProduction(null);
       } finally {
         if (active) setLoadingProduction(false);
       }
@@ -267,7 +265,7 @@ export default function UpdateProduction() {
 
   const validate = () => {
     const nextErrors = {};
-    if (!form.pmId) nextErrors.pmId = "Vui lòng chọn PM quản lý.";
+    if (!form.pmId) nextErrors.pmId = "Vui lòng chọn Người quản lý.";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -290,10 +288,10 @@ export default function UpdateProduction() {
     try {
       setIsSubmitting(true);
       await ProductionService.updateProductionPm(production.productionId, form.pmId);
-      toast.success("Cập nhật PM quản lý thành công!");
+      toast.success("Cập nhật Người quản lý thành công!");
       navigate(`/production/${production.productionId}`);
     } catch (_err) {
-      toast.error("Không thể cập nhật PM quản lý.");
+      toast.error("Không thể cập nhật Người quản lý.");
     } finally {
       setIsSubmitting(false);
     }
@@ -315,7 +313,7 @@ export default function UpdateProduction() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   Cập nhật đơn sản xuất cho đơn hàng #{order?.id ?? "--"}
                 </h1>
-                <p className="text-slate-600">Thiết lập PM quản lý cho đơn sản xuất.</p>
+                <p className="text-slate-600">Thiết lập Người quản lý cho đơn sản xuất.</p>
               </div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -333,7 +331,7 @@ export default function UpdateProduction() {
 
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">PM quản lý</label>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Người quản lý</label>
                     <select
                       name="pmId"
                       value={form.pmId}
@@ -341,10 +339,10 @@ export default function UpdateProduction() {
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                       disabled={loadingPM}
                     >
-                      <option value="">{loadingPM ? "Đang tải danh sách PM..." : "Chọn PM"}</option>
+                      <option value="">{loadingPM ? "Đang tải danh sách Người quản lý..." : "Chọn Người quản lý"}</option>
                       {pmUsers.map((pm) => (
                         <option key={pm.id} value={pm.id}>
-                          {pm.fullName || pm.userName || `PM #${pm.id}`}
+                          {pm.fullName || pm.userName || `Người quản lý #${pm.id}`}
                         </option>
                       ))}
                     </select>
@@ -400,7 +398,7 @@ export default function UpdateProduction() {
                     )}
                   </div>
                   <div className="text-xs text-slate-500 leading-relaxed">
-                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho PM quản lý.
+                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho Người quản lý.
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">

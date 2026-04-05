@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -11,12 +11,11 @@ import {
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import {
-  EMPLOYEE_FORM_ROLE_OPTIONS,
+  EMPLOYEE_CREATE_ROLE_OPTIONS,
   SYSTEM_ROLE_IDS,
-  USER_STATUS_IDS,
-  getAllowedManagerRoles,
+  getDirectManagerRoleLabel,
   getManagerRoleHint,
-  getSystemRoleLabel,
+  isEligibleDirectManager,
   isManagerRequired,
   pickPrimarySystemRole,
 } from "@/lib/orgHierarchy";
@@ -25,8 +24,14 @@ import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerS
 import "@/styles/employee-create.css";
 
 export default function EmployeeUpdate() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
+  const backTarget = location.state?.from || "/employees";
+  const detailTarget = {
+    pathname: `/employees/${id}`,
+  };
+  const detailState = { from: backTarget };
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,7 +44,6 @@ export default function EmployeeUpdate() {
     userName: "",
     fullName: "",
     role: "PM",
-    statusId: USER_STATUS_IDS.Active,
     managerId: "",
   });
 
@@ -55,9 +59,8 @@ export default function EmployeeUpdate() {
       try {
         const [employee, managerResponse] = await Promise.all([
           WorkerService.getEmployeeById(id),
-          WorkerService.getEmployeeDirectory({
+          WorkerService.getManagerDirectory({
             pageSize: 100,
-            includeHidden: true,
           }),
         ]);
 
@@ -77,7 +80,6 @@ export default function EmployeeUpdate() {
           userName: employee.userName || "",
           fullName: employee.fullName || "",
           role: pickPrimarySystemRole(employee.role) || "PM",
-          statusId: employee.statusId ?? USER_STATUS_IDS.Active,
           managerId: employee.managerId != null ? String(employee.managerId) : "",
         });
       } catch (err) {
@@ -103,19 +105,11 @@ export default function EmployeeUpdate() {
     };
   }, [id]);
 
-  const allowedManagerRoles = useMemo(
-    () => getAllowedManagerRoles(form.role),
-    [form.role]
-  );
-
   const availableManagers = useMemo(
     () =>
-      managerOptions.filter((employee) =>
-        employee.roles.some((role) => allowedManagerRoles.includes(role))
-      ),
-    [allowedManagerRoles, managerOptions]
+      managerOptions.filter((employee) => isEligibleDirectManager(employee, form.role)),
+    [form.role, managerOptions]
   );
-
   useEffect(() => {
     if (!form.managerId) return;
 
@@ -180,13 +174,11 @@ export default function EmployeeUpdate() {
     try {
       await WorkerService.updateEmployee(id, {
         fullName: normalizedFullName,
-        statusId: Number(form.statusId) || USER_STATUS_IDS.Active,
-        managerId: form.role === "Owner" ? null : Number(form.managerId),
+        managerId: Number(form.managerId),
         roleIds: [SYSTEM_ROLE_IDS[form.role]],
-        workerRoleIds: [],
       });
 
-      navigate(`/employees/${id}`);
+      navigate(detailTarget.pathname, { state: detailState });
     } catch (err) {
       setSubmitError(
         getEmployeeModuleErrorMessage(
@@ -205,18 +197,22 @@ export default function EmployeeUpdate() {
         <div className="employee-create-shell mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-create-hero">
             <div className="employee-create-hero__heading">
-              <Link to={`/employees/${id}`} className="employee-create-hero__back">
+              <Link to={detailTarget.pathname} state={detailState} className="employee-create-hero__back">
                 <ArrowLeft size={20} />
                 <span>Quay lại chi tiết</span>
               </Link>
               <h1 className="employee-create-hero__title">Cập nhật thông tin nhân viên</h1>
               <p className="employee-create-hero__subtitle">
-                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo hierarchy Owner / PM / Worker.
+                Cập nhật hồ sơ nhân sự và gán lại đúng quản lý trực tiếp theo sơ đồ Chủ xưởng / Quản lý sản xuất / Nhân viên.
               </p>
             </div>
 
             <div className="employee-create-hero__actions">
-              <button type="button" className="employee-create-btn employee-create-btn--ghost" onClick={() => navigate(`/employees/${id}`)}>
+              <button
+                type="button"
+                className="employee-create-btn employee-create-btn--ghost"
+                onClick={() => navigate(detailTarget.pathname, { state: detailState })}
+              >
                 Hủy
               </button>
               <button
@@ -272,7 +268,7 @@ export default function EmployeeUpdate() {
                     <span className="employee-create-field__label">Vai trò hệ thống</span>
                     <ShieldCheck size={18} className="employee-create-field__icon" />
                     <select value={form.role} onChange={handleChange("role")} className="employee-create-field__control">
-                      {EMPLOYEE_FORM_ROLE_OPTIONS.map((roleOption) => (
+                      {EMPLOYEE_CREATE_ROLE_OPTIONS.map((roleOption) => (
                         <option key={roleOption.value} value={roleOption.value}>
                           {roleOption.label}
                         </option>
@@ -288,20 +284,18 @@ export default function EmployeeUpdate() {
                       value={form.managerId}
                       onChange={handleChange("managerId")}
                       className="employee-create-field__control"
-                      disabled={form.role === "Owner" || managerLoading}
+                      disabled={managerLoading}
                     >
                       <option value="">
-                        {form.role === "Owner"
-                          ? "Owner không có quản lý trực tiếp"
-                          : managerLoading
-                            ? "Đang tải danh sách quản lý..."
-                            : availableManagers.length
-                              ? "Chọn quản lý trực tiếp"
-                              : "Chưa có quản lý phù hợp"}
+                        {managerLoading
+                          ? "Đang tải danh sách quản lý..."
+                          : availableManagers.length
+                            ? "Chọn quản lý trực tiếp"
+                            : "Chưa có quản lý phù hợp"}
                       </option>
                       {availableManagers.map((manager) => (
                         <option key={manager.id} value={manager.id}>
-                          {manager.fullName} - {getSystemRoleLabel(manager.primarySystemRole || manager.roles[0] || "")}
+                          {manager.fullName} - {getDirectManagerRoleLabel(manager, form.role)}
                         </option>
                       ))}
                     </select>
@@ -313,10 +307,10 @@ export default function EmployeeUpdate() {
                 {form.role === "Worker" ? (
                   <div className="employee-create-banner">
                     <span>
-                      Chuyên môn của worker đã được tách sang màn riêng để hỗ trợ chọn nhiều skill cùng lúc.
+                      Chuyên môn của nhân viên đã được tách sang màn riêng để hỗ trợ chọn nhiều chuyên môn cùng lúc.
                       {" "}
                       <Link to={`/employees/${id}/skills`} className="employee-create-inline-link">
-                        Mở màn gán skill
+                        Mở màn gán chuyên môn
                       </Link>
                     </span>
                   </div>
