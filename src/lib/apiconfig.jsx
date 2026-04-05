@@ -9,7 +9,7 @@
 
 //TrungNT chang 03-04-26
 //Ngrok build production
-const BASE_URL = 'https://semibaldly-choppiest-sarai.ngrok-free.dev';
+const BASE_URL = 'https://clever-friends-itch.loca.lt';
 
 // const BASE_URL = 'https://localhost:7096';
 // const BASE_URL = '';
