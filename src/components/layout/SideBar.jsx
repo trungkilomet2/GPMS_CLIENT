@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Users,
   Wallet,
+  X,
 } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
@@ -66,9 +67,13 @@ function getInitials(name = "") {
     .toUpperCase();
 }
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [isMobileViewport, setIsMobileViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= 768;
+  });
   const [collapsed, setCollapsed] = useState(() => {
     try {
       const raw = localStorage.getItem("gpms-sidebar-collapsed");
@@ -79,6 +84,7 @@ export default function Sidebar() {
   });
 
   const user = getStoredUser();
+  const effectiveCollapsed = collapsed && !isMobileViewport;
   const navItems = resolveSidebarItems(user).filter((item) => {
     if (item.to === "/leave") {
       return canManageLeaveRequests(user?.role);
@@ -100,29 +106,63 @@ export default function Sidebar() {
     }
   }, [collapsed]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleResize = () => {
+      setIsMobileViewport(window.innerWidth <= 768);
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
   };
 
   return (
-    <aside className={`dashboard-sidebar ${collapsed ? "is-collapsed" : ""}`} aria-expanded={!collapsed}>
+    <>
+      <div
+        className={`dashboard-sidebar__overlay ${mobileOpen ? "is-visible" : ""}`}
+        onClick={onClose}
+        aria-hidden={!mobileOpen}
+      />
+
+      <aside
+        className={`dashboard-sidebar ${effectiveCollapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
+        aria-expanded={isMobileViewport ? mobileOpen : !effectiveCollapsed}
+      >
       <div className="dashboard-sidebar__brand">
         <button
           type="button"
           className="dashboard-sidebar__logo"
-          onClick={() => setCollapsed((prev) => !prev)}
-          title={collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
+          onClick={() => {
+            if (isMobileViewport) return;
+            setCollapsed((prev) => !prev);
+          }}
+          title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
         >
           <span className="dashboard-sidebar__logo-mark">GP</span>
         </button>
 
-        {!collapsed && (
+        {!effectiveCollapsed && (
           <div className="dashboard-sidebar__brand-text">
             <div className="dashboard-sidebar__brand-title">GPMS</div>
             <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
           </div>
         )}
+
+        <button
+          type="button"
+          className="dashboard-sidebar__mobile-close"
+          onClick={onClose}
+          aria-label="Đóng menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <nav className="dashboard-sidebar__nav">
@@ -137,7 +177,7 @@ export default function Sidebar() {
                 title={label}
               >
                 {createElement(Icon, { size: 22 })}
-                {!collapsed && <span>{label}</span>}
+                {!effectiveCollapsed && <span>{label}</span>}
               </div>
             );
           }
@@ -147,6 +187,7 @@ export default function Sidebar() {
               key={to}
               to={to}
               title={label}
+              onClick={onClose}
               className={({ isActive }) => {
                 const isForcedActive = (to === "/orders/owner" && isOrdersSection) || (to === "/production" && isProductionSection);
                 const active = isActive || isForcedActive;
@@ -154,7 +195,7 @@ export default function Sidebar() {
               }}
             >
               {createElement(Icon, { size: 22 })}
-              {!collapsed && <span>{label}</span>}
+              {!effectiveCollapsed && <span>{label}</span>}
             </NavLink>
           );
         })}
@@ -164,12 +205,13 @@ export default function Sidebar() {
         <NavLink
           to="/profile"
           title="Hồ sơ cá nhân"
+          onClick={onClose}
           className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
         >
           <div className="dashboard-sidebar__avatar">
             {getInitials(user?.fullName || user?.name || "GP")}
           </div>
-          {!collapsed && (
+          {!effectiveCollapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
               <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
@@ -184,9 +226,10 @@ export default function Sidebar() {
           title="Đăng xuất"
         >
           <LogOut size={18} />
-          {!collapsed && <span>Đăng xuất</span>}
+          {!effectiveCollapsed && <span>Đăng xuất</span>}
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

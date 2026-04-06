@@ -712,3 +712,127 @@
     max-width: none;
   }
 }
+
+@media (max-width: 768px) {
+  .employee-page {
+    background:
+      radial-gradient(circle at top right, rgba(111, 222, 160, 0.14), transparent 24%),
+      linear-gradient(180deg, #f6fbf8 0 8.5rem, #f5f3ee 8.5rem 100%);
+  }
+
+  .employee-shell {
+    gap: 1rem;
+  }
+
+  .employee-filter-card,
+  .employee-table-card,
+  .employee-summary,
+  .employee-directory-row {
+    border-radius: 1.3rem;
+  }
+
+  .employee-filter-card {
+    padding: 1rem;
+  }
+
+  .employee-table-card__header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+  }
+
+  .employee-table-card__title {
+    font-size: 1rem;
+  }
+
+  .employee-table-card__subtitle {
+    font-size: 0.82rem;
+  }
+
+  .employee-hero__title {
+    font-size: 1.55rem;
+  }
+
+  .employee-hero__subtitle {
+    font-size: 0.9rem;
+  }
+
+  .employee-hero__action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .employee-filter-actions {
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .employee-filter-info,
+  .employee-filter-reset {
+    width: 100%;
+  }
+
+  .employee-table {
+    min-width: 1100px;
+    table-layout: auto;
+  }
+
+  .employee-table-th,
+  .employee-table-td {
+    white-space: nowrap;
+  }
+
+  .employee-table-th--person,
+  .employee-table-td--person {
+    min-width: 16rem;
+  }
+
+  .employee-table-th--username,
+  .employee-table-td--username {
+    min-width: 11rem;
+  }
+
+  .employee-table-th--role,
+  .employee-table-td--role {
+    min-width: 10rem;
+  }
+
+  .employee-table-th--specialty,
+  .employee-table-td--specialty {
+    min-width: 9rem;
+  }
+
+  .employee-table-th--phone,
+  .employee-table-td--phone {
+    min-width: 8.5rem;
+  }
+
+  .employee-table-th--email,
+  .employee-table-td--email {
+    min-width: 13rem;
+  }
+
+  .employee-table-th--status,
+  .employee-table-td--status {
+    min-width: 9rem;
+  }
+
+  .employee-table-th--action,
+  .employee-table-td--action {
+    min-width: 10rem;
+  }
+
+  .employee-person {
+    align-items: flex-start;
+  }
+
+  .employee-person__name,
+  .employee-person__hint,
+  .employee-role-cell__primary,
+  .employee-role-cell__secondary,
+  .employee-table-td--email {
+    white-space: normal;
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+}

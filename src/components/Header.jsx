@@ -108,7 +108,7 @@ export default function Header() {
 
           {/* Contact — chỉ hiện khi chưa login */}
           {!user && (
-            <div className="header-contact-area" style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            <div className="header-contact-area">
               {PUBLIC_SITE_CONTENT.guestHeaderActions.map((action) => (
                 <button
                   key={action.label}
@@ -126,7 +126,7 @@ export default function Header() {
           )}
 
           {/* Auth area */}
-          <div style={{ display: "flex", gap: ".8rem", alignItems: "center", marginLeft: "auto" }}>
+          <div className="header-auth-area">
 
             {user ? (
               <>

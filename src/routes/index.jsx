@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import AdminRouteGuard from "@/routes/AdminRouteGuard";
 import LeaveRouteGuard from "@/routes/LeaveRouteGuard";
+import PublicCustomerRouteGuard from "@/routes/PublicCustomerRouteGuard";
 import RoleRouteGuard from "@/routes/RoleRouteGuard";
 
 // HOMEPAGE
@@ -75,15 +76,19 @@ const guardByRoles = (allowedRoles, element) => (
   <RoleRouteGuard allowedRoles={allowedRoles}>{element}</RoleRouteGuard>
 );
 
+const guardPublicCustomer = (element) => (
+  <PublicCustomerRouteGuard>{element}</PublicCustomerRouteGuard>
+);
+
 export const routes = [
-  { path: "/", element: <HomePage /> },
+  { path: "/", element: guardPublicCustomer(<HomePage />) },
 
   // HOMEPAGE
-  { path: "/home", element: <HomePage /> },
-  { path: "/about", element: <AboutPage /> },
-  { path: "/services", element: <ServicesPage /> },
-  { path: "/factory", element: <FactoryPage /> },
-  { path: "/contact", element: <ContactPage /> },
+  { path: "/home", element: guardPublicCustomer(<HomePage />) },
+  { path: "/about", element: guardPublicCustomer(<AboutPage />) },
+  { path: "/services", element: guardPublicCustomer(<ServicesPage />) },
+  { path: "/factory", element: guardPublicCustomer(<FactoryPage />) },
+  { path: "/contact", element: guardPublicCustomer(<ContactPage />) },
   { path: "/dashboard", element: guardByRoles(["Owner"], <InternalDashboard />) },
 
   // AUTH
