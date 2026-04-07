@@ -9,7 +9,7 @@
 
 //TrungNT chang 03-04-26
 //Ngrok build production
-const BASE_URL = 'https://fifty-toes-move.loca.lt';
+const BASE_URL = 'https://quiet-olives-boil.loca.lt';
 
 // const BASE_URL = 'https://localhost:7096';
 // const BASE_URL = '';
