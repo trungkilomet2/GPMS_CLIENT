@@ -11,6 +11,10 @@ const BASE_URL = 'http://26.93.63.192:8000';
 // const BASE_URL = '';
 
 export const API_ENDPOINTS = {
+  AI: {
+    GEMINI_CHAT: `${BASE_URL}/ai/gemini/chat`,
+  },
+
   ACCOUNT: {
     LOGIN: `${BASE_URL}/api/Account/login`,
     REGISTER: `${BASE_URL}/api/Account/register`,

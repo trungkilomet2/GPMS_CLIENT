@@ -1,29 +1,311 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Bot, MessageSquare, SendHorizonal, Sparkles, X } from "lucide-react";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
+import { sendGpmsAiPrompt } from "@/services/AiChatService";
+import "@/styles/chat-widget.css";
 
-const CHATIVE_SCRIPT_ID = 'chative-messenger-script';
-const CHATIVE_SCRIPT_SRC =
-  'https://messenger.svc.chative.io/static/v1.0/channels/s90b3b96e-842b-47ac-9482-1335b0ea5141/messenger.js?mode=livechat';
+const STORAGE_KEY = "gpms-ai-chat-open";
+const CHAT_MODES = {
+  customer: {
+    eyebrow: "Hỗ trợ khách hàng",
+    title: "Trợ lý AI cho đơn hàng và hồ sơ",
+    launcherLabel: "Hỏi trợ lý",
+    placeholder: "Nhập câu hỏi về đơn hàng, hồ sơ hoặc cách dùng GPMS...",
+    sendingLabel: "Đang xử lý câu hỏi của bạn...",
+    assistantLabel: "Trợ lý khách hàng",
+    quickPrompts: [
+      "Hướng dẫn tạo đơn hàng mới",
+      "Cách theo dõi trạng thái đơn hàng",
+      "Cách cập nhật hồ sơ của tôi",
+    ],
+    buildGreeting(user) {
+      const name = user?.fullName || user?.name || "bạn";
+      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ khách hàng trên GPMS. Bạn có thể hỏi cách tạo đơn hàng, theo dõi trạng thái đơn, cập nhật hồ sơ hoặc thao tác trên màn hình hiện tại.`;
+    },
+  },
+  owner: {
+    eyebrow: "Hỗ trợ quản lý",
+    title: "Trợ lý AI cho chủ xưởng và quản lý",
+    launcherLabel: "AI quản lý",
+    placeholder: "Nhập câu hỏi về nhân sự, sản xuất, nghỉ phép hoặc cách dùng hệ thống...",
+    sendingLabel: "Đang phân tích yêu cầu quản lý của bạn...",
+    assistantLabel: "Trợ lý quản lý",
+    quickPrompts: [
+      "Cách thêm nhân viên mới",
+      "Hướng dẫn gán chuyên môn cho thợ",
+      "Cách kiểm tra đơn nghỉ phép",
+    ],
+    buildGreeting(user) {
+      const name = user?.fullName || user?.name || "bạn";
+      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ quản lý GPMS cho chủ xưởng và quản lý sản xuất. Bạn có thể hỏi về nhân sự, chuyên môn thợ, nghỉ phép, kế hoạch sản xuất hoặc cách dùng hệ thống ở màn hình hiện tại.`;
+    },
+  },
+  operations: {
+    eyebrow: "Hỗ trợ thao tác",
+    title: "Trợ lý AI cho sản xuất và công việc hằng ngày",
+    launcherLabel: "AI hỗ trợ",
+    placeholder: "Nhập câu hỏi về công việc được giao, báo cáo, sản lượng hoặc thao tác trên hệ thống...",
+    sendingLabel: "Đang xử lý yêu cầu thao tác của bạn...",
+    assistantLabel: "Trợ lý thao tác",
+    quickPrompts: [
+      "Cách xem việc được giao hôm nay",
+      "Hướng dẫn báo cáo sản lượng",
+      "Cách xem lịch sử đơn nghỉ",
+    ],
+    buildGreeting(user) {
+      const name = user?.fullName || user?.name || "bạn";
+      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ thao tác trên GPMS cho tổ trưởng, công nhân và bộ phận kiểm soát chất lượng. Bạn có thể hỏi về công việc được giao, báo cáo, đơn nghỉ hoặc cách thao tác trên màn hình hiện tại.`;
+    },
+  },
+};
+
+function resolveChatMode(user) {
+  if (!user) return "customer";
+
+  const primaryRole = getPrimaryWorkspaceRole(user.role);
+  if (primaryRole === "customer" || primaryRole === "guest") {
+    return "customer";
+  }
+
+  if (["owner", "pm", "admin", "manager"].includes(primaryRole)) {
+    return "owner";
+  }
+
+  return "operations";
+}
+
+function normalizeHistory(messages) {
+  return messages
+    .filter((item) => item.role === "user" || item.role === "assistant")
+    .map(({ role, content }) => ({ role, content }));
+}
 
 export default function ChatWidget() {
+  const user = useMemo(() => getStoredUser(), []);
+  const canShowChat = useMemo(() => {
+    if (!user) return true;
+
+    return hasAnyRole(splitRoles(user.role), [
+      "customer",
+      "admin",
+      "owner",
+      "pm",
+      "project manager",
+      "team leader",
+      "teamleader",
+      "worker",
+      "sewer",
+      "tailor",
+      "kcs",
+      "qc",
+      "quality control",
+    ]);
+  }, [user]);
+  const chatMode = useMemo(() => resolveChatMode(user), [user]);
+  const chatConfig = CHAT_MODES[chatMode];
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(STORAGE_KEY) === "true";
+  });
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [messages, setMessages] = useState(() => [
+    {
+      id: "assistant-greeting",
+      role: "assistant",
+      content: CHAT_MODES[resolveChatMode(getStoredUser())].buildGreeting(getStoredUser()),
+    },
+  ]);
+  const bodyRef = useRef(null);
+
   useEffect(() => {
-    if (typeof document === 'undefined') {
-      return undefined;
-    }
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEY, String(open));
+  }, [open]);
 
-    const existingScript = document.getElementById(CHATIVE_SCRIPT_ID);
-    if (existingScript) {
-      return undefined;
-    }
+  useEffect(() => {
+    if (typeof document === "undefined") return;
 
-    const script = document.createElement('script');
-    script.id = CHATIVE_SCRIPT_ID;
-    script.src = CHATIVE_SCRIPT_SRC;
-    script.defer = true;
-    script.async = true;
-    document.body.appendChild(script);
+    const removableNodes = [
+      document.getElementById("chative-messenger-script"),
+      document.getElementById("mtcContainer"),
+      document.getElementById("mtcLauncher"),
+      ...Array.from(document.querySelectorAll('script[src*="messenger.svc.chative.io"]')),
+      ...Array.from(document.querySelectorAll('script[src*="chative.io"]')),
+      ...Array.from(document.querySelectorAll('[class*="chative"]')),
+      ...Array.from(document.querySelectorAll('[id*="chative"]')),
+    ].filter(Boolean);
 
-    return undefined;
+    removableNodes.forEach((node) => node.remove());
   }, []);
 
-  return null;
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body) return;
+    body.scrollTop = body.scrollHeight;
+  }, [messages, open]);
+
+  useEffect(() => {
+    setMessages([
+      {
+        id: `assistant-greeting-${chatMode}`,
+        role: "assistant",
+        content: chatConfig.buildGreeting(user),
+      },
+    ]);
+  }, [chatConfig, chatMode, user]);
+
+  if (!canShowChat) {
+    return null;
+  }
+
+  async function handleSend(promptText) {
+    const message = String(promptText ?? input).trim();
+    if (!message || sending) return;
+
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: message,
+    };
+
+    const nextMessages = [...messages, userMessage];
+    setMessages(nextMessages);
+    setInput("");
+    setSending(true);
+
+    try {
+      const reply = await sendGpmsAiPrompt({
+        message,
+        history: normalizeHistory(nextMessages),
+        user,
+        pathname: typeof window !== "undefined" ? window.location.pathname : "",
+        assistantMode: chatMode,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: reply,
+        },
+      ]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: "assistant",
+          tone: "error",
+          content:
+            error?.message ||
+            "Hiện chưa thể kết nối trợ lý AI. Bạn kiểm tra lại cấu hình API hoặc thử lại sau.",
+        },
+      ]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="gpms-chat-widget">
+      {open ? (
+        <section className="gpms-chat-panel" aria-label="Trợ lý AI GPMS">
+          <header className="gpms-chat-panel__header">
+            <div className="gpms-chat-panel__title-wrap">
+              <div className="gpms-chat-panel__badge">
+                <Bot size={18} />
+              </div>
+              <div>
+                <div className="gpms-chat-panel__eyebrow">{chatConfig.eyebrow}</div>
+                <h2 className="gpms-chat-panel__title">{chatConfig.title}</h2>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="gpms-chat-panel__icon-btn"
+              onClick={() => setOpen(false)}
+              aria-label="Đóng khung chat"
+            >
+              <X size={18} />
+            </button>
+          </header>
+
+          <div className="gpms-chat-panel__prompts">
+            {chatConfig.quickPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                className="gpms-chat-panel__prompt"
+                onClick={() => handleSend(prompt)}
+                disabled={sending}
+              >
+                <Sparkles size={14} />
+                <span>{prompt}</span>
+              </button>
+            ))}
+          </div>
+
+          <div ref={bodyRef} className="gpms-chat-panel__body">
+            {messages.map((message) => (
+              <article
+                key={message.id}
+                className={`gpms-chat-message gpms-chat-message--${message.role}${
+                  message.tone === "error" ? " is-error" : ""
+                }`}
+              >
+                <div className="gpms-chat-message__label">
+                  {message.role === "assistant" ? chatConfig.assistantLabel : "Bạn"}
+                </div>
+                <div className="gpms-chat-message__content">{message.content}</div>
+              </article>
+            ))}
+
+            {sending ? (
+              <article className="gpms-chat-message gpms-chat-message--assistant">
+                <div className="gpms-chat-message__label">{chatConfig.assistantLabel}</div>
+                <div className="gpms-chat-message__content">{chatConfig.sendingLabel}</div>
+              </article>
+            ) : null}
+          </div>
+
+          <form
+            className="gpms-chat-panel__composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              handleSend();
+            }}
+          >
+            <textarea
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              className="gpms-chat-panel__input"
+              placeholder={chatConfig.placeholder}
+              rows={3}
+            />
+            <button
+              type="submit"
+              className="gpms-chat-panel__send"
+              disabled={!input.trim() || sending}
+            >
+              <SendHorizonal size={16} />
+              <span>Gửi</span>
+            </button>
+          </form>
+        </section>
+      ) : null}
+
+      <button
+        type="button"
+        className="gpms-chat-launcher"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={open ? "Ẩn trợ lý AI GPMS" : "Mở trợ lý AI GPMS"}
+      >
+        <MessageSquare size={20} />
+        <span>{chatConfig.launcherLabel}</span>
+      </button>
+    </div>
+  );
 }

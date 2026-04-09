@@ -247,9 +247,6 @@ export default function CustomerManagement() {
                 <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-[2.6rem]">
                   Khách hàng và đơn hàng trong một màn hình
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/85 sm:text-base">
-                  Tra cứu nhanh khách hàng, xem thông tin liên hệ và theo dõi toàn bộ đơn hàng liên quan mà không phải chuyển màn liên tục.
-                </p>
               </div>
               <div className="grid gap-3 text-sm md:grid-cols-3 xl:min-w-[34rem]">
                 <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
