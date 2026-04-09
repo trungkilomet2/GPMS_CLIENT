@@ -321,21 +321,30 @@ export const authService = {
   },
 
   async requestPasswordReset(payload) {
-    const endpoint = API_ENDPOINTS.ACCOUNT.FORGOT_PASSWORD;
-
-    if (!endpoint) {
-      return {
-        success: true,
-        email: payload.email,
-      };
-    }
-
-    const res = await fetch(endpoint, {
+    const res = await fetch(API_ENDPOINTS.ACCOUNT.FORGOT_PASSWORD, {
       method: "POST",
       credentials: "omit",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: payload.email,
+      }),
+    });
+
+    const data = await parseResponsePayload(res);
+    if (!res.ok) throw { response: { data } };
+    return data;
+  },
+
+  async resetPassword(payload) {
+    const res = await fetch(API_ENDPOINTS.ACCOUNT.RESET_PASSWORD, {
+      method: "POST",
+      credentials: "omit",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: payload.email,
+        otp: payload.otp,
+        newPassword: payload.newPassword,
+        confirmPassword: payload.confirmPassword,
       }),
     });
 

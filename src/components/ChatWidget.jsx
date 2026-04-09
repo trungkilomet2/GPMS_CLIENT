@@ -81,6 +81,31 @@ function normalizeHistory(messages) {
     .map(({ role, content }) => ({ role, content }));
 }
 
+function streamReplyText(text, onChunk) {
+  return new Promise((resolve) => {
+    const content = String(text ?? "");
+    if (!content) {
+      resolve();
+      return;
+    }
+
+    let index = 0;
+    const step = () => {
+      index = Math.min(index + 3, content.length);
+      onChunk(content.slice(0, index));
+
+      if (index >= content.length) {
+        resolve();
+        return;
+      }
+
+      window.setTimeout(step, 16);
+    };
+
+    step();
+  });
+}
+
 export default function ChatWidget() {
   const user = useMemo(() => getStoredUser(), []);
   const canShowChat = useMemo(() => {
@@ -110,6 +135,7 @@ export default function ChatWidget() {
   });
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [isStreamingReply, setIsStreamingReply] = useState(false);
   const [messages, setMessages] = useState(() => [
     {
       id: "assistant-greeting",
@@ -162,7 +188,7 @@ export default function ChatWidget() {
 
   async function handleSend(promptText) {
     const message = String(promptText ?? input).trim();
-    if (!message || sending) return;
+    if (!message || sending || isStreamingReply) return;
 
     const userMessage = {
       id: `user-${Date.now()}`,
@@ -184,14 +210,30 @@ export default function ChatWidget() {
         assistantMode: chatMode,
       });
 
+      const assistantId = `assistant-${Date.now()}`;
+
+      setIsStreamingReply(true);
       setMessages((prev) => [
         ...prev,
         {
-          id: `assistant-${Date.now()}`,
+          id: assistantId,
           role: "assistant",
-          content: reply,
+          content: "",
         },
       ]);
+
+      await streamReplyText(reply, (partialContent) => {
+        setMessages((prev) =>
+          prev.map((item) =>
+            item.id === assistantId
+              ? {
+                  ...item,
+                  content: partialContent,
+                }
+              : item
+          )
+        );
+      });
     } catch (error) {
       setMessages((prev) => [
         ...prev,
@@ -206,11 +248,12 @@ export default function ChatWidget() {
       ]);
     } finally {
       setSending(false);
+      setIsStreamingReply(false);
     }
   }
 
   return (
-    <div className="gpms-chat-widget">
+    <div className={`gpms-chat-widget${open ? " is-open" : ""}`}>
       {open ? (
         <section className="gpms-chat-panel" aria-label="Trợ lý AI GPMS">
           <header className="gpms-chat-panel__header">
@@ -263,12 +306,6 @@ export default function ChatWidget() {
               </article>
             ))}
 
-            {sending ? (
-              <article className="gpms-chat-message gpms-chat-message--assistant">
-                <div className="gpms-chat-message__label">{chatConfig.assistantLabel}</div>
-                <div className="gpms-chat-message__content">{chatConfig.sendingLabel}</div>
-              </article>
-            ) : null}
           </div>
 
           <form
@@ -281,6 +318,12 @@ export default function ChatWidget() {
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  handleSend();
+                }
+              }}
               className="gpms-chat-panel__input"
               placeholder={chatConfig.placeholder}
               rows={3}
@@ -288,7 +331,7 @@ export default function ChatWidget() {
             <button
               type="submit"
               className="gpms-chat-panel__send"
-              disabled={!input.trim() || sending}
+              disabled={!input.trim() || sending || isStreamingReply}
             >
               <SendHorizonal size={16} />
               <span>Gửi</span>
@@ -297,15 +340,17 @@ export default function ChatWidget() {
         </section>
       ) : null}
 
-      <button
-        type="button"
-        className="gpms-chat-launcher"
-        onClick={() => setOpen((value) => !value)}
-        aria-label={open ? "Ẩn trợ lý AI GPMS" : "Mở trợ lý AI GPMS"}
-      >
-        <MessageSquare size={20} />
-        <span>{chatConfig.launcherLabel}</span>
-      </button>
+      {!open ? (
+        <button
+          type="button"
+          className="gpms-chat-launcher"
+          onClick={() => setOpen(true)}
+          aria-label="Mở trợ lý AI GPMS"
+        >
+          <MessageSquare size={20} />
+          <span>{chatConfig.launcherLabel}</span>
+        </button>
+      ) : null}
     </div>
   );
 }

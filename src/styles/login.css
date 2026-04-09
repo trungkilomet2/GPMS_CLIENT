@@ -502,6 +502,16 @@ body{
   margin-top:8px;
 }
 
+.forgot-divider{
+  margin:2px 0 10px;
+  text-align:center;
+  color:#6b7280;
+  font-size:12px;
+  font-weight:700;
+  letter-spacing:0.04em;
+  text-transform:uppercase;
+}
+
 
 .input-error{
   border-color:#e53935 !important;
