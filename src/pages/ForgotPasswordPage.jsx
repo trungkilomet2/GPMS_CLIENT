@@ -26,6 +26,7 @@ export default function ForgotPasswordPage() {
   const [submittedEmail, setSubmittedEmail] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [resetSuccess, setResetSuccess] = useState("");
+  const isOtpStep = Boolean(submittedEmail);
 
   if (storedUser) {
     return <Navigate to={getPostLoginPath(storedUser?.role)} replace />;
@@ -160,6 +161,19 @@ export default function ForgotPasswordPage() {
     }
   };
 
+  const handleBackToEmailStep = () => {
+    setSubmittedEmail("");
+    setSubmitError("");
+    setResetSuccess("");
+    setErrors({});
+    setFormData((prev) => ({
+      ...prev,
+      otp: "",
+      newPassword: "",
+      confirmPassword: "",
+    }));
+  };
+
   return (
     <div className="login-container">
       <div className="login-left">
@@ -172,19 +186,17 @@ export default function ForgotPasswordPage() {
             </div>
           </div>
           <h1 className="left-heading">
-            Khôi phục tài khoản
+            Khôi phục mật khẩu
             <br />
-            nhanh và an toàn
+            trong 2 bước
           </h1>
           <p className="left-desc">
-            Nhập email đã đăng ký để nhận hướng dẫn đặt lại mật khẩu và tiếp tục truy cập hệ thống một cách an toàn.
+            Nhập email đã đăng ký, nhận OTP và đặt lại mật khẩu ngay trên cùng một màn hình.
           </p>
           <div className="features-box">
             {[
-              { icon: "📨", title: "Gửi hướng dẫn qua email", desc: "Hệ thống sẽ gửi liên kết hoặc hướng dẫn đặt lại mật khẩu đến địa chỉ đã đăng ký" },
-              { icon: "🛡", title: "Bảo vệ tài khoản", desc: "Thông báo phản hồi được giữ ở mức an toàn để tránh lộ thông tin tài khoản" },
-              { icon: "🔐", title: "Xác minh bằng OTP", desc: "Sau khi nhận mã OTP, người dùng có thể đặt lại mật khẩu ngay trên cùng màn hình" },
-              { icon: "⚡", title: "Khôi phục nhanh chóng", desc: "Toàn bộ thao tác gửi mã và đặt lại mật khẩu được xử lý trực tiếp qua API hiện tại" },
+              { icon: "📨", title: "Nhận mã OTP", desc: "Hệ thống gửi mã xác minh đến email đã đăng ký" },
+              { icon: "🔐", title: "Đặt lại ngay", desc: "Nhập OTP và mật khẩu mới để khôi phục tài khoản" },
             ].map((item) => (
               <div key={item.title} className="feature">
                 <div className="icon">{item.icon}</div>
@@ -200,7 +212,10 @@ export default function ForgotPasswordPage() {
       </div>
 
       <div className="login-right login-right--center">
-        <form className="login-card forgot-card" onSubmit={handleRequestOtp}>
+        <form
+          className="login-card forgot-card"
+          onSubmit={isOtpStep ? handleResetPassword : handleRequestOtp}
+        >
           <button
             type="button"
             className="auth-back-btn"
@@ -210,7 +225,22 @@ export default function ForgotPasswordPage() {
           </button>
 
           <h2>Quên mật khẩu</h2>
-          <p>Nhập email để nhận mã OTP và đặt lại mật khẩu</p>
+          <p>
+            {isOtpStep
+              ? "Nhập mã OTP và mật khẩu mới để hoàn tất khôi phục."
+              : "Bước 1: Nhập email để nhận mã OTP."}
+          </p>
+
+          <div className="forgot-stepper" aria-label="Tiến trình quên mật khẩu">
+            <div className={`forgot-step ${!isOtpStep ? "is-active" : "is-complete"}`}>
+              <span>1</span>
+              <strong>Nhập email</strong>
+            </div>
+            <div className={`forgot-step ${isOtpStep ? "is-active" : ""}`}>
+              <span>2</span>
+              <strong>Đặt lại mật khẩu</strong>
+            </div>
+          </div>
 
           {submittedEmail ? (
             <div className="forgot-success" role="status">
@@ -238,6 +268,7 @@ export default function ForgotPasswordPage() {
               onChange={handleChange}
               placeholder="Nhập email của bạn"
               className={errors.email ? "input-error" : ""}
+              disabled={isOtpStep}
             />
           </div>
           <p className={`error-text error-text--slot ${errors.email ? "" : "error-text--empty"}`}>
@@ -248,65 +279,84 @@ export default function ForgotPasswordPage() {
             <p className="error-text">{submitError}</p>
           ) : null}
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? "Đang gửi mã OTP..." : "Gửi mã OTP"}
-          </button>
+          {isOtpStep ? (
+            <>
+              <div className="forgot-inline-actions">
+                <button
+                  type="button"
+                  className="forgot-link-btn"
+                  onClick={handleBackToEmailStep}
+                  disabled={loading}
+                >
+                  Đổi email khác
+                </button>
+                <button
+                  type="button"
+                  className="forgot-link-btn"
+                  onClick={handleRequestOtp}
+                  disabled={loading}
+                >
+                  Gửi lại OTP
+                </button>
+              </div>
 
-          <div className="forgot-divider">Hoặc đặt lại mật khẩu ngay</div>
+              <label className="field-label">Mã OTP</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🔐</span>
+                <input
+                  type="text"
+                  name="otp"
+                  value={formData.otp}
+                  onChange={handleChange}
+                  placeholder="Nhập mã OTP"
+                  className={errors.otp ? "input-error" : ""}
+                />
+              </div>
+              <p className={`error-text error-text--slot ${errors.otp ? "" : "error-text--empty"}`}>
+                {errors.otp || ""}
+              </p>
 
-          <div className="input-wrapper">
-            <span className="input-icon">🔐</span>
-            <input
-              type="text"
-              name="otp"
-              value={formData.otp}
-              onChange={handleChange}
-              placeholder="Nhập mã OTP"
-              className={errors.otp ? "input-error" : ""}
-            />
-          </div>
-          <p className={`error-text error-text--slot ${errors.otp ? "" : "error-text--empty"}`}>
-            {errors.otp || ""}
-          </p>
+              <label className="field-label">Mật khẩu mới</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🔒</span>
+                <input
+                  type="password"
+                  name="newPassword"
+                  value={formData.newPassword}
+                  onChange={handleChange}
+                  placeholder="Nhập mật khẩu mới"
+                  className={errors.newPassword ? "input-error" : ""}
+                />
+              </div>
+              <p className={`error-text error-text--slot ${errors.newPassword ? "" : "error-text--empty"}`}>
+                {errors.newPassword || ""}
+              </p>
 
-          <div className="input-wrapper">
-            <span className="input-icon">🔒</span>
-            <input
-              type="password"
-              name="newPassword"
-              value={formData.newPassword}
-              onChange={handleChange}
-              placeholder="Mật khẩu mới"
-              className={errors.newPassword ? "input-error" : ""}
-            />
-          </div>
-          <p className={`error-text error-text--slot ${errors.newPassword ? "" : "error-text--empty"}`}>
-            {errors.newPassword || ""}
-          </p>
+              <label className="field-label">Xác nhận mật khẩu mới</label>
+              <div className="input-wrapper">
+                <span className="input-icon">🔒</span>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="Nhập lại mật khẩu mới"
+                  className={errors.confirmPassword ? "input-error" : ""}
+                />
+              </div>
+              <p className={`error-text error-text--slot ${errors.confirmPassword ? "" : "error-text--empty"}`}>
+                {errors.confirmPassword || ""}
+              </p>
 
-          <div className="input-wrapper">
-            <span className="input-icon">🔒</span>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              placeholder="Xác nhận mật khẩu mới"
-              className={errors.confirmPassword ? "input-error" : ""}
-            />
-          </div>
-          <p className={`error-text error-text--slot ${errors.confirmPassword ? "" : "error-text--empty"}`}>
-            {errors.confirmPassword || ""}
-          </p>
-
-          <button
-            type="button"
-            className="login-btn"
-            disabled={loading}
-            onClick={handleResetPassword}
-          >
-            {loading ? "Đang đặt lại mật khẩu..." : "Đặt lại mật khẩu"}
-          </button>
+              <button type="submit" className="login-btn" disabled={loading}>
+                {loading ? "Đang đặt lại mật khẩu..." : "Đặt lại mật khẩu"}
+              </button>
+            </>
+          ) : (
+            <button type="submit" className="login-btn" disabled={loading}>
+              {loading ? "Đang gửi mã OTP..." : "Gửi mã OTP"}
+            </button>
+          )}
 
           <div className="register-row">
             Nhớ lại mật khẩu? <Link to="/login">Đăng nhập</Link>
@@ -314,7 +364,6 @@ export default function ForgotPasswordPage() {
         </form>
       </div>
 
-      <div className="footer-text">© 2024 GarmentPro. Bảo lưu mọi quyền.</div>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { getStoredUser } from "@/lib/authStorage";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
+import WorkerService from "@/services/WorkerService";
 import "@/styles/leave.css";
 
 const MAX_REVIEW_REASON_LENGTH = 100;
@@ -68,20 +69,31 @@ function StatusBadge({ status }) {
 
 function DetailItem({ icon, label, value }) {
   const Icon = icon;
+  const hasValue = Boolean(value);
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+    <div className={`leave-detail-item rounded-xl border border-slate-200 p-3 ${hasValue ? "bg-slate-50" : "bg-white"}`}>
+      <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         <Icon size={13} />
         {label}
       </div>
-      <div className="text-[13px] font-medium leading-5 text-slate-800">{value || "Chưa cập nhật"}</div>
+      <div className={`text-[13px] font-medium leading-5 ${hasValue ? "text-slate-800" : "text-slate-500"}`}>
+        {value || "Chưa cập nhật"}
+      </div>
     </div>
   );
 }
 
 function shouldShowApprover(leave) {
   return Boolean(leave?.approvedByName) && leave?.status !== "pending";
+}
+
+function getContactItems(employeeInfo) {
+  return [
+    { icon: Phone, label: "Số điện thoại", value: employeeInfo?.phoneNumber || "" },
+    { icon: Mail, label: "Email", value: employeeInfo?.email || "" },
+    { icon: MapPin, label: "Địa chỉ", value: employeeInfo?.location || employeeInfo?.address || "" },
+  ];
 }
 
 function getTimelineItems(leave) {
@@ -118,6 +130,7 @@ export default function LeaveDetail() {
   const { id } = useParams();
   const user = getStoredUser();
   const [leave, setLeave] = useState(location.state?.leave ?? null);
+  const [employeeInfo, setEmployeeInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -139,10 +152,19 @@ export default function LeaveDetail() {
         if (!data) {
           setError("Không tìm thấy đơn xin nghỉ.");
           setLeave(null);
+          setEmployeeInfo(null);
           return;
         }
 
         setLeave(data);
+
+        if (data?.userId) {
+          const employee = await WorkerService.getEmployeeById(data.userId).catch(() => null);
+          if (active) setEmployeeInfo(employee);
+        } else if (active) {
+          setEmployeeInfo(null);
+        }
+
         setError("");
       } catch {
         if (!active) return;
@@ -164,6 +186,7 @@ export default function LeaveDetail() {
     [leave?.status]
   );
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
+  const contactItems = useMemo(() => getContactItems(employeeInfo), [employeeInfo]);
   const hasReviewPermission = canManageLeaveRequests(user?.role);
   const canReview = hasReviewPermission && leave?.status === "pending";
   const canConfirmCancel = hasReviewPermission && leave?.status === "cancel_requested";
@@ -308,13 +331,13 @@ export default function LeaveDetail() {
             </div>
           ) : (
             <>
-          <div className="flex flex-col gap-3 rounded-[2rem] bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-5 text-white shadow-lg">
+          <div className="flex flex-col gap-3 rounded-[2rem] bg-gradient-to-r from-emerald-900 via-emerald-800 to-emerald-700 p-4 text-white shadow-lg lg:p-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/15"
                 >
                   <ArrowLeft size={16} />
                   Quay lại
@@ -322,36 +345,37 @@ export default function LeaveDetail() {
                 <div className="hidden h-7 w-px bg-white/20 sm:block" />
                 <div>
                   <div className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80">Leave Request</div>
-                  <h1 className="mt-1 text-[1.75rem] font-bold leading-tight">Chi tiết đơn xin nghỉ</h1>
+                  <h1 className="mt-1 text-[1.55rem] font-bold leading-tight lg:text-[1.75rem]">Chi tiết đơn xin nghỉ</h1>
                 </div>
               </div>
 
               <StatusBadge status={leave.status} />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 lg:grid-cols-4">
               <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người gửi</div>
-                <div className="mt-1.5 text-base font-semibold leading-snug">{leave.userFullName}</div>
-                <div className="mt-1 text-[13px] text-emerald-100/90">{statusConfig.label}</div>
+                <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{leave.userFullName}</div>
+                <div className="mt-1 text-[12px] text-emerald-100/90">{statusConfig.label}</div>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
-                <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateCreate)}</div>
+                <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{formatLeaveDateTime(leave.dateCreate)}</div>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateReply)}</div>
+                <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{formatLeaveDateTime(leave.dateReply)}</div>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                 <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
-                <div className="mt-1.5 text-base font-semibold leading-snug">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
+                <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
               </div>
-              <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 md:col-span-3">
-                <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
-                <div className="mt-1.5 text-base font-semibold leading-snug">
-                  {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
-                </div>
+            </div>
+
+            <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+              <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
+              <div className="mt-1 text-[1.05rem] font-semibold leading-snug">
+                {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
               </div>
             </div>
           </div>
@@ -498,15 +522,13 @@ export default function LeaveDetail() {
 
             <div className="space-y-5">
               <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="text-[1.1rem] font-bold text-slate-900">Thông tin người gửi</h2>
-                <div className="mt-4 grid gap-3">
-                  <DetailItem icon={UserRound} label="Họ và tên" value={leave.userFullName} />
-                  <DetailItem icon={UserRound} label="Người phê duyệt" value={shouldShowApprover(leave) ? leave.approvedByName : ""} />
-                  <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
-                  <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
-                  <DetailItem icon={Phone} label="Số điện thoại" value="" />
-                  <DetailItem icon={Mail} label="Email" value="" />
-                  <DetailItem icon={MapPin} label="Địa chỉ" value="" />
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-[1.1rem] font-bold text-slate-900">Thông tin liên hệ</h2>
+                </div>
+                <div className="leave-detail-info-grid mt-4 grid gap-3 md:grid-cols-2">
+                  {contactItems.map((item) => (
+                    <DetailItem key={item.label} icon={item.icon} label={item.label} value={item.value} />
+                  ))}
                 </div>
               </div>
 

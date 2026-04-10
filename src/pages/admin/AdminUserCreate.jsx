@@ -17,6 +17,7 @@ import AdminUserService, {
 import {
   AdminBanner,
   AdminRoleBadge,
+  getAdminPermissionSummaryText,
 } from "@/pages/admin/adminShared";
 
 export default function AdminUserCreate() {
@@ -209,7 +210,7 @@ export default function AdminUserCreate() {
                   <div className="admin-preview-list__item">
                     <strong>Phạm vi quyền</strong>
                     <span>{permissionProfile?.shortLabel || "Chưa có thông tin"}</span>
-                      <span>{permissionProfile?.permissions ? `${Object.values(permissionProfile.permissions).flatMap(Object.values).filter(Boolean).length} quyền đang được áp dụng` : "Vai trò này hiện chưa có dữ liệu quyền tương ứng"}</span>
+                    <span>{permissionProfile ? getAdminPermissionSummaryText(permissionProfile) : "Vai trò này hiện chưa có dữ liệu quyền tương ứng"}</span>
                   </div>
                   <div className="admin-preview-list__item">
                       <strong>Mô tả vai trò</strong>

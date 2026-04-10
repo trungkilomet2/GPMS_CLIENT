@@ -474,6 +474,77 @@ body{
 .forgot-card{
   display:flex;
   flex-direction:column;
+  gap:0;
+}
+
+.forgot-stepper{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:4px 0 18px;
+}
+
+.forgot-step{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid #d9e4dd;
+  background:#f8fbf9;
+  color:#5e7267;
+}
+
+.forgot-step span{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:13px;
+  font-weight:800;
+  color:#315044;
+  background:#e7f3ec;
+}
+
+.forgot-step strong{
+  font-size:13px;
+  font-weight:800;
+}
+
+.forgot-step.is-active{
+  border-color:#2d9058;
+  background:rgba(45,144,88,0.08);
+  color:#1f4d3a;
+}
+
+.forgot-step.is-complete{
+  border-color:rgba(45,144,88,0.22);
+  background:rgba(45,144,88,0.06);
+}
+
+.forgot-inline-actions{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  margin:2px 0 12px;
+}
+
+.forgot-link-btn{
+  border:none;
+  background:none;
+  color:#2d6a4f;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  padding:0;
+}
+
+.forgot-link-btn:hover{
+  color:#1f4d3a;
+  text-decoration:underline;
 }
 
 .forgot-success{
@@ -607,6 +678,10 @@ body{
     line-height:1.5;
   }
 
+  .forgot-card{
+    padding:20px 16px 18px;
+  }
+
   .field-label{
     font-size:13px;
   }
@@ -656,5 +731,17 @@ body{
     margin-top:14px;
     text-align:center;
     color:rgba(255,255,255,0.7);
+  }
+
+  .forgot-stepper{
+    grid-template-columns:1fr;
+    gap:8px;
+    margin-bottom:14px;
+  }
+
+  .forgot-inline-actions{
+    flex-wrap:wrap;
+    justify-content:flex-start;
+    gap:8px 14px;
   }
 }

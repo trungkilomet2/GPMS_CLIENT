@@ -386,7 +386,7 @@ export default function EmployeeList() {
   return (
     <DashboardLayout>
       <div className="employee-page">
-        <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
           <Link to="/employees" className="employee-back">
             <ArrowLeft size={18} />
             <span>Quay lại danh sách nhân viên</span>
@@ -410,7 +410,7 @@ export default function EmployeeList() {
             ) : null}
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
             <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
             <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Danh sách quản lý sản xuất trong xưởng" tone="warning" />

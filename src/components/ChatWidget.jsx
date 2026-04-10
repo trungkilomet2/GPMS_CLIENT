@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, MessageSquare, SendHorizonal, Sparkles, X } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
 import { sendGpmsAiPrompt } from "@/services/AiChatService";
@@ -108,6 +109,7 @@ function streamReplyText(text, onChunk) {
 
 export default function ChatWidget() {
   const user = useMemo(() => getStoredUser(), []);
+  const location = useLocation();
   const canShowChat = useMemo(() => {
     if (!user) return true;
 
@@ -129,6 +131,7 @@ export default function ChatWidget() {
   }, [user]);
   const chatMode = useMemo(() => resolveChatMode(user), [user]);
   const chatConfig = CHAT_MODES[chatMode];
+  const isAuthPage = ["/login", "/register", "/forgot-password"].includes(location.pathname);
   const [open, setOpen] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(STORAGE_KEY) === "true";
@@ -253,7 +256,7 @@ export default function ChatWidget() {
   }
 
   return (
-    <div className={`gpms-chat-widget${open ? " is-open" : ""}`}>
+    <div className={`gpms-chat-widget${open ? " is-open" : ""}${isAuthPage ? " is-auth-page" : ""}`}>
       {open ? (
         <section className="gpms-chat-panel" aria-label="Trợ lý AI GPMS">
           <header className="gpms-chat-panel__header">

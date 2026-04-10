@@ -1,11 +1,43 @@
 import { createElement } from "react";
 import "@/styles/admin.css";
-import {
-  ADMIN_LOG_OUTCOME_META,
-  ADMIN_LOG_SEVERITY_META,
-  ADMIN_STATUS_META,
-  countGrantedPermissions,
-} from "@/lib/admin/adminMockStore";
+
+export const ADMIN_STATUS_META = {
+  active: { label: "Đang hoạt động" },
+  invited: { label: "Đã mời" },
+  inactive: { label: "Đã vô hiệu hóa" },
+  locked: { label: "Đã khóa" },
+  suspended: { label: "Tạm ngưng" },
+};
+
+export const ADMIN_LOG_SEVERITY_META = {
+  info: { label: "Thông tin", tone: "info" },
+  success: { label: "Thành công", tone: "success" },
+  warning: { label: "Cảnh báo", tone: "warning" },
+  danger: { label: "Lỗi", tone: "danger" },
+};
+
+export const ADMIN_LOG_OUTCOME_META = {
+  success: { label: "Thành công", tone: "success" },
+  warning: { label: "Cần kiểm tra", tone: "warning" },
+  failure: { label: "Thất bại", tone: "danger" },
+};
+
+export function countGrantedPermissions(profile) {
+  if (!profile) return 0;
+
+  if (Number.isFinite(Number(profile.permissionCount))) {
+    return Number(profile.permissionCount);
+  }
+
+  const permissions = profile.permissions;
+  if (!permissions || typeof permissions !== "object") {
+    return 0;
+  }
+
+  return Object.values(permissions)
+    .flatMap((group) => (group && typeof group === "object" ? Object.values(group) : []))
+    .filter(Boolean).length;
+}
 
 export function getAdminInitials(name = "") {
   return name
@@ -149,6 +181,11 @@ export function AdminRoleBadge({ tone = "primary", children }) {
 }
 
 export function AdminPermissionSummary({ profile }) {
+  if (!profile) return "Chưa gán quyền";
+  return `${countGrantedPermissions(profile)} quyền đang bật`;
+}
+
+export function getAdminPermissionSummaryText(profile) {
   if (!profile) return "Chưa gán quyền";
   return `${countGrantedPermissions(profile)} quyền đang bật`;
 }

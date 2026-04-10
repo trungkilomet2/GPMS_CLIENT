@@ -55,6 +55,18 @@
   letter-spacing: -0.03em;
 }
 
+.leave-detail-info-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.leave-detail-item {
+  min-height: 0;
+}
+
+.leave-detail-item .text-slate-500 {
+  color: #74867d;
+}
+
 .leave-table-card__header {
   display: flex;
   align-items: center;
@@ -177,6 +189,10 @@
     white-space: normal;
     overflow-wrap: break-word;
     word-break: keep-all;
+  }
+
+  .leave-detail-info-grid {
+    grid-template-columns: 1fr;
   }
 }
 
