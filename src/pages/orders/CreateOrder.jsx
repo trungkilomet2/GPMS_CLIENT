@@ -71,16 +71,71 @@ export default function CreateOrder() {
     userId,
     image: '',
     orderName: '',
-    type: '',
     size: '',
     color: '',
     startDate: new Date().toLocaleDateString('sv-SE'),
     endDate: new Date().toLocaleDateString('sv-SE'),
-    quantity: '',
+    quantity: 0,
     cpu: '',
     note: '',
     status: 'Chờ xét duyệt',
   });
+
+  const [variants, setVariants] = useState([
+    { id: 1, color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+  ]);
+
+  useEffect(() => {
+    const total = variants.reduce((acc, v) => {
+      const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      return acc + sum;
+    }, 0);
+    setOrderData(prev => ({ ...prev, quantity: total }));
+  }, [variants]);
+
+  const handleAddVariant = () => {
+    setVariants(prev => [
+      ...prev,
+      { id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+    ]);
+  };
+
+  const handleRemoveVariant = (index) => {
+    if (variants.length <= 1) return;
+    setDeleteConfirm({
+      show: true,
+      type: 'variant',
+      index: index,
+      title: 'Xóa phối màu',
+      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các size của phối màu này sẽ bị mất.'
+    });
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    
+    // Clear global variants error if any
+    if (errors.variantsGlobal) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.variantsGlobal;
+        return next;
+      });
+    }
+    // Clear specific variant error
+    if (errors.variants?.[index]?.[field]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        const nextVariantsErrors = { ...next.variants };
+        delete nextVariantsErrors[index][field];
+        if (Object.keys(nextVariantsErrors[index]).length === 0) {
+          delete nextVariantsErrors[index];
+        }
+        next.variants = nextVariantsErrors;
+        return next;
+      });
+    }
+  };
 
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,21 +178,29 @@ export default function CreateOrder() {
       newErrors.orderName = 'Tên đơn hàng không được vượt quá 100 ký tự';
     }
 
-    // TYPE: NOT NULL, NVARCHAR(50)
-    if (!orderData.type?.trim()) {
-      newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
-    } else if (orderData.type.trim().length > 50) {
-      newErrors.type = 'Loại sản phẩm không được vượt quá 50 ký tự';
+
+
+    // VARIANTS VALIDATION
+    const variantErrors = [];
+    let hasAnyQuantity = false;
+    variants.forEach((v, idx) => {
+      const vErrs = {};
+      if (!v.color?.trim()) {
+        vErrs.color = 'Vui lòng nhập tên màu';
+      }
+      const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      if (sum > 0) hasAnyQuantity = true;
+      
+      if (Object.keys(vErrs).length > 0) {
+        variantErrors[idx] = vErrs;
+      }
+    });
+
+    if (variantErrors.length > 0) {
+      newErrors.variants = variantErrors;
     }
-
-    // SIZE: CHAR(5) — dropdown nên chỉ cần bắt buộc chọn
-    if (!orderData.size?.trim()) newErrors.size = 'Vui lòng chọn kích thước';
-
-    // COLOR: NOT NULL, NVARCHAR(30)
-    if (!orderData.color?.trim()) {
-      newErrors.color = 'Màu sắc không được để trống';
-    } else if (orderData.color.trim().length > 30) {
-      newErrors.color = 'Màu sắc không được vượt quá 30 ký tự';
+    if (!hasAnyQuantity) {
+      newErrors.variantsGlobal = 'Vui lòng nhập ít nhất một kích thước có số lượng > 0';
     }
 
     // QUANTITY: INT NOT NULL, khoảng [100, 999] theo yêu cầu nghiệp vụ
@@ -494,6 +557,21 @@ export default function CreateOrder() {
           return { ...prev, materialsList: adjustedList };
         });
       }
+    } else if (type === 'variant') {
+      setVariants((prev) => prev.filter((_, i) => i !== index));
+      if (errors.variants) {
+        setErrors((prev) => {
+          const newVariants = { ...prev.variants };
+          delete newVariants[index];
+          const adjusted = {};
+          Object.keys(newVariants).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjusted[k - 1] = newVariants[key];
+            else adjusted[k] = newVariants[key];
+          });
+          return { ...prev, variants: adjusted };
+        });
+      }
     }
     setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
   };
@@ -569,13 +647,22 @@ export default function CreateOrder() {
         });
       }
 
+      // Map variants to legacy fields and metadata
+      const activeSizes = new Set();
+      const activeColors = new Set();
+      variants.forEach(v => {
+        if (v.color?.trim()) activeColors.add(v.color.trim());
+        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(s => {
+          if (v[s] > 0) activeSizes.add(s.toUpperCase());
+        });
+      });
+
       const payload = {
         userId: Number(orderData.userId ?? userId) || 0,
         image: orderImageUrl || null,
         orderName: orderData.orderName ?? '',
-        type: orderData.type ?? '',
-        size: orderData.size ?? '',
-        color: orderData.color ?? '',
+        size: Array.from(activeSizes).join(', '),
+        color: Array.from(activeColors).join(', '),
         startDate: orderData.startDate ?? '',
         endDate: orderData.endDate ?? '',
         quantity: Number(orderData.quantity) || 0,
@@ -583,6 +670,16 @@ export default function CreateOrder() {
         note: orderData.note ?? '',
         materials: materialsPayload,
         templates: templatesPayload,
+        variants: variants.map(v => ({
+          color: v.color,
+          xs: Number(v.xs) || 0,
+          s: Number(v.s) || 0,
+          m: Number(v.m) || 0,
+          l: Number(v.l) || 0,
+          xl: Number(v.xl) || 0,
+          '2xl': Number(v['2xl']) || 0,
+          '3xl': Number(v['3xl']) || 0,
+        }))
       };
       console.log('CreateOrder payload:', payload);
 
@@ -695,6 +792,10 @@ export default function CreateOrder() {
                     onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
                     editingIndex,
                   }}
+                  variants={variants}
+                  onAddVariant={handleAddVariant}
+                  onRemoveVariant={handleRemoveVariant}
+                  onVariantChange={handleVariantChange}
                 />
               </form>
             </>

@@ -36,7 +36,7 @@ export default function DesignTemplatesSection({
                 <div className="flex items-center justify-between">
                     <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{title}</h2>
                     <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                        {softTemplates.length} file
+                        {softTemplates.length} tệp
                     </span>
                 </div>
             )}
@@ -61,7 +61,7 @@ export default function DesignTemplatesSection({
                                             onClick={() => handleZoom(fileUrl)}
                                             title="Xem ảnh chi tiết"
                                         >
-                                            <img src={fileUrl} alt="thumbnail" className="w-full h-full object-cover" />
+                                            <img src={fileUrl} alt="hình thu nhỏ" className="w-full h-full object-cover" />
                                         </div>
                                     ) : (
                                         <div className="w-10 h-10 rounded-lg shrink-0 bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 mt-0.5">

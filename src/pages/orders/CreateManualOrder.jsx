@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Users, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OwnerLayout from '@/layouts/OwnerLayout';
@@ -16,23 +16,119 @@ export default function CreateManualOrder() {
   const [customerData, setCustomerData] = useState({
     customerName: '',
     customerPhone: '',
+    province: null,
+    ward: null,
+    detail: '',
     customerAddress: '',
   });
+
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+
+  // Fetch VN Provinces (v2)
+  useEffect(() => {
+    fetch('https://provinces.open-api.vn/api/v2/p/')
+      .then(res => res.json())
+      .then(data => setProvinces(data))
+      .catch(() => {});
+  }, []);
+
+  // Cascading fetch for ALL Wards in a Province (v2, Bypassing Districts)
+  useEffect(() => {
+    if (customerData.province) {
+      // In v2, depth=2 is used to get Wards directly from the Province object
+      fetch(`https://provinces.open-api.vn/api/v2/p/${customerData.province.code}?depth=2`)
+        .then(res => res.json())
+        .then(data => {
+          // In v2, 'wards' is directly a child of the province object
+          setWards(data.wards || []);
+        })
+        .catch(() => {});
+    } else {
+      setWards([]);
+    }
+  }, [customerData.province]);
+
+  // Auto-concatenate address
+  useEffect(() => {
+    const parts = [
+      customerData.detail,
+      customerData.ward?.name,
+      customerData.province?.name
+    ].filter(Boolean);
+    setCustomerData(prev => ({ ...prev, customerAddress: parts.join(', ') }));
+  }, [customerData.detail, customerData.ward, customerData.province]);
 
   const [materials, setMaterials] = useState([]);
   const [orderData, setOrderData] = useState({
     image: '',
     orderName: '',
-    type: '',
     size: '',
     color: '',
     startDate: new Date().toLocaleDateString('sv-SE'),
     endDate: new Date().toLocaleDateString('sv-SE'),
-    quantity: '',
+    quantity: 0,
     cpu: '',
     note: '',
     status: 'Chờ xét duyệt',
   });
+
+  const [variants, setVariants] = useState([
+    { id: 1, color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+  ]);
+
+  const handleAddVariant = () => {
+    setVariants(prev => [
+      ...prev,
+      { id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+    ]);
+  };
+
+  const handleRemoveVariant = (index) => {
+    if (variants.length <= 1) return;
+    setDeleteConfirm({
+      show: true,
+      type: 'variant',
+      index: index,
+      title: 'Xác nhận xóa phối màu',
+      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các size của phối màu này sẽ bị mất.'
+    });
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    
+    // Clear specific errors if they exist
+    if (errors.variants?.[index]?.[field]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        const nextVariantsErrors = { ...next.variants };
+        delete nextVariantsErrors[index][field];
+        if (Object.keys(nextVariantsErrors[index]).length === 0) {
+          delete nextVariantsErrors[index];
+        }
+        next.variants = nextVariantsErrors;
+        return next;
+      });
+    }
+
+    if (errors.variantsGlobal) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.variantsGlobal;
+        return next;
+      });
+    }
+  };
+
+  // Sync quantity automatically
+  useState(() => {
+    const total = variants.reduce((acc, v) => {
+      const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      return acc + sum;
+    }, 0);
+    setOrderData(prev => ({ ...prev, quantity: total }));
+  }, [variants]);
 
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,9 +167,20 @@ export default function CreateManualOrder() {
     else if (orderData.orderName.trim().length < 3 || orderData.orderName.trim().length > 50) {
       newErrors.orderName = 'Tên đơn hàng phải từ 3 đến 50 ký tự';
     }
-    if (!orderData.type?.trim()) newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
-    if (!orderData.size?.trim()) newErrors.size = 'Kích thước không được để trống';
-    if (!orderData.color?.trim()) newErrors.color = 'Màu sắc không được để trống';
+
+    // VARIANTS
+    const variantErrors = [];
+    let hasAnyQuantity = false;
+    variants.forEach((v, idx) => {
+      const vErrs = {};
+      if (!v.color?.trim()) vErrs.color = 'Vui lòng nhập tên màu';
+      const sumSize = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      if (sumSize > 0) hasAnyQuantity = true;
+      if (Object.keys(vErrs).length > 0) variantErrors[idx] = vErrs;
+    });
+
+    if (variantErrors.length > 0) newErrors.variants = variantErrors;
+    if (!hasAnyQuantity) newErrors.variantsGlobal = 'Vui lòng nhập ít nhất một kích thước có số lượng > 0';
     if (orderData.quantity <= 0) newErrors.quantity = 'Số lượng sản xuất phải lớn hơn 0';
     if (orderData.cpu < 0) newErrors.cpu = 'Chi phí đơn vị không được âm';
     if (orderData.cpu !== '' && Number(orderData.cpu) < 10) {
@@ -359,6 +466,21 @@ export default function CreateManualOrder() {
       }
     } else if (type === 'template') {
       setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+    } else if (type === 'variant') {
+      setVariants((prev) => prev.filter((_, i) => i !== index));
+      if (errors.variants) {
+        setErrors((prev) => {
+          const newVariants = { ...prev.variants };
+          delete newVariants[index];
+          const adjusted = {};
+          Object.keys(newVariants).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjusted[k - 1] = newVariants[key];
+            else adjusted[k] = newVariants[key];
+          });
+          return { ...prev, variants: adjusted };
+        });
+      }
     }
     setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' });
   };
@@ -428,13 +550,35 @@ export default function CreateManualOrder() {
         });
       }
 
+      // Map variants to legacy fields
+      const activeSizes = new Set();
+      const activeColors = new Set();
+      variants.forEach(v => {
+        if (v.color?.trim()) activeColors.add(v.color.trim());
+        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(s => {
+          if (v[s] > 0) activeSizes.add(s.toUpperCase());
+        });
+      });
+
       const payload = {
         customer: { ...customerData },
         order: {
           ...orderData,
+          size: Array.from(activeSizes).join(', '),
+          color: Array.from(activeColors).join(', '),
           image: orderImageUrl,
           materials: materialsPayload,
           templates: templatesPayload,
+          variants: variants.map(v => ({
+            color: v.color,
+            xs: Number(v.xs) || 0,
+            s: Number(v.s) || 0,
+            m: Number(v.m) || 0,
+            l: Number(v.l) || 0,
+            xl: Number(v.xl) || 0,
+            '2xl': Number(v['2xl']) || 0,
+            '3xl': Number(v['3xl']) || 0,
+          }))
         },
       };
 
@@ -480,9 +624,13 @@ export default function CreateManualOrder() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4 border-b border-slate-100 pb-2 text-slate-900">Thông tin khách hàng</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm space-y-8">
+              <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+                <Users size={20} className="text-emerald-500" />
+                <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Thông tin khách hàng</h2>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <OrderInput
                   label="Tên khách hàng"
                   name="customerName"
@@ -501,15 +649,54 @@ export default function CreateManualOrder() {
                   placeholder="Ví dụ: 0901 234 567"
                   required
                 />
+              </div>
+
+              <div className="pt-4 space-y-6">
+                <div className="flex items-center gap-2 mb-2">
+                   <div className="w-1 h-4 bg-emerald-500 rounded-full" />
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Địa chỉ giao hàng</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <OrderSelect
+                    label="Tỉnh / Thành phố"
+                    options={provinces.map(p => ({ value: p.code, label: p.name }))}
+                    value={customerData.province?.code || ''}
+                    onChange={(e) => {
+                      const p = provinces.find(x => String(x.code) === String(e.target.value));
+                      setCustomerData(prev => ({ ...prev, province: p, ward: null }));
+                    }}
+                    placeholder="Chọn Tỉnh/Thành"
+                    error={errors.province}
+                    required
+                  />
+                  <OrderSelect
+                    label="Phường / Xã"
+                    options={wards.map(w => ({ value: w.code, label: w.name }))}
+                    value={customerData.ward?.code || ''}
+                    onChange={(e) => {
+                      const w = wards.find(x => String(x.code) === String(e.target.value));
+                      setCustomerData(prev => ({ ...prev, ward: w }));
+                    }}
+                    placeholder="Chọn Phường/Xã"
+                    error={errors.ward}
+                    required
+                    disabled={!customerData.province}
+                  />
+                </div>
+
                 <OrderInput
-                  label="Địa chỉ"
-                  name="customerAddress"
-                  value={customerData.customerAddress}
-                  onChange={handleCustomerChange}
-                  error={errors.customerAddress}
-                  placeholder="Ví dụ: 123 Lê Lợi, Q1, TP.HCM"
-                  required
+                  label="Địa chỉ chi tiết"
+                  name="detail"
+                  value={customerData.detail}
+                  onChange={(e) => setCustomerData(p => ({ ...p, detail: e.target.value }))}
+                  placeholder="Số nhà, tên đường, tòa nhà..."
                 />
+
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic">
+                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Xem trước địa chỉ hợp nhất (2025):</p>
+                   <p className="text-xs font-bold text-slate-600">{customerData.customerAddress || "—"}</p>
+                </div>
               </div>
             </div>
 
@@ -555,6 +742,10 @@ export default function CreateManualOrder() {
                 onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
                 editingIndex,
               }}
+              variants={variants}
+              onAddVariant={handleAddVariant}
+              onRemoveVariant={handleRemoveVariant}
+              onVariantChange={handleVariantChange}
             />
           </form>
         </div>
@@ -582,5 +773,47 @@ export default function CreateManualOrder() {
         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
       />
     </OwnerLayout>
+  );
+}
+
+export function OrderSelect({
+  label,
+  value,
+  onChange,
+  options = [],
+  placeholder,
+  error,
+  required,
+  disabled
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block ml-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <div className="relative">
+        <select
+          value={value ?? ''}
+          onChange={onChange}
+          disabled={disabled}
+          className={`block w-full border rounded-xl px-4 py-3 text-sm font-semibold transition-all outline-none appearance-none cursor-pointer
+            ${disabled
+              ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed'
+              : error
+                ? 'border-red-300 bg-red-50/30 focus:border-red-500'
+                : 'border-slate-100 bg-slate-50/50 focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-500/5'
+            }`}
+        >
+          <option value="" disabled>{placeholder}</option>
+          {options.map((opt, i) => (
+            <option key={i} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+          <ChevronRight size={16} className="rotate-90" />
+        </div>
+      </div>
+      {error && <p className="text-[10px] text-red-500 font-bold ml-1 flex items-center gap-1 leading-none"><AlertCircle size={12} /> {error}</p>}
+    </div>
   );
 }
