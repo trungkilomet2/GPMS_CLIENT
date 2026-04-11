@@ -92,7 +92,11 @@ function getContactItems(employeeInfo) {
   return [
     { icon: Phone, label: "Số điện thoại", value: employeeInfo?.phoneNumber || "" },
     { icon: Mail, label: "Email", value: employeeInfo?.email || "" },
-    { icon: MapPin, label: "Địa chỉ", value: employeeInfo?.location || employeeInfo?.address || "" },
+    {
+      icon: MapPin,
+      label: "Địa chỉ",
+      value: employeeInfo?.location || employeeInfo?.address || "",
+    },
   ];
 }
 

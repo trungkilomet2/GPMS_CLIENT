@@ -2,10 +2,10 @@
 // const BASE_URL = 'http://localhost:5229';
 
 //main URL
-//const BASE_URL = 'http://26.250.4.244:5229';
+const BASE_URL = 'http://26.250.4.244:5229';
 
 // sub URL
-const BASE_URL = 'http://26.93.63.192:8000';
+// const BASE_URL = 'http://26.93.63.192:8000';
 
 // const BASE_URL = 'https://localhost:7096';
 // const BASE_URL = '';

@@ -133,10 +133,11 @@ function NavItem({ icon, label, active, onClick }) {
 }
 
 function SectionInfo({ user, onViewOrders, onCreateOrder }) {
+  const resolvedLocation = user.location || user.address || "";
   const customerProfileRows = [
-    ["👤", "Người đại diện", user.fullName || user.name],
+    ["👤", "Họ và tên", user.fullName || user.name],
     ["✉️", "Email", user.email],
-    ["📍", "Địa chỉ", user.address],
+    ["📍", "Địa chỉ", resolvedLocation],
   ];
 
   const orderSummaryRows = [
@@ -320,6 +321,7 @@ export default function ViewProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [warning, setWarning] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -333,18 +335,62 @@ export default function ViewProfile() {
 
       setLoading(true);
       setError(null);
+      setWarning(null);
       const userId = getCurrentUserId();
+      const storedUser = getStoredUser() || {};
 
-      Promise.all([
+      Promise.allSettled([
         userService.getProfile(),
-        userId ? OrderService.getOrdersByUser().catch(() => []) : Promise.resolve([]),
+        userId ? OrderService.getOrdersByUser() : Promise.resolve([]),
       ])
-        .then(([profileData, ordersResponse]) => {
+        .then(([profileResult, ordersResult]) => {
           if (!active) return;
-          const orders = ordersResponse?.data || ordersResponse || [];
+
+          const profileData =
+            profileResult?.status === "fulfilled"
+              ? profileResult.value
+              : null;
+
+          const fallbackProfile =
+            storedUser && (storedUser.fullName || storedUser.name || storedUser.email)
+              ? {
+                  fullName: storedUser.fullName || storedUser.name || "",
+                  name: storedUser.name || storedUser.fullName || "",
+                  email: storedUser.email || "",
+                  location: storedUser.location || storedUser.address || "",
+                  address: storedUser.address || storedUser.location || "",
+                  avatarUrl: storedUser.avatarUrl || "",
+                }
+              : null;
+
+          const resolvedProfile = profileData || fallbackProfile;
+
+          if (!resolvedProfile) {
+            const err = profileResult?.reason;
+            if (err?.response?.data?.status === 401 || err?.status === 401) {
+              clearAuthStorage();
+              navigate("/login");
+              return;
+            }
+            setError(err?.response?.data?.message || "Không thể tải hồ sơ.");
+            return;
+          }
+
+          const ordersSource =
+            ordersResult?.status === "fulfilled"
+              ? (ordersResult.value?.data || ordersResult.value || [])
+              : [];
+
+          if (profileResult?.status !== "fulfilled") {
+            setWarning("Không tải được hồ sơ mới nhất từ server. Đang hiển thị dữ liệu đã lưu gần nhất.");
+          } else if (ordersResult?.status !== "fulfilled") {
+            setWarning("Không tải được danh sách đơn hàng lúc này. Thông tin hồ sơ vẫn hiển thị bình thường.");
+          }
+
+          const orders = Array.isArray(ordersSource) ? ordersSource : [];
           setProfile({
-            ...profileData,
-            ...buildOrderSummary(Array.isArray(orders) ? orders : []),
+            ...resolvedProfile,
+            ...buildOrderSummary(orders),
           });
         })
         .catch(err => {
@@ -447,6 +493,21 @@ export default function ViewProfile() {
           position:"relative",zIndex:1,
         }}
       >
+        {warning ? (
+          <div style={{
+            gridColumn:"1 / -1",
+            marginBottom: "0.25rem",
+            border:`1px solid ${T.border}`,
+            background:T.light,
+            color:T.mid,
+            borderRadius:12,
+            padding:"0.85rem 1rem",
+            fontSize:".84rem",
+            fontWeight:600,
+          }}>
+            {warning}
+          </div>
+        ) : null}
         {/* Sidebar */}
         <aside style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
           {/* Nav tabs */}

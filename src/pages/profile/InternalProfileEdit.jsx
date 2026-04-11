@@ -3,8 +3,9 @@ import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import { authService } from "@/services/authService";
+import { locationService } from "@/services/locationService";
 import { userService } from "@/services/userService";
-import { getStoredUser } from "@/lib/authStorage";
+import { getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import {
   normalizeSpaces,
@@ -179,9 +180,13 @@ export default function InternalProfileEdit() {
   const [verifiedEmail, setVerifiedEmail] = useState("");
   const [initialEmail, setInitialEmail] = useState("");
   const [backendRequiresEmailVerification, setBackendRequiresEmailVerification] = useState(false);
-
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState("");
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [locationPreview, setLocationPreview] = useState("");
 
   const [form, setForm] = useState({
     fullName: "",
@@ -189,6 +194,47 @@ export default function InternalProfileEdit() {
     phoneNumber: "",
     location: "",
   });
+
+  useEffect(() => {
+    locationService.getProvinces().then(setProvinces).catch(() => setProvinces([]));
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadWards = async () => {
+      if (!selectedProvinceCode) {
+        setWards([]);
+        return;
+      }
+
+      const nextWards = await locationService.getWardsByProvinceCode(selectedProvinceCode);
+      if (!active) return;
+      setWards(nextWards);
+      if (!nextWards.some((item) => item.code === selectedWardCode)) {
+        setSelectedWardCode("");
+      }
+    };
+
+    loadWards();
+    return () => {
+      active = false;
+    };
+  }, [selectedProvinceCode]);
+
+  const syncStoredLocation = async (rawLocation) => {
+    const parsed = locationService.parseStoredLocation(rawLocation);
+    setSelectedProvinceCode(parsed.provinceCode);
+    setSelectedWardCode(parsed.wardCode);
+    setLocationPreview(parsed.currentLabel || "");
+
+    if (parsed.provinceCode) {
+      const nextWards = await locationService.getWardsByProvinceCode(parsed.provinceCode);
+      setWards(nextWards);
+    } else {
+      setWards([]);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -206,6 +252,7 @@ export default function InternalProfileEdit() {
           phoneNumber: profile?.phoneNumber || storedUser?.phoneNumber || storedUser?.phone || "",
           location: profile?.location || storedUser?.location || storedUser?.address || "",
         });
+        syncStoredLocation(profile?.location || storedUser?.location || storedUser?.address || "").catch(() => setWards([]));
         const resolvedEmail = String(profile?.email || "").trim();
         const emailVerified = profile?.emailVerified === true;
         setInitialEmail(resolvedEmail);
@@ -303,6 +350,41 @@ export default function InternalProfileEdit() {
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
     setTouched((prev) => ({ ...prev, avatar: true }));
+    setMessage(null);
+  };
+
+  const handleProvinceChange = async (e) => {
+    const nextProvinceCode = e.target.value;
+    setTouched((prev) => ({ ...prev, location: true }));
+    setSelectedProvinceCode(nextProvinceCode);
+    setSelectedWardCode("");
+    setMessage(null);
+
+    if (!nextProvinceCode) {
+      setWards([]);
+      setLocationPreview("");
+      setForm((prev) => ({ ...prev, location: "" }));
+      return;
+    }
+
+    const nextWards = await locationService.getWardsByProvinceCode(nextProvinceCode);
+    setWards(nextWards);
+    setLocationPreview("");
+    setForm((prev) => ({ ...prev, location: "" }));
+  };
+
+  const handleWardChange = (e) => {
+    const nextWardCode = e.target.value;
+    const province = provinces.find((item) => item.code === selectedProvinceCode);
+    const ward = wards.find((item) => item.code === nextWardCode);
+    const nextLocation = ward && province
+      ? locationService.formatLocation(ward.name, province.name)
+      : "";
+
+    setTouched((prev) => ({ ...prev, location: true }));
+    setSelectedWardCode(nextWardCode);
+    setLocationPreview(nextLocation);
+    setForm((prev) => ({ ...prev, location: nextLocation }));
     setMessage(null);
   };
 
@@ -468,17 +550,29 @@ export default function InternalProfileEdit() {
         return;
       }
 
-      const refreshedProfile = await userService.getProfile();
-      const nextEmail = String(refreshedProfile?.email || form.email || "").trim();
-      const nextFullName = String(refreshedProfile?.fullName || form.fullName || "");
-      const nextPhoneNumber = String(refreshedProfile?.phoneNumber || form.phoneNumber || "");
-      const nextLocation = String(refreshedProfile?.location || form.location || "");
+      const nextEmail = String(form.email || "").trim();
+      const nextFullName = String(form.fullName || "");
+      const nextPhoneNumber = String(form.phoneNumber || "");
+      const nextLocation = String(form.location || "");
 
       setForm({
         fullName: nextFullName,
         email: nextEmail,
         phoneNumber: nextPhoneNumber,
         location: nextLocation,
+      });
+      syncStoredLocation(nextLocation).catch(() => setWards([]));
+      setStoredUser({
+        ...(getStoredUser() || {}),
+        fullName: nextFullName,
+        name: nextFullName,
+        email: nextEmail,
+        emailVerified: true,
+        phoneNumber: nextPhoneNumber,
+        phone: nextPhoneNumber,
+        location: nextLocation,
+        address: nextLocation,
+        profileUpdatedAt: Date.now(),
       });
       setInitialEmail(nextEmail);
       setVerifiedEmail(nextEmail.toLowerCase());
@@ -737,17 +831,42 @@ export default function InternalProfileEdit() {
 
               <div className="sm:col-span-2">
                 <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                  Địa chỉ *
+                  Địa chỉ / Khu vực *
                 </label>
-                <input
-                  value={form.location}
-                  onChange={onChange("location")}
+                <select
+                  value={selectedProvinceCode}
+                  onChange={handleProvinceChange}
                   onBlur={() => setTouched((prev) => ({ ...prev, location: true }))}
                   className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 ${
                     effectiveErrors.location ? "border-rose-300" : "border-emerald-100"
                   }`}
-                  placeholder="Nhập địa chỉ"
-                />
+                >
+                  <option value="">Chọn tỉnh/thành</option>
+                  {provinces.map((item) => (
+                    <option key={item.code} value={item.code}>{item.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedWardCode}
+                  onChange={handleWardChange}
+                  onBlur={() => setTouched((prev) => ({ ...prev, location: true }))}
+                  disabled={!selectedProvinceCode}
+                  className={`mt-3 w-full rounded-2xl border px-4 py-3 text-sm font-semibold outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 ${
+                    effectiveErrors.location ? "border-rose-300" : "border-emerald-100"
+                  } ${selectedProvinceCode ? "bg-white" : "bg-slate-50 text-slate-400"}`}
+                >
+                  <option value="">{selectedProvinceCode ? "Chọn phường/xã" : "Chọn tỉnh/thành trước"}</option>
+                  {wards.map((item) => (
+                    <option key={item.code} value={item.code}>{item.name}</option>
+                  ))}
+                </select>
+                <div className="mt-3 text-sm font-semibold text-slate-500">
+                  {locationPreview
+                    ? <>Khu vực đã chọn: <span className="text-slate-800">{locationPreview}</span></>
+                    : form.location
+                      ? <>Khu vực hiện tại: <span className="text-slate-800">{form.location}</span></>
+                      : "Chọn đủ tỉnh/thành và phường/xã để lưu địa chỉ."}
+                </div>
                 {effectiveErrors.location ? (
                   <div className="mt-2 text-sm font-semibold text-rose-700">{effectiveErrors.location}</div>
                 ) : null}

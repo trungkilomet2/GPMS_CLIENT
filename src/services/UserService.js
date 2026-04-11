@@ -39,6 +39,7 @@ const authHeadersForm = () => ({
 });
 
 const PROFILE_CACHE_PREFIX = "profile-cache:";
+const RECENT_PROFILE_OVERRIDE_MS = 5 * 60 * 1000;
 
 function isSwaggerPlaceholder(value) {
   const v = String(value ?? "").trim().toLowerCase();
@@ -75,6 +76,31 @@ function setProfileCache(userId, profile) {
   } catch {
     // ignore quota/blocked storage
   }
+}
+
+function readRecentProfileUpdatedAt(...sources) {
+  return sources.reduce((latest, source) => {
+    const value = Number(source?.profileUpdatedAt ?? 0);
+    return Number.isFinite(value) && value > latest ? value : latest;
+  }, 0);
+}
+
+function shouldPreferRecentLocalProfile(...sources) {
+  const latestUpdatedAt = readRecentProfileUpdatedAt(...sources);
+  if (!latestUpdatedAt) return false;
+  return Date.now() - latestUpdatedAt <= RECENT_PROFILE_OVERRIDE_MS;
+}
+
+function resolveEditableProfileValue(serverValue, storedValue, cachedValue, preferLocal = false) {
+  const normalizedServer = normalizeServerValue(serverValue);
+  const normalizedStored = normalizeServerValue(storedValue);
+  const normalizedCached = normalizeServerValue(cachedValue);
+
+  if (preferLocal) {
+    return normalizedStored || normalizedCached || normalizedServer || "";
+  }
+
+  return normalizedServer || normalizedStored || normalizedCached || "";
 }
 
 function isOtpPendingResponse(payload = {}) {
@@ -166,51 +192,47 @@ export const userService = {
     const stored = getStoredUser() || {};
     const cached = getProfileCache(getUserId()) || {};
 
-    const serverFullName = normalizeServerValue(d.fullName);
-    const serverEmail = normalizeServerValue(d.email);
-    const serverPhone = normalizeServerValue(d.phoneNumber);
-    const serverAvatar = normalizeServerValue(d.avartarUrl);
-    const serverLocation = normalizeServerValue(d.location);
+    const preferRecentLocal = shouldPreferRecentLocalProfile(stored, cached);
     const emailVerified =
       readEmailVerificationStatus(d) ??
       readEmailVerificationStatus(stored) ??
       readEmailVerificationStatus(cached);
 
-    const fullName =
-      serverFullName ||
-      normalizeServerValue(stored.fullName) ||
-      normalizeServerValue(stored.name) ||
-      normalizeServerValue(cached.fullName) ||
-      normalizeServerValue(cached.name) ||
-      "";
+    const fullName = resolveEditableProfileValue(
+      d.fullName,
+      stored.fullName ?? stored.name,
+      cached.fullName ?? cached.name,
+      preferRecentLocal,
+    );
 
-    const email =
-      serverEmail ||
-      normalizeServerValue(stored.email) ||
-      normalizeServerValue(cached.email) ||
-      "";
+    const email = resolveEditableProfileValue(
+      d.email,
+      stored.email,
+      cached.email,
+      preferRecentLocal,
+    );
 
-    const phoneNumber =
-      serverPhone ||
-      normalizeServerValue(stored.phoneNumber) ||
-      normalizeServerValue(stored.phone) ||
-      normalizeServerValue(cached.phoneNumber) ||
-      normalizeServerValue(cached.phone) ||
-      "";
+    const phoneNumber = resolveEditableProfileValue(
+      d.phoneNumber,
+      stored.phoneNumber ?? stored.phone,
+      cached.phoneNumber ?? cached.phone,
+      preferRecentLocal,
+    );
 
-    const avatarUrl =
-      serverAvatar ||
-      normalizeServerValue(stored.avatarUrl) ||
-      normalizeServerValue(cached.avatarUrl) ||
-      "";
+    const avatarUrl = resolveEditableProfileValue(
+      d.avartarUrl,
+      stored.avatarUrl,
+      cached.avatarUrl,
+      preferRecentLocal,
+    );
 
-    const location =
-      serverLocation ||
-      normalizeServerValue(stored.location) ||
-      normalizeServerValue(stored.address) ||
-      normalizeServerValue(cached.location) ||
-      normalizeServerValue(cached.address) ||
-      "";
+    const location = resolveEditableProfileValue(
+      d.location,
+      stored.location ?? stored.address,
+      cached.location ?? cached.address,
+      preferRecentLocal,
+    );
+    const serverEmail = normalizeServerValue(d.email);
 
     const resolvedId = extractUserIdValue(d) || getUserId();
     const resolvedRole = extractRoleValue(d) || (stored.role ?? "");
@@ -235,6 +257,7 @@ export const userService = {
       managerId:   stored.managerId ?? cached.managerId ?? null,
       workerSkills: Array.isArray(stored.workerSkills) ? stored.workerSkills : (cached.workerSkills ?? []),
       accountStatus,
+      profileUpdatedAt: readRecentProfileUpdatedAt(stored, cached),
     };
 
     setStoredUser({
@@ -413,6 +436,7 @@ export const userService = {
       address:     resolvedLocation,
       managerId:   d.managerId   ?? stored.managerId ?? null,
       workerSkills: d.workerSkills ?? stored.workerSkills ?? [],
+      profileUpdatedAt: Date.now(),
     };
 
     setStoredUser(nextStored);
