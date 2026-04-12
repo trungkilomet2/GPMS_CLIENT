@@ -71,8 +71,6 @@ export default function CreateOrder() {
     userId,
     image: '',
     orderName: '',
-    size: '',
-    color: '',
     startDate: new Date().toLocaleDateString('sv-SE'),
     endDate: new Date().toLocaleDateString('sv-SE'),
     quantity: 0,
@@ -647,46 +645,73 @@ export default function CreateOrder() {
         });
       }
 
-      // Map variants to legacy fields and metadata
-      const activeSizes = new Set();
-      const activeColors = new Set();
+      const sizesPayload = [];
+      const SIZE_ID_MAP = {
+        'xs': 1,
+        's': 2,
+        'm': 3,
+        'l': 4,
+        'xl': 5,
+        '2xl': 6,
+        '3xl': 7
+      };
+
       variants.forEach(v => {
-        if (v.color?.trim()) activeColors.add(v.color.trim());
-        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(s => {
-          if (v[s] > 0) activeSizes.add(s.toUpperCase());
+        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(sizeKey => {
+          const qty = Number(v[sizeKey]) || 0;
+          if (qty > 0) {
+            sizesPayload.push({
+              sizeId: SIZE_ID_MAP[sizeKey],
+              color: v.color?.trim() || '',
+              quantity: qty
+            });
+          }
         });
       });
 
       const payload = {
-        userId: Number(orderData.userId ?? userId) || 0,
-        image: orderImageUrl || null,
-        orderName: orderData.orderName ?? '',
-        size: Array.from(activeSizes).join(', '),
-        color: Array.from(activeColors).join(', '),
-        startDate: orderData.startDate ?? '',
-        endDate: orderData.endDate ?? '',
-        quantity: Number(orderData.quantity) || 0,
+        userId: Number(orderData.userId || userId) || 0,
+        image: orderImageUrl || "",
+        orderName: (orderData.orderName || "").trim(),
+        startDate: orderData.startDate || "",
+        endDate: orderData.endDate || "",
+        quantity: Math.floor(Number(orderData.quantity) || 0),
         cpu: Number(orderData.cpu) || 0,
-        note: orderData.note ?? '',
-        materials: materialsPayload,
-        templates: templatesPayload,
-        variants: variants.map(v => ({
-          color: v.color,
-          xs: Number(v.xs) || 0,
-          s: Number(v.s) || 0,
-          m: Number(v.m) || 0,
-          l: Number(v.l) || 0,
-          xl: Number(v.xl) || 0,
-          '2xl': Number(v['2xl']) || 0,
-          '3xl': Number(v['3xl']) || 0,
-        }))
+        note: (orderData.note || "").trim(),
+        materials: materialsPayload.map(m => ({
+          ...m,
+          image: m.image || "",
+          note: (m.note || "").trim()
+        })),
+        o_Material: materialsPayload.map(m => ({
+          ...m,
+          image: m.image || "",
+          note: (m.note || "").trim()
+        })),
+        templates: templatesPayload.map(t => ({
+          ...t,
+          type: "SOFT", // Thống nhất với chuẩn hệ thống (Bản mềm)
+          file: t.file || "",
+          note: (t.note || "").trim()
+        })),
+        o_Template: templatesPayload.map(t => ({
+          ...t,
+          type: "SOFT",
+          file: t.file || "",
+          note: (t.note || "").trim()
+        })),
+        sizes: sizesPayload
       };
-      console.log('CreateOrder payload:', payload);
+      console.log('CreateOrder payload (AutoMapper focus):', payload);
 
       await OrderService.createOrder(payload);
       setIsSuccessOpen(true);
     } catch (error) {
-      console.error('Lỗi API (CreateOrder):', error);
+      console.error('--- LỖI API CHI TIẾT (CreateOrder) ---');
+      console.error('Status:', error?.response?.status);
+      console.error('Data từ Backend:', error?.response?.data);
+      console.error('Message:', error?.message);
+      
       const errMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ');
       toast.error('Lỗi: ' + errMsg);
     } finally {

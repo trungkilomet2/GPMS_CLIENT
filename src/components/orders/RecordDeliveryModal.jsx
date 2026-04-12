@@ -71,16 +71,16 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <div className="w-12 h-12 rounded-xl bg-[#f0f9f4] flex items-center justify-center text-[#1e6e43] shadow-sm">
                             <Truck size={24} />
                         </div>
                         <div>
                             <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase">Ghi nhận giao hàng chi tiết</h3>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Nhập số lượng giao cho từng Màu & Size</p>
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest italic">Nhập số lượng giao cho từng Màu & Size</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
@@ -92,33 +92,33 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                     {/* Date Picker */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Calendar size={12} className="text-emerald-500" /> Ngày giao
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <Calendar size={12} className="text-[#1e6e43]" /> Ngày giao
                             </label>
                             <input 
                                 type="date"
                                 value={deliveryDate}
                                 onChange={(e) => setDeliveryDate(e.target.value)}
-                                className="w-full h-12 px-6 rounded-2xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                                className="w-full h-12 px-6 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e6e43]/20 focus:border-[#1e6e43] transition-all"
                             />
                         </div>
                     </div>
 
                     {/* Table */}
                     <div className="space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                            <Edit3 size={12} className="text-emerald-500" /> Chi tiết số lượng (Màu & Size)
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <Edit3 size={12} className="text-[#1e6e43]" /> Chi tiết số lượng (Màu & Size)
                         </label>
-                        <div className="rounded-[2rem] border border-slate-100 bg-slate-50/30 overflow-hidden">
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/30 overflow-hidden">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 border-b border-slate-100">
-                                        <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Màu sắc</th>
-                                        <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Size</th>
-                                        <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Đã giao</th>
-                                        <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Tổng đặt</th>
-                                        <th className="px-6 py-4 text-center text-[9px] font-black text-slate-400 uppercase tracking-widest">Còn lại</th>
-                                        <th className="px-6 py-4 text-right text-[9px] font-black text-slate-400 uppercase tracking-widest">Giao đợt này</th>
+                                        <th className="px-6 py-4 text-[9px] font-black text-gray-500 uppercase tracking-widest">Màu sắc</th>
+                                        <th className="px-6 py-4 text-center text-[9px] font-black text-gray-500 uppercase tracking-widest">Size</th>
+                                        <th className="px-6 py-4 text-center text-[9px] font-black text-gray-500 uppercase tracking-widest">Đã giao</th>
+                                        <th className="px-6 py-4 text-center text-[9px] font-black text-gray-500 uppercase tracking-widest">Tổng đặt</th>
+                                        <th className="px-6 py-4 text-center text-[9px] font-black text-gray-500 uppercase tracking-widest">Còn lại</th>
+                                        <th className="px-6 py-4 text-right text-[9px] font-black text-gray-500 uppercase tracking-widest">Giao đợt này</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-slate-50">
@@ -135,8 +135,8 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                                                     {item.size}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-400">{item.alreadyDelivered}</td>
-                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-600">{item.totalOrdered}</td>
+                                            <td className="px-6 py-4 text-center text-xs font-bold text-gray-500">{item.alreadyDelivered}</td>
+                                            <td className="px-6 py-4 text-center text-xs font-bold text-slate-700">{item.totalOrdered}</td>
                                             <td className="px-6 py-4 text-center text-xs font-black text-slate-900">{item.remaining}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <input 
@@ -144,7 +144,7 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                                                     value={item.quantity || ''}
                                                     placeholder="0"
                                                     onChange={(e) => handleQtyChange(idx, e.target.value)}
-                                                    className="w-20 h-10 px-3 rounded-xl bg-slate-50 border border-slate-100 text-right text-sm font-black text-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                    className="w-20 h-10 px-3 rounded-lg bg-slate-50 border border-slate-100 text-right text-sm font-black text-[#1e6e43] focus:outline-none focus:ring-2 focus:ring-[#1e6e43]/20"
                                                 />
                                             </td>
                                         </tr>
@@ -156,12 +156,12 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
 
                     {/* Note */}
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ghi chú</label>
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Ghi chú</label>
                         <textarea 
                             value={note}
                             onChange={(e) => setNote(e.target.value)}
                             placeholder="Thông tin bổ sung đợt giao..."
-                            className="w-full h-24 p-6 rounded-[1.5rem] bg-slate-50 border border-slate-100 text-sm font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                            className="w-full h-24 p-6 rounded-xl bg-slate-50 border border-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e6e43]/20 resize-none placeholder:text-gray-400"
                         />
                     </div>
                 </div>
@@ -169,18 +169,18 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                 {/* Footer */}
                 <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
                     <div>
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng cộng đợt này</p>
-                        <p className="text-2xl font-black text-emerald-600">
-                            {totalThisBatch.toLocaleString()} <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Sản phẩm</span>
+                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Tổng cộng đợt này</p>
+                        <p className="text-2xl font-black text-[#1e6e43]">
+                            {totalThisBatch.toLocaleString()} <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Sản phẩm</span>
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
-                        <button onClick={onClose} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">
+                        <button onClick={onClose} className="px-6 py-3 text-[10px] font-black text-gray-500 uppercase tracking-widest hover:text-slate-900 transition-colors">
                             Hủy
                         </button>
                         <button 
                             onClick={handleSubmit}
-                            className="flex items-center gap-3 px-10 py-4 bg-emerald-600 text-white rounded-[1.5rem] font-black text-[12px] uppercase tracking-widest shadow-xl shadow-emerald-100 transition-all hover:bg-emerald-700 hover:-translate-y-0.5"
+                            className="flex items-center gap-3 px-10 py-4 bg-[#1e6e43] text-white rounded-xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-green-100/50 transition-all hover:bg-[#155232] hover:-translate-y-0.5"
                         >
                             <CheckCircle size={18} />
                             Xác nhận giao hàng

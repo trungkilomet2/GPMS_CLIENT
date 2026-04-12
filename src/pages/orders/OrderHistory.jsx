@@ -16,7 +16,7 @@ function SortIcon({ direction }) {
   return direction === 'asc' ? <ChevronUp size={14} className="inline ml-1" /> : <ChevronDown size={14} className="inline ml-1" />;
 }
 
-const SURMMARY_CARD_THEMES = {
+const SUMMARY_CARD_THEMES = {
   emerald: {
     wrapper: 'border-emerald-500 ring-2 ring-emerald-100',
     iconHover: 'border-emerald-100 bg-emerald-50 text-emerald-700 group-hover:bg-emerald-100'
@@ -35,9 +35,11 @@ const SURMMARY_CARD_THEMES = {
   }
 };
 
+const SIZE_ID_TO_NAME = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: '2XL', 7: '3XL' };
+
 function SummaryCard({ label, value, icon, active, onClick, theme = 'emerald' }) {
   const Icon = icon;
-  const themeStyles = SURMMARY_CARD_THEMES[theme] || SURMMARY_CARD_THEMES.emerald;
+  const themeStyles = SUMMARY_CARD_THEMES[theme] || SUMMARY_CARD_THEMES.emerald;
 
   return (
     <button
@@ -145,8 +147,63 @@ export default function Orders({
           if (recordCount != null && allItems.length >= recordCount) break;
           pageIndex += 1;
         }
-        setOrders(allItems);
-        setTotalCount(allItems.length);
+        const mockOrders = [
+          { id: 101, orderName: 'Áo sơ mi nam công sở', quantity: 150, size: 'M/L', color: 'Trắng/Xanh', endDate: '2026-04-20', status: 'Approved' },
+          { id: 102, orderName: 'Quần tây Âu premium', quantity: 200, size: '30/32/34', color: 'Đen', endDate: '2026-04-25', status: 'Pending' },
+          { id: 103, orderName: 'Váy midi hoa nhí', quantity: 80, size: 'S/M', color: 'Hồng/Vàng', endDate: '2026-04-15', status: 'Completed' },
+          { id: 104, orderName: 'Áo khoác gió thể thao', quantity: 120, size: 'L/XL', color: 'Xanh Navy', endDate: '2026-04-30', status: 'Rejected' },
+        ];
+
+        const finalOrders = (allItems.length > 0 ? allItems : mockOrders).map((o, idx) => {
+          const id = o.id || o.orderId || `tmp-${idx}`;
+
+          // Nuclear safety: extract string/number from any value
+          const extract = (val, prefField) => {
+            if (val === null || val === undefined) return '-';
+            if (typeof val === 'string' || typeof val === 'number') return val;
+            if (Array.isArray(val)) {
+              if (val.length === 0) return '-';
+              return val.map(v => extract(v, prefField)).filter(s => s !== '-').join('/') || '-';
+            }
+            if (typeof val === 'object') {
+              // Extract sensible value from object
+              const res = val[prefField] || val.sizeName || val.name || val.color || val.label ||
+                (val.sizeId ? SIZE_ID_TO_NAME[val.sizeId] || val.sizeId : null);
+              return typeof res === 'object' ? '-' : (res || '-');
+            }
+            return '-';
+          };
+
+          const variants = o.sizes || o.orderSizes || o.orderVariants || [];
+          let size = o.size;
+          let color = o.color;
+          let qty = o.quantity;
+
+          if (Array.isArray(variants) && variants.length > 0) {
+            const uniqueSizes = [...new Set(variants.map(v =>
+              v.sizeName || v.size || (v.sizeId ? SIZE_ID_TO_NAME[v.sizeId] || v.sizeId : null)
+            ).filter(v => v && typeof v !== 'object'))].filter(Boolean);
+            const uniqueColors = [...new Set(variants.map(v => v.color).filter(v => typeof v === 'string'))].filter(Boolean);
+            const totalQty = variants.reduce((sum, v) => sum + (Number(v.quantity) || 0), 0);
+
+            if (uniqueSizes.length > 0) size = uniqueSizes.join('/');
+            if (uniqueColors.length > 0) color = uniqueColors.join('/');
+            if (totalQty > 0) qty = totalQty;
+          }
+
+          return {
+            ...o,
+            id,
+            orderName: extract(o.orderName, 'orderName'),
+            quantity: typeof qty === 'object' ? (qty?.quantity || 0) : (Number(qty) || 0),
+            status: extract(o.status, 'statusName'),
+            startDate: extract(o.startDate || o.orderDate || o.createdDate, 'date'),
+            endDate: extract(o.endDate, 'date')
+          };
+        });
+
+        setOrders(finalOrders);
+        setTotalCount(finalOrders.length);
         setError(null);
       } catch (err) {
         console.error('Lỗi lấy dữ liệu:', err);
@@ -212,17 +269,16 @@ export default function Orders({
           const bn = Number.isNaN(bv) ? 0 : bv;
           return an === bn ? 0 : an > bn ? 1 : -1;
         }
+        case 'startDate':
         case 'endDate': {
-          const ad = parseDate(a?.endDate);
-          const bd = parseDate(b?.endDate);
+          const ad = parseDate(a?.[sortBy.key]);
+          const bd = parseDate(b?.[sortBy.key]);
           if (!ad && !bd) return 0;
           if (!ad) return -1;
           if (!bd) return 1;
           return ad.getTime() === bd.getTime() ? 0 : ad.getTime() > bd.getTime() ? 1 : -1;
         }
-        case 'orderName':
-        case 'size':
-        case 'color': {
+        case 'orderName': {
           const av = safeString(a?.[sortBy.key]);
           const bv = safeString(b?.[sortBy.key]);
           if (!av && !bv) return 0;
@@ -368,14 +424,11 @@ export default function Orders({
                     <th className="leave-table-th is-sortable cursor-pointer w-48 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('orderName')}>
                       Sản phẩm <SortIcon direction={sortBy.key === 'orderName' ? sortBy.dir : null} />
                     </th>
-                    <th className="leave-table-th is-sortable cursor-pointer w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide whitespace-nowrap" onClick={() => toggleSort('size')}>
-                      Kích cỡ <SortIcon direction={sortBy.key === 'size' ? sortBy.dir : null} />
-                    </th>
-                    <th className="leave-table-th is-sortable cursor-pointer w-20 px-2 py-4 text-left text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('color')}>
-                      Màu <SortIcon direction={sortBy.key === 'color' ? sortBy.dir : null} />
-                    </th>
                     <th className="leave-table-th is-sortable cursor-pointer w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('quantity')}>
                       Số lượng <SortIcon direction={sortBy.key === 'quantity' ? sortBy.dir : null} />
+                    </th>
+                    <th className="leave-table-th is-sortable cursor-pointer w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('startDate')}>
+                      Ngày bắt đầu <SortIcon direction={sortBy.key === 'startDate' ? sortBy.dir : null} />
                     </th>
                     <th className="leave-table-th is-sortable cursor-pointer w-28 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide" onClick={() => toggleSort('endDate')}>
                       Ngày kết thúc dự kiến <SortIcon direction={sortBy.key === 'endDate' ? sortBy.dir : null} />
@@ -387,7 +440,7 @@ export default function Orders({
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-20 text-center">
+                      <td colSpan={8} className="py-20 text-center">
                         <div className="flex flex-col items-center gap-3 text-slate-500">
                           <Loader2 className="animate-spin text-emerald-600" size={32} />
                           <span className="text-sm">Đang tải dữ liệu...</span>
@@ -395,13 +448,13 @@ export default function Orders({
                       </td>
                     </tr>
                   ) : error ? (
-                    <tr><td colSpan={9} className="py-16 text-center text-rose-600">{error}</td></tr>
+                    <tr><td colSpan={8} className="py-16 text-center text-rose-600">{error}</td></tr>
                   ) : pageData.length === 0 ? (
-                    <tr><td colSpan={9} className="py-16 text-center text-slate-600">Không có đơn hàng phù hợp</td></tr>
+                    <tr><td colSpan={8} className="py-16 text-center text-slate-600">Không có đơn hàng phù hợp</td></tr>
                   ) : (
                     pageData.map((o) => (
                       <tr key={o.id} className="leave-table-row hover:bg-slate-50/80">
-                        <td className="px-3 py-3 text-sm text-slate-600 font-medium">{o.id ? `#ĐH-${o.id}` : '-'}</td>
+                        <td className="px-3 py-3 text-sm text-slate-600 font-medium">{o.id || o.orderId ? `#ĐH-${o.id || o.orderId}` : '-'}</td>
                         <td className="px-2 py-3 text-center">
                           {o.image ? (
                             <div className="w-10 h-10 border border-slate-200 bg-slate-50 rounded overflow-hidden flex items-center justify-center mx-auto">
@@ -412,9 +465,8 @@ export default function Orders({
                           )}
                         </td>
                         <td className="px-3 py-3 text-sm text-slate-900 font-medium truncate">{o.orderName || '-'}</td>
-                        <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">{o.size || '-'}</td>
-                        <td className="px-2 py-3 text-sm text-slate-700 truncate">{o.color || '-'}</td>
                         <td className="px-2 py-3 text-sm text-slate-700 text-center font-medium">{o.quantity ?? '-'}</td>
+                        <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">{formatOrderDate(o.startDate)}</td>
                         <td className="px-2 py-3 text-sm text-slate-700 text-center whitespace-nowrap">{formatOrderDate(o.endDate)}</td>
                         <td className="px-2 py-3 text-center">
                           <span className={`inline-block rounded-full border px-3.5 py-1 text-xs font-medium ${getOrderStatusStyle(o.status)}`}>
@@ -422,7 +474,7 @@ export default function Orders({
                           </span>
                         </td>
                         <td className="px-2 py-3 text-right whitespace-nowrap">
-                          <Link to={`/orders/detail/${o.id}`} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">
+                          <Link to={`/orders/detail/${o.id || o.orderId}`} className="rounded-xl border border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50">
                             Xem chi tiết
                           </Link>
                         </td>

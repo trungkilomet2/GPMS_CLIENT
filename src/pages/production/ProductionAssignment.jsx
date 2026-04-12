@@ -205,7 +205,7 @@ export default function ProductionAssignment() {
         {/* HEADER */}
         <div className="flex items-center justify-between">
            <div className="flex items-center gap-5">
-              <button onClick={() => navigate(-1)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm hover:text-emerald-500 transition">
+              <button onClick={() => navigate(-1)} className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm hover:text-[#1e6e43] transition">
                  <ArrowLeft size={20} />
               </button>
               <div>
@@ -216,7 +216,7 @@ export default function ProductionAssignment() {
            
            <button 
              onClick={() => isEditing ? setIsConfirmOpen(true) : setIsEditing(true)}
-             className={`h-12 px-8 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 ${isEditing ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-800 text-white shadow-slate-200'}`}
+             className={`h-12 px-8 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl flex items-center gap-3 ${isEditing ? 'bg-[#1e6e43] text-white shadow-green-100' : 'bg-[#1e6e43] text-white shadow-green-100/50'}`}
            >
               {isSaving ? <Loader2 className="animate-spin" size={16} /> : isEditing ? <Save size={16} /> : <Edit size={16} />}
               {isEditing ? "Lưu kết quả" : "Bắt đầu gán việc"}

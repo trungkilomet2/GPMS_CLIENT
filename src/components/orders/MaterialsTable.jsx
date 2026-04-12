@@ -28,7 +28,7 @@ const VARIANT_STYLES = {
         name: 'px-6 py-4 font-semibold text-gray-700 text-center',
         colorHeader: 'px-6 py-3 text-center',
         color: 'px-6 py-4 text-gray-600 text-center',
-        value: 'px-6 py-4 text-center text-emerald-700 font-bold',
+        value: 'px-6 py-4 text-center text-[#1e6e43] font-bold',
         uom: 'px-6 py-4 text-center text-gray-500 font-medium uppercase',
         empty: 'px-6 py-10 text-center text-gray-400 text-xs italic',
         imageHeader: 'px-6 py-3 text-center w-24',

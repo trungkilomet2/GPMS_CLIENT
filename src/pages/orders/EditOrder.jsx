@@ -112,10 +112,24 @@ export default function EditOrder() {
         setOrderData((prev) => ({ ...prev, ...formattedData }));
         setMaterials((data.materials || []).map(normalizeMaterial));
 
-        // Handle Variants
+        // Handle Variants / Sizes
+        const rawSizes = data.sizes || [];
         const rawVariants = data.variants || [];
         let parsedVariants = [];
-        if (Array.isArray(rawVariants) && rawVariants.length > 0) {
+
+        if (Array.isArray(rawSizes) && rawSizes.length > 0) {
+            const grouped = {};
+            const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+            rawSizes.forEach((s, idx) => {
+                const colorOrId = s.color || `Màu ${idx + 1}`;
+                if (!grouped[colorOrId]) {
+                    grouped[colorOrId] = { id: idx + 1, color: colorOrId, xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 };
+                }
+                const key = SIZE_ID_TO_KEY[s.sizeId];
+                if (key) grouped[colorOrId][key] = s.quantity;
+            });
+            parsedVariants = Object.values(grouped);
+        } else if (Array.isArray(rawVariants) && rawVariants.length > 0) {
             parsedVariants = rawVariants.map((v, idx) => ({
                 id: v.id || idx + 1,
                 color: v.color || '',
@@ -756,13 +770,27 @@ export default function EditOrder() {
                 });
             }
 
-            // Map variants to legacy fields and metadata
-            const activeSizes = new Set();
-            const activeColors = new Set();
+            const sizesPayload = [];
+            const SIZE_ID_MAP = {
+                'xs': 1,
+                's': 2,
+                'm': 3,
+                'l': 4,
+                'xl': 5,
+                '2xl': 6,
+                '3xl': 7
+            };
+
             variants.forEach(v => {
-                if (v.color?.trim()) activeColors.add(v.color.trim());
-                ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(s => {
-                    if (v[s] > 0) activeSizes.add(s.toUpperCase());
+                ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(sizeKey => {
+                    const qty = Number(v[sizeKey]) || 0;
+                    if (qty > 0) {
+                        sizesPayload.push({
+                            sizeId: SIZE_ID_MAP[sizeKey],
+                            color: v.color?.trim() || '',
+                            quantity: qty
+                        });
+                    }
                 });
             });
 
@@ -770,45 +798,35 @@ export default function EditOrder() {
                 userId: Number(orderData.userId ?? userId) || 0,
                 image: orderImageUrl || null,
                 orderName: orderData.orderName ?? '',
-                size: Array.from(activeSizes).join(', '),
-                color: Array.from(activeColors).join(', '),
                 startDate: orderData.startDate ?? '',
                 endDate: orderData.endDate ?? '',
                 quantity: Number(orderData.quantity) || 0,
                 cpu: Number(orderData.cpu) || 0,
                 note: orderData.note ?? '',
+                createTime: orderData.createTime || new Date().toISOString(),
                 materials: materialsPayload,
-                templates: templatesPayload,
-                variants: variants.map(v => ({
-                    color: v.color,
-                    xs: Number(v.xs) || 0,
-                    s: Number(v.s) || 0,
-                    m: Number(v.m) || 0,
-                    l: Number(v.l) || 0,
-                    xl: Number(v.xl) || 0,
-                    '2xl': Number(v['2xl']) || 0,
-                    '3xl': Number(v['3xl']) || 0,
-                }))
+                o_Material: materialsPayload,
+                templates: templatesPayload.map(t => ({
+                    ...t,
+                    type: "SOFT"
+                })),
+                o_Template: templatesPayload.map(t => ({
+                    ...t,
+                    type: "SOFT"
+                })),
+                sizes: sizesPayload
             };
 
             await OrderService.updateOrder(id, payload);
             setIsSuccessOpen(true);
         } catch (error) {
-            console.error('Lỗi API:', error.response?.data || error.message);
-            const data = error.response?.data;
-            let errorMsg = 'Không thể kết nối đến máy chủ';
+            console.error('--- LỖI API CHI TIẾT (EditOrder) ---');
+            console.error('Status:', error?.response?.status);
+            console.error('Data từ Backend:', error?.response?.data);
+            console.error('Message:', error?.message);
 
-            if (data) {
-                if (data.errors) {
-                    errorMsg = Object.values(data.errors)
-                        .flat()
-                        .map(translateError)
-                        .join(' - ');
-                } else {
-                    errorMsg = translateError(data.detail || data.title || error.message);
-                }
-            }
-            toast.error('Lỗi: ' + errorMsg);
+            const errMsg = getErrorMessage(error, 'Không thể cập nhật đơn hàng');
+            toast.error('Lỗi: ' + errMsg);
         } finally {
             setIsSubmitting(false);
         }

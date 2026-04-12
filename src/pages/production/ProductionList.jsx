@@ -342,8 +342,6 @@ export default function ProductionList() {
                     <th className="leave-table-th w-36 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Tên đơn</th>
                     <th className="leave-table-th w-20 px-3 py-4 text-left text-xs font-semibold uppercase tracking-wide">Người quản lý</th>
                     <th className="leave-table-th w-16 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Công đoạn</th>
-                    <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Bắt đầu</th>
-                    <th className="leave-table-th w-20 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Kết thúc</th>
                     <th className="leave-table-th w-24 px-2 py-4 text-center text-xs font-semibold uppercase tracking-wide">Trạng thái</th>
                     <th className="leave-table-th w-20 px-2 py-4 text-right text-xs font-semibold uppercase tracking-wide">Thao tác</th>
                   </tr>
@@ -351,19 +349,19 @@ export default function ProductionList() {
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-slate-600">
+                      <td colSpan={7} className="py-16 text-center text-slate-600">
                         Đang tải danh sách đơn sản xuất...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-red-600">
+                      <td colSpan={7} className="py-16 text-center text-red-600">
                         {error}
                       </td>
                     </tr>
                   ) : pageData.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-slate-600">
+                      <td colSpan={7} className="py-16 text-center text-slate-600">
                         Không có đơn sản xuất phù hợp
                       </td>
                     </tr>
@@ -382,8 +380,6 @@ export default function ProductionList() {
                         <td className="px-3 py-3 text-sm text-center text-slate-700 font-medium">
                           {partCounts[item.productionId] ?? "--"}
                         </td>
-                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.startDate ?? item.pStartDate ?? "-"}</td>
-                        <td className="px-3 py-3 text-sm text-slate-700 text-center">{item.endDate ?? item.pEndDate ?? "-"}</td>
                         <td className="px-3 py-3 text-center">
                           {(() => {
                             const statusLabel = item.statusName
