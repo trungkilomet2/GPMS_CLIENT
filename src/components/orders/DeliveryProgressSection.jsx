@@ -1,13 +1,13 @@
 import React from 'react';
 import { Truck, CheckCircle, Clock, Plus, BarChart2, Info, History } from 'lucide-react';
 
-export default function DeliveryProgressSection({ 
-    variants = [], 
-    deliveries = [], 
-    onAddDelivery, 
-    isOwner = false, 
-    isCustomer = false, 
-    onConfirmDelivery 
+export default function DeliveryProgressSection({
+    variants = [],
+    deliveries = [],
+    onAddDelivery,
+    isOwner = false,
+    isCustomer = false,
+    onConfirmDelivery
 }) {
     const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
     const sizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
@@ -69,7 +69,7 @@ export default function DeliveryProgressSection({
                 </div>
             </div>
 
-            {/* Stats Cards - Sleeker Design */}
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
                     { label: 'Tổng đặt hàng', value: totalOrdered, icon: BarChart2, color: 'gray' },
@@ -103,108 +103,101 @@ export default function DeliveryProgressSection({
                 })}
             </div>
 
-            {/* Compact Matrix View */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-8 py-5 border-b border-gray-50 flex items-center justify-between bg-white">
-                    <div className="flex items-center gap-3">
-                        <div className="w-1 h-5 bg-[#1e6e43] rounded-full" />
-                        <h4 className="text-[11px] font-bold uppercase tracking-widest text-gray-600">Ma trận giao nhận hợp nhất</h4>
+            {/* Unified Delivery Matrix */}
+            <div className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600">Ma trận giao nhận hợp nhất</h4>
+                </div>
+
+                <div className="border border-black overflow-hidden bg-white shadow-sm">
+                    {/* Grid Header */}
+                    <div className="grid grid-cols-11 bg-slate-50 border-b border-black divide-x divide-black">
+                        <div className="col-span-2 py-4 px-6 text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Phân loại Màu</div>
+                        {sizeLabels.map(s => (
+                            <div key={s} className="col-span-1 py-4 text-center text-[10px] font-black text-black uppercase tracking-widest flex items-center justify-center">{s}</div>
+                        ))}
+                        <div className="col-span-2 py-4 px-6 text-right text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Tiến độ dòng</div>
+                    </div>
+
+                    {/* Grid Body */}
+                    <div className="divide-y divide-black font-mono text-[13px]">
+                        {variants.map((v, idx) => {
+                            const rowOrdered = sizeKeys.reduce((sum, k) => sum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
+                            if (rowOrdered === 0) return null;
+
+                            const rowDelivered = deliveries
+                                .filter(d => d.color === v.color)
+                                .reduce((sum, d) => sum + (d.quantity || 0), 0);
+
+                            const rowProgress = Math.round((rowDelivered / rowOrdered) * 100);
+
+                            return (
+                                <div key={idx} className="grid grid-cols-11 items-stretch hover:bg-slate-50/50 transition-all divide-x divide-black">
+                                    <div className="col-span-2 py-4 px-6 flex items-center bg-slate-50/10">
+                                        <div className="flex items-center gap-2 truncate">
+                                            <span className="font-bold text-slate-800 uppercase truncate">{v.color}</span>
+                                        </div>
+                                    </div>
+                                    {sizeKeys.map(k => {
+                                        const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
+                                        const delivered = deliveries
+                                            .filter(d => d.color === v.color && d.size?.toLowerCase() === k)
+                                            .reduce((sum, d) => sum + (d.quantity || 0), 0);
+
+                                        const cellProgress = ordered > 0 ? (delivered / ordered) * 100 : 0;
+
+                                        return (
+                                            <div key={k} className="col-span-1 py-4 flex items-center justify-center">
+                                                {ordered > 0 ? (
+                                                    <div className="flex flex-col items-center gap-1 w-full px-1">
+                                                        <div className="flex items-baseline gap-0.5 justify-center">
+                                                            <span className={`font-black ${delivered === ordered ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                                {delivered}
+                                                            </span>
+                                                            <span className="text-[9px] font-bold text-slate-300">/</span>
+                                                            <span className="text-[10px] font-bold text-slate-400">{ordered}</span>
+                                                        </div>
+                                                        <div className="w-full max-w-[32px] h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full ${delivered === ordered ? 'bg-emerald-500' : 'bg-amber-400'} transition-all`}
+                                                                style={{ width: `${cellProgress}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-200 font-bold">-</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    <div className="col-span-2 py-4 px-6 flex flex-col items-end justify-center bg-slate-50/10 space-y-1">
+                                        <span className={`font-black ${rowProgress === 100 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                            {rowProgress}%
+                                        </span>
+                                        <div className="w-full h-1 bg-slate-200/50 rounded-full overflow-hidden">
+                                            <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${rowProgress}%` }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
+            </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                        <thead>
-                            <tr className="bg-[#F8FAF9]">
-                                <th className="px-8 py-5 text-left text-[9px] font-bold text-gray-600 uppercase tracking-widest border-b border-gray-100">Phân loại Màu</th>
-                                {sizeLabels.map(s => (
-                                    <th key={s} className="px-4 py-5 text-center text-[9px] font-bold text-gray-600 uppercase tracking-widest border-b border-gray-100">{s}</th>
-                                ))}
-                                <th className="px-8 py-5 text-right text-[9px] font-bold text-gray-600 uppercase tracking-widest border-b border-gray-100">Tiến độ dòng</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {variants.map((v, idx) => {
-                                const rowOrdered = sizeKeys.reduce((sum, k) => sum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
-                                if (rowOrdered === 0) return null;
-
-                                const rowDelivered = deliveries
-                                    .filter(d => d.color === v.color)
-                                    .reduce((sum, d) => sum + (d.quantity || 0), 0);
-
-                                const rowProgress = Math.round((rowDelivered / rowOrdered) * 100);
-
-                                return (
-                                    <tr key={idx} className="group hover:bg-gray-50/50 transition-all">
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-4 h-4 rounded-full border border-gray-100" style={{ backgroundColor: v.colorCode || '#cbd5e1' }} />
-                                                <span className="text-xs font-bold text-gray-700 uppercase">{v.color}</span>
-                                            </div>
-                                        </td>
-                                        {sizeKeys.map(k => {
-                                            const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
-                                            const delivered = deliveries
-                                                .filter(d => d.color === v.color && d.size?.toLowerCase() === k)
-                                                .reduce((sum, d) => sum + (d.quantity || 0), 0);
-
-                                            const cellProgress = ordered > 0 ? (delivered / ordered) * 100 : 0;
-
-                                            return (
-                                                <td key={k} className="px-4 py-6 text-center">
-                                                    {ordered > 0 ? (
-                                                        <div className="flex flex-col items-center gap-1.5">
-                                                            <div className="flex items-baseline gap-1">
-                                                                <span className={`text-[12px] font-bold ${delivered === ordered ? 'text-[#1e6e43]' : 'text-gray-900'}`}>
-                                                                    {delivered}
-                                                                </span>
-                                                                <span className="text-[10px] font-bold text-gray-400">/</span>
-                                                                <span className="text-[10px] font-bold text-gray-500">{ordered}</span>
-                                                            </div>
-                                                            <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                                                <div
-                                                                    className={`h-full ${delivered === ordered ? 'bg-[#2d9058]' : 'bg-amber-400/70'} transition-all`}
-                                                                    style={{ width: `${cellProgress}%` }}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-100 font-bold">-</span>
-                                                    )}
-                                                </td>
-                                            );
-                                        })}
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="inline-flex flex-col items-end gap-1.5">
-                                                <span className={`text-[12px] font-bold ${rowProgress === 100 ? 'text-[#1e6e43]' : 'text-gray-600'}`}>
-                                                    {rowProgress}%
-                                                </span>
-                                                <div className="w-20 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-[#1e6e43]" style={{ width: `${rowProgress}%` }} />
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Footer / Info */}
-                <div className="px-8 py-5 bg-[#F8FAF9]/50 border-t border-gray-50 flex items-center justify-between">
-                    <p className="text-[10px] font-medium text-gray-400 italic">
-                        * Dữ liệu được hợp nhất từ {deliveries.length} đợt giao hàng thực tế.
-                    </p>
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-[#1e6e43]" />
-                            <span className="text-[10px] font-bold uppercase text-gray-600 tracking-widest">Hoàn tất</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-amber-400/70" />
-                            <span className="text-[10px] font-bold uppercase text-gray-600 tracking-widest">Đang giao</span>
-                        </div>
+            <div className="px-8 py-5 bg-[#F8FAF9]/50 border-t border-gray-50 flex items-center justify-between">
+                <p className="text-[10px] font-medium text-gray-400 italic">
+                    * Dữ liệu được hợp nhất từ {deliveries.length} đợt giao hàng thực tế.
+                </p>
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#1e6e43]" />
+                        <span className="text-[10px] font-bold uppercase text-gray-600 tracking-widest">Hoàn tất</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-amber-400/70" />
+                        <span className="text-[10px] font-bold uppercase text-gray-600 tracking-widest">Đang giao</span>
                     </div>
                 </div>
             </div>
@@ -224,28 +217,22 @@ export default function DeliveryProgressSection({
                                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Lịch sử giao nhận & trạng thái xác nhận</p>
                                 </div>
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setIsDiaryOpen(false)}
                                 className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
                             >
                                 <Plus size={18} className="rotate-45" />
                             </button>
                         </div>
-
-                        {/* Modal Body - Timeline */}
                         <div className="flex-1 overflow-y-auto p-8 bg-gray-50/20">
                             <div className="relative pl-8 space-y-6 before:content-[''] before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-px before:bg-gray-200/60">
                                 {deliveries.slice().reverse().map((d, i) => {
                                     const originalIdx = deliveries.length - 1 - i;
                                     const autoConfirmed = isAutoConfirmed(d.date);
                                     const confirmed = d.isConfirmed || autoConfirmed;
-
                                     return (
                                         <div key={i} className="relative group">
-                                            <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${
-                                                confirmed ? 'bg-[#1e6e43]' : 'bg-amber-400'
-                                            }`} />
-
+                                            <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${confirmed ? 'bg-[#1e6e43]' : 'bg-amber-400'}`} />
                                             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:border-[#d4e3da] hover:shadow-md transition-all">
                                                 <div className="flex flex-wrap items-start justify-between gap-4">
                                                     <div className="space-y-4 flex-1">
@@ -254,27 +241,24 @@ export default function DeliveryProgressSection({
                                                                 <span className="text-[10px] font-black text-[#1e6e43] uppercase">{d.color} — {d.size?.toUpperCase()}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                                                 <span>{d.date}</span>
-                                                                 <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                                                 <span className="text-gray-900 font-black">+{d.quantity} SP</span>
+                                                                <span>{d.date}</span>
+                                                                <div className="w-1 h-1 rounded-full bg-gray-200" />
+                                                                <span className="text-gray-900 font-black">+{d.quantity} SP</span>
                                                             </div>
                                                         </div>
                                                         <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-600 font-medium leading-relaxed italic">
-                                                             "{d.note || 'Không có ghi chú nào cho đợt giao này.'}"
+                                                            "{d.note || 'Không có ghi chú nào cho đợt giao này.'}"
                                                         </div>
                                                     </div>
-
                                                     <div className="flex flex-col items-end gap-2">
                                                         {confirmed ? (
-                                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${
-                                                                autoConfirmed && !d.isConfirmed ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'
-                                                            }`}>
+                                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && !d.isConfirmed ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
                                                                 <CheckCircle size={12} />
                                                                 {autoConfirmed && !d.isConfirmed ? 'Đã nhận (Tự động)' : 'Đã xác nhận'}
                                                             </div>
                                                         ) : (
                                                             isCustomer && (
-                                                                <button 
+                                                                <button
                                                                     onClick={() => onConfirmDelivery(originalIdx)}
                                                                     className="px-5 h-8 bg-[#1e6e43] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-md shadow-green-100 hover:bg-[#155232] active:scale-95 transition-all"
                                                                 >
@@ -289,17 +273,15 @@ export default function DeliveryProgressSection({
                                     );
                                 })}
                                 {deliveries.length === 0 && (
-                                     <div className="flex flex-col items-center justify-center py-20 text-gray-300 gap-4">
-                                         <Truck size={40} className="opacity-20" />
-                                         <p className="text-[11px] font-bold uppercase tracking-widest italic">Chưa có lịch sử giao nhận cho đơn hàng này</p>
-                                     </div>
+                                    <div className="flex flex-col items-center justify-center py-20 text-gray-300 gap-4">
+                                        <Truck size={40} className="opacity-20" />
+                                        <p className="text-[11px] font-bold uppercase tracking-widest italic">Chưa có lịch sử giao nhận cho đơn hàng này</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
-
-                        {/* Modal Footer */}
                         <div className="px-8 py-5 bg-white border-t border-gray-100 flex justify-end">
-                            <button 
+                            <button
                                 onClick={() => setIsDiaryOpen(false)}
                                 className="px-8 h-10 bg-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest text-white hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95"
                             >
@@ -312,6 +294,7 @@ export default function DeliveryProgressSection({
         </div>
     );
 }
+
 function DetailItem({ label, value, isBold = false, isGreen = false }) {
     return (
         <div className="flex flex-col gap-1.5">

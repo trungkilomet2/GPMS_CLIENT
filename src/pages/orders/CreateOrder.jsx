@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
@@ -23,6 +23,70 @@ export default function CreateOrder() {
 
   const userId = getUserId();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const reuse = location.state?.reuseOrder;
+    if (!reuse) return;
+
+    // 1. Basic Info
+    setOrderData(prev => ({
+      ...prev,
+      orderName: `${reuse.orderName || ''}`,
+      image: reuse.image || '',
+      note: reuse.note || '',
+      cpu: reuse.cpu || '',
+    }));
+
+    // 2. Materials
+    if (reuse.materials && Array.isArray(reuse.materials)) {
+      setMaterials(reuse.materials.map(m => ({
+        materialName: m.materialName || '',
+        color: m.color || '',
+        value: m.value || m.quantity || '',
+        uom: m.uom || '',
+        image: m.image || '',
+        imageFile: null,
+        imagePreview: m.image || '',
+        note: m.note || '',
+      })));
+    }
+
+    // 3. Size / Variants Mapping (Matrix Conversion)
+    const rawSizes = reuse.sizes || reuse.size || [];
+    if (Array.isArray(rawSizes) && rawSizes.length > 0) {
+      const grouped = {};
+      const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+      rawSizes.forEach((item, idx) => {
+        const colorLabel = item.color || 'Mặc định';
+        if (!grouped[colorLabel]) {
+          grouped[colorLabel] = {
+            id: `reuse-${idx}-${Date.now()}`,
+            color: colorLabel,
+            xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+          };
+        }
+        const key = SIZE_ID_TO_KEY[item.sizeId];
+        if (key) grouped[colorLabel][key] = Number(item.quantity) || 0;
+      });
+      setVariants(Object.values(grouped));
+    }
+
+    // 4. Templates
+    const rawTemplates = reuse.templates || reuse.template || [];
+    if (Array.isArray(rawTemplates)) {
+      setTemplateItems(rawTemplates.map((t, idx) => ({
+        id: `reuse-tmp-${idx}-${Date.now()}`,
+        file: t.file || '',
+        fileName: t.templateName || 'Bản sao thiết kế',
+        templateName: t.templateName || 'Bản sao thiết kế',
+        type: t.type || 'FILE',
+        note: t.note || '',
+      })));
+    }
+
+    toast.info('Đã tải dữ liệu từ đơn hàng cũ.');
+  }, [location.state]);
 
   const [profileCheck, setProfileCheck] = useState({ checking: true, missing: [] });
 
@@ -111,7 +175,7 @@ export default function CreateOrder() {
 
   const handleVariantChange = (index, field, value) => {
     setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
-    
+
     // Clear global variants error if any
     if (errors.variantsGlobal) {
       setErrors(prev => {
@@ -188,7 +252,7 @@ export default function CreateOrder() {
       }
       const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
       if (sum > 0) hasAnyQuantity = true;
-      
+
       if (Object.keys(vErrs).length > 0) {
         variantErrors[idx] = vErrs;
       }
@@ -471,7 +535,7 @@ export default function CreateOrder() {
         let reason = "Định dạng không hỗ trợ";
         if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
         else if (!isNameOk) reason = "Tên file quá 255 ký tự";
-        
+
         invalid.push(`${file.name} (${reason})`);
       }
     });
@@ -502,7 +566,7 @@ export default function CreateOrder() {
       prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
     );
   };
-  
+
   const removeTemplateItem = (index) => {
     setDeleteConfirm({
       show: true,
@@ -711,7 +775,7 @@ export default function CreateOrder() {
       console.error('Status:', error?.response?.status);
       console.error('Data từ Backend:', error?.response?.data);
       console.error('Message:', error?.message);
-      
+
       const errMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ');
       toast.error('Lỗi: ' + errMsg);
     } finally {
@@ -741,8 +805,8 @@ export default function CreateOrder() {
                 <div className="flex-1">
                   <div className="mb-1 text-lg font-bold text-slate-900">Thông tin tài khoản chưa hoàn thiện</div>
                   <p className="text-slate-600 leading-relaxed mb-4">
-                    Để đảm bảo việc liên lạc và giao nhận hàng chính xác, vui lòng cập nhật đầy đủ 
-                    <span className="font-bold text-slate-900"> số điện thoại</span> và 
+                    Để đảm bảo việc liên lạc và giao nhận hàng chính xác, vui lòng cập nhật đầy đủ
+                    <span className="font-bold text-slate-900"> số điện thoại</span> và
                     <span className="font-bold text-slate-900"> địa chỉ</span> của bạn.
                   </p>
                   <button

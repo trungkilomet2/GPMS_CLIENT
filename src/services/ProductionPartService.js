@@ -11,8 +11,8 @@ const ProductionPartService = {
   getAssignWorkers(params) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.LIST_ASSIGN_WORKERS, { params });
   },
-  updateAssignWorker(partId, payload) {
-    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.UPDATE_ASSIGN_WORKERS(partId), payload);
+  updateAssignWorker(partId, partOrderSizeId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.UPDATE_ASSIGN_WORKERS(partId, partOrderSizeId), payload);
   },
   updatePart(partId, payload) {
     return axiosClient.put(API_ENDPOINTS.PRODUCTION_PART.UPDATE_PART(partId), payload);
@@ -27,8 +27,8 @@ const ProductionPartService = {
       data: payload,
     });
   },
-  getWorkLogs(partId) {
-    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_WORK_LOGS(partId));
+  getWorkLogs(partId, partOrderSizeId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_WORK_LOGS(partId, partOrderSizeId));
   },
   createIssue(partId, formData) {
     return axiosClient.post(

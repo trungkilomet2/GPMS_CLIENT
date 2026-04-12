@@ -19,6 +19,9 @@ const OrderService = {
     createOrder: (orderData) => {
         return axiosClient.post(API_ENDPOINTS.ORDER.CREATE_ORDER, orderData);
     },
+    createManualOrder: (orderData) => {
+        return axiosClient.post(API_ENDPOINTS.ORDER.CREATE_MANUAL, orderData);
+    },
     updateOrder: (orderId, orderData) => {
         return axiosClient.put(API_ENDPOINTS.ORDER.UPDATE_ORDER(orderId), orderData);
     },

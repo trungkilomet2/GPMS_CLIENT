@@ -112,49 +112,62 @@ export default function EditOrder() {
         setOrderData((prev) => ({ ...prev, ...formattedData }));
         setMaterials((data.materials || []).map(normalizeMaterial));
 
-        // Handle Variants / Sizes
-        const rawSizes = data.sizes || [];
-        const rawVariants = data.variants || [];
+        // Handle Variants / Sizes (Matrix Mapping)
+        const rawSizes = data.size || data.sizes || [];
+        const horizontalVariants = data.variants || data.orderVariants || data.orderItemVariants || [];
         let parsedVariants = [];
 
         if (Array.isArray(rawSizes) && rawSizes.length > 0) {
             const grouped = {};
             const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
-            rawSizes.forEach((s, idx) => {
-                const colorOrId = s.color || `Màu ${idx + 1}`;
-                if (!grouped[colorOrId]) {
-                    grouped[colorOrId] = { id: idx + 1, color: colorOrId, xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 };
+            rawSizes.forEach((item, idx) => {
+                const colorLabel = item.color || item.Color || 'Mặc định';
+                if (!grouped[colorLabel]) {
+                    grouped[colorLabel] = {
+                        id: `variant-${idx}-${Date.now()}`,
+                        color: colorLabel,
+                        xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+                    };
                 }
-                const key = SIZE_ID_TO_KEY[s.sizeId];
-                if (key) grouped[colorOrId][key] = s.quantity;
+                const key = SIZE_ID_TO_KEY[item.sizeId];
+                if (key) {
+                    grouped[colorLabel][key] = Number(item.quantity) || 0;
+                }
             });
             parsedVariants = Object.values(grouped);
-        } else if (Array.isArray(rawVariants) && rawVariants.length > 0) {
-            parsedVariants = rawVariants.map((v, idx) => ({
+        } else if (Array.isArray(horizontalVariants) && horizontalVariants.length > 0) {
+            parsedVariants = horizontalVariants.map((v, idx) => ({
                 id: v.id || idx + 1,
                 color: v.color || '',
-                xs: v.xs || 0,
-                s: v.s || 0,
-                m: v.m || 0,
-                l: v.l || 0,
-                xl: v.xl || 0,
-                '2xl': v['2xl'] || 0,
-                '3xl': v['3xl'] || 0,
+                xs: Number(v.xs || v.XS || 0),
+                s: Number(v.s || v.S || 0),
+                m: Number(v.m || v.M || 0),
+                l: Number(v.l || v.L || 0),
+                xl: Number(v.xl || v.XL || 0),
+                '2xl': Number(v['2xl'] || v['2XL'] || 0),
+                '3xl': Number(v['3xl'] || v['3XL'] || 0),
             }));
-        } else {
-            // Fallback: Create one variant from legacy color/size/quantity
-            parsedVariants = [{
-                id: 1,
-                color: formattedData.color || '',
-                xs: formattedData.size === 'XS' ? formattedData.quantity : 0,
-                s: formattedData.size === 'S' ? formattedData.quantity : 0,
-                m: formattedData.size === 'M' ? formattedData.quantity : 0,
-                l: formattedData.size === 'L' ? formattedData.quantity : 0,
-                xl: formattedData.size === 'XL' ? formattedData.quantity : 0,
-                '2xl': formattedData.size === '2XL' ? formattedData.quantity : 0,
-                '3xl': formattedData.size === '3XL' ? formattedData.quantity : 0,
-            }];
+        } else if (formattedData.color || formattedData.size) {
+            // Fallback: Create one variant from legacy root fields
+            const sKey = String(formattedData.size || '').toLowerCase();
+            const record = {
+                id: 'legacy-1',
+                color: formattedData.color || 'Mặc định',
+                xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+            };
+            if (sKey && record[sKey] !== undefined) {
+                record[sKey] = Number(formattedData.quantity) || 0;
+            } else {
+                record.s = Number(formattedData.quantity) || 0;
+            }
+            parsedVariants = [record];
         }
+
+        // If still empty, ensure at least one empty row
+        if (parsedVariants.length === 0) {
+            parsedVariants = [{ id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }];
+        }
+
         setVariants(parsedVariants);
         setInitialVariants(JSON.parse(JSON.stringify(parsedVariants)));
 
@@ -795,26 +808,29 @@ export default function EditOrder() {
             });
 
             const payload = {
-                userId: Number(orderData.userId ?? userId) || 0,
-                image: orderImageUrl || null,
-                orderName: orderData.orderName ?? '',
-                startDate: orderData.startDate ?? '',
-                endDate: orderData.endDate ?? '',
+                orderName: orderData.orderName?.trim() || '',
+                startDate: orderData.startDate || null,
+                endDate: orderData.endDate || null,
                 quantity: Number(orderData.quantity) || 0,
                 cpu: Number(orderData.cpu) || 0,
-                note: orderData.note ?? '',
-                createTime: orderData.createTime || new Date().toISOString(),
-                materials: materialsPayload,
-                o_Material: materialsPayload,
+                image: orderImageUrl || '',
+                note: orderData.note?.trim() || '',
+                sizes: sizesPayload,
                 templates: templatesPayload.map(t => ({
-                    ...t,
-                    type: "SOFT"
+                    templateName: t.templateName,
+                    type: "SOFT", // Mapping "SOFT" as standard technical requirement
+                    file: t.file,
+                    quantity: 1, // Defaulting to 1 as specified in dynamic structures
+                    note: t.note
                 })),
-                o_Template: templatesPayload.map(t => ({
-                    ...t,
-                    type: "SOFT"
-                })),
-                sizes: sizesPayload
+                materials: materialsPayload.map(m => ({
+                    materialName: m.materialName,
+                    color: m.color,
+                    image: m.image || '',
+                    value: Number(m.value) || 0,
+                    note: m.note,
+                    uom: m.uom
+                }))
             };
 
             await OrderService.updateOrder(id, payload);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Users, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
@@ -9,9 +9,12 @@ import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
+import OrderService from '@/services/OrderService';
+import { getStoredUser } from '@/lib/authStorage';
 
 export default function CreateManualOrder() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [customerData, setCustomerData] = useState({
     customerName: '',
@@ -30,7 +33,7 @@ export default function CreateManualOrder() {
     fetch('https://provinces.open-api.vn/api/v2/p/')
       .then(res => res.json())
       .then(data => setProvinces(data))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Cascading fetch for ALL Wards in a Province (v2, Bypassing Districts)
@@ -43,7 +46,7 @@ export default function CreateManualOrder() {
           // In v2, 'wards' is directly a child of the province object
           setWards(data.wards || []);
         })
-        .catch(() => {});
+        .catch(() => { });
     } else {
       setWards([]);
     }
@@ -97,7 +100,7 @@ export default function CreateManualOrder() {
 
   const handleVariantChange = (index, field, value) => {
     setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
-    
+
     // Clear specific errors if they exist
     if (errors.variants?.[index]?.[field]) {
       setErrors(prev => {
@@ -122,7 +125,7 @@ export default function CreateManualOrder() {
   };
 
   // Sync quantity automatically
-  useState(() => {
+  useEffect(() => {
     const total = variants.reduce((acc, v) => {
       const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
       return acc + sum;
@@ -130,11 +133,92 @@ export default function CreateManualOrder() {
     setOrderData(prev => ({ ...prev, quantity: total }));
   }, [variants]);
 
+  useEffect(() => {
+    const reuse = location.state?.reuseOrder;
+    if (!reuse) return;
+
+    // 1. Basic Order Info
+    setOrderData(prev => ({
+      ...prev,
+      orderName: `${reuse.orderName || ''}`,
+      image: reuse.image || '',
+      note: reuse.note || '',
+      cpu: reuse.cpu || '',
+    }));
+
+    // 2. Materials
+    if (reuse.materials && Array.isArray(reuse.materials)) {
+      setMaterials(reuse.materials.map(m => ({
+        materialName: m.materialName || '',
+        color: m.color || '',
+        value: m.value || m.quantity || '',
+        uom: m.uom || '',
+        image: m.image || '',
+        imageFile: null,
+        imagePreview: m.image || '',
+        note: m.note || '',
+      })));
+    }
+
+    // 3. Size / Variants Mapping (Matrix Conversion)
+    const rawSizes = reuse.sizes || reuse.size || [];
+    if (Array.isArray(rawSizes) && rawSizes.length > 0) {
+      const grouped = {};
+      const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+      rawSizes.forEach((item, idx) => {
+        const colorLabel = item.color || 'Mặc định';
+        if (!grouped[colorLabel]) {
+          grouped[colorLabel] = {
+            id: `reuse-${idx}-${Date.now()}`,
+            color: colorLabel,
+            xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+          };
+        }
+        const key = SIZE_ID_TO_KEY[item.sizeId];
+        if (key) grouped[colorLabel][key] = Number(item.quantity) || 0;
+      });
+      setVariants(Object.values(grouped));
+    }
+
+    // 4. Templates
+    const rawTemplates = reuse.templates || reuse.template || [];
+    if (Array.isArray(rawTemplates)) {
+      setTemplateItems(rawTemplates.map((t, idx) => ({
+        id: `reuse-tmp-${idx}-${Date.now()}`,
+        file: t.file || '',
+        fileName: t.templateName || 'Bản sao thiết kế',
+        templateName: t.templateName || 'Bản sao thiết kế',
+        type: t.type || 'FILE',
+        note: t.note || '',
+      })));
+    }
+
+    // 5. Guest Info (if any)
+    if (reuse.guest) {
+      setCustomerData(prev => ({
+        ...prev,
+        customerName: reuse.guest.fullName || '',
+        customerPhone: reuse.guest.phoneNumber || '',
+        customerAddress: reuse.guest.address || '',
+      }));
+    } else if (reuse.guestName || reuse.customerName) {
+      setCustomerData(prev => ({
+        ...prev,
+        customerName: reuse.guestName || reuse.customerName || '',
+        customerPhone: reuse.guestPhone || reuse.customerPhone || '',
+        customerAddress: reuse.guestAddress || reuse.customerAddress || '',
+      }));
+    }
+
+    toast.info('Đã tải dữ liệu từ đơn hàng cũ.');
+  }, [location.state]);
+
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [materialFormData, setMaterialFormData] = useState({
     materialName: '',
+    color: '',
     value: '',
     uom: '',
     image: '',
@@ -142,6 +226,7 @@ export default function CreateManualOrder() {
     imagePreview: '',
     note: '',
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderImageFile, setOrderImageFile] = useState(null);
   const [orderImagePreview, setOrderImagePreview] = useState('');
@@ -274,6 +359,7 @@ export default function CreateManualOrder() {
   const handleSaveMaterial = async () => {
     const pendingMaterial = {
       materialName: materialFormData.materialName,
+      color: materialFormData.color,
       value: parseMaterialValue(materialFormData.value),
       uom: materialFormData.uom,
       image: materialFormData.image || '',
@@ -395,7 +481,7 @@ export default function CreateManualOrder() {
         let reason = "Định dạng không hỗ trợ";
         if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
         else if (!isNameOk) reason = "Tên file quá 255 ký tự";
-        
+
         invalid.push(`${file.name} (${reason})`);
       }
     });
@@ -519,7 +605,7 @@ export default function CreateManualOrder() {
             const uploadRes = await CloudinaryService.uploadImage(m.imageFile);
             imageUrl = uploadRes?.url || null;
           } else if (typeof m.image === 'string' && !/^https?:\/\//i.test(m.image)) {
-            imageUrl = null; // Ensure invalid strings/empty are null
+            imageUrl = null;
           }
 
           return {
@@ -527,6 +613,7 @@ export default function CreateManualOrder() {
             value: Number(m.value) || 0,
             uom: m.uom,
             image: imageUrl,
+            color: m.color || '',
             note: m.note ?? '',
           };
         })
@@ -550,47 +637,65 @@ export default function CreateManualOrder() {
         });
       }
 
-      // Map variants to legacy fields
-      const activeSizes = new Set();
-      const activeColors = new Set();
+      // Size ID Mapping: XS:1, S:2, M:3, L:4, XL:5, 2XL:6, 3XL:7
+      const sizeIdMap = {
+        'xs': 1, 's': 2, 'm': 3, 'l': 4, 'xl': 5, '2xl': 6, '3xl': 7
+      };
+
+      const sizesPayload = [];
       variants.forEach(v => {
-        if (v.color?.trim()) activeColors.add(v.color.trim());
-        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(s => {
-          if (v[s] > 0) activeSizes.add(s.toUpperCase());
+        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(sKey => {
+          const qty = Number(v[sKey]) || 0;
+          if (qty > 0) {
+            sizesPayload.push({
+              sizeId: sizeIdMap[sKey],
+              color: v.color || 'Default',
+              quantity: qty
+            });
+          }
         });
       });
 
       const payload = {
-        customer: { ...customerData },
         order: {
-          ...orderData,
-          size: Array.from(activeSizes).join(', '),
-          color: Array.from(activeColors).join(', '),
-          image: orderImageUrl,
+          userId: getStoredUser()?.userId || getStoredUser()?.id || 0,
+          image: orderImageUrl || '',
+          orderName: orderData.orderName || '',
+          startDate: orderData.startDate,
+          endDate: orderData.endDate,
+          quantity: Number(orderData.quantity) || 0,
+          cpu: Number(orderData.cpu) || 0,
+          note: orderData.note || '',
+          createTime: new Date().toISOString(),
           materials: materialsPayload,
           templates: templatesPayload,
-          variants: variants.map(v => ({
-            color: v.color,
-            xs: Number(v.xs) || 0,
-            s: Number(v.s) || 0,
-            m: Number(v.m) || 0,
-            l: Number(v.l) || 0,
-            xl: Number(v.xl) || 0,
-            '2xl': Number(v['2xl']) || 0,
-            '3xl': Number(v['3xl']) || 0,
-          }))
+          sizes: sizesPayload
         },
+        guest: {
+          fullName: customerData.customerName || '',
+          phoneNumber: customerData.customerPhone || '',
+          address: customerData.customerAddress || ''
+        }
       };
 
-      console.log('Manual order payload (hardcode):', payload);
+      console.log('Final Manual Order Payload:', JSON.stringify(payload, null, 2));
+
+      const response = await OrderService.createManualOrder(payload);
+
+      // Since our axiosClient returns response.data directly, 
+      // getting here means the request was successful.
+      toast.success("Tạo đơn hàng thủ công thành công!");
       setIsSuccessOpen(true);
+
     } catch (error) {
-      console.error('Lỗi xử lý (CreateManualOrder):', error.response?.data || error.message);
+      console.error('Lỗi API (CreateManualOrder):', error.response?.data || error.message);
       const data = error.response?.data;
       let errorMsg = 'Không thể kết nối đến máy chủ';
-      
+
       if (data) {
-        if (data.errors) {
+        if (typeof data === 'string') {
+          errorMsg = data;
+        } else if (data.errors) {
           errorMsg = Object.values(data.errors)
             .flat()
             .map(translateError)
@@ -598,6 +703,8 @@ export default function CreateManualOrder() {
         } else {
           errorMsg = translateError(data.detail || data.title || error.message);
         }
+      } else {
+        errorMsg = error.message;
       }
       toast.error('Lỗi: ' + errorMsg);
     } finally {
@@ -629,7 +736,7 @@ export default function CreateManualOrder() {
                 <Users size={20} className="text-emerald-500" />
                 <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Thông tin khách hàng</h2>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <OrderInput
                   label="Tên khách hàng"
@@ -653,10 +760,10 @@ export default function CreateManualOrder() {
 
               <div className="pt-4 space-y-6">
                 <div className="flex items-center gap-2 mb-2">
-                   <div className="w-1 h-4 bg-emerald-500 rounded-full" />
-                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Địa chỉ giao hàng</span>
+                  <div className="w-1 h-4 bg-emerald-500 rounded-full" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Địa chỉ giao hàng</span>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <OrderSelect
                     label="Tỉnh / Thành phố"
@@ -694,8 +801,8 @@ export default function CreateManualOrder() {
                 />
 
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic">
-                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Xem trước địa chỉ hợp nhất (2025):</p>
-                   <p className="text-xs font-bold text-slate-600">{customerData.customerAddress || "—"}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Xem trước địa chỉ hợp nhất (2025):</p>
+                  <p className="text-xs font-bold text-slate-600">{customerData.customerAddress || "—"}</p>
                 </div>
               </div>
             </div>
@@ -717,6 +824,7 @@ export default function CreateManualOrder() {
                 setEditingIndex(i);
                 setMaterialFormData({
                   materialName: materials[i].materialName ?? materials[i].name ?? '',
+                  color: materials[i].color ?? '',
                   value: materials[i].value ?? materials[i].quantity ?? '',
                   uom: materials[i].uom ?? '',
                   image: materials[i].image ?? '',

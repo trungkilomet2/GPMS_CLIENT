@@ -4,7 +4,8 @@ import {
   ArrowLeft, Edit, Plus, Users, LayoutList, History,
   Trash2, AlertTriangle, CheckCircle, Send, RotateCcw,
   Eye, FileText, Settings, Hammer, Scissors, Package, Download, Info,
-  Loader2, MessageSquare, Truck, BarChart2, Activity, UserCheck, Clock, Layers
+  Loader2, MessageSquare, Truck, BarChart2, Activity, UserCheck, Clock, Layers,
+  Circle, CheckCircle2, AlertCircle, RefreshCw, ChevronDown, ChevronRight, ClipboardCheck
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import MaterialsTable from "@/components/orders/MaterialsTable";
@@ -20,12 +21,14 @@ import {
   STATUS_STYLES as PRODUCTION_STATUS_STYLES,
   getProductionStatusLabel,
   getPlanStatusLabel,
+  getVariantStatusLabel,
   STATUS_STYLES
 } from "@/utils/statusUtils";
 import "@/styles/leave.css";
 import { userService } from "@/services/UserService";
 import ProductionPartService from "@/services/ProductionPartService";
 import CuttingNotebookService from "@/services/CuttingNotebookService";
+import WorkerService from "@/services/WorkerService";
 import { toast } from "react-toastify";
 import Pagination from "@/components/Pagination";
 import { Link } from "react-router-dom";
@@ -34,6 +37,7 @@ import { hasAnyRole } from "@/lib/roleAccess";
 import DesignTemplatesSection from '@/components/orders/DesignTemplatesSection';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
+import { processOrderVariants } from '@/lib/orders/variants';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -78,9 +82,11 @@ export default function ProductionDetail() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [steps, setSteps] = useState([]);
+  const [rawParts, setRawParts] = useState([]);
   const [totalParts, setTotalParts] = useState(0);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('production'); // production, order_info, history
+  const [activeTab, setActiveTab] = useState('production');
+  const [workerMap, setWorkerMap] = useState({}); // id -> fullName
 
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
@@ -110,9 +116,10 @@ export default function ProductionDetail() {
             pmName: payload.pm?.fullName ?? payload.pmName ?? (payload.pmId ? `Quản lý #${payload.pmId}` : ""),
             note: payload.note || payload.productionNote || "",
             order: {
+              ...payload,
               ...order,
-              templates: Array.isArray(order.templates) ? order.templates.map(t => ({ ...t, templateName: t.templateName ?? t.name })) : [],
-              materials: Array.isArray(order.materials) ? order.materials.map(m => ({ ...m, materialName: m.materialName ?? m.name })) : [],
+              templates: Array.isArray(order.templates || payload.templates) ? (order.templates || payload.templates).map(t => ({ ...t, templateName: t.templateName ?? t.name })) : [],
+              materials: Array.isArray(order.materials || payload.materials) ? (order.materials || payload.materials).map(m => ({ ...m, materialName: m.materialName ?? m.name })) : [],
             }
           });
         }
@@ -132,15 +139,97 @@ export default function ProductionDetail() {
     ProductionService.getProductionRejectReason(production.productionId).then(res => setRejectReason(res?.data)).catch(() => setRejectReason(null));
   }, [production?.productionId, production?.status]);
 
+  // Load worker directory để resolve assigneeIds → tên thật (role-aware, không crash 403)
+  useEffect(() => {
+    const loadWorkerMap = async () => {
+      try {
+        const calls = [];
+        // Nếu là Owner/Admin, ưu tiên lấy danh bạ toàn hệ thống và danh bạ manager
+        if (isOwner) {
+          calls.push(WorkerService.getEmployeeDirectory({ PageSize: 1000 }));
+          calls.push(WorkerService.getManagerDirectory({ PageSize: 1000 }));
+        } else {
+          // Nếu là PM/Worker, chỉ nên lấy danh bạ trong phạm vi được phép (PM Scope)
+          // để tránh lỗi 403 Forbidden khi truy cập danh bạ toàn cục.
+          calls.push(WorkerService.getEmployeeDirectoryByPmScope({ PageSize: 1000 }));
+        }
+
+        const results = await Promise.allSettled(calls);
+
+        const map = {};
+        const process = (p) => {
+          if (p.status === 'fulfilled' && p.value?.data) {
+            p.value.data.forEach(e => {
+              if (e.id) {
+                const sid = String(e.id);
+                // Ưu tiên fullName thực sự > userName > fallback Thợ #id
+                const realName = (e.fullName && e.fullName !== "Chưa cập nhật") 
+                   ? e.fullName 
+                   : (e.userName || `Thợ #${e.id}`);
+                map[sid] = realName;
+              }
+            });
+          }
+        };
+
+        results.forEach(process);
+
+        // Bổ sung PM của chính dự án này vào map để chắc chắn hiển thị đúng tên Tùng (Manager)
+        if (production?.pmId && production?.pmName) {
+          map[String(production.pmId)] = production.pmName;
+        }
+
+        setWorkerMap(map);
+      } catch (err) {
+        console.error("Worker map load error:", err);
+      }
+    };
+    loadWorkerMap();
+  }, [isOwner, production?.pmId, production?.pmName]);
+
   useEffect(() => {
     if (!production?.productionId) return;
-    ProductionPartService.getPartsByProduction(production.productionId, { PageIndex: 0, PageSize: 50, SortColumn: "Name", SortOrder: "ASC" })
+    ProductionPartService.getPartsByProduction(production.productionId, { PageIndex: 0, PageSize: 100, SortColumn: "id", SortOrder: "ASC" })
       .then(res => {
-        const list = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
-        setSteps(list);
-        setTotalParts(list.length);
+        const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+        setRawParts(rawList);
+        setTotalParts(rawList.length);
       });
   }, [production?.productionId]);
+
+  // Flatten rawParts + workerMap → steps, tự re-compute khi worker map load xong
+  useEffect(() => {
+    if (!rawParts.length) return;
+    const flattened = [];
+    rawParts.forEach(part => {
+      const variants = part.listPartOrderSizes || [];
+      if (variants.length > 0) {
+        variants.forEach(variant => {
+          flattened.push({
+            ...part,
+            id: variant.id,
+            partId: part.id,
+            variant: variant,
+            colorName: variant.color,
+            sizeName: variant.size,
+            quantity: variant.quantity,
+            actualQuantity: variant.actualQuantity || 0,
+            unitPrice: part.cpu,
+            statusName: part.statusName,
+            variantStatusId: variant.partOrderSizeStatusId,
+            assignees: (variant.assigneeIds || variant.assignees || variant.workers || []).map(a => {
+              if (typeof a === 'object') return a;
+              const sid = String(a);
+              return { id: sid, fullName: workerMap[sid] || `Thợ #${sid}`, name: workerMap[sid] || `Thợ #${sid}` };
+            }),
+          });
+        });
+      } else {
+        flattened.push({ ...part, unitPrice: part.cpu, actualQuantity: 0, quantity: 0 });
+      }
+    });
+    setSteps(flattened);
+  }, [rawParts, workerMap]);
 
   // --- DERIVED VALUES ---
   const isAssignedPM = isOwner || (isPM && String(currentUserId) === String(production?.pmId));
@@ -160,18 +249,33 @@ export default function ProductionDetail() {
   });
 
   const processedVariants = useMemo(() => {
-    if (!order) return [];
-    const realVariants = order.variants || order.orderVariants || order.productVariants || order.itemVariants || (order.data?.variants);
-    const mockVariants = [
-      { color: 'Đỏ Đô', colorCode: '#991b1b', xs: 15, s: 25, m: 40, l: 30, xl: 20, '2xl': 10, '3xl': 5 },
-      { color: 'Xám Khói', colorCode: '#475569', xs: 10, s: 30, m: 55, l: 45, xl: 15, '2xl': 5, '3xl': 0 },
-      { color: 'Xanh Navy', colorCode: '#1e3a8a', xs: 20, s: 40, m: 60, l: 50, xl: 30, '2xl': 15, '3xl': 10 },
-    ];
-    return (Array.isArray(realVariants) && realVariants.length > 0) ? realVariants : mockVariants;
+    return processOrderVariants(order);
   }, [order]);
 
-  const softTemplates = Array.isArray(order.templates) ? order.templates.filter(t => t.type !== "HARD") : [];
   const statusStyle = PRODUCTION_STATUS_STYLES[production?.status] || PRODUCTION_STATUS_STYLES["Default"];
+  const softTemplates = Array.isArray(order.templates) ? order.templates.filter(t => t.type !== "HARD") : [];
+
+  const stagesSummary = useMemo(() => {
+    const total = steps.length;
+    const completedCount = steps.filter(s => {
+      const status = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+      return status === "Đã Hoàn Thành" || status === "Hoàn Thành";
+    }).length;
+    const inProgressCount = steps.filter(s => {
+      const status = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+      return status === "Đang Thực Hiện";
+    }).length;
+    const pendingCount = steps.filter(s => {
+      const status = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+      return status === "Đợi Xác Nhận" || status === "Chờ Chấp Nhận" || status === "Chưa Bắt Đầu";
+    }).length;
+    const issuesCount = steps.filter(s => {
+      const status = s.statusName || getPlanStatusLabel(s.statusId || s.status);
+      return status === "Báo Lỗi" || status === "Sự Cố";
+    }).length;
+
+    return { total, completed: completedCount, inProgress: inProgressCount, pending: pendingCount, issues: issuesCount, percent: total > 0 ? Math.round((completedCount / total) * 100) : 0 };
+  }, [steps]);
 
   // --- HANDLERS ---
   const handleApproveProduction = () => setIsApproveOrderConfirmOpen(true);
@@ -396,119 +500,19 @@ export default function ProductionDetail() {
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="px-8 py-5 text-left text-[9px] font-bold text-gray-500 uppercase tracking-widest">Tên công đoạn</th>
-                            <th className="px-4 py-5 text-center text-[9px] font-bold text-gray-500 uppercase tracking-widest">Màu sắc</th>
-                            <th className="px-4 py-5 text-center text-[9px] font-bold text-gray-500 uppercase tracking-widest">Kích cỡ</th>
-                            <th className="px-6 py-5 text-center text-[9px] font-bold text-gray-500 uppercase tracking-widest">Nhân sự</th>
-                            <th className="px-6 py-5 text-center text-[9px] font-bold text-gray-500 uppercase tracking-widest">Trạng thái</th>
-                            <th className="px-8 py-5 text-right text-[9px] font-bold text-gray-500 uppercase tracking-widest">Hành động</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {steps.map((row, idx) => {
-                            const partStatus = row.statusName || getPlanStatusLabel(row.statusId || row.status);
-                            const isDone = partStatus === "Đã Hoàn Thành" || partStatus === "Hoàn Thành";
-
-                            return (
-                              <tr key={idx} className="group hover:bg-gray-50 transition-all border-b border-gray-50">
-                                <td className="px-8 py-6">
-                                  <div className="flex flex-col gap-1">
-                                    <span className="text-sm font-bold text-gray-900 uppercase tracking-tight">{row.partName || row.name}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] font-medium text-gray-500">Đơn giá: {row.unitPrice?.toLocaleString() || row.price?.toLocaleString() || '-'} đ</span>
-                                      <span className="w-1 h-1 rounded-full bg-gray-200" />
-                                      <span className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-widest">Tiến độ: {row.actualQuantity || 0} / {row.quantity || '-'}</span>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-6 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border border-gray-200" style={{ backgroundColor: row.colorCode || '#eee' }} />
-                                    <span className="text-[11px] font-bold text-gray-700">{row.color || row.variant?.color || '-'}</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-6 text-center">
-                                  <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-1 rounded bg-gray-100 text-[10px] font-black text-gray-600 border border-gray-200 uppercase">
-                                    {row.sizeName || row.sizeValue || row.size || row.variant?.sizeName || '-'}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-6 font-bold text-sm text-center">
-                                  <div className="flex -space-x-2 justify-center">
-                                    {(row.assignees || row.workers || []).slice(0, 3).map((w, wi) => (
-                                      <div key={wi} className="w-8 h-8 rounded-full bg-[#f0f9f4] border border-white flex items-center justify-center text-[10px] font-bold text-[#1e6e43] shadow-sm" title={w.fullName || w.name}>
-                                        {String(w.fullName || w.name || "?").charAt(0).toUpperCase()}
-                                      </div>
-                                    ))}
-                                    {(row.assignees || row.workers || []).length > 3 && (
-                                      <div className="w-8 h-8 rounded-full bg-gray-50 border border-white flex items-center justify-center text-[9px] font-bold text-gray-400 shadow-sm">
-                                        +{(row.assignees || row.workers || []).length - 3}
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-6 text-center">
-                                  {(() => {
-                                    const s = partStatus;
-                                    let badgeClass = "bg-gray-100 text-gray-500 border-gray-200";
-                                    if (s === "Đã Hoàn Thành" || s === "Hoàn Thành") badgeClass = "bg-[#f0f9f4] text-[#1e6e43] border-[#d4e3da]";
-                                    if (s === "Đang Thực Hiện") badgeClass = "bg-amber-50 text-amber-700 border-amber-100";
-                                    if (s === "Đợi Xác Nhận" || s === "Chờ Chấp Nhận") badgeClass = "bg-indigo-50 text-indigo-700 border-indigo-100";
-                                    if (s === "Báo Lỗi" || s === "Sự Cố") badgeClass = "bg-rose-50 text-rose-700 border-rose-100";
-
-                                    return (
-                                      <div className={`inline-flex items-center justify-center px-4 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest border transition-all ${badgeClass}`}>
-                                        {s}
-                                      </div>
-                                    );
-                                  })()}
-                                </td>
-                                <td className="px-8 py-6 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <button onClick={() => navigate(`/production/part/${row.id}/history`)} className="p-2 rounded-lg bg-gray-50 text-gray-400 hover:bg-gray-900 hover:text-white transition-all shadow-sm" title="Lịch sử báo cáo sản lượng">
-                                      <LayoutList size={16} />
-                                    </button>
-                                    {!isDone && isInProduction && (isOwner || isPM) && (
-                                      <button
-                                        onClick={() => {
-                                          if (row.actualQuantity < row.quantity && partStatus !== "Đợi Xác Nhận") {
-                                            toast.warning("Công đoạn chưa hoàn thành hoặc chưa ở trạng thái chờ nghiệm thu!");
-                                            return;
-                                          }
-                                          handleDonePart(row.id);
-                                        }}
-                                        className={`p-2 rounded-lg transition-all shadow-sm ${(row.actualQuantity >= row.quantity || partStatus === "Đợi Xác Nhận")
-                                          ? 'bg-[#f0f9f4] text-[#1e6e43] hover:bg-[#1e6e43] hover:text-white'
-                                          : 'bg-gray-50 text-gray-200 cursor-not-allowed'
-                                          }`}
-                                        title={row.actualQuantity < row.quantity ? "Sản lượng chưa đạt mục tiêu" : "Xác nhận hoàn thành công đoạn"}
-                                      >
-                                        <CheckCircle size={16} />
-                                      </button>
-                                    )}
-                                    <button onClick={() => handleBaoLoi(row)} className="p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white transition-all shadow-sm" title="Báo cáo lỗi / Sự cố">
-                                      <AlertTriangle size={16} />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                          {steps.length === 0 && (
-                            <tr>
-                              <td colSpan={6} className="px-8 py-20 text-center">
-                                <div className="flex flex-col items-center gap-2">
-                                  <Layers size={40} className="text-gray-100" />
-                                  <p className="text-[11px] font-bold text-gray-300 uppercase tracking-widest">Chưa có kế hoạch công đoạn</p>
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                    <div className="overflow-y-auto max-h-[480px] scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                      <StageMatrix
+                        steps={steps}
+                        isInProduction={isInProduction}
+                        isOwner={isOwner}
+                        isPM={isPM}
+                        navigate={navigate}
+                        handleDonePart={handleDonePart}
+                        handleBaoLoi={handleBaoLoi}
+                        getPlanStatusLabel={getPlanStatusLabel}
+                        getVariantStatusLabel={getVariantStatusLabel}
+                        toast={toast}
+                      />
                     </div>
                   </div>
 
@@ -565,37 +569,52 @@ export default function ProductionDetail() {
                       </div>
                     </div>
 
-                    <div className="space-y-6 pt-10 border-t border-black-100">
-                      <div className="mb-6">
-                        <p className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-[0.2em] mb-1">Ma trận chi tiết</p>
-                        <h4 className="text-lg font-bold text-gray-900 tracking-tight uppercase">Phân bổ Màu & Size</h4>
+                    <div className="space-y-6 pt-10 border-t border-gray-100">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="w-2 h-6 bg-emerald-500 rounded-full" />
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600">Phân bổ Màu & Size</h4>
                       </div>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-10 bg-gray-50 rounded-xl py-4 px-8 border border-gray-100">
-                          <div className="col-span-2 text-[8px] font-bold text-gray-500 uppercase tracking-widest">Màu sắc</div>
-                          {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].map(s => <div key={s} className="text-center text-[8px] font-bold text-gray-500 uppercase tracking-widest">{s}</div>)}
-                          <div className="text-right text-[8px] font-bold text-gray-500 uppercase tracking-widest">Tổng</div>
+
+                      <div className="border border-black overflow-hidden bg-white shadow-sm">
+                        {/* Matrix Header */}
+                        <div className="grid grid-cols-11 bg-slate-50 border-b border-black divide-x divide-black">
+                          <div className="col-span-2 py-4 px-6 text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Phối màu</div>
+                          {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].map(s => (
+                            <div key={s} className="col-span-1 py-4 text-center text-[10px] font-black text-black uppercase tracking-widest flex items-center justify-center">{s}</div>
+                          ))}
+                          <div className="col-span-2 py-4 px-6 text-right text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Tổng cộng</div>
                         </div>
-                        <div className="space-y-1">
-                          {processedVariants.map((v, idx) => {
-                            const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
-                            const total = sizeKeys.reduce((acc, k) => acc + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
-                            return (
-                              <div key={idx} className="grid grid-cols-10 py-4 px-8 items-center bg-white border border-gray-50 rounded-xl hover:bg-gray-50 transition-all">
-                                <div className="col-span-2 flex items-center gap-3">
-                                  <div className="w-3.5 h-3.5 rounded-full border border-gray-100" style={{ backgroundColor: v.colorCode || '#cbd5e1' }} />
-                                  <span className="text-[11px] font-bold text-gray-800 uppercase tracking-tight">{v.color}</span>
+
+                        {/* Matrix Body */}
+                        <div className="divide-y divide-black font-mono text-[13px]">
+                          {processedVariants.length > 0 ? (
+                            processedVariants.map((v, idx) => {
+                              const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
+                              const rowTotal = sizeKeys.reduce((acc, k) => acc + (v[k] || 0), 0);
+                              return (
+                                <div key={idx} className="grid grid-cols-11 items-stretch hover:bg-slate-50/50 transition-all divide-x divide-black">
+                                  <div className="col-span-2 py-4 px-6 flex items-center bg-slate-50/10">
+                                    <span className="text-[12px] font-black text-black uppercase tracking-tight truncate">{v.color}</span>
+                                  </div>
+                                  {sizeKeys.map(k => (
+                                    <div key={k} className="col-span-1 py-4 text-center flex items-center justify-center">
+                                      <span className={`text-[13px] font-black ${v[k] > 0 ? 'text-[#1e6e43]' : 'text-slate-300'}`}>
+                                        {v[k] > 0 ? v[k].toLocaleString() : '-'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="col-span-2 py-4 px-6 text-right flex items-center justify-end bg-slate-50/10">
+                                    <span className="text-[14px] font-black text-black">{rowTotal.toLocaleString()}</span>
+                                  </div>
                                 </div>
-                                {sizeKeys.map(k => {
-                                  const val = Number(v[k] || v[k.toUpperCase()] || 0);
-                                  return <div key={k} className="text-center text-[10px] font-bold text-gray-600">{val || '-'}</div>;
-                                })}
-                                <div className="text-right">
-                                  <span className="bg-gray-100 px-3 py-1 rounded-lg text-[9px] font-bold text-gray-700">{total}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })
+                          ) : (
+                            <div className="py-20 flex flex-col items-center justify-center bg-slate-50/30">
+                              <Package className="text-slate-200 mb-4" size={32} />
+                              <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Chưa có dữ liệu phân bổ</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -616,7 +635,6 @@ export default function ProductionDetail() {
                         variant="detail"
                         showImage
                         emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
-                        onImageClick={(url) => { if (url) { setZoomImageUrl(url); setIsImageModalOpen(true); } }}
                       />
                     </div>
                   </div>
@@ -660,6 +678,268 @@ export default function ProductionDetail() {
       <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message="Chấp nhận đơn sản xuất thành công!" />
       <SuccessModal isOpen={isRejectSuccessModalOpen} onClose={() => setIsRejectSuccessModalOpen(false)} message="Đã từ chối đơn sản xuất." />
     </OwnerLayout>
+  );
+}
+
+function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDonePart, handleBaoLoi, getPlanStatusLabel, getVariantStatusLabel, toast }) {
+  const [expandedStageIds, setExpandedStageIds] = useState(new Set());
+
+  // Group flat steps by partName/partId
+  const groups = useMemo(() => {
+    const map = new Map();
+    steps.forEach(row => {
+      const key = row.partId ?? row.partName;
+      if (!map.has(key)) {
+        map.set(key, { key, partName: row.partName, unitPrice: row.unitPrice, variants: [] });
+      }
+      map.get(key).variants.push(row);
+    });
+    return Array.from(map.values());
+  }, [steps]);
+
+  const toggleStage = (key) => {
+    setExpandedStageIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const getStageStatus = (variants, getPlanStatusLabel) => {
+    const statuses = variants.map(v => v.statusName || getPlanStatusLabel(v.statusId || v.status));
+    if (statuses.every(s => s === "Đã Hoàn Thành" || s === "Hoàn Thành")) return "Đã Hoàn Thành";
+    if (statuses.some(s => s === "Báo Lỗi" || s === "Sự Cố")) return "Báo Lỗi";
+    if (statuses.some(s => s === "Chờ Nghiệm Thu")) return "Chờ Nghiệm Thu";
+    if (statuses.some(s => s === "Đang Sản Xuất" || s === "Đang Thực Hiện")) return "Đang Sản Xuất";
+    if (statuses.some(s => s === "Đợi Xác Nhận" || s === "Chờ Chấp Nhận")) return "Đợi Xác Nhận";
+    return "Chưa Thực Hiện";
+  };
+
+  const STATUS_CONFIG = {
+    // Stage-level (PPS)
+    "Đã Hoàn Thành":   { color: "text-emerald-700", bg: "bg-emerald-50",  dot: "bg-emerald-500", label: "Đã hoàn thành" },
+    "Hoàn Thành":      { color: "text-emerald-700", bg: "bg-emerald-50",  dot: "bg-emerald-500", label: "Đã hoàn thành" },
+    "Đang Sản Xuất":   { color: "text-blue-700",    bg: "bg-blue-50",    dot: "bg-blue-500",    label: "Đang sản xuất" },
+    // Variant-level (PPOSS)
+    "Đang Thực Hiện":  { color: "text-amber-700",   bg: "bg-amber-50",   dot: "bg-amber-500",   label: "Đang thực hiện" },
+    "Chờ Nghiệm Thu":  { color: "text-indigo-700",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Chờ nghiệm thu" },
+    // Common
+    "Chưa Thực Hiện":  { color: "text-gray-400",    bg: "bg-gray-50",    dot: "bg-gray-300",    label: "Chưa thực hiện" },
+    "Báo Lỗi":         { color: "text-rose-600",    bg: "bg-rose-50",    dot: "bg-rose-500",    label: "Báo lỗi" },
+    "Sự Cố":           { color: "text-rose-600",    bg: "bg-rose-50",    dot: "bg-rose-500",    label: "Sự cố" },
+    "Đợi Xác Nhận":    { color: "text-indigo-600",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Đợi xác nhận" },
+    "Chờ Chấp Nhận":   { color: "text-indigo-600",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Đợi xác nhận" },
+  };
+
+  if (steps.length === 0) {
+    return (
+      <div className="py-20 flex flex-col items-center gap-3 text-gray-300 border-t border-gray-100">
+        <Layers size={36} />
+        <p className="text-[10px] font-black uppercase tracking-widest">Chưa có kế hoạch thiết lập</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-t border-gray-100 divide-y divide-gray-100">
+      {/* Header */}
+      <div className="grid grid-cols-12 items-center px-6 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+        <div className="col-span-4 text-xs font-black text-gray-500 uppercase tracking-widest">Công đoạn</div>
+        <div className="col-span-3 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Biến thể</div>
+        <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Sản lượng</div>
+        <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Trạng thái</div>
+        <div className="col-span-1"></div>
+      </div>
+
+      {groups.map((group, gIdx) => {
+        const isExpanded = expandedStageIds.has(group.key);
+        const stageStatus = getStageStatus(group.variants, getPlanStatusLabel);
+        const cfg = STATUS_CONFIG[stageStatus] || STATUS_CONFIG["Chưa Thực Hiện"];
+        const totalQty = group.variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0);
+        const actualQty = group.variants.reduce((s, v) => s + (Number(v.actualQuantity) || 0), 0);
+        const pct = totalQty > 0 ? Math.min(100, Math.round((actualQty / totalQty) * 100)) : 0;
+        const allAssignees = [];
+        const seenIds = new Set();
+        group.variants.forEach(v => (v.assignees || []).forEach(w => {
+          const wid = w.id || w.name || w.fullName;
+          if (!seenIds.has(wid)) { seenIds.add(wid); allAssignees.push(w); }
+        }));
+
+        return (
+          <div key={group.key} className="group/stage">
+            {/* Stage Row */}
+            <button
+              onClick={() => toggleStage(group.key)}
+              className="w-full grid grid-cols-12 items-center px-6 py-2.5 hover:bg-emerald-50/30 transition-all text-left gap-2"
+            >
+              {/* Stage Name */}
+              <div className="col-span-4 flex items-center gap-3 min-w-0">
+                <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-sm font-black text-gray-600 border border-gray-200">
+                  {gIdx + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-gray-900 uppercase tracking-tight truncate leading-snug">{group.partName}</p>
+                  {group.unitPrice > 0 && (
+                    <p className="text-[10px] font-semibold text-gray-400 mt-0.5">₫{Number(group.unitPrice).toLocaleString()}/sp</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Variant chips */}
+              <div className="col-span-3 flex flex-wrap gap-1.5 px-2 justify-center">
+                {group.variants.slice(0, 5).map((v, vi) => {
+                  const vs = getVariantStatusLabel
+                    ? getVariantStatusLabel(v.variantStatusId)
+                    : (v.statusName || "Chưa Thực Hiện");
+                  const vDone = vs === "Đã Hoàn Thành";
+                  const vCfg = STATUS_CONFIG[vs] || STATUS_CONFIG["Chưa Thực Hiện"];
+                  return (
+                    <span
+                      key={vi}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold uppercase border ${vDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : `${vCfg.bg} border-${vCfg.dot.replace('bg-','')} ${vCfg.color}`}`}
+                    >
+                      <span>{v.colorName || v.color || '?'}</span>
+                      <span className="text-slate-300 font-normal">/</span>
+                      <span>{v.sizeName || v.size || '?'}</span>
+                    </span>
+                  );
+                })}
+                {group.variants.length > 5 && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                    +{group.variants.length - 5}
+                  </span>
+                )}
+              </div>
+
+              {/* Progress */}
+              <div className="col-span-2 flex flex-col items-center gap-1.5 px-2">
+                <span className="text-sm font-black text-[#1e6e43]">{actualQty}/{totalQty}</span>
+                <div className="w-full max-w-[80px] h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[10px] font-bold text-gray-500">{pct}%</span>
+              </div>
+
+              {/* Status */}
+              <div className="col-span-2 flex items-center justify-center">
+                <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black uppercase ${cfg.color} ${cfg.bg}`}>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                  {cfg.label}
+                </span>
+              </div>
+
+              {/* Expand toggle */}
+              <div className="col-span-1 flex items-center justify-end">
+                <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 text-gray-500 group-hover/stage:bg-gray-200 group-hover/stage:text-gray-700 transition-all">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </span>
+              </div>
+            </button>
+
+            {/* Expanded Variants */}
+            {isExpanded && (
+              <div className="bg-gray-50/60 border-t border-dashed border-gray-200">
+                {/* Sub-header */}
+                <div className="grid grid-cols-12 items-center px-6 py-2 border-b border-gray-200 bg-gray-100/50">
+                  <div className="col-span-1" />
+                  <div className="col-span-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Màu / Size</div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Sản lượng</div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Nhân sự</div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Trạng thái</div>
+                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Thao tác</div>
+                </div>
+                {group.variants.map((row, vi) => {
+                  const partStatus = getVariantStatusLabel
+                    ? getVariantStatusLabel(row.variantStatusId)
+                    : (row.statusName || "Chưa Thực Hiện");
+                  const isDone = partStatus === "Đã Hoàn Thành";
+                  const vcfg = STATUS_CONFIG[partStatus] || STATUS_CONFIG["Chưa Thực Hiện"];
+                  const vPct = (row.quantity > 0) ? Math.min(100, Math.round(((row.actualQuantity || 0) / row.quantity) * 100)) : 0;
+
+                  return (
+                    <div key={vi} className="grid grid-cols-12 items-center px-6 py-3 hover:bg-white/90 transition-all group/row border-b border-gray-100 last:border-0">
+                      {/* Color dot */}
+                      <div className="col-span-1 flex justify-center">
+                        <div className="w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: row.colorCode || row.variant?.colorCode || '#e2e8f0' }} />
+                      </div>
+                      {/* Color / Size */}
+                      <div className="col-span-3 flex items-center gap-2">
+                        <span className="text-sm font-bold text-gray-800 uppercase">{row.colorName || row.color || '-'}</span>
+                        <span className="text-gray-300">/</span>
+                        <span className="px-2 py-0.5 rounded bg-white border border-gray-200 text-xs font-black text-gray-700 uppercase shadow-sm">{row.sizeName || row.size || '-'}</span>
+                      </div>
+                      {/* Quantity */}
+                      <div className="col-span-2 flex flex-col items-center gap-1">
+                        <span className="text-sm font-black text-[#1e6e43]">{row.actualQuantity || 0}/{row.quantity || 0}</span>
+                        <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${vPct}%` }} />
+                        </div>
+                      </div>
+                      {/* Assignees */}
+                      <div className="col-span-2 flex flex-wrap gap-1.5 justify-center">
+                        {(row.assignees || []).length > 0 ? (
+                          (row.assignees || []).map((w, wi) => (
+                            <span
+                              key={wi}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-[10px] font-bold text-[#1e6e43] border border-emerald-200 whitespace-nowrap shadow-sm"
+                            >
+                              {w.fullName || w.name || "?"}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] text-gray-400 font-semibold italic">Chưa phân công</span>
+                        )}
+                      </div>
+                      {/* Status */}
+                      <div className="col-span-2 flex justify-center">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${vcfg.color} ${vcfg.bg}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${vcfg.dot}`} />
+                          {vcfg.label}
+                        </span>
+                      </div>
+                      {/* Actions */}
+                      <div className="col-span-2 flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100 transition-all">
+                        {/* Báo cáo ngày (chỉ hiện khi đã phân công) */}
+                        {isInProduction && (row.assignees || []).length > 0 && (
+                          <button 
+                            onClick={() => navigate(`/worker/daily-report`, { state: { targetPartId: row.partId, targetVariantId: row.id } })}
+                            title="Báo cáo sản lượng ngày" 
+                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-all"
+                          >
+                            <ClipboardCheck size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => navigate(`/production/part/${row.partId}/${row.id}/history`)} title="Lịch sử" className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-all">
+                          <History size={14} />
+                        </button>
+                        {!isDone && isInProduction && (isOwner || isPM) && (
+                          <button
+                            onClick={() => {
+                              if ((row.actualQuantity || 0) < (row.quantity || 0) && partStatus !== "Đợi Xác Nhận") {
+                                toast.warning("Sản lượng chưa đạt mục tiêu!");
+                                return;
+                              }
+                              handleDonePart(row.id);
+                            }}
+                            title="Hoàn thành"
+                            className={`p-2 rounded-lg transition-all ${((row.actualQuantity || 0) >= (row.quantity || 0) || partStatus === "Đợi Xác Nhận") ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-200 cursor-not-allowed'}`}
+                          >
+                            <CheckCircle size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => handleBaoLoi(row)} title="Báo lỗi" className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-all">
+                          <AlertTriangle size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

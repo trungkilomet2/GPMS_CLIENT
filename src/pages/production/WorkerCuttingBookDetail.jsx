@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ClipboardCheck, Eraser, Plus, Save } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Edit, Eraser, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import WorkerLayout from "@/layouts/WorkerLayout";
@@ -142,15 +142,11 @@ export default function WorkerCuttingBookDetail() {
 
   const validateRecord = () => {
     const errs = {};
-
-    // --- MÀU SẮC ---
     if (!hasValue(record.color)) {
       errs.color = "Vui lòng nhập màu.";
     } else if (String(record.color).length > 30) {
       errs.color = "Màu sắc tối đa 30 ký tự.";
     }
-
-    // --- SỐ M/KG ---
     const mPk = Number(record.meterPerKg);
     if (!hasValue(record.meterPerKg)) {
       errs.meterPerKg = "Nhập số m/kg.";
@@ -161,8 +157,6 @@ export default function WorkerCuttingBookDetail() {
     } else if (String(record.meterPerKg).length > 10) {
       errs.meterPerKg = "Số quá dài (Tối đa 10 ký tự).";
     }
-
-    // --- SỐ LỚP ---
     const ly = Number(record.layer);
     if (!hasValue(record.layer)) {
       errs.layer = "Nhập số lớp.";
@@ -173,8 +167,6 @@ export default function WorkerCuttingBookDetail() {
     } else if (String(record.layer).length > 10) {
       errs.layer = "Số quá dài.";
     }
-
-    // --- SẢN LƯỢNG ---
     const qty = Number(record.productQty);
     if (!hasValue(record.productQty)) {
       errs.productQty = "Nhập sản lượng.";
@@ -185,16 +177,43 @@ export default function WorkerCuttingBookDetail() {
     } else if (String(record.productQty).length > 10) {
       errs.productQty = "Dữ liệu quá dài.";
     }
-
-    // --- GHI CHÚ (Optional check) ---
     if (record.note && record.note.length > 200) {
-      // Note usually has its own area, but check it in validate anyway
       toast.warning("Ghi chú tối đa 200 ký tự.");
       return false;
     }
-
     setRecordErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  const handleEditRecord = (item) => {
+    setRecord({
+      color: item.color,
+      meterPerKg: item.meterPerKg,
+      layer: item.layer,
+      productQty: item.productQty,
+      dateCreate: item.dateCreate?.split(" ")[0] || getTodayString(),
+      note: item.note,
+    });
+    setEditingRecordId(item.id);
+    setRecordErrors({});
+    setShowEntryModal(true);
+  };
+
+  const [isDeletingId, setIsDeletingId] = useState(null);
+
+  const handleDeleteRecord = async (logId) => {
+    try {
+      setIsDeletingId(logId);
+      await CuttingNotebookService.deleteLog(logId);
+      setRecords((prev) => prev.filter((r) => r.id !== logId));
+      toast.success("Đã xóa dòng ghi thành công!");
+    } catch (err) {
+      console.error("Error deleting log:", err);
+      toast.error(getErrorMessage(err, "Không thể xóa dòng ghi."));
+    } finally {
+      setIsDeletingId(null);
+      setConfirmDeleteId(null);
+    }
   };
 
   const saveRecord = async () => {
@@ -202,20 +221,35 @@ export default function WorkerCuttingBookDetail() {
     try {
       setIsSavingRecord(true);
       const currentId = user?.userId || user?.id || localStorage.getItem("userId") || 1;
-      const payload = {
-        userId: Number(currentId),
-        color: record.color,
-        meterPerKg: Number(record.meterPerKg),
-        layer: Number(record.layer),
-        productQty: Number(record.productQty),
-        dateCreate: record.dateCreate ? new Date(record.dateCreate).toISOString() : new Date().toISOString(),
-        note: record.note,
-      };
 
-      console.log(payload);
-      const res = await CuttingNotebookService.createLog(notebookId, payload);
-      const newLog = res?.data?.data ?? res?.data ?? res;
-      setRecords((prev) => [mapNotebookLogToRecord(newLog), ...prev]);
+      if (editingRecordId) {
+        const payload = {
+          color: record.color,
+          meterPerKg: Number(record.meterPerKg),
+          layer: Number(record.layer),
+          productQty: Number(record.productQty),
+          avgConsumption: Number(record.avgConsumption || 0),
+          note: record.note,
+        };
+        const res = await CuttingNotebookService.updateLog(editingRecordId, payload);
+        const updatedLog = res?.data?.data ?? res?.data ?? res;
+        setRecords((prev) => prev.map((r) => (r.id === editingRecordId ? mapNotebookLogToRecord(updatedLog) : r)));
+        toast.success("Cập nhật dòng ghi thành công!");
+      } else {
+        const payload = {
+          userId: Number(currentId),
+          color: record.color,
+          meterPerKg: Number(record.meterPerKg),
+          layer: Number(record.layer),
+          productQty: Number(record.productQty),
+          dateCreate: record.dateCreate ? new Date(record.dateCreate).toISOString() : new Date().toISOString(),
+          note: record.note,
+        };
+        const res = await CuttingNotebookService.createLog(notebookId, payload);
+        const newLog = res?.data?.data ?? res?.data ?? res;
+        setRecords((prev) => [mapNotebookLogToRecord(newLog), ...prev]);
+        toast.success("Đã ghi dòng mới thành công!");
+      }
 
       clearRecord();
       setSavedAt(new Date().toLocaleString("vi-VN", {
@@ -225,7 +259,6 @@ export default function WorkerCuttingBookDetail() {
         month: "2-digit",
         year: "numeric"
       }));
-      toast.success("Đã ghi dòng mới thành công!");
       return true;
     } catch (err) {
       console.error("Error saving log:", err);
@@ -345,6 +378,7 @@ export default function WorkerCuttingBookDetail() {
                     <th className="px-3 py-3 text-center w-28">Sản lượng</th>
                     <th className="px-3 py-3 text-center w-28">Ngày ghi</th>
                     <th className="px-3 py-3 text-left w-48">Ghi chú</th>
+                    <th className="px-3 py-3 text-center w-32">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -360,7 +394,25 @@ export default function WorkerCuttingBookDetail() {
                       </td>
                       <td className="px-3 py-2 text-center font-bold text-slate-800">{item.productQty || "-"}</td>
                       <td className="px-3 py-2 text-center text-slate-500 text-xs">{item.dateCreate || "-"}</td>
-                      <td className="px-3 py-2 text-slate-500 italic text-xs">{item.note || "-"}</td>
+                      <td className="px-3 py-2 text-slate-500 italic text-xs truncate max-w-[150px]" title={item.note}>{item.note || "-"}</td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => handleEditRecord(item)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Sửa"
+                          >
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(item.id)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            title="Xóa"
+                          >
+                            {isDeletingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -454,6 +506,38 @@ export default function WorkerCuttingBookDetail() {
                 className="rounded-xl bg-emerald-600 px-8 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:bg-emerald-300 shadow-lg shadow-emerald-100 transition-all active:scale-95"
               >
                 {isSavingRecord ? "Đang lưu..." : "Xác nhận & Lưu"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="rounded-full bg-rose-50 p-3 text-rose-500">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Xác nhận xóa?</h3>
+                <p className="text-sm text-slate-500 mt-1">Dòng ghi này sẽ bị xóa vĩnh viễn khỏi sổ cắt. Thao tác này không thể hoàn tác.</p>
+              </div>
+            </div>
+            <div className="mt-8 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="flex-1 px-4 py-2.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteRecord(confirmDeleteId)}
+                disabled={!!isDeletingId}
+                className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 rounded-xl shadow-lg shadow-rose-100 transition-all active:scale-95"
+              >
+                {isDeletingId ? "Đang xóa..." : "Xóa vĩnh viễn"}
               </button>
             </div>
           </div>

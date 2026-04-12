@@ -20,6 +20,12 @@ const CuttingNotebookService = {
   getNotebookById: (notebookId) => {
     return axiosClient.get(API_ENDPOINTS.CUTTING_NOTEBOOK.GET_BY_ID(notebookId));
   },
+  updateLog: (logId, payload) => {
+    return axiosClient.put(API_ENDPOINTS.CUTTING_NOTEBOOK.UPDATE_LOG(logId), payload);
+  },
+  deleteLog: (logId) => {
+    return axiosClient.delete(API_ENDPOINTS.CUTTING_NOTEBOOK.DELETE_LOG(logId));
+  },
 };
 
 export default CuttingNotebookService;

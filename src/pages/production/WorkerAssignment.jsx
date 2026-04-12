@@ -1,4 +1,4 @@
-﻿import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ClipboardCheck, DollarSign, Calendar, Users, Clock, CheckCircle2, Clock as ClockIcon } from "lucide-react";
 import WorkerLayout from "@/layouts/WorkerLayout";

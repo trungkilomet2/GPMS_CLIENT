@@ -106,36 +106,48 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
 
     console.debug(`[Payroll] Processing ${relevantParts.length} parts for ${month}/${year}`);
 
-    // 3. Fetch all work logs for relevant parts in parallel
-    const logsResults = await Promise.all(
-      relevantParts.map(part => ProductionPartService.getWorkLogs(part.id))
-    );
+    // 3. Fetch all work logs for EACH VARIANT of relevant parts in parallel
+    const logPromises = [];
+    const logSourceMap = []; // To trace back which part/variant a log belongs to
+
+    relevantParts.forEach(part => {
+      if (Array.isArray(part.listPartOrderSizes)) {
+        part.listPartOrderSizes.forEach(variant => {
+          logPromises.push(ProductionPartService.getWorkLogs(part.id, variant.id));
+          logSourceMap.push({ part, variant });
+        });
+      }
+    });
+
+    const logsResults = await Promise.all(logPromises);
 
     const allLogs = [];
     logsResults.forEach((res, idx) => {
-      const part = relevantParts[idx];
+      const { part, variant } = logSourceMap[idx];
       const rawLogs = res?.data?.data || res?.data || [];
       if (Array.isArray(rawLogs)) {
         rawLogs.forEach(log => {
-          const d = new Date(log.workDate || log.reportDate);
+          // Use createDate as per new schema
+          const d = new Date(log.createDate || log.workDate || log.reportDate);
           if (d.getMonth() + 1 === month && d.getFullYear() === year) {
             const logEntry = {
               ...log,
               partId: part.id,
               partName: part.partName || part.name,
+              variantName: `${variant.color || ""} / ${variant.size || ""}`,
               cpu: part.cpu || 0,
               productionId: part.productionId,
               orderName: part.orderName,
               orderId: part.orderId,
               workerId: log.userId,
-              workerName: log.workerName || log.userName || `Tùng Tổng Tài`, //fix cái này
+              workerName: log.workerName || log.userName || `Thợ #${log.userId}`,
               quantity: log.quantity || 0,
-              reportDate: log.workDate || log.reportDate,
+              reportDate: log.createDate || log.workDate || log.reportDate,
               workerFullName: null,
               workerAvatar: null,
             };
 
-            // Enhance with profile
+            // Enhance with profile from directory map
             const profile = workerProfileMap.get(String(log.userId));
             if (profile) {
               logEntry.workerFullName = profile.fullName;

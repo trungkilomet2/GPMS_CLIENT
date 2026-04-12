@@ -126,7 +126,7 @@ export const routes = [
   { path: "/worker/leave-requests", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequests />) },
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
   { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
-  { path: "/production/part/:partId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
+  { path: "/production/part/:partId/:variantId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
   { path: "/leave-requests", element: guardByRoles(["PM", "Team Leader"], <LeaveRequests />) },
   { path: "/customers", element: guardByRoles(["Owner"], <CustomerManagement />) },
   { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },

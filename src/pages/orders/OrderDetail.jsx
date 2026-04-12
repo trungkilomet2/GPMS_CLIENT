@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, FileText, MessageSquare, History,
@@ -27,6 +27,8 @@ import "@/styles/leave.css";
 import RecordDeliveryModal from '@/components/orders/RecordDeliveryModal';
 import ProductionService from '@/services/ProductionService';
 import { getProductionStatusLabel } from '@/utils/statusUtils';
+import { processOrderVariants } from '@/lib/orders/variants';
+import OrderSpecificationCard from '@/components/orders/OrderSpecificationCard';
 import '@/styles/homepage.css';
 
 function extractRejectReasonFromResponse(response) {
@@ -89,33 +91,23 @@ export default function OrderDetail() {
     const canModerate = isOwner || isAdmin;
 
     // --- EFFECTS ---
-    useEffect(() => {
-        const fetchOrderDetail = async () => {
-            try {
-                setLoading(true);
-                const response = await OrderService.getOrderDetail(id);
-                setOrder(response.data.data || response.data);
-                setError(null);
-            } catch (_err) {
-                // FALLBACK MOCK DATA FOR IDS 101, 102, 103, 104
-                const mockID = String(id);
-                const MOCK_ORDERS = {
-                    '101': { id: 101, orderName: 'Áo sơ mi nam công sở', quantity: 150, size: 'M/L', color: 'Trắng/Xanh', endDate: '2026-04-20', status: 'Approved', statusName: 'Đã chấp nhận', orderVariants: [], customerId: 1 },
-                    '102': { id: 102, orderName: 'Quần tây Âu premium', quantity: 200, size: '30/32/34', color: 'Đen', endDate: '2026-04-25', status: 'Pending', statusName: 'Chờ xét duyệt', orderVariants: [], customerId: user?.userId || user?.id || 1 },
-                    '103': { id: 103, orderName: 'Váy midi hoa nhí', quantity: 80, size: 'S/M', color: 'Hồng/Vàng', endDate: '2026-04-15', status: 'Completed', statusName: 'Hoàn thành', orderVariants: [], customerId: 1 },
-                    '104': { id: 104, orderName: 'Áo khoác gió thể thao', quantity: 120, size: 'L/XL', color: 'Xanh Navy', endDate: '2026-04-30', status: 'Rejected', statusName: 'Từ chối', orderVariants: [], customerId: 1 },
-                };
+    const fetchOrderDetail = async () => {
+        try {
+            setLoading(true);
+            const response = await OrderService.getOrderDetail(id);
+            console.log('Order Detail Response:', response);
+            setOrder(response.data.data || response.data);
+            setError(null);
+        } catch (err) {
+            console.error('Lỗi khi tải chi tiết đơn hàng:', err.response?.data || err.message);
+            const serverMsg = typeof err.response?.data === 'string' ? err.response.data : (err.response?.data?.message || err.response?.data?.detail);
+            setError(serverMsg || getErrorMessage(err, "Không thể tải thông tin đơn hàng."));
+        } finally {
+            setLoading(false);
+        }
+    };
 
-                if (MOCK_ORDERS[mockID]) {
-                    setOrder(MOCK_ORDERS[mockID]);
-                    setError(null);
-                } else {
-                    setError("Không thể tải thông tin đơn hàng.");
-                }
-            } finally {
-                setLoading(false);
-            }
-        };
+    useEffect(() => {
         if (id) fetchOrderDetail();
     }, [id]);
 
@@ -210,38 +202,12 @@ export default function OrderDetail() {
     const isCompleted = normalizedStatus === 'Đã hoàn thành';
 
     // Permission rules
-    const canEdit = (isOwner || isAdmin || (isCustomer && isOrderOwner)) && (normalizedStatus === 'Chờ xét duyệt' || normalizedStatus === 'Yêu cầu chỉnh sửa');
+    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
     const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;
 
-    const processedVariants = (() => {
-        if (!order) return [];
-
-        // Check for new 'sizes' structure first
-        if (order.sizes && Array.isArray(order.sizes)) {
-            const grouped = {};
-            const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
-            order.sizes.forEach(s => {
-                const color = s.color || 'Chưa xác định';
-                if (!grouped[color]) {
-                    grouped[color] = { color, xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 };
-                }
-                const key = SIZE_ID_TO_KEY[s.sizeId];
-                if (key) grouped[color][key] = s.quantity;
-            });
-            return Object.values(grouped);
-        }
-
-        const realVariants = order.variants || order.orderVariants || order.productVariants || order.itemVariants || (order.data?.variants);
-        const mockVariants = [
-            { color: 'Đỏ Đô', colorCode: '#991b1b', xs: 15, s: 25, m: 40, l: 30, xl: 20, '2xl': 10, '3xl': 5 },
-            { color: 'Xám Khói', colorCode: '#475569', xs: 10, s: 30, m: 55, l: 45, xl: 15, '2xl': 5, '3xl': 0 },
-            { color: 'Xanh Navy', colorCode: '#1e3a8a', xs: 20, s: 40, m: 60, l: 50, xl: 30, '2xl': 15, '3xl': 10 },
-            { color: 'Xanh Rêu', colorCode: '#166534', xs: 5, s: 15, m: 25, l: 20, xl: 10, '2xl': 0, '3xl': 0 },
-        ];
-        return (Array.isArray(realVariants) && realVariants.length > 0) ? realVariants : mockVariants;
-    })();
+    const processedVariants = processOrderVariants(order);
 
     // --- HANDLERS ---
     const handleApproveOrder = async () => {
@@ -249,8 +215,10 @@ export default function OrderDetail() {
         try {
             setIsUpdatingStatus(true);
             await OrderService.approveOrder(order?.id ?? id);
-            setOrder(prev => (prev ? { ...prev, status: 'Đã chấp nhận', statusName: 'Đã chấp nhận' } : prev));
             toast.success("Đã chấp nhận đơn hàng.");
+            setIsApproveModalOpen(false);
+            // Re-fetch to update all derived states (buttons, UI, etc)
+            await fetchOrderDetail();
         } catch (err) {
             toast.error(getErrorMessage(err, 'Không thể chấp nhận đơn hàng.'));
         } finally {
@@ -264,9 +232,9 @@ export default function OrderDetail() {
         try {
             setDenyLoading(true);
             await OrderService.denyOrder(orderId);
-            setOrder(prev => (prev ? { ...prev, status: 'Đã hủy', statusName: 'Đã hủy' } : prev));
-            setShowDenyConfirm(false);
             toast.success("Đã hủy đơn hàng.");
+            setShowDenyConfirm(false);
+            await fetchOrderDetail();
         } catch (err) {
             toast.error(getErrorMessage(err, 'Hủy đơn hàng thất bại.'));
         } finally {
@@ -401,6 +369,25 @@ export default function OrderDetail() {
                                             Sửa đơn
                                         </button>
                                     )}
+                                    {(isCustomer || isOwner) && (
+                                        <button
+                                            onClick={() => {
+                                                const target = isOwner ? '/orders/create-manual' : '/orders/create';
+                                                navigate(target, { state: { reuseOrder: order } });
+                                            }}
+                                            className="h-9 px-5 rounded-xl bg-amber-50 border border-black text-[9px] font-black uppercase tracking-widest text-amber-700 transition-all hover:bg-amber-100 active:scale-95 shadow-sm"
+                                        >
+                                            Tái sử dụng
+                                        </button>
+                                    )}
+                                    {isOwner && isAccepted && !hasProduction && (
+                                        <button
+                                            onClick={() => navigate(`/production/create/${order.id}`)}
+                                            className="h-9 px-5 rounded-xl bg-emerald-600 border border-black text-[9px] font-black uppercase tracking-widest text-white transition-all hover:bg-emerald-700 active:scale-95 shadow-sm"
+                                        >
+                                            Tạo đơn sản xuất
+                                        </button>
+                                    )}
                                     {canCustomerDeny && (
                                         <button
                                             onClick={() => setShowDenyConfirm(true)}
@@ -418,139 +405,10 @@ export default function OrderDetail() {
                         <div className="lg:col-span-2 space-y-8">
 
                             {activeTab === 'specification' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div className="rounded-xl border border-black bg-white overflow-hidden">
-                                        {/* Header */}
-                                        <div className="px-8 py-4 border-b border-black-600 flex items-center gap-3 bg-white">
-                                            <Info size={16} className="text-gray-400" />
-                                            <h2 className="text-[11px] font-bold uppercase tracking-widest text-[#4a5568]">Thông tin tổng quát đơn hàng</h2>
-                                        </div>
-
-                                        <div className="p-8 space-y-8">
-                                            {/* Image Section */}
-                                            <div className="space-y-4">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ảnh đơn hàng</p>
-                                                <div className="flex flex-col md:flex-row gap-8 items-center">
-                                                    <div className="w-[160px] h-[160px] shrink-0 rounded-2xl border border-gray-200 bg-white p-2 shadow-sm">
-                                                        {order.image ? (
-                                                            <img
-                                                                src={order.image}
-                                                                alt=""
-                                                                className="w-full h-full object-contain cursor-pointer"
-                                                                onClick={() => { setZoomImageUrl(order.image); setIsImageModalOpen(true); }}
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-300">
-                                                                <Package size={40} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-[13px] text-gray-500 max-w-md leading-relaxed">
-                                                        Ảnh tham khảo tổng quan đơn hàng, dùng để kiểm tra nhanh trước khi sản xuất.
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* Info Grid */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 pt-4 border-t border-gray-50 relative">
-                                                {/* Left Column */}
-                                                <div className="flex flex-col">
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Mã đơn hàng</span>
-                                                        <span className="text-[13px] font-bold text-gray-700">#DH-{order.id}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tên đơn hàng</span>
-                                                        <span className="text-[14px] font-bold text-gray-900 uppercase">{order.orderName}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ngày bắt đầu</span>
-                                                        <span className="text-[13px] font-bold text-gray-600">{formatOrderDate(order.startDate)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4 md:border-b-0 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ngày kết thúc</span>
-                                                        <span className="text-[13px] font-bold text-gray-600">{formatOrderDate(order.endDate)}</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Vertical Divider for MD+ screens */}
-                                                <div className="hidden md:block absolute left-1/2 h-full w-px bg-gray-50 -translate-x-1/2" />
-
-                                                {/* Right Column */}
-                                                <div className="flex flex-col relative">
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Số lượng</span>
-                                                        <span className="text-[13px] font-bold text-gray-700">{order.quantity?.toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Đơn giá</span>
-                                                        <span className="text-[13px] font-bold text-gray-700">{order.cpu?.toLocaleString()} VND/SP</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4 border-b border-gray-100">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tổng tiền đơn hàng</span>
-                                                        <span className="text-[14px] font-extrabold text-[#111827]">{(order.quantity * order.cpu).toLocaleString()} VND</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center py-4">
-                                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tổng số ngày thực hiện</span>
-                                                        <span className="text-[13px] font-bold text-[#1e6e43]">
-                                                            {(() => {
-                                                                const s = new Date(order.startDate);
-                                                                const e = new Date(order.endDate);
-                                                                const diff = Math.ceil(Math.abs(e - s) / (1000 * 60 * 60 * 24)) + 1;
-                                                                return isNaN(diff) ? '-' : `${diff} ngày`;
-                                                            })()}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Restore Distribution Chart */}
-                                            <div className="py-8 border-t border-gray-100">
-                                                <div className="mb-6">
-                                                    <p className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-[0.2em] mb-1">Cấu trúc chi tiết</p>
-                                                    <h4 className="text-lg font-bold text-gray-900 tracking-tight uppercase">Phân bổ Màu & Size</h4>
-                                                </div>
-
-                                                <div className="space-y-4">
-                                                    <div className="grid grid-cols-10 bg-gray-100/50 rounded-xl py-4 px-8 border border-black">
-                                                        <div className="col-span-2 text-[9px] font-bold text-gray-600 uppercase tracking-widest">Màu sắc</div>
-                                                        {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].map(s => <div key={s} className="text-center text-[9px] font-bold text-gray-600 uppercase tracking-widest">{s}</div>)}
-                                                        <div className="text-right text-[9px] font-bold text-gray-600 uppercase tracking-widest">Tổng</div>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        {processedVariants.map((v, idx) => {
-                                                            const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
-                                                            const total = sizeKeys.reduce((acc, k) => acc + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
-                                                            return (
-                                                                <div key={idx} className="grid grid-cols-10 py-5 px-8 items-center bg-white border border-black rounded-xl hover:bg-gray-50 transition-all">
-                                                                    <div className="col-span-2 flex items-center gap-3">
-                                                                        <div className="w-4 h-4 rounded-full border border-gray-100" style={{ backgroundColor: v.colorCode || '#cbd5e1' }} />
-                                                                        <span className="text-xs font-bold text-gray-800 uppercase">{v.color}</span>
-                                                                    </div>
-                                                                    {sizeKeys.map(k => {
-                                                                        const val = Number(v[k] || v[k.toUpperCase()] || 0);
-                                                                        return <div key={k} className="text-center text-sm font-bold text-[#1e6e43]">{val || '-'}</div>;
-                                                                    })}
-                                                                    <div className="text-right">
-                                                                        <span className="bg-gray-100 px-3 py-1 rounded-lg text-[10px] font-bold text-gray-700">{total}</span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Note Section */}
-                                            <div className="pt-6 border-t border-gray-50 space-y-3">
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ghi chú vận hành</p>
-                                                <p className="text-[14px] text-gray-600 italic">
-                                                    "{order.note || "Không có ghi chú bổ sung"}"
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <OrderSpecificationCard
+                                    order={order}
+                                    onImageClick={(url) => { setZoomImageUrl(url); setIsImageModalOpen(true); }}
+                                />
                             )}
 
                             {activeTab === 'delivery' && (
@@ -596,7 +454,7 @@ export default function OrderDetail() {
 
                         <div className="space-y-8">
                             <div className="rounded-xl border border-black bg-white shadow-sm p-8 space-y-8 sticky top-8">
-                                {canModerate && customerProfile && (
+                                {canModerate && (customerProfile || order?.guest || order?.guestName || order?.customerName) && (
                                     <div className="pb-8 border-b border-black">
                                         <CustomerInfoCard order={order} profile={customerProfile} />
                                     </div>
@@ -639,9 +497,9 @@ export default function OrderDetail() {
                         try {
                             setIsUpdatingStatus(true);
                             await OrderService.requestOrderModification(order.id, { reason });
-                            setOrder(prev => ({ ...prev, status: 'Yêu cầu chỉnh sửa', statusName: 'Yêu cầu chỉnh sửa' }));
-                            setIsReasonModalOpen(false);
                             toast.success("Đã gửi yêu cầu chỉnh sửa.");
+                            setIsReasonModalOpen(false);
+                            await fetchOrderDetail();
                         } catch (err) {
                             toast.error("Gửi yêu cầu thất bại.");
                         } finally {
@@ -651,10 +509,9 @@ export default function OrderDetail() {
                         try {
                             setIsUpdatingStatus(true);
                             await OrderService.rejectOrder({ orderId: order.id, reason, userId: user?.userId });
-                            setOrder(prev => ({ ...prev, status: 'Đã từ chối', statusName: 'Đã từ chối' }));
-                            setRejectReason(reason);
-                            setIsReasonModalOpen(false);
                             toast.success("Đã từ chối đơn hàng.");
+                            setIsReasonModalOpen(false);
+                            await fetchOrderDetail();
                         } catch (err) {
                             toast.error("Từ chối thất bại.");
                         } finally {

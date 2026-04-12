@@ -7,18 +7,24 @@ const pickFirstNonEmpty = (...values) => {
   return "";
 };
 
-export const getOrderCustomerId = (order) =>
-  order?.userId ??
-  order?.customerId ??
-  order?.ownerId ??
-  order?.user?.id ??
-  order?.user?.userId ??
-  null;
+export const getOrderCustomerId = (order) => {
+  if (!order) return null;
+  return (
+    order.userId ??
+    order.customerId ??
+    order.ownerId ??
+    order.user?.id ??
+    order.user?.userId ??
+    null
+  );
+};
 
 export const getOrderCustomerInfo = (order, profile = null) => ({
   name: pickFirstNonEmpty(
     profile?.fullName,
     profile?.name,
+    order?.guest?.fullName,
+    order?.guestName,
     order?.customerName,
     order?.userName,
     order?.fullName,
@@ -28,6 +34,8 @@ export const getOrderCustomerInfo = (order, profile = null) => ({
   phone: pickFirstNonEmpty(
     profile?.phoneNumber,
     profile?.phone,
+    order?.guest?.phoneNumber,
+    order?.guestPhone,
     order?.customerPhone,
     order?.phone,
     order?.phoneNumber,
@@ -37,6 +45,8 @@ export const getOrderCustomerInfo = (order, profile = null) => ({
   address: pickFirstNonEmpty(
     profile?.location,
     profile?.address,
+    order?.guest?.address,
+    order?.guestAddress,
     order?.customerAddress,
     order?.address,
     order?.location,

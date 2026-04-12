@@ -33,6 +33,7 @@ export const API_ENDPOINTS = {
     GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
     GET_ORDERS_BY_USER: `${BASE_URL}/api/Order/my-orders`,
     CREATE_ORDER: `${BASE_URL}/api/Order/create-order`,
+    CREATE_MANUAL: `${BASE_URL}/api/Order/create-manual-order`,
     UPDATE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/update`,
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
     REQUEST_MODIFICATION: (orderId) => `${BASE_URL}/api/Order/request-order-modification/${orderId}`,
@@ -66,11 +67,11 @@ export const API_ENDPOINTS = {
       `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
     UPDATE_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/update/${id}`,
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
-    UPDATE_ASSIGN_WORKERS: (id) =>
-      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
+    UPDATE_ASSIGN_WORKERS: (partId, partOrderSizeId) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${partId}/${partOrderSizeId}`,
     CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
     UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
-    GET_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
+    GET_WORK_LOGS: (partId, partOrderSizeId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}/${partOrderSizeId}`,
     CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/create/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
@@ -84,6 +85,8 @@ export const API_ENDPOINTS = {
     UPDATE: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/update/${notebookId}`,
     CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
     GET_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
+    UPDATE_LOG: (logId) => `${BASE_URL}/api/CuttingNotebook/notebook/log/update/${logId}`,
+    DELETE_LOG: (logId) => `${BASE_URL}/api/CuttingNotebook/notebook/log/delete/${logId}`,
   },
 
   CLOUDINARY: {

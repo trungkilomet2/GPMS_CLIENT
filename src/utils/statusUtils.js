@@ -99,3 +99,21 @@ export function getPlanStatusLabel(status) {
   const normalized = raw.toLowerCase();
   return PLAN_LABELS[normalized] || raw;
 }
+
+// Mapping theo bảng PPOSS_STATUS (PartOrderSize) — 4 trạng thái riêng
+export function getVariantStatusLabel(status) {
+  if (typeof status === "number") {
+    if (status === 1) return "Chưa Thực Hiện";
+    if (status === 2) return "Đang Thực Hiện";
+    if (status === 3) return "Chờ Nghiệm Thu";
+    if (status === 4) return "Đã Hoàn Thành";
+  }
+  let raw = String(status ?? "").trim();
+  if (!raw) return "-";
+  const normalized = raw.toLowerCase();
+  if (normalized.includes("chưa") || normalized.includes("chua")) return "Chưa Thực Hiện";
+  if (normalized.includes("đang") || normalized.includes("dang")) return "Đang Thực Hiện";
+  if (normalized.includes("nghiệm") || normalized.includes("nghiem")) return "Chờ Nghiệm Thu";
+  if (normalized.includes("hoàn") || normalized.includes("hoan")) return "Đã Hoàn Thành";
+  return raw;
+}

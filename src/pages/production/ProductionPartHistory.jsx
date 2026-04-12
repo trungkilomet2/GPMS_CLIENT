@@ -8,7 +8,7 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 export default function ProductionPartHistory() {
-  const { partId } = useParams();
+  const { partId, variantId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const partInfo = location.state?.part || {};
@@ -21,7 +21,7 @@ export default function ProductionPartHistory() {
     const fetchLogs = async () => {
       try {
         setLoading(true);
-        const res = await ProductionPartService.getWorkLogs(partId);
+        const res = await ProductionPartService.getWorkLogs(partId, variantId);
         const data = res?.data?.data || res?.data || [];
         setLogs(Array.isArray(data) ? data : []);
       } catch (err) {
@@ -31,8 +31,8 @@ export default function ProductionPartHistory() {
         setLoading(false);
       }
     };
-    if (partId) fetchLogs();
-  }, [partId]);
+    if (partId && variantId) fetchLogs();
+  }, [partId, variantId]);
 
   const totalQuantity = useMemo(() => {
     return logs.reduce((sum, log) => sum + (Number(log.quantity) || 0), 0);
