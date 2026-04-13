@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, CalendarDays, ChevronRight, X, ClipboardCheck, Loader2, BookOpen } from "lucide-react";
 import WorkerLayout from "@/layouts/WorkerLayout";
+import OwnerLayout from "@/layouts/OwnerLayout";
 import { toast } from "react-toastify";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getErrorMessage } from "@/utils/errorUtils";
-import { hasAnyRole } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 
 
 function toArray(value) {
@@ -113,6 +114,9 @@ export default function WorkerDailyReport() {
 
   const planSteps = Array.isArray(plan?.steps) ? plan.steps : [];
   const currentUser = getStoredUser() || {};
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const primaryRole = getPrimaryWorkspaceRole(roleValue);
+  const LayoutComponent = ["worker", "kcs"].includes(primaryRole) ? WorkerLayout : OwnerLayout;
   const currentWorkerIdSet = new Set(
     [currentUser?.id, currentUser?.userId, currentUser?.accountId]
       .filter((value) => value != null && String(value).trim() !== "")
@@ -550,7 +554,7 @@ export default function WorkerDailyReport() {
   };
 
   return (
-    <WorkerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -560,7 +564,6 @@ export default function WorkerDailyReport() {
                 onClick={() => {
                   const prodId = plan?.production?.productionId ?? assignment?.productionId;
                   if (prodId) {
-                    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
                     const isWorkerRole = hasAnyRole(roleValue, ["Worker", "KCS"]);
                     const target = isWorkerRole ? `/worker/production-plan/${prodId}` : `/production/${prodId}`;
                     navigate(target);
@@ -810,7 +813,7 @@ export default function WorkerDailyReport() {
           </div>
         </div>
       )}
-    </WorkerLayout>
+    </LayoutComponent>
   );
 }
 

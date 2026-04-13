@@ -95,7 +95,14 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
     return true;
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
-  const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
+  const isProductionSection = [
+    location.pathname.startsWith("/production"),
+    location.pathname.startsWith("/production-plan"),
+    location.pathname.startsWith("/worker/daily-report"),
+    location.pathname.startsWith("/worker/error-report"),
+    location.pathname.startsWith("/worker/production-plan"),
+    location.pathname.includes("/cutting-book"),
+  ].some(Boolean);
   const userRoleLabel = splitRoles(user?.role)
     .map((role) => getSystemRoleLabel(role))
     .join(", ");

@@ -609,36 +609,47 @@ export default function ProductionDetail() {
                           <h4 className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-widest mb-1">Chi tiết đơn hàng gốc</h4>
                           <h3 className="text-2xl font-bold text-gray-900 tracking-tight uppercase leading-tight">{order.orderName}</h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-x-12 gap-y-8 border-t border-gray-50 pt-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-6 border-t border-gray-50 pt-8">
                           <DetailItem label="Tổng số lượng đặt" value={`${order.quantity?.toLocaleString() || 0} Sản phẩm`} isBold isGreen />
-                          <DetailItem label="Thời hạn sản xuất" value={`${formatOrderDate(order.startDate)} - ${formatOrderDate(order.endDate)} (${getProductionDurationText(order.startDate, order.endDate)})`} />
+                          <DetailItem label="Thời gian bắt đầu" value={formatOrderDate(order.startDate)} isBold />
+                          <DetailItem label="Thời gian giao trả hàng" value={formatOrderDate(order.endDate)} isBold />
+                          <DetailItem label="Tổng số ngày" value={getProductionDurationText(order.startDate, order.endDate)} isBold isGreen />
                         </div>
 
                         {/* Financial Card moved here */}
                         {financialSummary && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan || isInProduction) && (
-                          <div className="p-6 rounded-[2rem] bg-[#f0f9f4] border border-[#1e6e43]/20 shadow-lg shadow-[#1e6e43]/5 grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in zoom-in-95 duration-500">
-                             <div className="space-y-1 flex flex-col items-center sm:items-start text-center sm:text-left">
-                               <p className="text-[9px] font-black text-[#1e6e43]/60 uppercase tracking-widest">Lợi nhuận gộp dự kiến</p>
-                               <p className={`text-2xl font-black ${financialSummary.profit >= 0 ? 'text-[#1e6e43]' : 'text-rose-600'}`}>
+                          <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 p-6 sm:p-7 shadow-sm animate-in zoom-in-95 duration-500">
+                            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-5">
+                              <div className="rounded-2xl border border-emerald-100 bg-white/85 p-5 space-y-3">
+                                <p className="text-[11px] font-extrabold text-[#1e6e43]/75 uppercase tracking-[0.14em]">Lợi nhuận gộp dự kiến</p>
+                                <p className={`text-4xl leading-none font-black tracking-tight tabular-nums ${financialSummary.profit >= 0 ? 'text-[#1e6e43]' : 'text-rose-600'}`}>
                                   {financialSummary.profit >= 0 ? '+' : ''}₫{financialSummary.profit.toLocaleString()}
-                               </p>
-                               <span className={`text-[9px] font-black px-2 py-1 rounded-full ${financialSummary.profit >= 0 ? 'bg-[#1e6e43] text-white' : 'bg-rose-500 text-white'} uppercase mt-1`}>
-                                  Tỷ suất: {financialSummary.profitMargin.toFixed(1)}%
-                               </span>
-                             </div>
-                             <div className="space-y-3 border-t sm:border-t-0 sm:border-l border-[#1e6e43]/10 pt-4 sm:pt-0 sm:pl-6">
-                                <div className="flex justify-between items-center text-[10px] font-bold">
-                                   <span className="text-[#1e6e43]/60 uppercase">Doanh thu</span>
-                                   <span className="text-slate-900">₫{financialSummary.revenue.toLocaleString()}</span>
+                                </p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`text-[10px] font-black px-3 py-1 rounded-full ${financialSummary.profit >= 0 ? 'bg-[#1e6e43] text-white' : 'bg-rose-500 text-white'} uppercase`}>
+                                    Tỷ suất: {financialSummary.profitMargin.toFixed(1)}%
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-slate-500 tracking-wide">
+                                    Lợi nhuận = Doanh thu - Tổng chi phí
+                                  </span>
                                 </div>
-                                <div className="flex justify-between items-center text-[10px] font-bold">
-                                   <span className="text-[#1e6e43]/60 uppercase">Tổng chi phí</span>
-                                   <span className="text-rose-600">₫{financialSummary.totalCost.toLocaleString()}</span>
+                              </div>
+
+                              <div className="rounded-2xl border border-emerald-100/70 bg-white/80 p-4 sm:p-5 space-y-3">
+                                <div className="flex items-center justify-between gap-3 border-b border-emerald-100 pb-2">
+                                  <p className="text-[11px] font-bold text-[#1e6e43]/70 uppercase tracking-wide">Doanh thu</p>
+                                  <p className="text-lg font-black text-slate-900 tabular-nums whitespace-nowrap">₫{financialSummary.revenue.toLocaleString()}</p>
                                 </div>
-                                <div className="pt-2 border-t border-[#1e6e43]/5 flex justify-between gap-2 text-[8px] font-bold text-[#1e6e43]/40 uppercase">
-                                  <span>Chi phí nhân công: ₫{financialSummary.laborCost.toLocaleString()}</span>
+                                <div className="flex items-center justify-between gap-3 border-b border-rose-100 pb-2">
+                                  <p className="text-[11px] font-bold text-rose-500/90 uppercase tracking-wide">Tổng chi phí</p>
+                                  <p className="text-lg font-black text-rose-600 tabular-nums whitespace-nowrap">₫{financialSummary.totalCost.toLocaleString()}</p>
                                 </div>
-                             </div>
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Chi phí nhân công</p>
+                                  <p className="text-lg font-black text-slate-700 tabular-nums whitespace-nowrap">₫{financialSummary.laborCost.toLocaleString()}</p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -665,7 +676,7 @@ export default function ProductionDetail() {
                         </div>
 
                         {/* Matrix Body */}
-                        <div className="divide-y divide-black font-mono text-[13px]">
+                        <div className="divide-y divide-black font-sans text-[13px]">
                           {processedVariants.length > 0 ? (
                             processedVariants.map((v, idx) => {
                               const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];

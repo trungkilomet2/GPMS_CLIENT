@@ -11,7 +11,8 @@ import {
   X,
   CheckCircle2,
   ShieldCheck,
-  Zap
+  Zap,
+  History
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -43,6 +44,23 @@ export default function ProductionPartHistory() {
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [approveQty, setApproveQty] = useState("");
   const [targetLog, setTargetLog] = useState(null);
+
+  const toPositiveInt = (value) => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const getLogIdentity = (log = {}) => {
+    const partOrderSizeCandidate = log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || log.productOrderSizeId || 0;
+    const partCandidate = log.productionPartId || log.partId || log.productPartId || log.partID || 0;
+    const part = partsLookup[String(partOrderSizeCandidate)] || partsLookup[String(partCandidate)] || {};
+
+    return {
+      partId: toPositiveInt(partCandidate || part.partId || part.id),
+      partOrderSizeId: toPositiveInt(partOrderSizeCandidate || part.partOrderSizeId || part.orderSizeId),
+      workLogId: toPositiveInt(log.workLogId || log.id || log.sourceId || log.wlId),
+    };
+  };
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -125,15 +143,23 @@ export default function ProductionPartHistory() {
   }, [productionId, params.partId]);
 
   const stats = useMemo(() => {
-    const totalQty = logs.reduce((sum, log) => sum + (log.quantity || 0), 0);
-    return { totalQty, totalLogs: logs.length };
+    const totalLogs = logs.length;
+    const pendingCount = logs.filter(log => 
+      !(log.status === 2 || log.statusName === "Đã nghiệm thu" || log.status === 4 || log.statusName === "Đã hoàn thành")
+    ).length;
+    
+    return { 
+      totalLogs, 
+      pendingCount 
+    };
   }, [logs]);
 
   // --- ACTIONS ---
 
   const handleOpenApprove = (log) => {
+    const fallbackQty = Number(log.quantity);
     setTargetLog(log);
-    setApproveQty(String(log.quantity)); // Fill with worker's quantity
+    setApproveQty(Number.isFinite(fallbackQty) ? String(Math.max(0, Math.floor(fallbackQty))) : "");
     setIsApproveOpen(true);
   };
 
@@ -144,40 +170,28 @@ export default function ProductionPartHistory() {
       toast.warn("Số lượng nghiệm thu không hợp lệ.");
       return;
     }
-
+    const approvedQuantity = Math.floor(qty);
+    const { partId, partOrderSizeId, workLogId } = getLogIdentity(targetLog);
+    if (!partId || !partOrderSizeId || !workLogId) {
+      toast.error("Không đủ thông tin để nghiệm thu bản ghi này.");
+      return;
+    }
     setIsApproveOpen(false);
     setIsProcessing(true);
     try {
-      // Robust mapping from log to part details
-      const posId = targetLog.partOrderSizeId || targetLog.productionPartOrderSizeId || 0;
-      const pId = targetLog.productionPartId || targetLog.partId || 0;
-
-      const part = partsLookup[String(posId)] || partsLookup[String(pId)];
-
-      const finalPartId = pId || part?.partId || part?.id || 0;
-      const finalPOSId = posId || part?.partOrderSizeId || 0;
-      const logId = targetLog.id || targetLog.workLogId || 0;
-
-      const payload = {
-        approvedQuantity: Math.floor(qty)
-      };
-
-      console.log("GPMS - Executing Approve with IDs:", { finalPartId, finalPOSId, logId });
-
-      await ProductionPartService.approveWorkLog(finalPartId, finalPOSId, logId, payload);
-
-      setLogs(prev => prev.map(item =>
-        (item.id || item.workLogId) === logId
-          ? { ...item, quantity: qty, status: 2, statusName: "Đã nghiệm thu" }
+      const payload = { approvedQuantity };
+      console.log("GPMS - Executing Approve with IDs:", { partId, partOrderSizeId, workLogId });
+      await ProductionPartService.approveWorkLog(partId, partOrderSizeId, workLogId, payload);
+      setLogs((prev) => prev.map((item) => (
+        getLogIdentity(item).workLogId === workLogId
+          ? { ...item, quantity: approvedQuantity, status: 2, statusName: "Đã nghiệm thu" }
           : item
-      ));
+      )));
       toast.success("Đã nghiệm thu sản lượng thành công.");
     } catch (err) {
       console.error("Full Error Response:", err.response);
-
       let msg = "Lỗi nghiệm thu: ";
       const data = err.response?.data;
-
       if (data?.errors) {
         // Extract all validation messages
         const errors = data.errors;
@@ -186,7 +200,6 @@ export default function ProductionPartHistory() {
       } else {
         msg += data?.message || data?.title || "Lỗi hệ thống (400)";
       }
-
       toast.error(msg, { autoClose: 5000 });
     } finally {
       setIsProcessing(false);
@@ -226,19 +239,22 @@ export default function ProductionPartHistory() {
 
     try {
       if (type === "DELETE") {
-        const logId = data.id || data.workLogId;
-        await ProductionPartService.deleteWorkLog(logId);
-        setLogs(prev => prev.filter(item => (item.id || item.workLogId) !== logId));
+        const { workLogId } = getLogIdentity(data);
+        if (!workLogId) {
+          throw new Error("Missing work log id");
+        }
+        await ProductionPartService.deleteWorkLog(workLogId);
+        setLogs((prev) => prev.filter((item) => getLogIdentity(item).workLogId !== workLogId));
         toast.success("Đã xóa bản ghi.");
       } else if (type === "EDIT") {
         const { log, newVal } = data;
-        const part = partsLookup[String(log.partOrderSizeId)] || partsLookup[String(log.partId)];
-        const partId = log.partId || part?.partId || part?.id || 0;
-        const partOrderSizeId = log.partOrderSizeId || part?.partOrderSizeId || 0;
-        const logId = log.id || log.workLogId || 0;
+        const { partId, partOrderSizeId, workLogId } = getLogIdentity(log);
+        if (!partId || !partOrderSizeId || !workLogId) {
+          throw new Error("Missing ids to update work log");
+        }
 
-        await ProductionPartService.updateWorkLog(partId, partOrderSizeId, logId, { quantity: newVal });
-        setLogs(prev => prev.map(item => (item.id || item.workLogId) === logId ? { ...item, quantity: newVal } : item));
+        await ProductionPartService.updateWorkLog(partId, partOrderSizeId, workLogId, { quantity: newVal });
+        setLogs((prev) => prev.map((item) => (getLogIdentity(item).workLogId === workLogId ? { ...item, quantity: newVal } : item)));
         setEditingId(null);
         toast.success("Đã cập nhật số lượng.");
       }
@@ -257,7 +273,7 @@ export default function ProductionPartHistory() {
 
   return (
     <OwnerLayout>
-      <div className="min-h-screen bg-[#F4F7F6] font-sans selection:bg-emerald-100 selection:text-emerald-900 pb-20">
+      <div className="min-h-screen bg-[#f0f9f4] font-sans selection:bg-[#1e6e43]/10 selection:text-[#1e6e43] pb-20">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
 
           {/* HEADER SECTION */}
@@ -265,7 +281,7 @@ export default function ProductionPartHistory() {
             <div className="flex items-start gap-4">
               <button
                 onClick={() => navigate(-1)}
-                className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-600 transition-all hover:border-black hover:text-black shadow-sm active:scale-95"
+                className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-600 transition-all hover:border-[#1e6e43] hover:text-[#1e6e43] shadow-sm active:scale-95"
               >
                 <ArrowLeft size={22} />
               </button>
@@ -280,7 +296,7 @@ export default function ProductionPartHistory() {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
+              <span className="px-4 py-2 bg-[#f0f9f4] text-[#1e6e43] border border-[#d4e3da] rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
                 {stats.totalLogs} Lượt báo cáo
               </span>
             </div>
@@ -289,16 +305,16 @@ export default function ProductionPartHistory() {
           {/* STATS SECTION */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <StatCard
-              icon={<Package size={24} />}
-              label="Tổng sản lượng báo cáo"
-              value={`${stats.totalQty.toLocaleString("vi-VN")} cái`}
+              icon={<History size={24} />}
+              label="Số lượt báo cáo"
+              value={loading ? "..." : `${stats.totalLogs} lượt`}
               color="emerald"
             />
             <StatCard
-              icon={<ClipboardCheck size={24} />}
-              label="Trạng thái hệ thống"
-              value={loading ? "Đang truy xuất..." : "Hoạt động"}
-              color="blue"
+              icon={<Zap size={24} />}
+              label="Bản ghi chờ duyệt"
+              value={loading ? "..." : `${stats.pendingCount} bản ghi`}
+              color="emerald"
             />
           </div>
 
@@ -306,7 +322,7 @@ export default function ProductionPartHistory() {
           <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
             <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-slate-900 rounded-full" />
+                <div className="w-1.5 h-6 bg-[#1e6e43] rounded-full" />
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Bảng kê chi tiết thực hiện</h2>
               </div>
               {loading && <Loader2 className="animate-spin text-slate-400" size={18} />}
@@ -316,13 +332,13 @@ export default function ProductionPartHistory() {
               <table className="w-full min-w-[1000px] border border-black">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-black">
-                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black w-16">STT</th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Công đoạn</th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Biến thể</th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Thợ thực hiện</th>
-                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Số lượng</th>
-                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Ngày ghi</th>
-                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Trạng thái</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black w-16">STT</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Công đoạn</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Biến thể</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Thợ thực hiện</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Số lượng</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Ngày ghi</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Trạng thái</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>
                   </tr>
                 </thead>
@@ -341,15 +357,20 @@ export default function ProductionPartHistory() {
                     const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.partID || "");
                     const part = partsLookup[logPosId] || partsLookup[logPartId];
                     const osInfo = orderSizeLookup[logPosId];
-                    const logId = log.id || log.workLogId;
-                    const isEditing = editingId === logId;
-                    const isDone = log.status === 2 || log.statusName === "Đã nghiệm thu";
+                    const { workLogId } = getLogIdentity(log);
+                    const rowId = workLogId || `row-${index}`;
+                    const isEditing = editingId === rowId;
+                    const isDone =
+                      log.status === 2 ||
+                      log.statusName === "Đã nghiệm thu" ||
+                      log.status === 4 ||
+                      log.statusName === "Đã hoàn thành";
 
                     const color = osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
                     const size = osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
 
                     return (
-                      <tr key={logId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
+                      <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
                         <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(index + 1).padStart(2, "0")}</td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{part?.name || part?.partName || "N/A"}</div>
@@ -386,6 +407,10 @@ export default function ProductionPartHistory() {
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-emerald-600 shadow-sm">
                               <CheckCircle2 size={11} /> Hoàn nhận
                             </span>
+                          ) : log.status === 2 || log.statusName === "Đã nghiệm thu" ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-300 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-indigo-700 shadow-sm">
+                              <ClipboardCheck size={11} /> Đã nghiệm thu
+                            </span>
                           ) : log.status === 3 || log.statusName === "Chờ Nghiệm Thu" ? (
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
                               <Zap size={11} className="animate-pulse" /> Chờ duyệt
@@ -408,13 +433,13 @@ export default function ProductionPartHistory() {
                                 {!isDone && (
                                   <button
                                     onClick={() => handleOpenApprove(log)}
-                                    className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 active:scale-95 transition-all shadow-sm"
-                                    title="Nghiệm thu"
+                                    title="Xác nhận Nghiệm thu"
+                                    className="w-10 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-[#1e6e43] flex items-center justify-center transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95"
                                   >
-                                    <Zap size={15} fill="currentColor" />
+                                    <Zap size={16} />
                                   </button>
                                 )}
-                                <button onClick={() => { setEditingId(logId); setEditValue(String(log.quantity)); }} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all shadow-sm" title="Sửa"><Pencil size={15} /></button>
+                                <button onClick={() => { setEditingId(rowId); setEditValue(String(log.quantity)); }} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all shadow-sm" title="Sửa"><Pencil size={15} /></button>
                                 <button onClick={() => openDeleteConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95 transition-all shadow-sm" title="Xóa"><Trash size={15} /></button>
                               </>
                             )}
@@ -431,8 +456,8 @@ export default function ProductionPartHistory() {
 
         {/* MODALS */}
         {isApproveOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-3xl bg-white p-8 border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-8 border border-black shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="text-center mb-8">
                 <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 text-black mb-4">
                   <ShieldCheck size={32} />
@@ -468,7 +493,7 @@ export default function ProductionPartHistory() {
                 </button>
                 <button
                   onClick={executeApprove}
-                  className="flex-[2] rounded-xl bg-slate-900 py-4 text-xs font-bold text-white uppercase tracking-widest hover:bg-slate-800 shadow-md active:scale-[0.98] transition-all"
+                  className="flex-[2] rounded-xl bg-[#1e6e43] py-4 text-xs font-bold text-white uppercase tracking-widest hover:bg-[#155232] shadow-lg shadow-green-100 active:scale-[0.98] transition-all"
                 >
                   Xác nhận Nghiệm thu
                 </button>
@@ -503,12 +528,11 @@ export default function ProductionPartHistory() {
 
 function StatCard({ icon, label, value, color }) {
   const colorMap = {
-    emerald: "bg-emerald-50/50 border-emerald-200 text-emerald-600",
-    blue: "bg-slate-50 border-slate-200 text-slate-600"
+    emerald: "bg-[#f0f9f4] border-[#d4e3da] text-[#1e6e43]",
   };
   return (
-    <div className="flex items-center gap-6 rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:translate-y-[-2px] hover:shadow-md">
-      <div className={`flex h-16 w-16 items-center justify-center rounded-xl border shadow-sm ${colorMap[color]}`}>{icon}</div>
+    <div className="flex items-center gap-6 rounded-2xl border border-black bg-white p-8 shadow-sm transition-all hover:translate-y-[-2px] hover:shadow-md">
+      <div className={`flex h-16 w-16 items-center justify-center rounded-xl border shadow-sm ${colorMap[color] || colorMap.emerald}`}>{icon}</div>
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
         <p className="text-3xl font-black text-slate-900 tracking-tighter">{value}</p>
@@ -516,4 +540,3 @@ function StatCard({ icon, label, value, color }) {
     </div>
   );
 }
-

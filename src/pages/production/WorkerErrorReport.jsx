@@ -10,10 +10,10 @@ import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 const SEVERITIES = [
-  { value: "low", label: "Thấp", priority: 1 },
-  { value: "medium", label: "Trung bình", priority: 2 },
-  { value: "high", label: "Cao", priority: 3 },
-  { value: "critical", label: "Nghiêm trọng", priority: 4 },
+  { value: 1, label: "Thấp" },
+  { value: 2, label: "Trung bình" },
+  { value: 3, label: "Cao" },
+  { value: 4, label: "Nghiêm trọng" },
 ];
 
 const ERROR_TYPES = [
@@ -58,6 +58,7 @@ const mapPart = (part, fallbackProductionId) => ({
   sizeName: part?.sizeName ?? part?.size ?? part?.variant?.size ?? "",
   startDate: part?.startDate ?? part?.planStartDate ?? "",
   endDate: part?.endDate ?? part?.planEndDate ?? "",
+  partOrderSizeId: part?.partOrderSizeId ?? part?.orderSizeId ?? null,
 });
 
 const getPriorityBySeverity = (severity) =>
@@ -99,12 +100,13 @@ export default function WorkerErrorReport() {
     sizeName: normalizedAssignment?.sizeName || "",
     orderSizeId: normalizedAssignment?.orderSizeId || "",
     errorType: normalizedAssignment?.errorType !== undefined ? normalizedAssignment.errorType : 0,
-    severity: "medium",
+    severity: 2,
     title: "",
     description: "",
     quantity: "",
     happenAt: formatToDateTimeLocal(normalizedAssignment?.happenAt || new Date().toISOString()),
-    repairWorker: "", // Person responsible or fixer
+    repairWorker: "", // Full name for UI display if needed
+    assignedTo: "",   // The worker ID (integer)
   });
 
   const [employees, setEmployees] = useState([]);
@@ -404,6 +406,16 @@ export default function WorkerErrorReport() {
         if (part) {
           next.colorName = part.colorName || "";
           next.sizeName = part.sizeName || "";
+          next.orderSizeId = part.partOrderSizeId || ""; // Syncing orderSizeId
+        }
+      }
+
+      if (field === "assignedTo") {
+        const emp = employees.find(e => String(e.id) === String(value));
+        if (emp) {
+          next.repairWorker = emp.fullName;
+        } else {
+          next.repairWorker = "";
         }
       }
 
@@ -463,7 +475,7 @@ export default function WorkerErrorReport() {
       title: "",
       description: "",
       quantity: "",
-      happenAt: "",
+      happenAt: formatToDateTimeLocal(new Date().toISOString()),
       repairWorker: "",
       otherErrorDetail: "",
     }));
@@ -488,7 +500,8 @@ export default function WorkerErrorReport() {
     let title = String(form.title || "").trim();
     const typeNum = Number(form.errorType);
 
-    if (typeNum !== 3) {
+    // If title is empty, generate a default one
+    if (!title) {
       const typeLabel = getErrorTypeLabel(typeNum);
       if (typeNum === 0) {
         title = `${typeLabel}: ${selectedPart?.partName || `Mã #${partId}`}`;
@@ -514,7 +527,6 @@ export default function WorkerErrorReport() {
       setSubmitError(`Vui lòng nhập ${titleLabel}.`);
       return;
     }
-
     const qtyRaw = String(form.quantity || "").trim();
     if (qtyRaw) {
       const qty = Number(qtyRaw);
@@ -523,6 +535,14 @@ export default function WorkerErrorReport() {
         return;
       }
     }
+
+    const assignedTo = Number(form.assignedTo);
+    if (!assignedTo) {
+      setSubmitError("Vui lòng chọn nhân viên liên quan.");
+      return;
+    }
+
+    const priority = Number(form.severity || 2);
 
     const storedUser = getStoredUser() || {};
     const createdBy = Number(storedUser?.userId ?? storedUser?.id ?? getAuthItem("userId"));
@@ -536,8 +556,8 @@ export default function WorkerErrorReport() {
 
       const formData = new FormData();
       formData.append("CreatedBy", String(createdBy));
-      // Default to Medium priority (2) since UI is removed
-      formData.append("Priority", "2");
+      formData.append("AssignedTo", String(assignedTo));
+      formData.append("Priority", String(priority));
       formData.append("TypeIssue", String(form.errorType));
       formData.append("Title", title);
 
@@ -547,8 +567,7 @@ export default function WorkerErrorReport() {
       }
       if (form.colorName) fullDescription += `\n(Màu sắc: ${form.colorName})`;
       if (form.sizeName) fullDescription += `\n(Kích cỡ: ${form.sizeName})`;
-      if (form.happenAt) fullDescription += `\n(Xảy ra lúc: ${form.happenAt})`;
-      if (form.repairWorker) fullDescription += `\n(Nhân viên liên quan: ${form.repairWorker})`;
+      // No need to append time/worker to description anymore as they have fields
 
       if (fullDescription) formData.append("Description", fullDescription);
 
@@ -556,11 +575,18 @@ export default function WorkerErrorReport() {
         formData.append("Quantity", String(Number(qtyRaw)));
       }
 
+      const isoHappenAt = form.happenAt ? new Date(form.happenAt).toISOString() : new Date().toISOString();
+      formData.append("OccurredAt", isoHappenAt);
+
       if (attachments.length > 0 && attachments[0]?.file) {
         formData.append("Image", attachments[0].file);
       }
 
-      await ProductionPartService.createIssue(Number(partId), formData);
+      // API param is actually partOrderSizeId (or the ID we use in the URL)
+      // Check if we have orderSizeId from normalizedAssignment or the selected part
+      const finalId = selectedPart?.partOrderSizeId || form.orderSizeId || partId;
+
+      await ProductionPartService.createIssue(Number(finalId), formData);
 
       resetFormAfterSubmit();
       toast.success("Gửi báo cáo lỗi thành công.");
@@ -624,7 +650,7 @@ export default function WorkerErrorReport() {
               onSubmit={handleSubmit}
               className="rounded-xl border border-black bg-white p-5 shadow-sm"
             >
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Đơn sản xuất</label>
                   <select
@@ -672,7 +698,19 @@ export default function WorkerErrorReport() {
                     <div className="mt-1 text-xs text-rose-600">{partsError}</div>
                   )}
                 </div>
+              </div>
 
+              <div className="mt-4">
+                <label className="text-xs font-semibold uppercase text-slate-500">Tiêu đề lỗi <span className="text-rose-500">*</span></label>
+                <input
+                  value={form.title}
+                  onChange={(event) => handleChange("title", event.target.value)}
+                  placeholder="Nhập tiêu đề ngắn gọn cho lỗi này..."
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
                   <input
@@ -684,12 +722,48 @@ export default function WorkerErrorReport() {
                 </div>
 
                 <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Mức độ lỗi</label>
+                  <select
+                    value={form.severity}
+                    onChange={(event) => handleChange("severity", Number(event.target.value))}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    {SEVERITIES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi<span className="text-rose-500">*</span></label>
+                  <select
+                    value={form.assignedTo}
+                    onChange={(event) => handleChange("assignedTo", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    <option value="">Chọn nhân viên...</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingEmployees && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải danh sách nhân viên...</div>
+                  )}
+                </div>
+
+                <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Thời gian phát sinh</label>
                   <input
                     type="datetime-local"
                     value={form.happenAt}
                     readOnly
-                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 outline-none cursor-not-allowed"
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm text-amber-900 outline-none transition cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -704,34 +778,6 @@ export default function WorkerErrorReport() {
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                 />
               </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4">
-                <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Nhân viên liên quan</label>
-                  <select
-                    value={form.repairWorker}
-                    onChange={(event) => handleChange("repairWorker", event.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    <option value="">Chọn nhân viên...</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.fullName}>
-                        {emp.fullName}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingEmployees ? (
-                    <div className="mt-1 text-xs text-slate-400">Đang tải danh sách nhân viên...</div>
-                  ) : (
-                    employees.length === 0 && form.partId && (
-                      <div className="mt-1 text-xs text-amber-600 font-medium italic">
-                        * Công đoạn này chưa có nhân viên được phân công.
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-
               <div className="mt-4">
                 <label className="text-xs font-semibold uppercase text-slate-500">Ảnh minh chứng</label>
                 <div
