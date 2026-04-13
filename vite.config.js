@@ -13,7 +13,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-	  '@/services/userService': path.resolve(__dirname, './src/services/UserService.js')
     },
   },
   test: {
