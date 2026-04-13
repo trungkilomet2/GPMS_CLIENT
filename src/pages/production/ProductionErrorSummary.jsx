@@ -107,6 +107,8 @@ const normalizeIssue = (item, index) => {
     (item?.partId ? `Công đoạn #${item.partId}` : typeLabel);
 
   const severity = getSeverityFromPriority(item?.priority, item?.severity);
+  const status = Number(item?.status);
+  const hasStatus = Number.isFinite(status) && status > 0;
 
   return {
     id: item?.issueId ?? item?.id ?? `issue-${index}`,
@@ -121,8 +123,8 @@ const normalizeIssue = (item, index) => {
     quantity: Number(item?.quantity) || 0,
     imageUrl: item?.imageUrl ?? "",
     createdAt: item?.createdAt ?? "",
-    status: item?.status ?? 1,
-    statusName: ISSUE_STATUS_LABELS[item?.status] ?? "Chờ xử lý",
+    status: hasStatus ? status : null,
+    statusName: hasStatus ? ISSUE_STATUS_LABELS[status] ?? `#${status}` : "-",
   };
 };
 
@@ -421,6 +423,7 @@ export default function ProductionErrorSummary() {
                     <th className="px-4 py-3 text-left">Công đoạn</th>
                     <th className="px-4 py-3 text-left">Tiêu đề</th>
                     <th className="px-4 py-3 text-center">Minh chứng</th>
+                    <th className="px-4 py-3 text-center">Mức độ</th>
                     <th className="px-4 py-3 text-center">Số lượng</th>
                     <th className="px-4 py-3 text-center">Trạng thái</th>
                     <th className="px-4 py-3 text-center">Thời gian</th>
@@ -471,13 +474,17 @@ export default function ProductionErrorSummary() {
                       </td>
                       <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
                       <td className="px-4 py-3 text-center">
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                            ISSUE_STATUS_STYLES[item.status] ?? ISSUE_STATUS_STYLES[1]
-                          }`}
-                        >
-                          {item.statusName}
-                        </span>
+                        {item.status ? (
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                              ISSUE_STATUS_STYLES[item.status] ?? ISSUE_STATUS_STYLES[1]
+                            }`}
+                          >
+                            {item.statusName}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] italic text-slate-300">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
                       <td className="px-4 py-3 text-center">
@@ -487,7 +494,7 @@ export default function ProductionErrorSummary() {
                             setIsHandlingModalOpen(true);
                           }}
                           className="rounded-lg bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
-                          disabled={item.status === 3 || item.status === 4}
+                          disabled={!item.status || item.status === 3 || item.status === 4}
                         >
                           Xác nhận
                         </button>
@@ -496,7 +503,7 @@ export default function ProductionErrorSummary() {
                   ))}
                     {errors.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                      <td colSpan={8} className="py-8 text-center text-slate-500">
                         Chưa có lỗi nào được ghi nhận.
                       </td>
                     </tr>

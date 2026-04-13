@@ -475,7 +475,7 @@ export default function WorkerErrorReport() {
       title: "",
       description: "",
       quantity: "",
-      happenAt: "",
+      happenAt: formatToDateTimeLocal(new Date().toISOString()),
       repairWorker: "",
       otherErrorDetail: "",
     }));
@@ -762,8 +762,8 @@ export default function WorkerErrorReport() {
                   <input
                     type="datetime-local"
                     value={form.happenAt}
-                    onChange={(event) => handleChange("happenAt", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    readOnly
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm text-amber-900 outline-none transition cursor-not-allowed"
                   />
                 </div>
               </div>
