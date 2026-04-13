@@ -1,6 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, ClipboardCheck, Factory, LogOut, Users, X } from "lucide-react";
+import { ClipboardList, ClipboardCheck, LogOut, Users, X } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
@@ -61,17 +61,6 @@ export default function TeamLeaderSidebar({ mobileOpen = false, onClose = () => 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-
-    const shouldLockChat = isMobileViewport && mobileOpen;
-    document.body.classList.toggle("gpms-mobile-menu-open", shouldLockChat);
-
-    return () => {
-      document.body.classList.remove("gpms-mobile-menu-open");
-    };
-  }, [isMobileViewport, mobileOpen]);
-
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
@@ -90,26 +79,24 @@ export default function TeamLeaderSidebar({ mobileOpen = false, onClose = () => 
         aria-expanded={isMobileViewport ? mobileOpen : !effectiveCollapsed}
       >
       <div className="dashboard-sidebar__brand">
-        <div className="dashboard-sidebar__brand-main">
-          <button
-            type="button"
-            className="dashboard-sidebar__logo"
-            onClick={() => {
-              if (isMobileViewport) return;
-              setCollapsed((prev) => !prev);
-            }}
-            title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
-          >
-            <Factory className="dashboard-sidebar__logo-mark" size={22} strokeWidth={2.1} aria-hidden="true" />
-          </button>
+        <button
+          type="button"
+          className="dashboard-sidebar__logo"
+          onClick={() => {
+            if (isMobileViewport) return;
+            setCollapsed((prev) => !prev);
+          }}
+          title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
+        >
+          <span className="dashboard-sidebar__logo-mark">GP</span>
+        </button>
 
-          {!effectiveCollapsed && (
-            <div className="dashboard-sidebar__brand-text">
-              <div className="dashboard-sidebar__brand-title">GPMS</div>
-              <div className="dashboard-sidebar__brand-subtitle">Tổ trưởng</div>
-            </div>
-          )}
-        </div>
+        {!effectiveCollapsed && (
+          <div className="dashboard-sidebar__brand-text">
+            <div className="dashboard-sidebar__brand-title">GPMS</div>
+            <div className="dashboard-sidebar__brand-subtitle">Tổ trưởng</div>
+          </div>
+        )}
 
         <button
           type="button"

@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { RotateCcw, Save, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, RotateCcw, Save, ShieldAlert, ShieldCheck, Table2, Users } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
+import {
+  ADMIN_DB_PERMISSION_CORE_TABLES,
+  ADMIN_DB_ROLE_BLUEPRINTS,
+  ADMIN_DB_USER_FOREIGN_TABLES,
+  getAdminDbRoleBlueprint,
+  getAdminDbRoleOptions,
+} from "@/lib/admin/adminSchemaBlueprint";
 import {
   AdminBanner,
   AdminRoleBadge,
@@ -10,12 +17,12 @@ import {
 } from "@/pages/admin/adminShared";
 import PermissionService from "@/services/PermissionService";
 
-const ROLE_META = {
-  Admin: { label: "Quản trị hệ thống", shortLabel: "Quản trị hệ thống", description: "Quản lý quyền và tài khoản toàn hệ thống.", tone: "danger" },
-  Customer: { label: "Khách hàng", shortLabel: "Khách hàng", description: "Theo dõi đơn hàng và hồ sơ khách hàng.", tone: "primary" },
-  Owner: { label: "Chủ xưởng", shortLabel: "Chủ xưởng", description: "Theo dõi và vận hành toàn bộ xưởng.", tone: "warning" },
-  PM: { label: "Quản lý sản xuất", shortLabel: "Quản lý sản xuất", description: "Phụ trách nhân sự và sản xuất.", tone: "info" },
-  Worker: { label: "Nhân viên", shortLabel: "Nhân viên", description: "Thực hiện công việc được phân công.", tone: "success" },
+const BACKEND_ROLE_ID_MAP = {
+  Admin: 1,
+  Customer: 2,
+  Owner: 3,
+  PM: 4,
+  Worker: 5,
 };
 
 const METHOD_LABELS = {
@@ -47,6 +54,47 @@ const CONTROLLER_LABELS = {
   WorkerRole: "Chuyên môn thợ",
 };
 
+function normalizeSearchText(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+function isBusinessTableRelatedToRole(tableInfo, blueprint) {
+  const scopeText = normalizeSearchText(
+    [
+      blueprint.key,
+      blueprint.label,
+      blueprint.shortLabel,
+      blueprint.description,
+      blueprint.joinPath,
+      ...blueprint.touchpoints.map((item) => `${item.table} ${item.columns} ${item.relation}`),
+    ].join(" ")
+  );
+
+  const tableTokens = [
+    tableInfo.table,
+    String(tableInfo.table ?? "").replaceAll("[", "").replaceAll("]", ""),
+    tableInfo.module,
+    tableInfo.column,
+    tableInfo.purpose,
+  ].map((token) => normalizeSearchText(token));
+
+  return tableTokens.some((token) => token && scopeText.includes(token));
+}
+
+function formatSimpleTableLabel(value = "") {
+  return String(value ?? "").replaceAll("[", "").replaceAll("]", "");
+}
+
+function getRoleToneByName(roleName = "") {
+  return getAdminDbRoleBlueprint(roleName)?.tone || "info";
+}
+
 function getPermissionCaption(permission) {
   const controllerLabel = CONTROLLER_LABELS[permission.controller] || permission.controller || "Khác";
   const methodLabel = METHOD_LABELS[permission.method] || permission.method || "Xử lý";
@@ -61,7 +109,7 @@ function getPermissionCaption(permission) {
 
 export default function AdminManagePermission() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedRole, setSelectedRole] = useState(searchParams.get("role") || "");
+  const selectedRole = searchParams.get("role") || ADMIN_DB_ROLE_BLUEPRINTS[0].key;
   const [permissionLoading, setPermissionLoading] = useState(true);
   const [permissionError, setPermissionError] = useState("");
   const [permissions, setPermissions] = useState([]);
@@ -69,6 +117,16 @@ export default function AdminManagePermission() {
   const [draftPermissions, setDraftPermissions] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveNotice, setSaveNotice] = useState(null);
+
+  const roleOptions = useMemo(() => getAdminDbRoleOptions(), []);
+  const activeBlueprint = useMemo(() => getAdminDbRoleBlueprint(selectedRole), [selectedRole]);
+  const selectedRoleId = BACKEND_ROLE_ID_MAP[activeBlueprint.key] || null;
+
+  const relatedBusinessTables = useMemo(() => {
+    return ADMIN_DB_USER_FOREIGN_TABLES.filter((tableInfo) =>
+      isBusinessTableRelatedToRole(tableInfo, activeBlueprint)
+    );
+  }, [activeBlueprint]);
 
   const permissionItems = useMemo(() => {
     return [...permissions]
@@ -82,42 +140,6 @@ export default function AdminManagePermission() {
         return leftKey.localeCompare(rightKey, "vi");
       });
   }, [permissions]);
-
-  const roleOptions = useMemo(() => {
-    const uniqueRoles = new Map();
-    permissionItems.forEach((permission) => {
-      permission.roles.forEach((role) => {
-        if (!role?.id || !role?.name || uniqueRoles.has(role.id)) return;
-        const meta = ROLE_META[role.name] || {};
-        uniqueRoles.set(role.id, {
-          id: role.id,
-          key: role.name,
-          label: meta.label || role.name,
-          shortLabel: meta.shortLabel || meta.label || role.name,
-          description: meta.description || `Theo dõi quyền đang gán cho vai trò ${role.name}.`,
-          tone: meta.tone || "info",
-        });
-      });
-    });
-    return Array.from(uniqueRoles.values()).sort((left, right) => left.id - right.id);
-  }, [permissionItems]);
-
-  useEffect(() => {
-    const roleFromQuery = searchParams.get("role");
-    if (roleFromQuery && roleOptions.some((role) => role.key === roleFromQuery)) {
-      if (selectedRole !== roleFromQuery) setSelectedRole(roleFromQuery);
-      return;
-    }
-    if (!selectedRole && roleOptions[0]?.key) {
-      setSelectedRole(roleOptions[0].key);
-    }
-  }, [roleOptions, searchParams, selectedRole]);
-
-  const activeRole = useMemo(
-    () => roleOptions.find((role) => role.key === selectedRole) || roleOptions[0] || null,
-    [roleOptions, selectedRole]
-  );
-  const selectedRoleId = activeRole?.id || null;
 
   const permissionCount = permissionItems.length;
 
@@ -145,7 +167,6 @@ export default function AdminManagePermission() {
     const next = new URLSearchParams(searchParams);
     next.set("role", roleKey);
     setSearchParams(next);
-    setSelectedRole(roleKey);
     setSaveNotice(null);
   };
 
@@ -166,11 +187,11 @@ export default function AdminManagePermission() {
         return accumulator;
       }, {})
     );
-      setSaveNotice({
-        tone: "info",
-        title: "Đã hoàn tác bản nháp",
-        description: `Quyền của ${activeRole?.label || "vai trò đang chọn"} đã được đưa về đúng trạng thái hiện tại của hệ thống.`,
-      });
+    setSaveNotice({
+      tone: "info",
+      title: "Đã hoàn tác bản nháp",
+      description: `Quyền của ${activeBlueprint.label} đã được đưa về đúng trạng thái hiện tại của hệ thống.`,
+    });
   };
 
   const loadPermissionData = async () => {
@@ -225,7 +246,7 @@ export default function AdminManagePermission() {
       setSaveNotice({
         tone: "success",
         title: "Đã lưu quyền thành công",
-        description: `Đã cập nhật ${changedItems.length} quyền cho ${activeRole?.label || "vai trò đang chọn"}.`,
+        description: `Đã cập nhật ${changedItems.length} quyền cho ${activeBlueprint.label}.`,
       });
     } catch (error) {
       setSaveNotice({
@@ -265,7 +286,7 @@ export default function AdminManagePermission() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Phân quyền hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Chọn vai trò, xem quyền hiện có và lưu thay đổi trực tiếp lên hệ thống.
+                Theo dõi vai trò đang có trong hệ thống, phạm vi dữ liệu liên quan và mức độ sẵn sàng của hệ thống cho phân quyền chi tiết.
               </p>
             </div>
 
@@ -296,14 +317,21 @@ export default function AdminManagePermission() {
               icon={ShieldCheck}
               label="Số vai trò"
               value={roleOptions.length}
-              meta="Các vai trò thực sự xuất hiện trong dữ liệu quyền"
+              meta="Các vai trò nội bộ đang được hệ thống theo dõi"
               tone="primary"
             />
             <AdminStatCard
+              icon={Table2}
+              label="Bảng lõi"
+              value={ADMIN_DB_PERMISSION_CORE_TABLES.length}
+              meta="Các bảng đang tham gia vào luồng vai trò hiện tại"
+              tone="success"
+            />
+            <AdminStatCard
               icon={Users}
-              label="Vai trò đang chọn"
-              value={activeRole?.shortLabel || "..."}
-              meta="Mọi thay đổi bên dưới áp dụng cho vai trò này"
+              label="Bảng nghiệp vụ"
+              value={ADMIN_DB_USER_FOREIGN_TABLES.length}
+              meta="Những bảng có liên quan tới tài khoản hoặc người phụ trách"
               tone="info"
             />
             <AdminStatCard
@@ -331,17 +359,20 @@ export default function AdminManagePermission() {
           <section className="admin-card">
             <div className="admin-card__header">
               <div>
-                  <h2 className="admin-card__title">Chọn vai trò cần rà soát</h2>
-                  <p className="admin-card__subtitle">
-                    Danh sách vai trò được gom trực tiếp từ từng bản ghi quyền mà backend trả về.
-                  </p>
-                </div>
+                <h2 className="admin-card__title">Chọn vai trò cần rà soát</h2>
+                <p className="admin-card__subtitle">
+                  Mỗi vai trò hiển thị các bảng đang liên quan và mức độ sẵn sàng của hệ thống cho phân quyền chi tiết.
+                </p>
               </div>
+            </div>
 
-              <div className="admin-role-grid">
-              {roleOptions.map((role) => (
+            <div className="admin-role-grid">
+              {roleOptions.map((role) => {
+                const blueprint = getAdminDbRoleBlueprint(role.key);
+
+                return (
                   <button
-                    key={role.id}
+                    key={role.key}
                     type="button"
                     className={`admin-role-card admin-focusable ${selectedRole === role.key ? "is-active" : ""}`}
                     onClick={() => handleRoleChange(role.key)}
@@ -349,9 +380,13 @@ export default function AdminManagePermission() {
                     <AdminRoleBadge tone={role.tone}>{role.label}</AdminRoleBadge>
                     <strong className="mt-3">{role.shortLabel}</strong>
                     <span>{role.description}</span>
+                    <div className="admin-role-card__meta">
+                      <span>{blueprint.touchpoints.length} điểm dữ liệu liên quan</span>
+                    </div>
                   </button>
-                ))}
-              </div>
+                );
+              })}
+            </div>
           </section>
 
           <div className="admin-grid admin-grid--permissions">
@@ -413,7 +448,7 @@ export default function AdminManagePermission() {
 
                         <div className="admin-permission-item__summary">
                           <div className="admin-permission-item__summary-stack">
-                            <AdminRoleBadge tone={activeRole?.tone || "info"}>{activeRole?.label || "Vai trò"}</AdminRoleBadge>
+                            <AdminRoleBadge tone={activeBlueprint.tone}>{activeBlueprint.label}</AdminRoleBadge>
                             <AdminRoleBadge tone={isEnabled ? "success" : "danger"}>
                               {isEnabled ? "Đang bật" : "Đang tắt"}
                             </AdminRoleBadge>
@@ -428,13 +463,10 @@ export default function AdminManagePermission() {
                       <div className="admin-permission-item__body">
                         <div className="admin-permission-panel admin-permission-panel--current">
                           <span className="admin-permission-panel__title">Hiện tại</span>
-                          <div className="admin-permission-panel__summary">
-                            {selectedRoleId && permission.roleIds.includes(selectedRoleId) ? "Đang có quyền" : "Chưa có quyền"}
-                          </div>
-                          <div className="admin-permission-table__draft admin-table__secondary">
-                            {selectedRoleId && permission.roleIds.includes(selectedRoleId)
-                              ? "Vai trò đang được phép dùng thao tác này."
-                              : "Vai trò hiện chưa được phép dùng thao tác này."}
+                          <div className="admin-permission-table__badges">
+                            <AdminRoleBadge tone={selectedRoleId && permission.roleIds.includes(selectedRoleId) ? "success" : "danger"}>
+                              {selectedRoleId && permission.roleIds.includes(selectedRoleId) ? "Vai trò này đang có quyền" : "Vai trò này chưa có quyền"}
+                            </AdminRoleBadge>
                           </div>
                         </div>
 
@@ -447,7 +479,7 @@ export default function AdminManagePermission() {
                                 checked={isEnabled}
                                 onChange={() => handleTogglePermission(permission.id)}
                               />
-                              <span>{isEnabled ? "Đang bật cho vai trò này" : "Đang tắt cho vai trò này"}</span>
+                              <span>{isEnabled ? "Bật quyền này cho vai trò đang chọn" : "Tắt quyền này cho vai trò đang chọn"}</span>
                             </label>
                           </div>
                         </div>
@@ -489,23 +521,67 @@ export default function AdminManagePermission() {
               </div>
             </section>
 
+            <section className="admin-card">
+              <div className="admin-card__header">
+                <div>
+                  <h2 className="admin-card__title">Phạm vi dữ liệu của {activeBlueprint.label}</h2>
+                  <p className="admin-card__subtitle">
+                    Tập trung vào bảng, cột và mối liên hệ đang ảnh hưởng trực tiếp đến vai trò này.
+                  </p>
+                </div>
+              </div>
+
+              <div className="admin-matrix-wrap">
+                <table className="admin-matrix">
+                  <thead>
+                    <tr>
+                      <th>Phạm vi</th>
+                      <th>Bảng</th>
+                      <th>Cột</th>
+                      <th>Ý nghĩa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeBlueprint.touchpoints.map((touchpoint) => (
+                      <tr key={`${activeBlueprint.key}-${touchpoint.table}-${touchpoint.columns}`}>
+                        <td>
+                          <div className="admin-chips">
+                            <AdminRoleBadge tone={touchpoint.tone}>{touchpoint.scope}</AdminRoleBadge>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="admin-table__primary">{formatSimpleTableLabel(touchpoint.table)}</div>
+                        </td>
+                        <td>
+                          <div className="admin-table__secondary">{touchpoint.columns}</div>
+                        </td>
+                        <td>
+                          <div className="admin-table__secondary">{touchpoint.relation}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
             <aside className="admin-sidebar-stack">
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
                     <h2 className="admin-card__title">Tóm tắt vai trò</h2>
-                    <p className="admin-card__subtitle">Thông tin rút trực tiếp từ danh sách quyền hiện có của backend.</p>
+                    <p className="admin-card__subtitle">Những gì quản trị viên cần nắm nhanh trước khi chỉnh phân quyền.</p>
                   </div>
                 </div>
 
                 <div className="admin-preview-list">
                   <div className="admin-preview-list__item">
                     <strong>Vai trò</strong>
-                    <span>{activeRole?.label || "Chưa chọn"}</span>
+                    <span>{activeBlueprint.label}</span>
                   </div>
                   <div className="admin-preview-list__item">
-                    <strong>Số quyền đang bật</strong>
-                    <span>{grantedPermissionCount}</span>
+                    <strong>Luồng dữ liệu</strong>
+                    <span>{activeBlueprint.joinPath}</span>
                   </div>
                   <div className="admin-preview-list__item">
                     <strong>Trạng thái quyền</strong>
@@ -523,25 +599,25 @@ export default function AdminManagePermission() {
               <section className="admin-card">
                 <div className="admin-card__header">
                   <div>
-                    <h2 className="admin-card__title">Nhật ký phân quyền gần đây</h2>
-                    <p className="admin-card__subtitle">Các bản ghi gần nhất hệ thống trả về để theo dõi thay đổi quyền.</p>
+                    <h2 className="admin-card__title">Bảng nghiệp vụ liên quan</h2>
+                    <p className="admin-card__subtitle">Các bảng có thể bị ảnh hưởng khi vai trò này tham gia quy trình nghiệp vụ.</p>
                   </div>
                 </div>
 
-                {permissionAuditItems.length === 0 ? (
-                  <div className="admin-preview-list">
-                    <div className="admin-preview-list__item">
-                      <strong>Chưa có dữ liệu nhật ký</strong>
-                      <span>Hệ thống chưa trả bản ghi thay đổi quyền gần đây.</span>
-                    </div>
+                {relatedBusinessTables.length === 0 ? (
+                  <div className="admin-note-box">
+                    <strong>Chưa xác định rõ bảng nghiệp vụ</strong>
+                    <p>Vai trò này hiện chủ yếu đi qua bảng nối hoặc hệ thống chưa trả đủ dữ liệu để ánh xạ sâu hơn.</p>
                   </div>
                 ) : (
                   <div className="admin-preview-list">
-                    {permissionAuditItems.map((item) => (
-                      <div key={item.id || `${item.timestamp}-${item.message}`} className="admin-preview-list__item">
-                        <strong>{item.message || "Thay đổi phân quyền"}</strong>
-                        <span>{formatAdminDateTime(item.timestamp)}</span>
-                        <span className="admin-preview-list__subtext">{item.level || "Thông tin"}</span>
+                    {relatedBusinessTables.map((tableInfo) => (
+                      <div key={`${tableInfo.table}-${tableInfo.column}`} className="admin-preview-list__item">
+                        <strong>{formatSimpleTableLabel(tableInfo.table)}</strong>
+                        <span>{tableInfo.purpose}</span>
+                        <span className="admin-preview-list__subtext">
+                          {tableInfo.module} <ArrowRight size={14} /> {tableInfo.column}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -554,16 +630,16 @@ export default function AdminManagePermission() {
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Quyền trả về từ hệ thống</h2>
-                  <p className="admin-card__subtitle">Danh sách rút gọn để kiểm nhanh controller, action và method hiện có.</p>
+                  <h2 className="admin-card__title">Bảng lõi hiện có</h2>
+                  <p className="admin-card__subtitle">Những bảng của hệ thống đang thực sự tham gia vào cơ chế vai trò hiện tại.</p>
                 </div>
               </div>
 
               <div className="admin-preview-list admin-preview-list--compact">
-                {permissionItems.slice(0, 8).map((permission) => (
-                  <div key={permission.id} className="admin-preview-list__item">
-                    <strong>{permission.summary.title}</strong>
-                    <span>{permission.summary.subtitle}</span>
+                {ADMIN_DB_PERMISSION_CORE_TABLES.map((tableInfo) => (
+                  <div key={tableInfo.table} className="admin-preview-list__item">
+                    <strong>{formatSimpleTableLabel(tableInfo.table)}</strong>
+                    <span>{tableInfo.description}</span>
                   </div>
                 ))}
               </div>
@@ -572,18 +648,26 @@ export default function AdminManagePermission() {
             <section className="admin-card">
               <div className="admin-card__header">
                 <div>
-                  <h2 className="admin-card__title">Vai trò đang có trong dữ liệu quyền</h2>
-                  <p className="admin-card__subtitle">Danh sách này được gom từ các role đi kèm từng bản ghi quyền.</p>
+                  <h2 className="admin-card__title">Nhật ký phân quyền gần đây</h2>
+                  <p className="admin-card__subtitle">Các bản ghi gần nhất hệ thống trả về để theo dõi thay đổi quyền.</p>
                 </div>
               </div>
 
               <div className="admin-preview-list admin-preview-list--compact">
-                {roleOptions.map((role) => (
-                  <div key={role.id} className="admin-preview-list__item">
-                    <strong>{role.label}</strong>
-                    <span>{role.description}</span>
+                {permissionAuditItems.length === 0 ? (
+                  <div className="admin-preview-list__item">
+                    <strong>Chưa có dữ liệu nhật ký</strong>
+                    <span>Hệ thống chưa trả bản ghi thay đổi quyền gần đây.</span>
                   </div>
-                ))}
+                ) : (
+                  permissionAuditItems.map((item) => (
+                    <div key={item.id || `${item.timestamp}-${item.message}`} className="admin-preview-list__item">
+                      <strong>{item.message || "Thay đổi phân quyền"}</strong>
+                      <span>{formatAdminDateTime(item.timestamp)}</span>
+                      <span className="admin-preview-list__subtext">{item.level || "Thông tin"}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
 
@@ -596,14 +680,12 @@ export default function AdminManagePermission() {
               </div>
 
               <div className="admin-preview-list admin-preview-list--compact">
-                <div className="admin-preview-list__item">
-                  <strong>Nguồn vai trò</strong>
-                  <span>Vai trò đang được suy ra từ dữ liệu quyền, không lấy từ catalog nội bộ riêng.</span>
-                </div>
-                <div className="admin-preview-list__item">
-                  <strong>Nguồn nhật ký</strong>
-                  <span>Màn chỉ hiển thị những gì backend trả về từ audit quyền.</span>
-                </div>
+                {activeBlueprint.gaps.map((gap) => (
+                  <div key={gap} className="admin-preview-list__item">
+                    <strong>{activeBlueprint.label}</strong>
+                    <span>{gap}</span>
+                  </div>
+                ))}
                 <div className="admin-preview-list__item">
                   <strong>Đi tới quản lý tài khoản</strong>
                   <span>

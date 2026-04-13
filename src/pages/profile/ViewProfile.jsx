@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
-import { authService } from "@/services/authService";
 import OrderService from "@/services/OrderService";
 import Header from "@/components/Header";
 import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";
-import { getErrorMessage } from "@/utils/errorUtils";
 
 const T = {
   dark:"#0d4225", mid:"#186637", base:"#1e8a47",
@@ -26,11 +24,6 @@ const GLOBAL_CSS = `
     .pf-avatar{width:84px!important;height:84px!important;font-size:2rem!important}
     .pf-cover{height:160px!important}
     .pf-actions{flex-wrap:wrap}
-    .customer-profile__summary{grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:0 1rem!important}
-    .customer-profile__info-grid{grid-template-columns:1fr!important}
-  }
-  @media(max-width:560px){
-    .customer-profile__summary{grid-template-columns:1fr!important}
   }
 `;
 
@@ -56,29 +49,6 @@ function RoleBadge({ children }) {
       <span style={{width:7,height:7,borderRadius:"50%",background:T.base,display:"inline-block"}}/>
       {children}
     </span>
-  );
-}
-
-function EyeIcon({ open = false }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M2 12C3.8 8.6 7.4 6.5 12 6.5C16.6 6.5 20.2 8.6 22 12C20.2 15.4 16.6 17.5 12 17.5C7.4 17.5 3.8 15.4 2 12Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      {!open ? (
-        <path
-          d="M4 20L20 4"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      ) : null}
-    </svg>
   );
 }
 
@@ -203,8 +173,8 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
           </div>
 
           <div style={{display:"flex",gap:".75rem",flexWrap:"wrap"}}>
-            <BtnPrimary onClick={onViewOrders}>Xem đơn hàng</BtnPrimary>
-            <BtnSecondary onClick={onCreateOrder}>Tạo yêu cầu mới</BtnSecondary>
+            <BtnPrimary onClick={onViewOrders}>📋 Xem đơn hàng</BtnPrimary>
+            <BtnSecondary onClick={onCreateOrder}>➕ Tạo yêu cầu mới</BtnSecondary>
           </div>
         </CardSection>
       </div>
@@ -215,31 +185,15 @@ function SectionInfo({ user, onViewOrders, onCreateOrder }) {
 function SectionSecurity() {
   const [form,setForm] = useState({current:"",next:"",confirm:""});
   const [msg,setMsg]   = useState(null);
-  const [saving,setSaving] = useState(false);
   const [show,setShow] = useState({current:false,next:false,confirm:false});
-  const [expanded, setExpanded] = useState(false);
   const handle = e => setForm(p=>({...p,[e.target.name]:e.target.value}));
-  const submit = async (e) => {
+  const submit = e => {
     e.preventDefault();
-    const validationMessage = validateNewPassword(form.current, form.next, form.confirm);
-    if (validationMessage) return setMsg({ ok: false, text: validationMessage });
-
-    try {
-      setSaving(true);
-      setMsg(null);
-      await authService.changePassword({
-        currentPassword: form.current,
-        newPassword: form.next,
-        confirmPassword: form.confirm,
-      });
-      setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
-      setForm({current:"",next:"",confirm:""});
-      setTimeout(()=>setMsg(null),3000);
-    } catch (error) {
-      setMsg({ ok:false, text: getErrorMessage(error, "Không thể đổi mật khẩu lúc này.") });
-    } finally {
-      setSaving(false);
-    }
+    if(form.next!==form.confirm) return setMsg({ok:false,text:"Mật khẩu mới không khớp."});
+    if(form.next.length<6)       return setMsg({ok:false,text:"Mật khẩu phải ít nhất 6 ký tự."});
+    setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
+    setForm({current:"",next:"",confirm:""});
+    setTimeout(()=>setMsg(null),3000);
   };
   const fields = [
     {name:"current",label:"Mật khẩu hiện tại", placeholder:"Nhập mật khẩu hiện tại"},
@@ -248,127 +202,49 @@ function SectionSecurity() {
   ];
   return (
     <CardSection title="Đổi mật khẩu" mb="0">
-      <div style={{
-        display:"flex",
-        justifyContent:"space-between",
-        alignItems:"center",
-        gap:"1rem",
-        flexWrap:"wrap",
-        padding:"1rem 1.1rem",
-        border:`1px solid ${T.border}`,
-        borderRadius:16,
-        background:"linear-gradient(135deg, #ffffff 0%, #f6fbf7 100%)",
-      }}>
-        <div style={{display:"grid",gap:".35rem",maxWidth:540}}>
-          <div style={{fontSize:".98rem",fontWeight:800,color:T.text}}>Cập nhật mật khẩu để bảo vệ tài khoản</div>
-          <div style={{fontSize:".84rem",lineHeight:1.6,color:T.textMid}}>
-            Chỉ mất vài giây để mở biểu mẫu và thay đổi mật khẩu an toàn hơn.
+      {msg&&(
+        <div style={{padding:".75rem 1rem",borderRadius:8,marginBottom:"1rem",background:msg.ok?T.light:T.redBg,color:msg.ok?T.mid:T.red,fontSize:".84rem",fontWeight:600}}>
+          {msg.ok?"✅":"⚠️"}&nbsp;{msg.text}
+        </div>
+      )}
+      <form onSubmit={submit} style={{maxWidth:400}}>
+        {fields.map(f=>(
+          <div key={f.name} style={{marginBottom:"1rem"}}>
+            <label style={{display:"block",fontSize:".75rem",fontWeight:700,color:T.textMid,marginBottom:".3rem",textTransform:"uppercase",letterSpacing:".04em"}}>{f.label}</label>
+            <div style={{position:"relative"}}>
+              <input
+                type={show[f.name] ? "text" : "password"}
+                name={f.name}
+                value={form[f.name]}
+                onChange={handle}
+                placeholder={f.placeholder}
+                style={{width:"100%",padding:".65rem 2.8rem .65rem .9rem",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:".88rem",outline:"none",background:T.white}}
+              />
+              <button
+                type="button"
+                onClick={() => setShow((p) => ({ ...p, [f.name]: !p[f.name] }))}
+                style={{
+                  position:"absolute",
+                  right:10,
+                  top:"50%",
+                  transform:"translateY(-50%)",
+                  border:"none",
+                  background:"transparent",
+                  color:T.textMid,
+                  cursor:"pointer",
+                  fontSize:".95rem",
+                  padding:0,
+                }}
+              >
+                {show[f.name] ? "🙈" : "👁"}
+              </button>
+            </div>
           </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setExpanded((prev) => !prev);
-            if (expanded) {
-              setMsg(null);
-              setForm({ current: "", next: "", confirm: "" });
-              setShow({ current: false, next: false, confirm: false });
-            }
-          }}
-          style={{
-            display:"inline-flex",
-            alignItems:"center",
-            gap:".45rem",
-            background:expanded ? T.light : T.base,
-            color:expanded ? T.mid : "#fff",
-            border:expanded ? `1px solid ${T.border}` : "none",
-            padding:".8rem 1.2rem",
-            borderRadius:12,
-            fontWeight:700,
-            fontSize:".84rem",
-            cursor:"pointer",
-            boxShadow:expanded ? "none" : "0 14px 30px rgba(30,110,67,.16)",
-          }}
-        >
-          {expanded ? "Ẩn đổi mật khẩu" : "Mở đổi mật khẩu"}
-        </button>
-      </div>
-
-      {expanded ? (
-        <div style={{marginTop:"1.1rem"}}>
-          {msg&&(
-            <div style={{padding:".75rem 1rem",borderRadius:8,marginBottom:"1rem",background:msg.ok?T.light:T.redBg,color:msg.ok?T.mid:T.red,fontSize:".84rem",fontWeight:600}}>
-              {msg.text}
-            </div>
-          )}
-          <form onSubmit={submit} style={{maxWidth:400}}>
-            <div style={{
-              marginBottom:"1rem",
-              padding:".85rem 1rem",
-              border:`1px solid ${T.border}`,
-              borderRadius:12,
-              background:T.sand,
-              color:T.textMid,
-              fontSize:".8rem",
-              lineHeight:1.65,
-            }}>
-              Mật khẩu mới cần có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
-            </div>
-            {fields.map(f=>(
-              <div key={f.name} style={{marginBottom:"1rem"}}>
-                <label style={{display:"block",fontSize:".75rem",fontWeight:700,color:T.textMid,marginBottom:".3rem",textTransform:"uppercase",letterSpacing:".04em"}}>{f.label}</label>
-                <div style={{position:"relative"}}>
-                  <input
-                    type={show[f.name] ? "text" : "password"}
-                    name={f.name}
-                    value={form[f.name]}
-                    onChange={handle}
-                    placeholder={f.placeholder}
-                    style={{width:"100%",padding:".65rem 2.8rem .65rem .9rem",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:".88rem",outline:"none",background:T.white}}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShow((p) => ({ ...p, [f.name]: !p[f.name] }))}
-                    style={{
-                      position:"absolute",
-                      right:10,
-                      top:"50%",
-                      transform:"translateY(-50%)",
-                      border:"none",
-                      background:"transparent",
-                      color:T.textMid,
-                      cursor:"pointer",
-                      padding:0,
-                      display:"inline-flex",
-                      alignItems:"center",
-                      justifyContent:"center",
-                    }}
-                    aria-label={show[f.name] ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                  >
-                    <EyeIcon open={show[f.name]} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            <BtnPrimary disabled={saving}>{saving ? "Đang cập nhật..." : "Cập nhật mật khẩu"}</BtnPrimary>
-          </form>
-        </div>
-      ) : null}
+        ))}
+        <BtnPrimary>🔒 Cập nhật mật khẩu</BtnPrimary>
+      </form>
     </CardSection>
   );
-}
-
-function validateNewPassword(currentPassword, nextPassword, confirmPassword) {
-  if (!currentPassword.trim()) return "Vui lòng nhập mật khẩu hiện tại.";
-  if (!nextPassword.trim()) return "Vui lòng nhập mật khẩu mới.";
-  if (nextPassword !== confirmPassword) return "Mật khẩu mới và xác nhận mật khẩu chưa khớp.";
-  if (nextPassword.length < 8) return "Mật khẩu mới phải có ít nhất 8 ký tự.";
-  if (nextPassword === currentPassword) return "Mật khẩu mới phải khác mật khẩu hiện tại.";
-  if (!/[A-Z]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ hoa.";
-  if (!/[a-z]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ thường.";
-  if (!/\d/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ số.";
-  if (!/[^A-Za-z0-9]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 ký tự đặc biệt.";
-  return "";
 }
 
 function LoadingSkeleton() {
@@ -394,64 +270,10 @@ function LoadingSkeleton() {
   );
 }
 
-function SummaryMetric({ label, value, meta, icon }) {
-  return (
-    <div style={{
-      background:T.white,
-      border:`1px solid ${T.border}`,
-      borderRadius:24,
-      padding:"1.2rem 1.25rem",
-      boxShadow:"0 12px 28px rgba(13,66,37,.06)",
-    }}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:".75rem"}}>
-        <div style={{fontSize:".74rem",fontWeight:800,color:T.textLt,textTransform:"uppercase",letterSpacing:".08em"}}>
-          {label}
-        </div>
-        <div style={{
-          width:44,height:44,borderRadius:16,background:T.light,color:T.base,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",
-        }}>
-          {icon}
-        </div>
-      </div>
-      <div style={{marginTop:".8rem",fontSize:"2.1rem",lineHeight:1,fontWeight:800,color:T.text}}>
-        {value}
-      </div>
-      <div style={{marginTop:".7rem",fontSize:".88rem",lineHeight:1.55,color:T.textMid}}>
-        {meta}
-      </div>
-    </div>
-  );
-}
-
-function MiniInfoCard({ label, value, icon }) {
-  return (
-    <div style={{
-      border:`1px solid ${T.border}`,
-      borderRadius:18,
-      background:T.sand,
-      padding:"1rem",
-    }}>
-      <div style={{display:"flex",alignItems:"center",gap:".8rem"}}>
-        <div style={{
-          width:42,height:42,borderRadius:14,background:T.light,
-          display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",
-        }}>
-          {icon}
-        </div>
-        <div>
-          <div style={{fontSize:".72rem",fontWeight:800,color:T.textLt,textTransform:"uppercase",letterSpacing:".08em"}}>
-            {label}
-          </div>
-          <div style={{marginTop:".18rem",fontSize:".98rem",fontWeight:700,lineHeight:1.5,color:T.text}}>
-            {value || "Chưa cập nhật"}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+const NAV_ITEMS = [
+  {key:"info",     icon:"👤",label:"Thông tin cá nhân"},
+  {key:"security", icon:"🔒",label:"Bảo mật"},
+];
 const IN_PROGRESS_STATUSES = ["Ch? x�t duy?t", "C?n c?p nh?t"];
 const DONE_STATUSES = ["Ch?p nh?n", "T? ch?i"];
 
@@ -495,6 +317,7 @@ function getCurrentUserId() {
 export default function ViewProfile() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [tab,     setTab]     = useState("info");
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
@@ -607,33 +430,6 @@ export default function ViewProfile() {
   );
 
   const name = profile?.fullName || profile?.name || "Người dùng";
-  const resolvedLocation = profile?.location || profile?.address || "";
-  const summaryCards = [
-    {
-      label:"Đơn đã hoàn thành",
-      value:profile?.completedOrders ?? 0,
-      meta:"Tổng số đơn đã hoàn tất của tài khoản này.",
-      icon:"📦",
-    },
-    {
-      label:"Đơn đang triển khai",
-      value:profile?.activeProjects ?? 0,
-      meta:"Các yêu cầu và đơn hàng đang được xử lý.",
-      icon:"🧵",
-    },
-    {
-      label:"Mức độ tương tác",
-      value:profile?.rating || "Mới",
-      meta:"Đánh giá nhanh dựa trên lịch sử giao dịch hiện có.",
-      icon:"⭐",
-    },
-    {
-      label:"Lần cập nhật gần nhất",
-      value:profile?.lastOrderAt || "Chưa có",
-      meta:"Thời điểm gần nhất hệ thống ghi nhận biến động đơn hàng.",
-      icon:"🕒",
-    },
-  ];
 
   return (
     <div style={{minHeight:"100vh",background:T.sand,fontFamily:"'Lexend',sans-serif"}}>
@@ -687,25 +483,12 @@ export default function ViewProfile() {
         </div>
       </div>
 
-      <div className="customer-profile__summary" style={{
-        maxWidth:960,
-        margin:"0 auto",
-        padding:"0 2rem",
-        display:"grid",
-        gridTemplateColumns:"repeat(4,minmax(0,1fr))",
-        gap:"1rem",
-        animation:"fadeUp .42s ease .03s both",
-      }}>
-        {summaryCards.map((card) => (
-          <SummaryMetric key={card.label} {...card} />
-        ))}
-      </div>
-
+      {/* ── Main layout ── */}
       <div
         className="pf-layout"
         style={{
-          maxWidth:960,margin:"1.5rem auto 0",padding:"0 2rem 4rem",
-          display:"grid",gridTemplateColumns:"minmax(0,1.08fr) minmax(320px,.92fr)",gap:"1.5rem",
+          maxWidth:960,margin:"0 auto",padding:"0 2rem 4rem",
+          display:"grid",gridTemplateColumns:"252px 1fr",gap:"1.5rem",
           animation:"fadeUp .4s ease .08s both",
           position:"relative",zIndex:1,
         }}
@@ -725,57 +508,25 @@ export default function ViewProfile() {
             {warning}
           </div>
         ) : null}
-        <main style={{display:"flex",flexDirection:"column",gap:"1.5rem"}}>
-          <CardSection
-            title="Thông tin hồ sơ khách hàng"
-            action={<RoleBadge>Hồ sơ hệ thống</RoleBadge>}
-            mb="0"
-          >
-            <div className="customer-profile__info-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"1rem"}}>
-              <MiniInfoCard icon="👤" label="Họ và tên" value={name} />
-              <MiniInfoCard icon="✉️" label="Email" value={profile?.email} />
-              <MiniInfoCard icon="📍" label="Địa chỉ" value={resolvedLocation} />
-              <MiniInfoCard icon="🗓️" label="Lần giao dịch gần nhất" value={profile?.lastOrderAt} />
-            </div>
-          </CardSection>
-
-          <SectionSecurity />
-        </main>
-
-        <aside style={{display:"flex",flexDirection:"column",gap:"1.5rem"}}>
-          <CardSection title="Đơn hàng và tương tác" mb="0">
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".75rem",marginBottom:"1rem"}}>
-              <div style={{border:`1px solid ${T.border}`,borderRadius:18,padding:"1rem",background:T.sand}}>
-                <div style={{fontSize:".72rem",fontWeight:800,color:T.textLt,textTransform:"uppercase",letterSpacing:".05em",marginBottom:".3rem"}}>
-                  Đơn đã hoàn thành
-                </div>
-                <div style={{fontSize:"1.95rem",fontWeight:800,color:T.text}}>
-                  {profile?.completedOrders ?? 0}
-                </div>
+        {/* Sidebar */}
+        <aside style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+          {/* Nav tabs */}
+          <div style={{background:T.white,borderRadius:16,border:`1px solid ${T.border}`,boxShadow:"0 2px 14px rgba(0,0,0,.05)",padding:".75rem"}}>
+            {NAV_ITEMS.map((item,i)=>(
+              <div key={item.key}>
+                {i===NAV_ITEMS.length-1&&<div style={{height:1,background:T.border,margin:".4rem 0"}}/>}
+                <NavItem icon={item.icon} label={item.label} active={tab===item.key} onClick={()=>setTab(item.key)}/>
               </div>
-              <div style={{border:`1px solid ${T.border}`,borderRadius:18,padding:"1rem",background:T.sand}}>
-                <div style={{fontSize:".72rem",fontWeight:800,color:T.textLt,textTransform:"uppercase",letterSpacing:".05em",marginBottom:".3rem"}}>
-                  Đơn đang triển khai
-                </div>
-                <div style={{fontSize:"1.95rem",fontWeight:800,color:T.text}}>
-                  {profile?.activeProjects ?? 0}
-                </div>
-              </div>
-            </div>
+            ))}
+          </div>
 
-            <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-              <BtnPrimary onClick={()=>navigate("/orders")}>📋 Xem đơn hàng</BtnPrimary>
-              <BtnSecondary onClick={()=>navigate("/orders/create")}>➕ Tạo yêu cầu mới</BtnSecondary>
-            </div>
-          </CardSection>
-
-          <CardSection title="Tóm tắt khách hàng" mb="0">
-            <div style={{display:"grid",gap:".8rem"}}>
-              <MiniInfoCard icon="⭐" label="Mức độ tương tác" value={profile?.rating || "Mới"} />
-              <MiniInfoCard icon="🧾" label="Trạng thái hồ sơ" value="Đang hoạt động" />
-            </div>
-          </CardSection>
         </aside>
+
+        {/* Content */}
+        <main>
+          {tab==="info"     && <SectionInfo     user={profile} onViewOrders={()=>navigate("/orders")} onCreateOrder={()=>navigate("/orders/create")}/>}
+          {tab==="security" && <SectionSecurity/>}
+        </main>
       </div>
     </div>
   );

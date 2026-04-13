@@ -9,53 +9,14 @@ function parseApiPayload(rawResponse) {
   try {
     return JSON.parse(rawResponse);
   } catch {
-    return rawResponse;
+    return {};
   }
-}
-
-function normalizeLogResponse(payload) {
-  const parsed = parseApiPayload(payload);
-
-  if (Array.isArray(parsed)) {
-    return {
-      data: parsed,
-      recordCount: parsed.length,
-    };
-  }
-
-  if (!parsed || typeof parsed !== "object") {
-    return {
-      data: [],
-      recordCount: 0,
-    };
-  }
-
-  const data =
-    (Array.isArray(parsed.data) && parsed.data) ||
-    (Array.isArray(parsed.items) && parsed.items) ||
-    (Array.isArray(parsed.results) && parsed.results) ||
-    (Array.isArray(parsed.records) && parsed.records) ||
-    [];
-
-  const recordCount = Number(
-    parsed.recordCount ??
-    parsed.totalCount ??
-    parsed.totalRecords ??
-    parsed.count ??
-    data.length
-  );
-
-  return {
-    ...parsed,
-    data,
-    recordCount: Number.isFinite(recordCount) ? recordCount : data.length,
-  };
 }
 
 const LogService = {
   async getAll(params = {}) {
     const rawResponse = await axiosClient.get(API_ENDPOINTS.LOG.GET_ALL, { params });
-    return normalizeLogResponse(rawResponse);
+    return parseApiPayload(rawResponse);
   },
 
   async getAllPages(options = {}) {
@@ -75,7 +36,12 @@ const LogService = {
       });
 
       const items = Array.isArray(response?.data) ? response.data : [];
-      const recordCount = Number(response?.recordCount);
+      const recordCount = Number(
+        response?.recordCount ??
+        response?.totalCount ??
+        response?.totalRecords ??
+        response?.count
+      );
 
       pages.push(...items);
 

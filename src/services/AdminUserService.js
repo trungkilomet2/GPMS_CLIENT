@@ -2,64 +2,66 @@ import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { getSystemRoleLabel } from "@/lib/orgHierarchy";
-import PermissionService from "@/services/PermissionService";
 
-const ROLE_DISPLAY_META = {
-  Admin: {
+const ROLE_CATALOG = [
+  {
+    key: "Admin",
+    roleId: 1,
     label: "Quản trị hệ thống",
-    shortLabel: "Quản trị hệ thống",
+    shortLabel: "Toàn quyền hệ thống",
     tone: "danger",
-    description: "Vai trò quản trị được hệ thống trả về từ dữ liệu quyền hiện tại.",
+    description: "Quản lý tài khoản, phân quyền và cấu hình hệ thống.",
+    permissionCount: 23,
   },
-  Owner: {
+  {
+    key: "Owner",
+    roleId: 3,
     label: "Chủ xưởng",
-    shortLabel: "Chủ xưởng",
+    shortLabel: "Quyền điều hành",
     tone: "warning",
-    description: "Vai trò điều hành xưởng được hệ thống trả về từ dữ liệu quyền hiện tại.",
+    description: "Theo dõi và phê duyệt các nghiệp vụ quan trọng của xưởng.",
+    permissionCount: 16,
   },
-  PM: {
+  {
+    key: "PM",
+    roleId: 4,
     label: "Quản lý sản xuất",
-    shortLabel: "Quản lý sản xuất",
+    shortLabel: "Điều phối vận hành",
     tone: "primary",
-    description: "Vai trò quản lý sản xuất được hệ thống trả về từ dữ liệu quyền hiện tại.",
+    description: "Quản lý sản xuất, nhân sự và tiến độ vận hành.",
+    permissionCount: 14,
   },
-  Worker: {
+  {
+    key: "Worker",
+    roleId: 5,
     label: "Nhân viên",
-    shortLabel: "Nhân viên",
+    shortLabel: "Nhân sự vận hành",
     tone: "success",
-    description: "Vai trò nhân viên được hệ thống trả về từ dữ liệu quyền hiện tại.",
+    description: "Tài khoản nhân viên sản xuất và tác nghiệp hằng ngày.",
+    permissionCount: 8,
   },
-  Customer: {
+  {
+    key: "Customer",
+    roleId: 2,
     label: "Khách hàng",
     shortLabel: "Khách hàng",
     tone: "info",
-    description: "Vai trò khách hàng được hệ thống trả về từ dữ liệu quyền hiện tại.",
+    description: "Tài khoản khách hàng theo dõi và tạo đơn hàng.",
+    permissionCount: 5,
   },
-};
+];
 
 const ROLE_PRIORITY = ["Admin", "Owner", "PM", "Worker", "Customer"];
-const FALLBACK_ROLE_DIRECTORY = [
-  { id: 1, key: "Admin" },
-  { id: 2, key: "Customer" },
-  { id: 3, key: "Owner" },
-  { id: 4, key: "PM" },
-  { id: 5, key: "Worker" },
-].map((role) => {
-  const meta = ROLE_DISPLAY_META[role.key] || {};
-  return {
-    ...role,
-    label: meta.label || getSystemRoleLabel(role.key),
-    shortLabel: meta.shortLabel || meta.label || getSystemRoleLabel(role.key),
-    tone: meta.tone || "info",
-    description: meta.description || `Vai trò ${role.key} đang dùng bản dự phòng từ frontend.`,
-  };
-});
-const FALLBACK_ROLE_ID_MAP = FALLBACK_ROLE_DIRECTORY.reduce((map, item) => {
-  map[item.id] = item.key;
+
+const ROLE_KEY_MAP = ROLE_CATALOG.reduce((map, item) => {
+  map[item.key] = item;
   return map;
 }, {});
-let roleDirectoryCache = [];
-let roleDirectoryPromise = null;
+
+const ROLE_ID_MAP = ROLE_CATALOG.reduce((map, item) => {
+  map[item.roleId] = item.key;
+  return map;
+}, {});
 
 const parseApiPayload = (rawResponse) => {
   if (typeof rawResponse !== "string") {
@@ -87,66 +89,6 @@ const splitRoles = (value = "") => {
 };
 
 const unique = (values = []) => Array.from(new Set(values.filter(Boolean)));
-
-const getRolePriorityIndex = (roleKey = "") => {
-  const index = ROLE_PRIORITY.indexOf(roleKey);
-  return index === -1 ? ROLE_PRIORITY.length + 1 : index;
-};
-
-const buildRoleDirectory = (permissions = []) => {
-  const roleMap = new Map();
-
-  permissions.forEach((permission) => {
-    const roles = Array.isArray(permission?.roles) ? permission.roles : [];
-    roles.forEach((role) => {
-      const id = Number(role?.id ?? 0);
-      const key = String(role?.name ?? "").trim();
-      if (!id || !key || roleMap.has(key)) return;
-
-      const meta = ROLE_DISPLAY_META[key] || {};
-      roleMap.set(key, {
-        id,
-        key,
-        label: meta.label || getSystemRoleLabel(key),
-        shortLabel: meta.shortLabel || meta.label || getSystemRoleLabel(key),
-        tone: meta.tone || "info",
-        description: meta.description || `Vai trò ${key} đang được đồng bộ từ dữ liệu quyền hiện tại.`,
-      });
-    });
-  });
-
-  return Array.from(roleMap.values()).sort((left, right) => {
-    const priorityDiff = getRolePriorityIndex(left.key) - getRolePriorityIndex(right.key);
-    if (priorityDiff !== 0) return priorityDiff;
-    return left.label.localeCompare(right.label, "vi");
-  });
-};
-
-async function fetchRoleDirectory(force = false) {
-  if (!force && roleDirectoryCache.length > 0) {
-    return roleDirectoryCache;
-  }
-
-  if (!force && roleDirectoryPromise) {
-    return roleDirectoryPromise;
-  }
-
-  roleDirectoryPromise = PermissionService.getPermissions()
-    .then((response) => {
-      const directory = buildRoleDirectory(response?.data ?? []);
-      roleDirectoryCache = directory.length > 0 ? directory : FALLBACK_ROLE_DIRECTORY;
-      return roleDirectoryCache;
-    })
-    .catch(() => {
-      roleDirectoryCache = FALLBACK_ROLE_DIRECTORY;
-      return roleDirectoryCache;
-    })
-    .finally(() => {
-      roleDirectoryPromise = null;
-    });
-
-  return roleDirectoryPromise;
-}
 
 const extractNamesFromCollection = (collection = []) => {
   if (!Array.isArray(collection)) return [];
@@ -241,12 +183,13 @@ const getRoleMeta = (roleKey = "") => {
   const trimmedKey = String(roleKey ?? "").trim();
   if (!trimmedKey) return null;
 
-  return ROLE_DISPLAY_META[trimmedKey] || {
+  return ROLE_KEY_MAP[trimmedKey] || {
     key: trimmedKey,
     label: getSystemRoleLabel(trimmedKey),
     shortLabel: getSystemRoleLabel(trimmedKey),
     tone: "info",
-    description: "Vai trò này chưa có mô tả riêng trong frontend và sẽ hiển thị theo dữ liệu backend trả về.",
+    description: "Vai trò này chưa có phần xem nhanh quyền trong màn quản trị.",
+    permissionCount: 0,
   };
 };
 
@@ -279,11 +222,11 @@ const flattenValidationErrors = (errors) => {
 const mapRoleIdsToKeys = (value) => {
   if (Array.isArray(value)) {
     return unique(
-      value.map((item) => FALLBACK_ROLE_ID_MAP[Number(item)] || "")
+      value.map((item) => ROLE_ID_MAP[Number(item)] || "")
     );
   }
 
-  const singleRole = FALLBACK_ROLE_ID_MAP[Number(value)];
+  const singleRole = ROLE_ID_MAP[Number(value)];
   return singleRole ? [singleRole] : [];
 };
 
@@ -386,8 +329,8 @@ const normalizeAdminUser = (item = {}) => {
     roleLabel: roleMeta?.label || "Chưa đồng bộ vai trò",
     roleTone: roleMeta?.tone || "info",
     roleShortLabel: roleMeta?.shortLabel || "Chưa có vai trò",
-    roleDescription: roleMeta?.description || "Vai trò hiện được hiển thị theo dữ liệu backend trả về.",
-    grantedPermissionCount: null,
+    roleDescription: roleMeta?.description || "Danh sách tài khoản hiện chưa trả đủ thông tin vai trò cho tài khoản này.",
+    grantedPermissionCount: Number(roleMeta?.permissionCount ?? 0),
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
     workerRoleLabel: workerRoleNames[0] || "",
@@ -494,13 +437,19 @@ export function getAdminUserErrorMessage(error, fallbackMessage) {
   return error?.response?.data?.message || error?.response?.data?.detail || error?.response?.data?.title || fallbackMessage;
 }
 
-export async function getAdminSupportedRoleOptions() {
-  return fetchRoleDirectory();
+export function getAdminSupportedRoleOptions() {
+  return ROLE_CATALOG.map((item) => ({
+    key: item.key,
+    label: item.label,
+    tone: item.tone,
+    shortLabel: item.shortLabel,
+    description: item.description,
+    roleId: item.roleId,
+  }));
 }
 
-export async function getAdminRoleProfile(roleKey) {
-  const directory = await fetchRoleDirectory();
-  return directory.find((role) => role.key === roleKey) || getRoleMeta(roleKey);
+export function getAdminRoleProfile(roleKey) {
+  return getRoleMeta(roleKey);
 }
 
 async function fetchAdminUserDetail(id) {
@@ -559,8 +508,7 @@ const AdminUserService = {
   },
 
   async createUser(payload) {
-    const roleDirectory = await fetchRoleDirectory();
-    const roleMeta = roleDirectory.find((role) => role.key === String(payload?.roleKey ?? "").trim());
+    const roleMeta = ROLE_KEY_MAP[String(payload?.roleKey ?? "").trim()];
     if (!roleMeta) {
       throw new Error("Vai trò này hiện chưa được hỗ trợ.");
     }
@@ -666,9 +614,8 @@ const AdminUserService = {
   },
 
   async assignRoles(id, roleKeys = []) {
-    const roleDirectory = await fetchRoleDirectory();
     const normalizedRoleIds = unique(roleKeys)
-      .map((roleKey) => roleDirectory.find((role) => role.key === String(roleKey ?? "").trim())?.id)
+      .map((roleKey) => ROLE_KEY_MAP[String(roleKey ?? "").trim()]?.roleId)
       .filter((roleId) => Number.isFinite(roleId));
 
     if (!normalizedRoleIds.length) {

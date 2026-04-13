@@ -250,7 +250,7 @@ export default function AdminSystemLog() {
             <div className="admin-hero__heading">
               <h1 className="admin-hero__title">Nhật ký hệ thống</h1>
               <p className="admin-hero__subtitle">
-                Theo dõi lỗi và cảnh báo từ hệ thống theo thời gian, đường dẫn yêu cầu và nội dung chi tiết.
+                Dùng nhật ký thật từ hệ thống để kiểm tra lỗi vận hành, cảnh báo hạ tầng và những phần còn thiếu kiểm tra hoặc ràng buộc.
               </p>
             </div>
 
@@ -277,7 +277,7 @@ export default function AdminSystemLog() {
             }
             description={
               error ||
-              "Dữ liệu được lấy trực tiếp từ hệ thống và ưu tiên hiển thị rõ các bản ghi lỗi, cảnh báo để kiểm tra nhanh."
+              "Màn này đang đọc trực tiếp từ nhật ký thật của hệ thống, ưu tiên hiển thị rõ các lỗi và cảnh báo để quản trị viên xử lý nhanh."
             }
             tone={error ? "warning" : stats.errors > 0 ? "warning" : "success"}
           />
@@ -337,6 +337,9 @@ export default function AdminSystemLog() {
                   <ClipboardList size={16} />
                   <span>{filteredLogs.length} bản ghi phù hợp</span>
                 </div>
+                <button type="button" className="admin-filter-reset admin-focusable" onClick={applyFilters}>
+                  Áp dụng
+                </button>
                 <button type="button" className="admin-filter-reset admin-focusable" onClick={clearFilters}>
                   Xóa
                 </button>

@@ -1,24 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { authService } from "@/services/authService";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import { userService } from "@/services/userService";
 import WorkerService from "@/services/WorkerService";
 import LeaveService from "@/services/LeaveService";
-import AdminUserService from "@/services/AdminUserService";
-import PermissionService from "@/services/PermissionService";
-import LogService from "@/services/LogService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPostLoginPath } from "@/lib/authRouting";
-import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel, pickPrimarySystemRole } from "@/lib/orgHierarchy";
-import { getErrorMessage } from "@/utils/errorUtils";
+import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 
 function getRoleLabel(roleValue) {
-  const primaryRole = pickPrimarySystemRole(roleValue);
-  if (!primaryRole) return "Chưa cập nhật";
-  return getSystemRoleLabel(primaryRole);
+  const roles = splitRoles(roleValue);
+  if (!roles.length) return "Chưa cập nhật";
+  return roles.join(", ");
 }
 
 function getInitials(name = "") {
@@ -74,174 +68,6 @@ function OverviewCard({ label, value, meta }) {
   );
 }
 
-function EyeIcon({ open = false }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M2 12C3.8 8.6 7.4 6.5 12 6.5C16.6 6.5 20.2 8.6 22 12C20.2 15.4 16.6 17.5 12 17.5C7.4 17.5 3.8 15.4 2 12Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      {!open ? (
-        <path
-          d="M4 20L20 4"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      ) : null}
-    </svg>
-  );
-}
-
-function validateNewPassword(currentPassword, nextPassword, confirmPassword) {
-  if (!currentPassword.trim()) return "Vui lòng nhập mật khẩu hiện tại.";
-  if (!nextPassword.trim()) return "Vui lòng nhập mật khẩu mới.";
-  if (nextPassword !== confirmPassword) return "Mật khẩu mới và xác nhận mật khẩu chưa khớp.";
-  if (nextPassword.length < 8) return "Mật khẩu mới phải có ít nhất 8 ký tự.";
-  if (nextPassword === currentPassword) return "Mật khẩu mới phải khác mật khẩu hiện tại.";
-  if (!/[A-Z]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ hoa.";
-  if (!/[a-z]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ thường.";
-  if (!/\d/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 chữ số.";
-  if (!/[^A-Za-z0-9]/.test(nextPassword)) return "Mật khẩu mới cần có ít nhất 1 ký tự đặc biệt.";
-  return "";
-}
-
-function SecuritySection() {
-  const [form, setForm] = useState({ current: "", next: "", confirm: "" });
-  const [show, setShow] = useState({ current: false, next: false, confirm: false });
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);
-  const [expanded, setExpanded] = useState(false);
-
-  const handleChange = (event) => {
-    const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const submit = async (event) => {
-    event.preventDefault();
-    const validationMessage = validateNewPassword(form.current, form.next, form.confirm);
-    if (validationMessage) {
-      setMessage({ ok: false, text: validationMessage });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setMessage(null);
-      await authService.changePassword({
-        currentPassword: form.current,
-        newPassword: form.next,
-        confirmPassword: form.confirm,
-      });
-      setMessage({ ok: true, text: "Đổi mật khẩu thành công!" });
-      setForm({ current: "", next: "", confirm: "" });
-    } catch (error) {
-      setMessage({ ok: false, text: getErrorMessage(error, "Không thể đổi mật khẩu lúc này.") });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const fields = [
-    { name: "current", label: "Mật khẩu hiện tại", placeholder: "Nhập mật khẩu hiện tại" },
-    { name: "next", label: "Mật khẩu mới", placeholder: "Nhập mật khẩu mới" },
-    { name: "confirm", label: "Xác nhận mật khẩu mới", placeholder: "Nhập lại mật khẩu mới" },
-  ];
-
-  return (
-    <div className="rounded-[28px] border border-emerald-100/70 bg-white/80 p-6 shadow-[0_18px_40px_rgba(30,110,67,0.10)] backdrop-blur">
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-emerald-100 bg-gradient-to-r from-white to-emerald-50/70 p-5">
-        <div className="max-w-2xl">
-          <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">Đổi mật khẩu</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Mở biểu mẫu để cập nhật mật khẩu mới và tăng độ an toàn cho tài khoản của bạn.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setExpanded((prev) => !prev);
-            if (expanded) {
-              setMessage(null);
-              setForm({ current: "", next: "", confirm: "" });
-              setShow({ current: false, next: false, confirm: false });
-            }
-          }}
-          className={`rounded-2xl px-5 py-3 text-sm font-extrabold transition ${
-            expanded
-              ? "border border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "bg-emerald-700 text-white shadow-[0_16px_30px_rgba(30,110,67,0.18)] hover:bg-emerald-800"
-          }`}
-        >
-          {expanded ? "Ẩn đổi mật khẩu" : "Mở đổi mật khẩu"}
-        </button>
-      </div>
-
-      {expanded ? (
-        <div className="mt-5">
-          {message ? (
-            <div
-              className={`mb-4 rounded-2xl px-4 py-3 text-sm font-semibold ${
-                message.ok
-                  ? "border border-emerald-100 bg-emerald-50 text-emerald-800"
-                  : "border border-rose-200 bg-rose-50 text-rose-700"
-              }`}
-            >
-              {message.text}
-            </div>
-          ) : null}
-
-          <form onSubmit={submit} className="grid max-w-2xl gap-4">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm leading-6 text-slate-600">
-              Mật khẩu mới cần có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt.
-            </div>
-            {fields.map((field) => (
-              <label key={field.name} className="grid gap-2">
-                <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700/70">
-                  {field.label}
-                </span>
-                <div className="relative">
-                  <input
-                    type={show[field.name] ? "text" : "password"}
-                    name={field.name}
-                    value={form[field.name]}
-                    onChange={handleChange}
-                    placeholder={field.placeholder}
-                    className="w-full rounded-2xl border border-emerald-100 bg-white px-4 py-3 pr-12 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-300"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShow((prev) => ({ ...prev, [field.name]: !prev[field.name] }))}
-                    className="absolute right-4 top-1/2 inline-flex -translate-y-1/2 items-center justify-center text-slate-500"
-                    aria-label={show[field.name] ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
-                  >
-                    <EyeIcon open={show[field.name]} />
-                  </button>
-                </div>
-              </label>
-            ))}
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-2xl bg-emerald-700 px-5 py-3 text-sm font-extrabold text-white shadow-[0_16px_30px_rgba(30,110,67,0.18)] transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300"
-              >
-                {saving ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 export default function InternalProfileView() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -284,7 +110,7 @@ export default function InternalProfileView() {
   useEffect(() => {
     const primaryRole = getPrimaryWorkspaceRole(profile?.role || storedUser?.role);
 
-    if (primaryRole !== "owner" && primaryRole !== "pm" && primaryRole !== "admin") {
+    if (primaryRole !== "owner" && primaryRole !== "pm") {
       setOverview(null);
       setOverviewLoading(false);
       return undefined;
@@ -296,48 +122,6 @@ export default function InternalProfileView() {
       setOverviewLoading(true);
 
       try {
-        if (primaryRole === "admin") {
-          const [usersResponse, permissionResponse, logResponse] = await Promise.all([
-            AdminUserService.getUsers({ pageSize: 100 }),
-            PermissionService.getPermissions(),
-            LogService.getAllPages({ pageSize: 50 }),
-          ]);
-
-          if (!mounted) return;
-
-          const users = Array.isArray(usersResponse?.data) ? usersResponse.data : [];
-          const permissions = Array.isArray(permissionResponse?.data) ? permissionResponse.data : [];
-          const logs = Array.isArray(logResponse?.data) ? logResponse.data : [];
-          const activeUsers = users.filter((item) => String(item?.status ?? "").toLowerCase() === "active").length;
-          const internalRoles = new Set();
-
-          permissions.forEach((permission) => {
-            const roles = Array.isArray(permission?.roles) ? permission.roles : [];
-            roles.forEach((role) => {
-              const roleName = String(role?.name ?? "").trim();
-              if (!roleName || roleName === "Customer") return;
-              internalRoles.add(roleName);
-            });
-          });
-
-          const latestLogs = logs.slice(0, 10);
-          const recentWarnings = latestLogs.filter((item) => {
-            const level = String(item?.level ?? "").toLowerCase();
-            return level.includes("warn") || level.includes("error");
-          }).length;
-
-          setOverview({
-            primaryRole,
-            users,
-            permissions,
-            activeUsers,
-            internalRoleCount: internalRoles.size,
-            recentWarnings,
-            recentLogCount: latestLogs.length,
-          });
-          return;
-        }
-
         const [employeeResponse, leaveResponse] = await Promise.all([
           primaryRole === "owner"
             ? WorkerService.getEmployeeDirectory({ pageSize: 100 })
@@ -391,34 +175,9 @@ export default function InternalProfileView() {
   const userName = storedUser?.userName || storedUser?.username || storedUser?.user || "";
   const homePath = getPostLoginPath(profile?.role || storedUser?.role);
   const primaryRole = getPrimaryWorkspaceRole(profile?.role || storedUser?.role);
-  const showManagementOverview = primaryRole === "owner" || primaryRole === "pm" || primaryRole === "admin";
+  const showManagementOverview = primaryRole === "owner" || primaryRole === "pm";
   const overviewCards = useMemo(() => {
     if (!overview || !showManagementOverview) return [];
-
-    if (overview.primaryRole === "admin") {
-      return [
-        {
-          label: "Tài khoản hệ thống",
-          value: overview.users.length,
-          meta: "Tổng số tài khoản nội bộ đang được theo dõi trong hệ thống.",
-        },
-        {
-          label: "Vai trò nội bộ",
-          value: overview.internalRoleCount,
-          meta: "Số vai trò đang có dữ liệu quyền từ máy chủ.",
-        },
-        {
-          label: "Đang hoạt động",
-          value: overview.activeUsers,
-          meta: "Số tài khoản đang có trạng thái hoạt động.",
-        },
-        {
-          label: "Cảnh báo gần đây",
-          value: overview.recentWarnings,
-          meta: `Theo dõi trên ${overview.recentLogCount || 0} bản ghi nhật ký gần nhất.`,
-        },
-      ];
-    }
 
     if (overview.primaryRole === "owner") {
       return [
@@ -526,9 +285,7 @@ export default function InternalProfileView() {
                 <p className="mt-1 text-sm leading-6 text-slate-500">
                   {primaryRole === "owner"
                     ? "Thông tin nhanh về nhân sự và các đầu việc điều hành trong xưởng."
-                    : primaryRole === "pm"
-                      ? "Thông tin nhanh về nhân viên bạn đang phụ trách và các việc cần theo dõi."
-                      : "Thông tin nhanh về tài khoản, vai trò và cảnh báo hệ thống gần đây."}
+                    : "Thông tin nhanh về nhân viên bạn đang phụ trách và các việc cần theo dõi."}
                 </p>
               </div>
             </div>
@@ -586,8 +343,6 @@ export default function InternalProfileView() {
             />
           </div>
         )}
-
-        <SecuritySection />
       </div>
     </Layout>
   );

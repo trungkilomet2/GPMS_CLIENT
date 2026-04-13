@@ -1,17 +1,5 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate, Link } from "react-router-dom";
-import {
-  ArrowLeft,
-  AtSign,
-  BarChart3,
-  BriefcaseBusiness,
-  Building2,
-  Clock3,
-  KeyRound,
-  Lock,
-  Package,
-  User,
-} from "lucide-react";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { getStoredUser } from "@/lib/authStorage";
 import { authService } from "../services/authService";
@@ -36,26 +24,6 @@ const initialValues = {
   otp: "",
   agree: false,
 };
-const AUTH_FEATURES = [
-  { icon: Clock3, title: "Theo dõi theo thời gian thực", desc: "Nắm tiến độ sản xuất và trạng thái đơn hàng ngay trên một màn hình." },
-  { icon: BriefcaseBusiness, title: "Quản lý nhân sự", desc: "Theo dõi phân công và cập nhật thông tin nhân sự tập trung." },
-  { icon: Package, title: "Quản lý đơn hàng", desc: "Theo dõi đơn hàng từ lúc tiếp nhận đến khi bàn giao." },
-  { icon: BarChart3, title: "Báo cáo rõ ràng", desc: "Tổng hợp số liệu vận hành để dễ kiểm tra và đối chiếu." },
-];
-
-function EyeIcon({ open = false }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M2 12C3.8 8.6 7.4 6.5 12 6.5C16.6 6.5 20.2 8.6 22 12C20.2 15.4 16.6 17.5 12 17.5C7.4 17.5 3.8 15.4 2 12Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-      {!open ? <path d="M4 20L20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> : null}
-    </svg>
-  );
-}
-
-function BrandMark() {
-  return <Building2 size={22} strokeWidth={2.1} aria-hidden="true" />;
-}
 
 function isEmailAlreadyVerifiedMessage(value) {
   const message = String(value ?? "").trim().toLowerCase();
@@ -333,7 +301,7 @@ export default function RegisterPage() {
       <div className="login-left">
         <div className="left-content">
           <div className="brand">
-            <div className="brand-logo"><BrandMark /></div>
+            <div className="brand-logo">🏭</div>
             <div className="brand-text">
               <h2>GPMS</h2>
               <p>Hệ thống quản lý sản xuất may mặc</p>
@@ -341,24 +309,26 @@ export default function RegisterPage() {
           </div>
 
           <h1 className="left-heading">
-            Theo dõi sản xuất <br />
-            rõ ràng hơn
+            Quản lý sản xuất <br />
+            thông minh
           </h1>
 
           <p className="left-desc">
-            Tạo tài khoản để bắt đầu quản lý đơn hàng, nhân sự và tiến độ sản xuất trên cùng một hệ thống.
+            Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả
           </p>
 
           <div className="features-box">
-            {AUTH_FEATURES.map((feature) => {
-              const Icon = feature.icon;
-              return (
-              <div key={feature.title} className="feature">
-                <div className="icon"><Icon size={18} strokeWidth={2.1} /></div>
-                <div><h4>{feature.title}</h4><p>{feature.desc}</p></div>
+            {[
+              { icon:"⏱", title:"Theo dõi thời gian thực", desc:"Giám sát tiến độ sản xuất mọi lúc mọi nơi" },
+              { icon:"👔", title:"Quản lý nhân sự",         desc:"Phân công công việc và theo dõi hiệu suất" },
+              { icon:"📦", title:"Quản lý đơn hàng",        desc:"Theo dõi đơn hàng từ A đến Z" },
+              { icon:"📊", title:"Báo cáo chi tiết",        desc:"Phân tích dữ liệu và tạo báo cáo tự động" },
+            ].map(f => (
+              <div key={f.title} className="feature">
+                <div className="icon">{f.icon}</div>
+                <div><h4>{f.title}</h4><p>{f.desc}</p></div>
               </div>
-            );
-            })}
+            ))}
           </div>
         </div>
         <div className="tape" />
@@ -371,8 +341,7 @@ export default function RegisterPage() {
             className="auth-back-btn"
             onClick={() => navigate("/home")}
           >
-            <ArrowLeft size={16} />
-            <span>Về trang chủ</span>
+            ← Về trang chủ
           </button>
 
           <h2>Tạo tài khoản mới</h2>
@@ -380,7 +349,7 @@ export default function RegisterPage() {
 
           <label className="field-label">Họ và tên *</label>
           <div className="input-wrapper">
-            <span className="input-icon"><User size={17} strokeWidth={2} /></span>
+            <span className="input-icon">👤</span>
             <input
               type="text"
               name="fullName"
@@ -394,7 +363,7 @@ export default function RegisterPage() {
 
           <label className="field-label">Email *</label>
           <div className="input-wrapper">
-            <span className="input-icon"><AtSign size={17} strokeWidth={2} /></span>
+            <span className="input-icon">✉️</span>
             <input
               type="email"
               name="email"
@@ -408,7 +377,7 @@ export default function RegisterPage() {
 
           <label className="field-label">Tên đăng nhập *</label>
           <div className="input-wrapper">
-            <span className="input-icon"><User size={17} strokeWidth={2} /></span>
+            <span className="input-icon">🆔</span>
             <input
               type="text"
               name="userName"
@@ -422,7 +391,7 @@ export default function RegisterPage() {
 
           <label className="field-label">Mật khẩu *</label>
           <div className="input-wrapper">
-            <span className="input-icon"><Lock size={17} strokeWidth={2} /></span>
+            <span className="input-icon">🔒</span>
             <input
               type={showPassword ? "text" : "password"}
               name="password"
@@ -435,16 +404,15 @@ export default function RegisterPage() {
               type="button"
               className="eye-btn"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
-              <EyeIcon open={showPassword} />
+              👁
             </button>
           </div>
           {errors.password && <p className="error-text">{errors.password}</p>}
 
           <label className="field-label">Xác nhận mật khẩu *</label>
           <div className="input-wrapper">
-            <span className="input-icon"><KeyRound size={17} strokeWidth={2} /></span>
+            <span className="input-icon">🔐</span>
             <input
               type={showConfirm ? "text" : "password"}
               name="confirmPassword"
@@ -457,9 +425,8 @@ export default function RegisterPage() {
               type="button"
               className="eye-btn"
               onClick={() => setShowConfirm((prev) => !prev)}
-              aria-label={showConfirm ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
             >
-              <EyeIcon open={showConfirm} />
+              👁
             </button>
           </div>
           {errors.confirmPassword && (
@@ -470,7 +437,7 @@ export default function RegisterPage() {
             <>
               <label className="field-label">Mã OTP *</label>
               <div className="input-wrapper">
-                <span className="input-icon"><KeyRound size={17} strokeWidth={2} /></span>
+                <span className="input-icon">🔢</span>
                 <input
                   type="text"
                   name="otp"

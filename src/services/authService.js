@@ -353,27 +353,6 @@ export const authService = {
     return data;
   },
 
-  async changePassword(payload) {
-    const token = getAuthItem("token");
-    const res = await fetch(API_ENDPOINTS.ACCOUNT.CHANGE_PASSWORD, {
-      method: "POST",
-      credentials: "omit",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({
-        currentPassword: payload.currentPassword,
-        newPassword: payload.newPassword,
-        confirmPassword: payload.confirmPassword,
-      }),
-    });
-
-    const data = await parseResponsePayload(res);
-    if (!res.ok) throw { response: { data, status: res.status } };
-    return data;
-  },
-
   async verifyRegisterOtp(payload) {
     const res = await fetch(API_ENDPOINTS.EMAIL.VERIFY_EMAIL, {
       method: "POST",
