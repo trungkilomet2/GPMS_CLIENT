@@ -28,11 +28,11 @@ export const BREADCRUMB_CONFIG = [
   { path: "/employees/management", label: "Nhóm quản lý", parent: "/employees" },
   { path: "/employees/workers", label: "Nhóm nhân viên", parent: "/employees" },
   { path: "/employees/create", label: "Thêm nhân viên mới", parent: "/employees" },
+  { path: "/production", label: "Danh sách sản xuất", parent: "/home" },
+  { path: "/production/:id", label: ({ id }) => `Chi tiết sản xuất #${id}`, parent: "/production" },
   { path: "/worker-roles", label: "Vai trò thợ", parent: "/home" },
   { path: "/worker-roles/create", label: "Thêm vai trò thợ", parent: "/worker-roles" },
   { path: "/worker/assignments", label: "Công việc được giao", parent: "/home" },
-  { path: "/worker/production-plan", label: "Kế hoạch sản xuất", parent: "/home" },
-  { path: "/worker/production-plan/:id", label: ({ id }) => `Kế hoạch #${id}`, parent: "/worker/production-plan" },
   { path: "/worker/output-history", label: "Lịch sử sản lượng", parent: "/home" },
   {
     path: "/employees/:id/edit",

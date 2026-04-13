@@ -29,6 +29,7 @@ export default function ProductionPartHistory() {
   const [productionId, setProductionId] = useState(params.productionId || "");
   const [logs, setLogs] = useState([]);
   const [partsLookup, setPartsLookup] = useState({});
+  const [variantLookup, setVariantLookup] = useState({});
   const [orderSizeLookup, setOrderSizeLookup] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -51,14 +52,42 @@ export default function ProductionPartHistory() {
   };
 
   const getLogIdentity = (log = {}) => {
-    const partOrderSizeCandidate = log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || log.productOrderSizeId || 0;
-    const partCandidate = log.productionPartId || log.partId || log.productPartId || log.partID || 0;
-    const part = partsLookup[String(partOrderSizeCandidate)] || partsLookup[String(partCandidate)] || {};
+    // WorkLogId is the ID of the record itself
+    const finalLogId = toPositiveInt(log.id || log.workLogId);
+    
+    // PartOrderSizeId is the variant/link ID
+    const variantIdValue = log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || 0;
+    const finalVariantId = toPositiveInt(variantIdValue);
+
+    // PartId is the Stage/ProductionPart ID. 
+    // We try to find it in the log first, then fallback to variantLookup if not present.
+    const logPartId = log.productionPartId || log.partId;
+    let finalPartId = toPositiveInt(logPartId);
+
+    if (finalPartId === 0 && finalVariantId !== 0) {
+      // Lookup the Stage ID from our variant map
+      const foundPart = variantLookup[String(finalVariantId)];
+      if (foundPart) {
+        finalPartId = toPositiveInt(foundPart.id || foundPart.partId);
+      }
+    }
+
+    // Last resort fallback to URL param if still 0
+    if (finalPartId === 0) {
+      finalPartId = toPositiveInt(params.partId);
+    }
+
+    console.log("GPMS - Mapped Identity:", {
+      partId: finalPartId,
+      partOrderSizeId: finalVariantId,
+      workLogId: finalLogId,
+      rawLog: log
+    });
 
     return {
-      partId: toPositiveInt(partCandidate || part.partId || part.id),
-      partOrderSizeId: toPositiveInt(partOrderSizeCandidate || part.partOrderSizeId || part.orderSizeId),
-      workLogId: toPositiveInt(log.workLogId || log.id || log.sourceId || log.wlId),
+      partId: finalPartId,
+      partOrderSizeId: finalVariantId,
+      workLogId: finalLogId,
     };
   };
 
@@ -118,15 +147,19 @@ export default function ProductionPartHistory() {
         const partsRes = await ProductionPartService.getPartsByProduction(activeProdId);
         const partsList = partsRes?.data?.data || partsRes?.data || [];
         console.log("GPMS - RAW Parts:", partsList);
-        const lookup = {};
+
+        const pLookup = {};
+        const vLookup = {};
 
         partsList.forEach((p) => {
-          const posid = String(p.partOrderSizeId || p.orderSizeId || "");
           const pid = String(p.id || p.partId || p.productionPartId || "");
-          if (posid && posid !== "0") lookup[posid] = p;
-          if (pid) lookup[pid] = p;
+          const vlinkId = String(p.partOrderSizeId || p.orderSizeId || p.productionPartOrderSizeId || "");
+
+          if (pid && pid !== "0") pLookup[pid] = p;
+          if (vlinkId && vlinkId !== "0") vLookup[vlinkId] = p;
         });
-        setPartsLookup(lookup);
+        setPartsLookup(pLookup);
+        setVariantLookup(vLookup);
 
         // D. Fetch Logs
         const logsRes = await ProductionPartService.getProductionWorkLogs(activeProdId);
@@ -144,13 +177,13 @@ export default function ProductionPartHistory() {
 
   const stats = useMemo(() => {
     const totalLogs = logs.length;
-    const pendingCount = logs.filter(log => 
+    const pendingCount = logs.filter(log =>
       !(log.status === 2 || log.statusName === "Đã nghiệm thu" || log.status === 4 || log.statusName === "Đã hoàn thành")
     ).length;
-    
-    return { 
-      totalLogs, 
-      pendingCount 
+
+    return {
+      totalLogs,
+      pendingCount
     };
   }, [logs]);
 
@@ -181,6 +214,7 @@ export default function ProductionPartHistory() {
     try {
       const payload = { approvedQuantity };
       console.log("GPMS - Executing Approve with IDs:", { partId, partOrderSizeId, workLogId });
+      console.log("GPMS - Payload:", payload);
       await ProductionPartService.approveWorkLog(partId, partOrderSizeId, workLogId, payload);
       setLogs((prev) => prev.map((item) => (
         getLogIdentity(item).workLogId === workLogId
@@ -193,14 +227,15 @@ export default function ProductionPartHistory() {
       let msg = "Lỗi nghiệm thu: ";
       const data = err.response?.data;
       if (data?.errors) {
-        // Extract all validation messages
-        const errors = data.errors;
-        const messages = Object.values(errors).flat().join(", ");
-        msg += messages;
+        msg += Object.values(data.errors).flat().join(", ");
+      } else if (data?.message) {
+        msg += data.message;
+      } else if (typeof data === 'string') {
+        msg += data;
       } else {
-        msg += data?.message || data?.title || "Lỗi hệ thống (400)";
+        msg += data?.title || "Lỗi tham số hoặc dữ liệu không hợp lệ (400)";
       }
-      toast.error(msg, { autoClose: 5000 });
+      toast.error(msg, { autoClose: 6000 });
     } finally {
       setIsProcessing(false);
       setTargetLog(null);
@@ -353,10 +388,12 @@ export default function ProductionPartHistory() {
                       </td>
                     </tr>
                   ) : logs.map((log, index) => {
-                    const logPosId = String(log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || log.productOrderSizeId || "");
-                    const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.partID || "");
-                    const part = partsLookup[logPosId] || partsLookup[logPartId];
-                    const osInfo = orderSizeLookup[logPosId];
+                    const logPosId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+                    const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.id || "");
+
+                    // Priority: variantLookup is more specific as it links a specific assignment to a stage
+                    const part = variantLookup[logPosId] || partsLookup[logPartId];
+                    const osInfo = orderSizeLookup[log.orderSizeId || log.productionPartOrderSizeId || log.partOrderSizeId];
                     const { workLogId } = getLogIdentity(log);
                     const rowId = workLogId || `row-${index}`;
                     const isEditing = editingId === rowId;
@@ -366,14 +403,15 @@ export default function ProductionPartHistory() {
                       log.status === 4 ||
                       log.statusName === "Đã hoàn thành";
 
-                    const color = osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
-                    const size = osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
+                    const partName = log.productionPartName || log.partName || part?.name || part?.partName || "N/A";
+                    const color = log.colorName || log.productColorName || log.color || osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
+                    const size = log.sizeName || log.productSizeName || log.size || osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
 
                     return (
                       <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
                         <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(index + 1).padStart(2, "0")}</td>
                         <td className="px-6 py-4">
-                          <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{part?.name || part?.partName || "N/A"}</div>
+                          <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{partName}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex gap-1.5 focus:outline-none">
@@ -430,7 +468,7 @@ export default function ProductionPartHistory() {
                               </>
                             ) : (
                               <>
-                                {!isDone && (
+                                {!isDone && !log.isReadOnly && (
                                   <button
                                     onClick={() => handleOpenApprove(log)}
                                     title="Xác nhận Nghiệm thu"
@@ -439,8 +477,22 @@ export default function ProductionPartHistory() {
                                     <Zap size={16} />
                                   </button>
                                 )}
-                                <button onClick={() => { setEditingId(rowId); setEditValue(String(log.quantity)); }} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all shadow-sm" title="Sửa"><Pencil size={15} /></button>
-                                <button onClick={() => openDeleteConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95 transition-all shadow-sm" title="Xóa"><Trash size={15} /></button>
+                                <button 
+                                  onClick={() => !log.isReadOnly && (setEditingId(rowId), setEditValue(String(log.quantity)))} 
+                                  disabled={log.isReadOnly || isDone}
+                                  className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-300' : 'text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95'}`} 
+                                  title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Sửa"}
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button 
+                                  onClick={() => !log.isReadOnly && openDeleteConfirm(log)} 
+                                  disabled={log.isReadOnly || isDone}
+                                  className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-200' : 'text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95'}`} 
+                                  title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Xóa"}
+                                >
+                                  <Trash size={15} />
+                                </button>
                               </>
                             )}
                           </div>

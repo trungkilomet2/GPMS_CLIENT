@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
@@ -153,6 +154,7 @@ export default function ProductionErrorSummary() {
   const [isHandlingModalOpen, setIsHandlingModalOpen] = useState(false);
   const [targetIssue, setTargetIssue] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [confirmedQuantity, setConfirmedQuantity] = useState(0);
   const pageSize = 10;
 
   useEffect(() => {
@@ -225,9 +227,7 @@ export default function ProductionErrorSummary() {
     if (!targetIssue) return;
     try {
       setIsUpdating(true);
-      await ProductionService.updateIssueStatus(targetIssue.rawId || targetIssue.id, {
-        status: statusId,
-      });
+      await ProductionService.updateIssueStatus(targetIssue.id, statusId);
 
       // Update local state
       setErrors((prev) =>
@@ -243,9 +243,44 @@ export default function ProductionErrorSummary() {
       );
       setIsHandlingModalOpen(false);
       setTargetIssue(null);
+      toast.success("Cập nhật trạng thái thành công!");
     } catch (err) {
-      console.error("Error updating issue status:", err);
-      // Optional: Add toast notification here
+      console.error("Error updating issue status:", err.response?.data || err);
+      const errorData = err.response?.data;
+      let errorMsg = "Không thể cập nhật trạng thái.";
+
+      if (typeof errorData === "string") {
+        errorMsg = errorData;
+      } else if (errorData?.errors) {
+        errorMsg = Object.values(errorData.errors).flat().join(", ");
+      } else if (errorData?.message || errorData?.detail) {
+        errorMsg = errorData.message || errorData.detail;
+      }
+
+      toast.error(errorMsg);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleConfirmUnfixable = async (quantity) => {
+    if (!targetIssue) return;
+    try {
+      setIsUpdating(true);
+      await ProductionService.confirmUnfixable(targetIssue.id, quantity);
+      toast.success("Đã xác nhận số lượng không thể sửa!");
+      setIsHandlingModalOpen(false);
+      setTargetIssue(null);
+      // Cập nhật lại danh sách hoặc UI nếu cần (ở đây là fetch lại data)
+      window.location.reload(); // Hoặc gọi lại fetchSummary nếu có sẵn trong scope
+    } catch (err) {
+      console.error("Error confirming unfixable:", err.response?.data || err);
+      const errorData = err.response?.data;
+      let errorMsg = "Không thể xác nhận số lượng.";
+      if (typeof errorData === "string") errorMsg = errorData;
+      else if (errorData?.errors) errorMsg = Object.values(errorData.errors).flat().join(", ");
+      else if (errorData?.message || errorData?.detail) errorMsg = errorData.message || errorData.detail;
+      toast.error(errorMsg);
     } finally {
       setIsUpdating(false);
     }
@@ -502,10 +537,11 @@ export default function ProductionErrorSummary() {
                         <button
                           onClick={() => {
                             setTargetIssue(item);
+                            setConfirmedQuantity(item.quantity || 0);
                             setIsHandlingModalOpen(true);
                           }}
                           className="rounded-lg bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
-                          disabled={item.statusId === 3 || item.statusId === 4}
+                          disabled={item.statusId === 3}
                         >
                           Xác nhận
                         </button>
@@ -565,27 +601,89 @@ export default function ProductionErrorSummary() {
                 Lỗi tại: <strong>{targetIssue?.partName}</strong>
                 <br />
                 Số lượng: <span className="font-bold text-rose-600">{targetIssue?.quantity} sản phẩm</span>
+                <br />
+                Trạng thái: <span className="font-bold text-slate-700 uppercase">{targetIssue?.status}</span>
               </p>
             </div>
 
             <div className="space-y-3">
-              <button
-                onClick={() => handleUpdateIssueStatus(3)}
-                disabled={isUpdating}
-                className="w-full rounded-xl bg-emerald-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-emerald-500 hover:bg-emerald-100 group"
-              >
-                <div className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Đã khắc phục</div>
-                <div className="text-[10px] font-medium text-emerald-600/70">Có thể tiếp tục sản xuất và giao nhận</div>
-              </button>
+              {/* Nếu là Chờ xử lý (1), hiển thị nút Bắt đầu xử lý (2) */}
+              {(targetIssue?.statusId === 1 || !targetIssue?.statusId) && (
+                <button
+                  onClick={() => handleUpdateIssueStatus(2)}
+                  disabled={isUpdating}
+                  className="w-full rounded-xl bg-blue-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-blue-500 hover:bg-blue-100 group"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-widest text-blue-700">Bắt đầu xử lý</div>
+                  <div className="text-[10px] font-medium text-blue-600/70">Xác nhận đang tiến hành sửa chữa</div>
+                </button>
+              )}
 
-              <button
-                onClick={() => handleUpdateIssueStatus(4)}
-                disabled={isUpdating}
-                className="w-full rounded-xl bg-rose-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-rose-500 hover:bg-rose-100 group"
-              >
-                <div className="text-[11px] font-black uppercase tracking-widest text-rose-700">Không thể sửa</div>
-                <div className="text-[10px] font-medium text-rose-600/70 text-center">Sản phẩm bị loại bỏ, trừ vào số lượng đơn</div>
-              </button>
+              {/* Nếu là Đang xử lý (2), hiển thị nút Đã khắc phục (3) */}
+              {targetIssue?.statusId === 2 && (
+                <button
+                  onClick={() => handleUpdateIssueStatus(3)}
+                  disabled={isUpdating}
+                  className="w-full rounded-xl bg-emerald-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-emerald-500 hover:bg-emerald-100 group"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Đã khắc phục</div>
+                  <div className="text-[10px] font-medium text-emerald-600/70">Có thể tiếp tục sản xuất và giao nhận</div>
+                </button>
+              )}
+
+              {/* Nếu là Đang ở trạng thái Không thể sửa (4) */}
+              {targetIssue?.statusId === 4 && (
+                <div className="space-y-4 rounded-2xl bg-orange-50/50 p-4 border border-orange-100">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-orange-700 ml-1">
+                      Số lượng xác nhận hủy
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="1"
+                        max={targetIssue?.quantity}
+                        value={confirmedQuantity}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (val > targetIssue?.quantity) {
+                            toast.warning(`Không được vượt quá ${targetIssue?.quantity}`);
+                            setConfirmedQuantity(targetIssue?.quantity);
+                          } else {
+                            setConfirmedQuantity(e.target.value);
+                          }
+                        }}
+                        className="w-full rounded-xl border-2 border-orange-200 bg-white px-4 py-3 text-sm font-bold text-orange-900 focus:border-orange-500 focus:ring-0 transition-all"
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400">
+                        MAX: {targetIssue?.quantity}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleConfirmUnfixable(Number(confirmedQuantity))}
+                    disabled={isUpdating || !confirmedQuantity || confirmedQuantity <= 0}
+                    className="w-full rounded-xl bg-orange-600 px-6 py-4 text-center shadow-lg shadow-orange-200 transition-all hover:bg-orange-700 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-widest text-white">Xác nhận chốt số lượng</div>
+                    <div className="text-[10px] font-medium text-orange-100">
+                      Chốt {confirmedQuantity} sản phẩm bị loại bỏ
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {targetIssue?.statusId !== 4 && (
+                <button
+                  onClick={() => handleUpdateIssueStatus(4)}
+                  disabled={isUpdating}
+                  className="w-full rounded-xl bg-rose-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-rose-500 hover:bg-rose-100 group"
+                >
+                  <div className="text-[11px] font-black uppercase tracking-widest text-rose-700">Không thể sửa</div>
+                  <div className="text-[10px] font-medium text-rose-600/70 text-center">Sản phẩm bị loại bỏ, trừ vào số lượng đơn</div>
+                </button>
+              )}
 
               <button
                 onClick={() => setIsHandlingModalOpen(false)}

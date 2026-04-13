@@ -1,13 +1,13 @@
 import { createElement, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { CalendarDays, ClipboardCheck, ListChecks, LogOut, X } from "lucide-react";
+import { CalendarDays, ClipboardCheck, ClipboardList, LogOut, X } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const WORKER_NAV_ITEMS = [
-  { to: "/worker/production-plan", label: "Kế hoạch sản xuất", icon: ListChecks },
+  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList },
   { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
@@ -44,7 +44,6 @@ export default function WorkerSidebar({ mobileOpen = false, onClose = () => {} }
   const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
   const brandSubtitle = hasAnyRole(roleValue, ["Owner", "Admin"]) ? "Tổng quan" : (hasAnyRole(roleValue, ["PM", "Manager"]) ? "Quản lý" : "Nhân viên");
   const defaultName = "Nhân viên";
-  const roleLabel = roleValue || "Worker";
 
   useEffect(() => {
     try {
@@ -122,13 +121,13 @@ export default function WorkerSidebar({ mobileOpen = false, onClose = () => {} }
               const currentPath = location.pathname;
               let isCategoryActive = isActive;
 
-              // Đặc biệt cho thợ: Các trang báo cáo và sổ cắt thuộc về Kế hoạch sản xuất
-              if (to === "/worker/production-plan") {
+              if (to === "/production") {
                 isCategoryActive = isActive || 
                   currentPath.startsWith("/worker/error-report") || 
                   currentPath.startsWith("/worker/daily-report") ||
                   currentPath.startsWith("/worker/cutting-book") ||
-                  currentPath.startsWith("/worker/production-plan");
+                  currentPath.startsWith("/worker/production-plan") ||
+                  currentPath.startsWith("/production");
               }
               
               if (to === "/worker/output-history") {

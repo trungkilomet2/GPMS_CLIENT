@@ -44,9 +44,20 @@ const ProductionService = {
   completeProduction(id, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.COMPLETE(id), payload);
   },
-  updateIssueStatus(issueId, payload) {
-    // Format payload as { status: number, note?: string }
-    return axiosClient.patch(API_ENDPOINTS.PRODUCTION.ISSUE_STATUS(issueId), payload);
+  updateIssueStatus(issueId, statusId) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.UPDATE_ISSUE_STATUS(issueId), {
+      statusId: statusId
+    });
+  },
+  confirmUnfixable(issueId, confirmedQuantity) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.CONFIRM_UNFIXABLE(issueId), {
+      confirmedQuantity: confirmedQuantity
+    });
+  },
+  confirmDelivery(deliveryId, confirmationText) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.CONFIRM_DELIVERY(deliveryId), {
+      confirmationText: confirmationText
+    });
   },
 };
 
