@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ViewProfile from "@/pages/profile/ViewProfile";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import OrderService from "@/services/OrderService";
 
 const mockNavigate = vi.fn();
@@ -18,7 +18,7 @@ vi.mock("@/components/Header", () => ({
   default: () => <div>Header</div>,
 }));
 
-vi.mock("@/services/userService", () => ({
+vi.mock("@/services/UserService", () => ({
   userService: {
     getProfile: vi.fn(),
   },

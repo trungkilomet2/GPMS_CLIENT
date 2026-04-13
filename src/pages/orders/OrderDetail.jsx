@@ -16,7 +16,7 @@ import { getOrderCustomerId, getOrderCustomerInfo } from '@/lib/orders/customerI
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import ProductionPartService from '@/services/ProductionPartService';
-import { userService } from '@/services/userService';
+import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import DeliveryProgressSection from '@/components/orders/DeliveryProgressSection';
 import { hasAnyRole, splitRoles } from '@/lib/authRouting';

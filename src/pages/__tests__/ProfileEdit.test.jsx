@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import ProfileEdit from "@/pages/profile/ProfileEdit";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import { authService } from "@/services/authService";
 import { locationService } from "@/services/locationService";
 
@@ -19,7 +19,7 @@ vi.mock("@/components/Header", () => ({
   default: () => <div data-testid="header-stub" />,
 }));
 
-vi.mock("@/services/userService", () => ({
+vi.mock("@/services/UserService", () => ({
   userService: {
     getProfile: vi.fn(),
     updateProfile: vi.fn(),

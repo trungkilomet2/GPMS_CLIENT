@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import OrderService from "@/services/OrderService";
 import Header from "@/components/Header";
 import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";

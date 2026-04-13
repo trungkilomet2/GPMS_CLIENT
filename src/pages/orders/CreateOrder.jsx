@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
-import { userService } from '@/services/userService';
+import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
