@@ -1,5 +1,6 @@
 import { getStoredUser } from "@/lib/authStorage";
 import { extractRoleValue } from "@/lib/authIdentity";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import MainLayout from "@/layouts/MainLayout";
@@ -26,13 +27,13 @@ export default function OwnerLayout({ children }) {
   const user = getStoredUser();
   // Some API responses store roles as objects in `roles`, not a string in `role`.
   const roleValue = extractRoleValue(user) || user?.role || user?.roles || "";
-  const roles = splitRoles(roleValue).map((role) => role.toLowerCase());
+  const primaryRole = getPrimaryWorkspaceRole(roleValue);
 
-  if (roles.includes("owner") || roles.includes("pm") || roles.includes("project manager")) {
+  if (["owner", "pm", "manager", "teamLeader"].includes(primaryRole.toLowerCase())) {
     return <DashboardLayout>{children}</DashboardLayout>;
   }
 
-  if (roles.includes("worker") || roles.includes("sewer") || roles.includes("tailor")) {
+  if (["worker"].includes(primaryRole.toLowerCase())) {
     return <WorkerLayout>{children}</WorkerLayout>;
   }
 

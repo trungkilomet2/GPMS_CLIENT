@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { X, MessageSquare, Send, Loader2, User } from 'lucide-react';
+import { HubConnectionBuilder, LogLevel, HttpTransportType } from '@microsoft/signalr';
 import CommentService from '@/services/CommentService';
 import { toast } from 'react-toastify';
 import BASE_URL from '@/lib/apiconfig';
@@ -38,7 +39,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
   const currentUserIdNormalized = normalizeId(CURRENT_USER_ID);
   const currentUserDisplayName = user.fullName ?? user.name ?? user.userName ?? 'Bạn';
 
-  const wsRef = useRef(null);
+  const connectionRef = useRef(null);
 
   const fetchComments = useCallback(async () => {
     if (!orderId) return;
@@ -62,57 +63,82 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
   useEffect(() => {
     if (!isOpen || !orderId) return;
 
-    const base = BASE_URL?.replace(/^http/i, 'ws');
-    const token = getAuthItem('token');
-    const qs = new URLSearchParams({
-      orderId: String(orderId),
-      userId: String(CURRENT_USER_ID ?? ''),
-      ...(token ? { token } : {}),
-    }).toString();
-    const wsUrl = (import.meta?.env?.VITE_COMMENT_WS_URL || `${base}/ws/comments`) + `?${qs}`;
+    const hubUrl = `${BASE_URL}/hubs/comments`;
+    const connection = new HubConnectionBuilder()
+      .withUrl(hubUrl, {
+        accessTokenFactory: () => getAuthItem('token') || '',
+        skipNegotiation: true,
+        transport: HttpTransportType.WebSockets
+      })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Information)
+      .build();
 
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
+    connectionRef.current = connection;
 
-    ws.onopen = () => {
+    const startConnection = async () => {
       try {
-        ws.send(JSON.stringify({ type: 'subscribe', orderId, userId: CURRENT_USER_ID }));
-      } catch (_err) {
-        // ignore if server doesn't need subscribe message
-      }
-    };
+        // Register handlers BEFORE starting
+        connection.on("CommentCreated", (msg) => {
+          console.log('SignalR Message: CommentCreated Received', msg);
+          if (!msg) return;
+          
+          const list = Array.isArray(msg) ? msg : [msg];
+          list.forEach((m) => {
+            const msgOrderId = m.toOrderId ?? m.ToOrderId ?? m.orderId ?? m.OrderId;
+            
+            if (msgOrderId && String(msgOrderId) !== String(orderId)) {
+                return;
+            }
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        const list = Array.isArray(data) ? data : [data];
-        list.forEach((msg) => {
-          const msgOrderId = msg.toOrderId ?? msg.orderId ?? msg.OrderId;
-          if (String(msgOrderId) !== String(orderId)) return;
+            setComments((prev) => {
+              // Check duplicate by ID or Content+User+Time
+              const exists = prev.some((c) => 
+                (c.id && m.Id && String(c.id) === String(m.Id)) || 
+                (c.id && m.id && String(c.id) === String(m.id)) ||
+                (c.content === m.Content && String(m.FromUserId) === String(c.fromUserId))
+              );
+              if (exists) return prev;
 
-          setComments((prev) => {
-            const exists = prev.some((c) => c.id && msg.id && c.id === msg.id);
-            if (exists) return prev;
-            return sortBySendTimeAsc([...prev, msg]);
+              // Map PascalCase from Server to camelCase for UI if needed
+              const normalizedMsg = {
+                ...m,
+                id: m.Id ?? m.id,
+                fromUserId: m.FromUserId ?? m.fromUserId,
+                fromUserName: m.FromUserName ?? m.fromUserName,
+                content: m.Content ?? m.content,
+                sendDateTime: m.SendDateTime ?? m.sendDateTime,
+                toOrderId: m.ToOrderId ?? m.toOrderId
+              };
+
+              return sortBySendTimeAsc([...prev, normalizedMsg]);
+            });
           });
         });
-      } catch (_err) {
-        // if server sends plain text, ignore
+
+        await connection.start();
+        console.log('SignalR Connected to Hub.');
+        
+        // Call the correct method from your CommentHub.cs
+        await connection.invoke("JoinOrderCommentGroup", Number(orderId));
+        console.log(`Joined group for order: ${orderId}`);
+
+      } catch (err) {
+        console.error('SignalR Connection Error: ', err);
       }
     };
 
-    ws.onerror = () => {
-      // fallback: do nothing, keep manual fetch
-    };
-
-    ws.onclose = () => {
-      wsRef.current = null;
-    };
+    startConnection();
 
     return () => {
-      ws.close();
+      if (connection) {
+        // Cleanup: Leave group
+        connection.invoke("LeaveOrderCommentGroup", Number(orderId)).catch(() => {});
+        connection.stop();
+        connectionRef.current = null;
+      }
     };
-  }, [isOpen, orderId, CURRENT_USER_ID]);
+  }, [isOpen, orderId]);
 
   useEffect(() => {
     if (scrollRef.current) {

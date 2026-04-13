@@ -107,8 +107,16 @@ const normalizeIssue = (item, index) => {
     (item?.partId ? `Công đoạn #${item.partId}` : typeLabel);
 
   const severity = getSeverityFromPriority(item?.priority, item?.severity);
-  const status = Number(item?.status);
-  const hasStatus = Number.isFinite(status) && status > 0;
+  const statusIdCandidate = Number(
+    item?.statusId ?? item?.issueStatusId ?? item?.status?.id ?? item?.status
+  );
+  const hasStatusId = Number.isFinite(statusIdCandidate) && statusIdCandidate > 0;
+  const statusId = hasStatusId ? statusIdCandidate : null;
+  const rawStatusText =
+    item?.statusName ??
+    item?.status?.name ??
+    (typeof item?.status === "string" ? item.status : "");
+  const statusText = String(rawStatusText ?? "").trim();
 
   return {
     id: item?.issueId ?? item?.id ?? `issue-${index}`,
@@ -123,8 +131,10 @@ const normalizeIssue = (item, index) => {
     quantity: Number(item?.quantity) || 0,
     imageUrl: item?.imageUrl ?? "",
     createdAt: item?.createdAt ?? "",
-    status: hasStatus ? status : null,
-    statusName: hasStatus ? ISSUE_STATUS_LABELS[status] ?? `#${status}` : "-",
+    statusId,
+    status: statusId
+      ? ISSUE_STATUS_LABELS[statusId] ?? `${statusId}`
+      : statusText || "-",
   };
 };
 
@@ -223,7 +233,11 @@ export default function ProductionErrorSummary() {
       setErrors((prev) =>
         prev.map((err) =>
           err.id === targetIssue.id
-            ? { ...err, status: statusId, statusName: ISSUE_STATUS_LABELS[statusId] }
+            ? {
+              ...err,
+              statusId,
+              status: ISSUE_STATUS_LABELS[statusId] ?? `${statusId}`,
+            }
             : err
         )
       );
@@ -283,7 +297,7 @@ export default function ProductionErrorSummary() {
 
     return Array.from(map.values());
   }, [errors]);
-
+  console.log(errors);
   const totalPages = Math.max(1, Math.ceil(errors.length / pageSize));
 
   const pagedErrors = useMemo(() => {
@@ -385,9 +399,8 @@ export default function ProductionErrorSummary() {
                       </td>
                       <td className="px-4 py-2 text-center">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                            SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
-                          }`}
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
+                            }`}
                         >
                           {SEVERITY_LABELS[row.highestSeverity] || "-"}
                         </span>
@@ -465,22 +478,20 @@ export default function ProductionErrorSummary() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                            SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
-                          }`}
+                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
+                            }`}
                         >
                           {SEVERITY_LABELS[item.severity] || "-"}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
                       <td className="px-4 py-3 text-center">
-                        {item.status ? (
+                        {item.status && item.status !== "-" ? (
                           <span
-                            className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                              ISSUE_STATUS_STYLES[item.status] ?? ISSUE_STATUS_STYLES[1]
-                            }`}
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${ISSUE_STATUS_STYLES[item.statusId] ?? "bg-slate-50 text-slate-600 border-slate-200"
+                              }`}
                           >
-                            {item.statusName}
+                            {item.status}
                           </span>
                         ) : (
                           <span className="text-[10px] italic text-slate-300">-</span>
@@ -494,14 +505,14 @@ export default function ProductionErrorSummary() {
                             setIsHandlingModalOpen(true);
                           }}
                           className="rounded-lg bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
-                          disabled={!item.status || item.status === 3 || item.status === 4}
+                          disabled={item.statusId === 3 || item.statusId === 4}
                         >
                           Xác nhận
                         </button>
                       </td>
                     </tr>
                   ))}
-                    {errors.length === 0 && (
+                  {errors.length === 0 && (
                     <tr>
                       <td colSpan={8} className="py-8 text-center text-slate-500">
                         Chưa có lỗi nào được ghi nhận.
