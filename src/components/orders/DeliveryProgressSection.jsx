@@ -20,9 +20,9 @@ export default function DeliveryProgressSection({
     const getDetailedInfo = (d) => {
         const osId = d.orderSizeId || d.orderSizeID || d.order_size_id;
         const os = rawOrderSizes.find(s => String(s.id || s.orderSizeId) === String(osId));
-        
+
         if (!os) return { color: d.colorName || d.color || "SP", size: d.sizeName || d.size || "" };
-        
+
         let sz = os.sizeName || os.sizeValue;
         if (!sz && os.sizeId) sz = SIZE_ID_TO_LABEL[os.sizeId];
         if (!sz && os.size) sz = typeof os.size === 'string' ? os.size : (os.size.sizeName || os.size.sizeValue);
@@ -180,7 +180,7 @@ export default function DeliveryProgressSection({
                                     {sizeKeys.map(k => {
                                         const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
                                         const osId = v.idMap ? v.idMap[k] : null;
-                                        
+
                                         // Precise match using orderSizeId
                                         const delivered = deliveries
                                             .filter(d => {
@@ -282,7 +282,7 @@ export default function DeliveryProgressSection({
                                     const dateStr = d.deliveredAt || d.receivedDate || d.date || "";
                                     const autoConfirmed = isAutoConfirmed(dateStr);
                                     const confirmed = d.isConfirmed || autoConfirmed || String(d.deliverStatusId) === "2";
-                                    
+
                                     const qtyDisp = d.deliverQuantity || d.quantity || 0;
                                     const statusLabel = d.deliverStatusName || getStatusLabel(d.deliverStatusId);
 
