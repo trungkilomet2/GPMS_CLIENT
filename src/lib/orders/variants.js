@@ -49,16 +49,21 @@ export const processOrderVariants = (order) => {
                 grouped[color] = { 
                     color, 
                     colorCode: item.colorCode, 
-                    xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 
+                    xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0,
+                    idMap: {} 
                 };
             }
             // Hỗ trợ cả sizeKey trực tiếp, sizeName hoặc sizeId
-            const sizeKey = (item.sizeName || item.sizeValue || item.size || '').toLowerCase() || SIZE_ID_TO_KEY[item.sizeId];
-            if (sizeKey && grouped[color][sizeKey] !== undefined) {
+            const sizeKeyFound = (item.sizeName || item.sizeValue || item.size || '').toLowerCase() || SIZE_ID_TO_KEY[item.sizeId];
+            const sizeKey = sizeKeyFound || 's'; // Default to 's' if not found
+            
+            if (grouped[color][sizeKey] !== undefined) {
                 grouped[color][sizeKey] += (Number(item.quantity) || 0);
-            } else if (item.quantity) {
-                 // Nếu không khớp size key cụ thể, mặc định cộng vào 's' hoặc giữ nguyên nếu chỉ có 1 size
-                 grouped[color].s += Number(item.quantity);
+                // Store the ID of this specific variant
+                const osId = item.id || item.orderSizeId || item.orderSizeID || item.order_size_id;
+                if (osId) {
+                    grouped[color].idMap[sizeKey] = osId;
+                }
             }
         });
         return Object.values(grouped);

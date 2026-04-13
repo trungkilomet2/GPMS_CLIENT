@@ -556,15 +556,18 @@ export default function ProductionDetail() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="p-8 rounded-xl bg-white border border-black-100 shadow-sm space-y-4 group transition-all hover:border-[#1e6e43]/30">
+                    <div 
+                      onClick={() => navigate(`/production-plan/${production.productionId}/history`)}
+                      className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-emerald-50/30 hover:border-[#1e6e43] cursor-pointer"
+                    >
                       <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-[#f0f9f4] rounded-2xl text-[#1e6e43]">
+                        <div className="p-3 bg-[#f0f9f4] rounded-2xl text-[#1e6e43] group-hover:bg-[#1e6e43] group-hover:text-white transition-all">
                           <Activity size={24} />
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#1e6e43] bg-[#f0f9f4] px-3 py-1 rounded-full">Công đoạn</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#1e6e43] bg-[#f0f9f4] px-3 py-1 rounded-full">Sản lượng</span>
                       </div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng công đoạn sản xuất</p>
-                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{totalParts} <span className="text-sm text-gray-400 ml-1">PHẦN</span></h5>
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Lịch sử báo cáo sản lượng</p>
+                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{totalParts} <span className="text-sm text-gray-400 ml-1">CÔNG ĐOẠN</span></h5>
                     </div>
 
                     <div 
@@ -1007,27 +1010,9 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                         </span>
                       </div>
                       {/* Actions */}
-                      <div className="col-span-2 flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100 transition-all">
-                        <button onClick={() => navigate(`/production/part/${row.partId}/${row.id}/history`)} title="Lịch sử" className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-all">
-                          <History size={14} />
-                        </button>
-                        {!isDone && isInProduction && (isOwner || isPM) && (
-                          <button
-                            onClick={() => {
-                              if ((row.actualQuantity || 0) < (row.quantity || 0) && partStatus !== "Đợi Xác Nhận") {
-                                toast.warning("Sản lượng chưa đạt mục tiêu!");
-                                return;
-                              }
-                              handleDonePart(row.id);
-                            }}
-                            title="Hoàn thành"
-                            className={`p-2 rounded-lg transition-all ${((row.actualQuantity || 0) >= (row.quantity || 0) || partStatus === "Đợi Xác Nhận") ? 'text-emerald-500 hover:bg-emerald-50' : 'text-gray-200 cursor-not-allowed'}`}
-                          >
-                            <CheckCircle size={14} />
-                          </button>
-                        )}
-                        <button onClick={() => handleBaoLoi(row)} title="Báo lỗi" className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-all">
-                          <AlertTriangle size={14} />
+                      <div className="col-span-2 flex items-center justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-all">
+                        <button onClick={() => handleBaoLoi(row)} title="Báo lỗi" className="p-2.5 rounded-xl hover:bg-rose-50 text-rose-500 hover:text-rose-600 transition-all border border-transparent hover:border-rose-200 shadow-sm active:scale-90">
+                          <AlertTriangle size={22} />
                         </button>
                       </div>
                     </div>

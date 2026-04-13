@@ -257,247 +257,263 @@ export default function ProductionPartHistory() {
 
   return (
     <OwnerLayout>
-      <div className="min-h-screen bg-[#F8FAFC] p-4 lg:p-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="h-10 w-10 flex items-center justify-center rounded-full bg-white shadow-sm hover:bg-emerald-50 text-slate-600 transition-all border border-slate-100">
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Nhật ký sản xuất</h1>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Production Code: #PR-{productionId || "..."}</p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[#F4F7F6] font-sans selection:bg-emerald-100 selection:text-emerald-900 pb-20">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
 
-        {/* Stats */}
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-          <StatCard icon={<Package size={22} />} label="Tổng sản lượng báo cáo" value={`${stats.totalQty.toLocaleString("vi-VN")} cái`} color="emerald" />
-          <StatCard icon={<ClipboardCheck size={22} />} label="Tổng số lượt báo cáo" value={`${stats.totalLogs} lần`} color="blue" />
-        </div>
-
-        {/* Table Container */}
-        <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl shadow-slate-200/50">
-          <div className="bg-slate-50/50 px-8 py-5 flex items-center justify-between border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-                <ShieldCheck size={20} />
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest text-slate-500">Chi tiết thực hiện & Nghiệm thu</span>
-            </div>
-            {loading && <Loader2 className="animate-spin text-emerald-600" size={20} />}
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead>
-                <tr className="bg-slate-50/30 text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
-                  <th className="px-8 py-5 text-center">STT</th>
-                  <th className="px-8 py-5">Công đoạn / Giai đoạn</th>
-                  <th className="px-8 py-5">Biến thể</th>
-                  <th className="px-8 py-5">Nhân sự</th>
-                  <th className="px-8 py-5 text-center">Sản lượng</th>
-                  <th className="px-8 py-5 text-center">Thời gian</th>
-                  <th className="px-8 py-5 text-center">Trạng thái</th>
-                  <th className="px-8 py-5 text-center text-emerald-600">Thao tác Quản lý</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {logs.length === 0 && !loading ? (
-                  <tr><td colSpan={8} className="py-32 text-center text-slate-400 font-bold uppercase tracking-widest opacity-40">Không có dữ liệu bản ghi</td></tr>
-                ) : logs.map((log, index) => {
-                  // Aggressive ID search
-                  const logPosId = String(log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || log.productOrderSizeId || "");
-                  const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.partID || "");
-
-                  const part = partsLookup[logPosId] || partsLookup[logPartId];
-                  const osInfo = orderSizeLookup[logPosId];
-
-                  const logId = log.id || log.workLogId;
-                  const isEditing = editingId === logId;
-                  const isDone = log.status === 2 || log.statusName === "Đã nghiệm thu";
-
-                  // Priority: OrderSizeLookup -> Part Color/Size -> Default "-"
-                  const color = osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
-                  const size = osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
-
-                  if (index === 0) {
-                    console.log("GPMS - Row 0 Processing:", { logPosId, logPartId, osInfo, part, color, size });
-                  }
-
-                  return (
-                    <tr key={logId} className={`group transition-all hover:bg-slate-50/80 ${isDone ? "bg-emerald-50/20" : ""}`}>
-                      <td className="px-8 py-5 text-center font-bold text-slate-300">{String(index + 1).padStart(2, "0")}</td>
-                      <td className="px-8 py-5">
-                        <div className="font-extrabold text-slate-800">{part?.name || part?.partName || "N/A"}</div>
-                        <div className="mt-1 text-[9px] font-bold text-slate-400 uppercase">Mã: {logPartId || "-"}</div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex gap-1.5 focus:outline-none">
-                          {color !== "-" && <span className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-black uppercase text-slate-500 shadow-sm">{color}</span>}
-                          {size !== "-" && <span className="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-black uppercase text-slate-500 shadow-sm">{size}</span>}
-                          {color === "-" && size === "-" && <span className="text-slate-300">---</span>}
-                        </div>
-                      </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">
-                            {(log.userName || log.workerName || "W")?.[0]}
-                          </div>
-                          <span className="font-bold text-slate-700">{log.userName || log.workerName || `Thợ #${log.userId}`}</span>
-                        </div>
-                      </td>
-                      <td className="px-8 py-5 text-center">
-                        {isEditing ? (
-                          <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-20 rounded-xl border-2 border-emerald-300 bg-white px-3 py-1.5 text-center font-black text-emerald-700 outline-none shadow-lg focus:border-emerald-500" autoFocus />
-                        ) : (
-                          <span className={`inline-flex h-10 min-w-[3rem] items-center justify-center rounded-2xl font-black text-sm px-3 ${isDone ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-white'}`}>
-                            {log.quantity}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-tighter italic">{formatDate(log.createDate || log.workDate)}</td>
-                      <td className="px-8 py-5 text-center">
-                        {log.status === 4 || log.statusName === "Đã hoàn thành" || log.statusName === "Đã hoàn thành" ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black uppercase text-emerald-600">
-                            <CheckCircle2 size={12} /> Đã hoàn thành
-                          </span>
-                        ) : log.status === 3 || log.statusName === "Chờ Nghiệm Thu" ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase text-amber-600">
-                            <Loader2 size={12} className="animate-spin" /> Chờ nghiệm thu
-                          </span>
-                        ) : log.status === 2 ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-[10px] font-black uppercase text-blue-600">
-                            Đang thực hiện
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase text-slate-400">
-                            Chưa thực hiện
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-8 py-5 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          {isEditing ? (
-                            <>
-                              <button onClick={() => openEditConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-md"><Check size={16} /></button>
-                              <button onClick={() => setEditingId(null)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-100 text-slate-400 hover:bg-slate-200 transition-all shadow-md"><X size={16} /></button>
-                            </>
-                          ) : (
-                            <>
-                              {(log.status === 4 || log.statusName === "Đã hoàn thành") ? (
-                                <div className="h-10 w-10 flex items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg transition-transform hover:scale-105 active:scale-95" title="Đã hoàn thành">
-                                  <CheckCircle2 size={18} strokeWidth={3} />
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={() => handleOpenApprove(log)}
-                                  className="h-10 w-10 flex items-center justify-center rounded-2xl bg-white text-emerald-600 border border-emerald-100 shadow-lg hover:bg-emerald-50 active:scale-95 transition-all"
-                                  title="Nghiệm thu bản ghi"
-                                >
-                                  <Zap size={18} fill="currentColor" />
-                                </button>
-                              )}
-                              <button onClick={() => { setEditingId(logId); setEditValue(String(log.quantity)); }} className="h-10 w-10 flex items-center justify-center rounded-2xl bg-white border border-blue-100 text-blue-600 shadow-lg hover:bg-blue-50 active:scale-95" title="Chỉnh sửa"><Pencil size={18} /></button>
-                              <button onClick={() => openDeleteConfirm(log)} className="h-10 w-10 flex items-center justify-center rounded-2xl bg-white border border-rose-100 text-rose-600 shadow-lg hover:bg-rose-50 active:scale-95" title="Xóa"><Trash size={18} /></button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* --- MODALS --- */}
-
-      {/* Approve Modal with Input */}
-      {isApproveOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
-          <div className="w-full max-w-md rounded-[2.5rem] bg-white p-8 shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-100">
-            <div className="mb-6 flex flex-col items-center text-center">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-100 text-emerald-600 shadow-inner">
-                <CheckCircle2 size={32} />
-              </div>
-              <h3 className="text-xl font-black text-slate-800 tracking-tight">Nghiệm thu sản lượng</h3>
-              <p className="mt-2 text-sm font-medium text-slate-500 px-4">
-                Xác nhận số lượng thực tế hoàn thành của <strong>{targetLog?.userName || targetLog?.workerName}</strong>.
-              </p>
-            </div>
-
-            <div className="mb-8 space-y-4">
-              <div className="rounded-3xl bg-slate-50 p-6 border border-slate-100 shadow-sm">
-                <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Số lượng nghiệm thu</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    value={approveQty}
-                    onChange={(e) => setApproveQty(e.target.value)}
-                    className="w-full rounded-2xl border-2 border-slate-200 bg-white px-5 py-4 text-center text-3xl font-black text-slate-900 outline-none transition-all focus:border-emerald-500 focus:shadow-emerald-100/50 shadow-lg"
-                    placeholder="0"
-                    autoFocus
-                  />
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-300 uppercase">Cái</div>
-                </div>
-                <p className="mt-4 text-center text-[11px] font-bold text-slate-400 italic">
-                  * Số lượng công nhân báo cáo: {targetLog?.quantity} cái
+          {/* HEADER SECTION */}
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex items-start gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-600 transition-all hover:border-black hover:text-black shadow-sm active:scale-95"
+              >
+                <ArrowLeft size={22} />
+              </button>
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none uppercase">
+                  Lịch sử công đoạn
+                </h1>
+                <p className="text-[10px] font-bold text-slate-600 tracking-widest uppercase mt-1">
+                  Mã sản xuất: #PR-{productionId || "..."}
                 </p>
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setIsApproveOpen(false)}
-                className="flex-1 rounded-2xl bg-slate-100 py-4 text-sm font-black text-slate-500 transition-all hover:bg-slate-200"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={executeApprove}
-                className="flex-[1.5] rounded-2xl bg-emerald-600 py-4 text-sm font-black text-white shadow-xl shadow-emerald-200 transition-all hover:bg-emerald-700 hover:scale-[1.02] active:scale-100"
-              >
-                Xác nhận Nghiệm thu
-              </button>
+            <div className="flex items-center gap-2">
+              <span className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
+                {stats.totalLogs} Lượt báo cáo
+              </span>
+            </div>
+          </div>
+
+          {/* STATS SECTION */}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <StatCard
+              icon={<Package size={24} />}
+              label="Tổng sản lượng báo cáo"
+              value={`${stats.totalQty.toLocaleString("vi-VN")} cái`}
+              color="emerald"
+            />
+            <StatCard
+              icon={<ClipboardCheck size={24} />}
+              label="Trạng thái hệ thống"
+              value={loading ? "Đang truy xuất..." : "Hoạt động"}
+              color="blue"
+            />
+          </div>
+
+          {/* TABLE SECTION */}
+          <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
+            <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-slate-900 rounded-full" />
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Bảng kê chi tiết thực hiện</h2>
+              </div>
+              {loading && <Loader2 className="animate-spin text-slate-400" size={18} />}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px] border border-black">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-black">
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black w-16">STT</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Công đoạn</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Biến thể</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Thợ thực hiện</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Số lượng</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Ngày ghi</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 border-r border-black">Trạng thái</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 border-black">
+                  {logs.length === 0 && !loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-32 text-center">
+                        <div className="flex flex-col items-center gap-4 text-slate-200">
+                          <Package size={64} />
+                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Không có dữ liệu bản ghi</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : logs.map((log, index) => {
+                    const logPosId = String(log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || log.productOrderSizeId || "");
+                    const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.partID || "");
+                    const part = partsLookup[logPosId] || partsLookup[logPartId];
+                    const osInfo = orderSizeLookup[logPosId];
+                    const logId = log.id || log.workLogId;
+                    const isEditing = editingId === logId;
+                    const isDone = log.status === 2 || log.statusName === "Đã nghiệm thu";
+
+                    const color = osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
+                    const size = osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
+
+                    return (
+                      <tr key={logId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
+                        <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(index + 1).padStart(2, "0")}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{part?.name || part?.partName || "N/A"}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-1.5 focus:outline-none">
+                            {color !== "-" && <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase text-slate-700">{color}</span>}
+                            {size !== "-" && <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase text-slate-700">{size}</span>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-slate-600 uppercase text-[10px] tracking-widest px-3 py-1 rounded-lg bg-slate-50 inline-block border border-black">
+                            {log.userName || log.workerName || `Thợ #${log.userId}`}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editValue}
+                              onChange={e => setEditValue(e.target.value)}
+                              className="w-20 rounded-xl border border-black bg-white px-3 py-2 text-center font-bold text-slate-900 outline-none shadow-sm focus:border-slate-400 transition-all"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className={`inline-flex h-9 w-12 items-center justify-center rounded-xl font-bold text-sm border ${isDone ? 'bg-slate-900 text-white border-black' : 'bg-white text-slate-800 border-black'}`}>
+                              {log.quantity}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-600 uppercase tracking-tighter italic">{formatDate(log.createDate || log.workDate)}</td>
+                        <td className="px-6 py-4 text-center">
+                          {log.status === 4 || log.statusName === "Đã hoàn thành" ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-emerald-600 shadow-sm">
+                              <CheckCircle2 size={11} /> Hoàn nhận
+                            </span>
+                          ) : log.status === 3 || log.statusName === "Chờ Nghiệm Thu" ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
+                              <Zap size={11} className="animate-pulse" /> Chờ duyệt
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-slate-600">
+                              Đang xử lý
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {isEditing ? (
+                              <>
+                                <button onClick={() => openEditConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all"><Check size={18} /></button>
+                                <button onClick={() => setEditingId(null)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all"><X size={18} /></button>
+                              </>
+                            ) : (
+                              <>
+                                {!isDone && (
+                                  <button
+                                    onClick={() => handleOpenApprove(log)}
+                                    className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-900 text-white border border-slate-900 hover:bg-slate-800 active:scale-95 transition-all shadow-sm"
+                                    title="Nghiệm thu"
+                                  >
+                                    <Zap size={15} fill="currentColor" />
+                                  </button>
+                                )}
+                                <button onClick={() => { setEditingId(logId); setEditValue(String(log.quantity)); }} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all shadow-sm" title="Sửa"><Pencil size={15} /></button>
+                                <button onClick={() => openDeleteConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95 transition-all shadow-sm" title="Xóa"><Trash size={15} /></button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      )}
 
-      <ConfirmModal
-        isOpen={confirmConfig.isOpen}
-        title={confirmConfig.title}
-        description={confirmConfig.description}
-        onConfirm={executeAction}
-        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-        primaryLabel={confirmConfig.type === "DELETE" ? "Đồng ý xóa" : "Xác nhận lưu"}
-        secondaryLabel="Quay lại"
-        confirmIcon={confirmConfig.type === "DELETE" ? Trash : Check}
-      />
+        {/* MODALS */}
+        {isApproveOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-8 border border-slate-200 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="text-center mb-8">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 text-black mb-4">
+                  <ShieldCheck size={32} />
+                </div>
+                <h3 className="text-xl font-black text-black uppercase tracking-tight">Nghiệm thu bản ghi</h3>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">
+                  Xác nhận sản lượng của: {targetLog?.userName || targetLog?.workerName}
+                </p>
+              </div>
 
-      {isProcessing && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/20 backdrop-blur-[2px]">
-          <div className="rounded-3xl bg-white p-6 shadow-2xl flex items-center gap-4 border border-slate-100 animate-in fade-in duration-300">
-            <Loader2 className="animate-spin text-emerald-600" size={24} />
-            <span className="text-sm font-black text-slate-700 uppercase tracking-widest">Đang cập nhật...</span>
+              <div className="space-y-6 mb-8">
+                <div className="relative">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Số lượng nghiệm thu</label>
+                  <input
+                    type="number"
+                    value={approveQty}
+                    onChange={(e) => setApproveQty(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-center text-4xl font-bold text-slate-900 outline-none focus:bg-white focus:border-slate-400 transition-all shadow-inner"
+                    autoFocus
+                  />
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-3 italic">
+                    * Thợ báo cáo: {targetLog?.quantity} cái
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setIsApproveOpen(false)}
+                  className="flex-1 rounded-xl bg-white border border-slate-200 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  onClick={executeApprove}
+                  className="flex-[2] rounded-xl bg-slate-900 py-4 text-xs font-bold text-white uppercase tracking-widest hover:bg-slate-800 shadow-md active:scale-[0.98] transition-all"
+                >
+                  Xác nhận Nghiệm thu
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        <ConfirmModal
+          isOpen={confirmConfig.isOpen}
+          title={confirmConfig.title}
+          description={confirmConfig.description}
+          onConfirm={executeAction}
+          onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          primaryLabel={confirmConfig.type === "DELETE" ? "Đồng ý xóa" : "Xác nhận lưu"}
+          secondaryLabel="Quay lại"
+          confirmIcon={confirmConfig.type === "DELETE" ? Trash : Check}
+        />
+
+        {isProcessing && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/5 backdrop-blur-[2px]">
+            <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-xl flex items-center gap-4">
+              <Loader2 className="animate-spin text-black" size={24} />
+              <span className="text-xs font-black text-black uppercase tracking-widest">Đang cập nhật...</span>
+            </div>
+          </div>
+        )}
+      </div>
     </OwnerLayout>
   );
 }
 
 function StatCard({ icon, label, value, color }) {
-  const colorMap = { emerald: "bg-emerald-50 text-emerald-600", blue: "bg-blue-50 text-blue-600" };
+  const colorMap = {
+    emerald: "bg-emerald-50/50 border-emerald-200 text-emerald-600",
+    blue: "bg-slate-50 border-slate-200 text-slate-600"
+  };
   return (
-    <div className="flex items-center gap-6 rounded-[2rem] border border-white bg-white p-8 shadow-xl shadow-slate-200/50 transition-all hover:translate-y-[-4px] hover:shadow-2xl">
-      <div className={`flex h-16 w-16 items-center justify-center rounded-[1.25rem] shadow-sm transform rotate-3 transition-transform group-hover:rotate-6 ${colorMap[color]}`}>{icon}</div>
+    <div className="flex items-center gap-6 rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all hover:translate-y-[-2px] hover:shadow-md">
+      <div className={`flex h-16 w-16 items-center justify-center rounded-xl border shadow-sm ${colorMap[color]}`}>{icon}</div>
       <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{label}</p>
-        <p className="text-2xl font-black text-slate-900 tracking-tight">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
+        <p className="text-3xl font-black text-slate-900 tracking-tighter">{value}</p>
       </div>
     </div>
   );
 }
+

@@ -157,12 +157,15 @@ export default function DeliveryProgressSection({
                             // First, identify all orderSizeIds in this row if possible
                             // For simplicity, we keep color-based grouping if that's what's in 'v'
                             const rowDelivered = deliveries
-                                .filter(d => 
-                                    // Match by color (legacy/ui model)
-                                    d.color === v.color ||
-                                    // Match by orderSizeId if it exists in any of the sizes of this variant row
-                                    (d.orderSizeId && v.orderSizes && v.orderSizes.some(os => String(os.id) === String(d.orderSizeId)))
-                                )
+                                .filter(d => {
+                                    const dOsId = String(d.orderSizeId || d.orderSizeID || d.order_size_id || "");
+                                    // Match if this delivery's orderSizeId matches ANY ID in this row's idMap
+                                    if (v.idMap && dOsId) {
+                                        return Object.values(v.idMap).some(id => String(id) === dOsId);
+                                    }
+                                    // Fallback
+                                    return d.color === v.color || d.colorName === v.color;
+                                })
                                 .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
 
                             const rowProgress = Math.round((rowDelivered / rowOrdered) * 100);
@@ -176,17 +179,19 @@ export default function DeliveryProgressSection({
                                     </div>
                                     {sizeKeys.map(k => {
                                         const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
+                                        const osId = v.idMap ? v.idMap[k] : null;
                                         
-                                        // Find the specific orderSizeId for this color/size back in the raw data if available
-                                        // But 'v' is already flattened. We need to match precisely.
+                                        // Precise match using orderSizeId
                                         const delivered = deliveries
                                             .filter(d => {
-                                                // Legacy match
-                                                const matchesLegacy = d.color === v.color && d.size?.toLowerCase() === k;
-                                                // New API match (if we had the ID mapped to the matrix cell)
-                                                // Since we don't have IDs here easily, we fallback to legacy logic for matrix UI
-                                                // or hope the backend delivery object has color/size
-                                                return matchesLegacy || (d.colorName === v.color && d.sizeName?.toLowerCase() === k);
+                                                const dOsId = d.orderSizeId || d.orderSizeID || d.order_size_id;
+                                                // If we have an ID for this cell, match strictly by ID
+                                                if (osId && dOsId) {
+                                                    return String(osId) === String(dOsId);
+                                                }
+                                                // Fallback to legacy color/size naming match
+                                                const matchesLegacy = d.color === v.color && (d.size?.toLowerCase() === k || d.sizeName?.toLowerCase() === k);
+                                                return matchesLegacy;
                                             })
                                             .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
 
