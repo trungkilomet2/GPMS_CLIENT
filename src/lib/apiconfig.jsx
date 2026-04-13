@@ -12,6 +12,7 @@ const BASE_URL = 'http://26.250.4.244:5229';
 
 export const API_ENDPOINTS = {
   AI: {
+    OPENROUTER_CHAT: `${BASE_URL}/ai/openrouter/chat`,
     GEMINI_CHAT: `${BASE_URL}/ai/gemini/chat`,
   },
 
@@ -20,6 +21,7 @@ export const API_ENDPOINTS = {
     REGISTER: `${BASE_URL}/api/Account/register`,
     FORGOT_PASSWORD: `${BASE_URL}/api/Account/forgot-password`,
     RESET_PASSWORD: `${BASE_URL}/api/Account/reset-password`,
+    CHANGE_PASSWORD: `${BASE_URL}/api/Account/change-password`,
   },
 
   EMAIL: {

@@ -187,5 +187,11 @@ export function AdminPermissionSummary({ profile }) {
 
 export function getAdminPermissionSummaryText(profile) {
   if (!profile) return "Chưa gán quyền";
-  return `${countGrantedPermissions(profile)} quyền đang bật`;
+
+  const grantedCount = countGrantedPermissions(profile);
+  if (grantedCount > 0) {
+    return `${grantedCount} quyền đang bật`;
+  }
+
+  return "Vai trò đang được đồng bộ từ dữ liệu quyền hiện tại.";
 }

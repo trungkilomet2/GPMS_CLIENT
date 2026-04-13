@@ -116,37 +116,37 @@ export const CATEGORIES = [
 
 // Homepage section data
 export const STATS = [
-  { val: "Đơn hàng", sub: "Theo dõi trạng thái tập trung" },
-  { val: "Sản xuất", sub: "Phối hợp theo từng công đoạn" },
-  { val: "Chất lượng", sub: "Ghi nhận và kiểm tra minh bạch" },
-  { val: "Tiến độ", sub: "Cập nhật xuyên suốt quy trình" },
+  { val: "6 vai trò", sub: "Khách, khách hàng, chủ xưởng, quản lý, thợ và quản trị viên" },
+  { val: "89 ca sử dụng", sub: "Bao phủ luồng đơn hàng, sản xuất, nhân sự và quản trị" },
+  { val: "≤ 2 giây", sub: "Mục tiêu phản hồi theo yêu cầu hiệu năng trong tài liệu đặc tả" },
+  { val: "Ứng dụng web", sub: "Trang công khai và hệ thống thao tác tập trung" },
 ];
 
 export const PRODUCTS = [
-  { img: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=500&q=80", tag: "Local Brand", title: "Áo thun local brand", desc: "Theo dõi toàn bộ đơn hàng" },
-  { img: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=500&q=80", tag: "Đồng phục", title: "Đồng phục công ty", desc: "Cập nhật tiến độ theo thời gian thực" },
-  { img: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=500&q=80", tag: "Thời trang", title: "Váy đầm thời trang", desc: "Kiểm tra tồn sản phẩm trong dây" },
-  { img: "https://images.unsplash.com/photo-1471286174890-9c112ffca5b4?w=500&q=80", tag: "Trẻ em", title: "Quần áo trẻ em", desc: "Theo dõi năng suất công nhân" },
+  { img: "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?w=900&q=80", tag: "Đơn hàng", title: "Tạo đơn và theo dõi khách hàng", desc: "Hỗ trợ đăng ký, tạo đơn, xem chi tiết, cập nhật lịch sử và phản hồi giữa khách hàng với chủ xưởng." },
+  { img: "https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=900&q=80", tag: "Sản xuất", title: "Kế hoạch và phân công sản xuất", desc: "Tạo đợt sản xuất, cấu hình công đoạn, gán quản lý và phân công thợ theo đúng phạm vi hệ thống." },
+  { img: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=900&q=80", tag: "Nhân sự", title: "Nhân viên, nghỉ phép và lương", desc: "Theo dõi hồ sơ nhân viên, đơn nghỉ phép, kỹ năng làm việc và dữ liệu phục vụ tính lương." },
+  { img: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=900&q=80", tag: "Quản trị", title: "Phân quyền, nhật ký và kiểm soát", desc: "Quản trị viên quản lý tài khoản, vai trò, quyền hạn và nhật ký hệ thống để đảm bảo vận hành có kiểm soát." },
 ];
 
 export const FEATURES = [
-  { icon: "📦", title: "Quản lý đơn hàng", desc: "Tiếp nhận, phân loại và theo dõi toàn bộ đơn hàng theo thời gian thực." },
-  { icon: "🏭", title: "Kế hoạch sản xuất", desc: "Lên kế hoạch và phân công công đoạn cho từng nhóm công nhân." },
-  { icon: "✅", title: "Kiểm soát chất lượng", desc: "Kiểm tra từng công đoạn, ghi nhận lỗi và xử lý tức thì." },
-  { icon: "💰", title: "Tính tiền công tự động", desc: "Tự động tính lương theo sản lượng và định mức từng sản phẩm." },
+  { icon: "📦", title: "Đơn hàng có kiểm duyệt", desc: "Đơn hàng được tạo, xem chi tiết, chỉnh sửa, từ chối hoặc yêu cầu sửa trước khi chuyển sang sản xuất." },
+  { icon: "🏭", title: "Kế hoạch theo công đoạn", desc: "Quản lý sản xuất và chủ xưởng cấu hình công đoạn, gửi duyệt kế hoạch và theo dõi tiến độ theo từng phần việc." },
+  { icon: "✅", title: "Lỗi, sổ cắt và sản lượng", desc: "Hệ thống hỗ trợ sổ cắt, nhật ký cắt, báo lỗi và xác nhận sản lượng theo phần việc được giao." },
+  { icon: "💰", title: "Nhân sự, nghỉ phép và quản trị", desc: "Bao gồm nhân viên, kỹ năng thợ, đơn nghỉ phép, lương cùng tài khoản, phân quyền và nhật ký hệ thống." },
 ];
 
 export const STEPS = [
-  "Khách gửi yêu cầu",
-  "Xưởng báo giá",
-  "Thiết kế mẫu",
-  "Sản xuất",
-  "Kiểm tra chất lượng",
-  "Giao hàng",
+  "Khách xem tổng quan",
+  "Khách hàng tạo đơn",
+  "Chủ xưởng duyệt đơn",
+  "Quản lý lập kế hoạch",
+  "Thợ cập nhật sản lượng",
+  "Quản trị viên theo dõi hệ thống",
 ];
 
 export const PROCESS_CARDS = [
-  { rng: "01-02", title: "Tư vấn & Báo giá", desc: "Tiếp nhận yêu cầu, làm rõ phạm vi công việc và trao đổi phương án phù hợp trong thời gian làm việc.", icon: "💬" },
-  { rng: "03-04", title: "Thiết kế & Sản xuất", desc: "Duyệt mẫu, cắt vải, may thành phẩm theo tiêu chuẩn kỹ thuật đã thỏa thuận.", icon: "✂️" },
-  { rng: "05-06", title: "Kiểm tra & Giao hàng", desc: "Kiểm tra thành phẩm trước khi đóng gói và bàn giao theo tiến độ đã thống nhất.", icon: "🚚" },
+  { rng: "01-02", title: "Trang công khai và tạo đơn", desc: "Khách xem trang chủ, đăng ký tài khoản và khách hàng gửi đơn với file thiết kế, vật liệu và yêu cầu sản phẩm.", icon: "💬" },
+  { rng: "03-04", title: "Xét duyệt và lập kế hoạch", desc: "Chủ xưởng duyệt đơn, tạo đợt sản xuất, giao quản lý và cấu hình các công đoạn cần thực hiện.", icon: "✂️" },
+  { rng: "05-06", title: "Thực thi và kiểm soát", desc: "Thợ cập nhật sản lượng, báo lỗi, xin nghỉ; đồng thời lương, phân quyền và nhật ký hệ thống được theo dõi tập trung.", icon: "🚚" },
 ];

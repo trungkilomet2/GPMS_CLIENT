@@ -20,7 +20,6 @@ import {
   validatePhoneNumber,
 } from "@/lib/validators";
 import AdminUserService, {
-  getAdminRoleProfile,
   getAdminSupportedRoleOptions,
   getAdminUserErrorMessage,
 } from "@/services/AdminUserService";
@@ -96,7 +95,7 @@ export default function AdminUserUpdate() {
   const [error, setError] = useState("");
   const [isDisabling, setIsDisabling] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
-  const roleOptions = useMemo(() => getAdminSupportedRoleOptions(), []);
+  const [roleOptions, setRoleOptions] = useState([]);
   const selectRoleOptions = useMemo(() => {
     if (!user?.roleKey || roleOptions.some((role) => role.key === user.roleKey)) {
       return roleOptions;
@@ -110,7 +109,28 @@ export default function AdminUserUpdate() {
       ...roleOptions,
     ];
   }, [roleOptions, user]);
-  const permissionProfile = useMemo(() => getAdminRoleProfile(form.roleKey), [form.roleKey]);
+  const permissionProfile = useMemo(
+    () => roleOptions.find((role) => role.key === form.roleKey) || null,
+    [form.roleKey, roleOptions]
+  );
+
+  useEffect(() => {
+    let mounted = true;
+
+    getAdminSupportedRoleOptions()
+      .then((options) => {
+        if (!mounted) return;
+        setRoleOptions(Array.isArray(options) ? options : []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setRoleOptions([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;

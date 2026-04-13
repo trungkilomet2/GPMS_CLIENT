@@ -1,7 +1,10 @@
 import { getAuthItem } from "@/lib/authStorage";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
-const CHAT_API_URL = import.meta.env.VITE_GPMS_AI_CHAT_URL || API_ENDPOINTS.AI.GEMINI_CHAT;
+const CHAT_API_URL =
+  import.meta.env.VITE_GPMS_OPENROUTER_CHAT_URL ||
+  import.meta.env.VITE_GPMS_AI_CHAT_URL ||
+  API_ENDPOINTS.AI.OPENROUTER_CHAT;
 const CHAT_API_KEY = import.meta.env.VITE_GPMS_AI_CHAT_API_KEY || "";
 
 function extractReply(payload) {
@@ -67,7 +70,7 @@ export async function sendGpmsAiPrompt({ message, history, user, pathname, assis
     throw new Error(errorMessage);
   }
 
-  const reply = extractReply(payload);
+  const reply = extractReply(payload) || (typeof rawText === "string" ? rawText.trim() : "");
   if (!reply) {
     throw new Error("API trợ lý AI chưa trả về nội dung phản hồi hợp lệ.");
   }

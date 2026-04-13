@@ -1088,8 +1088,8 @@ export default function ProfileEdit() {
 
               <div style={{ background: T.sand, borderRadius: 10, padding: "1rem", border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: ".6rem" }}>
                 {[
-                  ["📞", "Điện thoại", form.PhoneNumber],
-                  ["📍", "Địa chỉ",    form.Location],
+                  ["SĐT", "Điện thoại", form.PhoneNumber],
+                  ["DC", "Địa chỉ",    form.Location],
                 ].map(([ic, lbl, val]) => (
                   <div key={lbl} style={{ display: "flex", gap: ".65rem", alignItems: "center" }}>
                     <span style={{ width: 28, height: 28, borderRadius: 7, background: T.light, display: "flex", alignItems: "center", justifyContent: "center", fontSize: ".85rem", flexShrink: 0 }}>{ic}</span>
@@ -1106,10 +1106,10 @@ export default function ProfileEdit() {
             {/* Bottom actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: ".75rem" }}>
               {!forceProfileCompletion && (
-                <BtnSecondary onClick={() => navigate("/profile")}>✕ Huỷ bỏ</BtnSecondary>
+                <BtnSecondary onClick={() => navigate("/profile")}>Huỷ bỏ</BtnSecondary>
               )}
               <BtnPrimary type="submit" disabled={saving}>
-                {saving ? "⏳ Đang lưu…" : "💾 Lưu hồ sơ"}
+                {saving ? "Đang lưu..." : "Lưu hồ sơ"}
               </BtnPrimary>
             </div>
           </div>

@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, Link } from "react-router-dom";
+import {
+  ArrowLeft,
+  BarChart3,
+  BriefcaseBusiness,
+  Building2,
+  Clock3,
+  Lock,
+  Package,
+  User,
+} from "lucide-react";
 import { getPostLoginPath } from "@/lib/authRouting";
 import { getStoredUser } from "@/lib/authStorage";
 import { isProfileComplete } from "@/lib/profileCompletion";
@@ -9,6 +19,26 @@ import "../styles/login.css";
 
 const initialValues = { userName: "", password: "" };
 const INVALID_CREDENTIALS_MESSAGE = "Tài khoản hoặc mật khẩu không chính xác";
+const AUTH_FEATURES = [
+  { icon: Clock3, title: "Theo dõi theo thời gian thực", desc: "Nắm tiến độ sản xuất và trạng thái đơn hàng ngay trên một màn hình." },
+  { icon: BriefcaseBusiness, title: "Quản lý nhân sự", desc: "Theo dõi phân công và cập nhật thông tin nhân sự tập trung." },
+  { icon: Package, title: "Quản lý đơn hàng", desc: "Theo dõi đơn hàng từ lúc tiếp nhận đến khi bàn giao." },
+  { icon: BarChart3, title: "Báo cáo rõ ràng", desc: "Tổng hợp số liệu vận hành để dễ kiểm tra và đối chiếu." },
+];
+
+function EyeIcon({ open = false }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M2 12C3.8 8.6 7.4 6.5 12 6.5C16.6 6.5 20.2 8.6 22 12C20.2 15.4 16.6 17.5 12 17.5C7.4 17.5 3.8 15.4 2 12Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+      {!open ? <path d="M4 20L20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /> : null}
+    </svg>
+  );
+}
+
+function BrandMark() {
+  return <Building2 size={22} strokeWidth={2.1} aria-hidden="true" />;
+}
 
 function mapLoginError(err) {
   const status = err?.response?.data?.status ?? err?.status;
@@ -156,29 +186,27 @@ export default function LoginPage() {
       <div className="login-left">
         <div className="left-content">
           <div className="brand">
-            <div className="brand-logo">🏭</div>
+            <div className="brand-logo"><BrandMark /></div>
             <div className="brand-text">
               <h2>GPMS</h2>
               <p>Hệ thống quản lý sản xuất may mặc</p>
             </div>
           </div>
           <h1 className="left-heading">
-            Quản lý sản xuất <br />
-            thông minh
+            Theo dõi sản xuất <br />
+            rõ ràng hơn
           </h1>
-          <p className="left-desc">Tối ưu hóa quy trình sản xuất, theo dõi tiến độ và quản lý nhân sự hiệu quả</p>
+          <p className="left-desc">Đăng nhập để tiếp tục theo dõi đơn hàng, nhân sự và tiến độ vận hành của xưởng trên cùng một hệ thống.</p>
           <div className="features-box">
-            {[
-              { icon:"⏱", title:"Theo dõi thời gian thực", desc:"Giám sát tiến độ sản xuất mọi lúc mọi nơi" },
-              { icon:"👔", title:"Quản lý nhân sự",         desc:"Phân công công việc và theo dõi hiệu suất" },
-              { icon:"📦", title:"Quản lý đơn hàng",        desc:"Theo dõi đơn hàng từ A đến Z" },
-              { icon:"📊", title:"Báo cáo chi tiết",        desc:"Phân tích dữ liệu và tạo báo cáo tự động" },
-            ].map(f => (
-              <div key={f.title} className="feature">
-                <div className="icon">{f.icon}</div>
-                <div><h4>{f.title}</h4><p>{f.desc}</p></div>
+            {AUTH_FEATURES.map((feature) => {
+              const Icon = feature.icon;
+              return (
+              <div key={feature.title} className="feature">
+                <div className="icon"><Icon size={18} strokeWidth={2.1} /></div>
+                <div><h4>{feature.title}</h4><p>{feature.desc}</p></div>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
         <div className="tape" />
@@ -191,12 +219,13 @@ export default function LoginPage() {
             className="auth-back-btn"
             onClick={() => navigate("/home")}
           >
-            ← Về trang chủ
+            <ArrowLeft size={16} />
+            <span>Về trang chủ</span>
           </button>
 
           <div className="login-mobile-hero">
             <div className="login-mobile-hero__brand">
-              <div className="brand-logo">🏭</div>
+              <div className="brand-logo"><BrandMark /></div>
               <div className="brand-text">
                 <h2>GPMS</h2>
                 <p>Quản lý sản xuất may mặc</p>
@@ -212,7 +241,7 @@ export default function LoginPage() {
 
           <label className="field-label">Tên đăng nhập</label>
           <div className="input-wrapper">
-            <span className="input-icon">👤</span>
+            <span className="input-icon"><User size={17} strokeWidth={2} /></span>
             <input type="text" name="userName" value={formData.userName}
               onChange={handleChange} placeholder="Nhập tên đăng nhập"
               className={errors.userName ? "input-error" : ""} />
@@ -223,13 +252,15 @@ export default function LoginPage() {
 
           <label className="field-label">Mật khẩu</label>
           <div className="input-wrapper">
-            <span className="input-icon">🔒</span>
+            <span className="input-icon"><Lock size={17} strokeWidth={2} /></span>
             <input type={showPassword ? "text" : "password"} name="password"
               value={formData.password} onChange={handleChange}
               placeholder="Nhập mật khẩu"
               className={errors.password ? "input-error" : ""} />
             <button type="button" className="eye-btn"
-              onClick={() => setShowPassword(p => !p)}>👁</button>
+              onClick={() => setShowPassword(p => !p)}
+              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+            ><EyeIcon open={showPassword} /></button>
           </div>
           <p className={`error-text error-text--slot ${errors.password ? "" : "error-text--empty"}`}>
             {errors.password || ""}

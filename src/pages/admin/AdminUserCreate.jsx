@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,7 +10,6 @@ import {
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { normalizeSpaces, validateFullName, validatePassword, validateUserName } from "@/lib/validators";
 import AdminUserService, {
-  getAdminRoleProfile,
   getAdminSupportedRoleOptions,
   getAdminUserErrorMessage,
 } from "@/services/AdminUserService";
@@ -31,9 +30,30 @@ export default function AdminUserCreate() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [roleOptions, setRoleOptions] = useState([]);
 
-  const roleOptions = useMemo(() => getAdminSupportedRoleOptions(), []);
-  const permissionProfile = useMemo(() => getAdminRoleProfile(form.roleKey), [form.roleKey]);
+  useEffect(() => {
+    let mounted = true;
+
+    getAdminSupportedRoleOptions()
+      .then((options) => {
+        if (!mounted) return;
+        setRoleOptions(Array.isArray(options) ? options : []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setRoleOptions([]);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const permissionProfile = useMemo(
+    () => roleOptions.find((role) => role.key === form.roleKey) || null,
+    [form.roleKey, roleOptions]
+  );
 
   const handleChange = (field) => (event) => {
     setForm((current) => ({
@@ -165,6 +185,9 @@ export default function AdminUserCreate() {
                     <span className="admin-field__label">Vai trò</span>
                     <ShieldCheck size={18} className="admin-field__icon" />
                     <select value={form.roleKey} onChange={handleChange("roleKey")} className="admin-field__control">
+                      {!roleOptions.length ? (
+                        <option value="">Chưa tải được vai trò từ hệ thống</option>
+                      ) : null}
                       {roleOptions.map((role) => (
                         <option key={role.key} value={role.key}>
                           {role.label}
@@ -204,7 +227,7 @@ export default function AdminUserCreate() {
                   <div className="admin-preview-list__item">
                     <strong>Vai trò được gán</strong>
                     <div className="mt-3">
-                      <AdminRoleBadge tone={permissionProfile?.tone}>{permissionProfile?.label}</AdminRoleBadge>
+                      <AdminRoleBadge tone={permissionProfile?.tone}>{permissionProfile?.label || "Chưa chọn vai trò"}</AdminRoleBadge>
                     </div>
                   </div>
                   <div className="admin-preview-list__item">

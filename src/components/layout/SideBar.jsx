@@ -2,6 +2,7 @@
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
+  Factory,
   BriefcaseBusiness,
   CalendarDays,
   ChartPie,
@@ -19,7 +20,6 @@ import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
 import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -96,10 +96,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
   });
   const isOrdersSection = location.pathname.startsWith("/orders");
   const isProductionSection = location.pathname.startsWith("/production") || location.pathname.includes("/cutting-book");
-  const userRoleLabel = splitRoles(user?.role)
-    .map((role) => getSystemRoleLabel(role))
-    .join(", ");
-
   useEffect(() => {
     try {
       localStorage.setItem("gpms-sidebar-collapsed", JSON.stringify(collapsed));
@@ -120,6 +116,17 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    const shouldLockChat = isMobileViewport && mobileOpen;
+    document.body.classList.toggle("gpms-mobile-menu-open", shouldLockChat);
+
+    return () => {
+      document.body.classList.remove("gpms-mobile-menu-open");
+    };
+  }, [isMobileViewport, mobileOpen]);
+
   const handleLogout = () => {
     authService.logout();
     navigate("/login");
@@ -138,24 +145,26 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
         aria-expanded={isMobileViewport ? mobileOpen : !effectiveCollapsed}
       >
       <div className="dashboard-sidebar__brand">
-        <button
-          type="button"
-          className="dashboard-sidebar__logo"
-          onClick={() => {
-            if (isMobileViewport) return;
-            setCollapsed((prev) => !prev);
-          }}
-          title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
-        >
-          <span className="dashboard-sidebar__logo-mark">GP</span>
-        </button>
+        <div className="dashboard-sidebar__brand-main">
+          <button
+            type="button"
+            className="dashboard-sidebar__logo"
+            onClick={() => {
+              if (isMobileViewport) return;
+              setCollapsed((prev) => !prev);
+            }}
+            title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
+          >
+            <Factory className="dashboard-sidebar__logo-mark" size={22} strokeWidth={2.1} aria-hidden="true" />
+          </button>
 
-        {!effectiveCollapsed && (
-          <div className="dashboard-sidebar__brand-text">
-            <div className="dashboard-sidebar__brand-title">GPMS</div>
-            <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
-          </div>
-        )}
+          {!effectiveCollapsed && (
+            <div className="dashboard-sidebar__brand-text">
+              <div className="dashboard-sidebar__brand-title">GPMS</div>
+              <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
@@ -216,7 +225,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
           {!effectiveCollapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
             </div>
           )}
         </NavLink>
