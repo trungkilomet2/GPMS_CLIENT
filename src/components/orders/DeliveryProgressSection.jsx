@@ -3,6 +3,7 @@ import { Truck, CheckCircle, Clock, Plus, BarChart2, Info, History } from 'lucid
 
 export default function DeliveryProgressSection({
     variants = [],
+    rawOrderSizes = [],
     deliveries = [],
     onAddDelivery,
     isOwner = false,
@@ -11,14 +12,40 @@ export default function DeliveryProgressSection({
 }) {
     const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
     const sizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+    const SIZE_ID_TO_LABEL = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: '2XL', 7: '3XL' };
 
     const [isDiaryOpen, setIsDiaryOpen] = React.useState(false);
 
+    // Helpers for history mapping
+    const getDetailedInfo = (d) => {
+        const osId = d.orderSizeId || d.orderSizeID || d.order_size_id;
+        const os = rawOrderSizes.find(s => String(s.id || s.orderSizeId) === String(osId));
+        
+        if (!os) return { color: d.colorName || d.color || "SP", size: d.sizeName || d.size || "" };
+        
+        let sz = os.sizeName || os.sizeValue;
+        if (!sz && os.sizeId) sz = SIZE_ID_TO_LABEL[os.sizeId];
+        if (!sz && os.size) sz = typeof os.size === 'string' ? os.size : (os.size.sizeName || os.size.sizeValue);
+
+        return {
+            color: os.colorName || os.color || "SP",
+            size: sz || ""
+        };
+    };
+
+    const getStatusLabel = (sId) => {
+        const id = Number(sId);
+        if (id === 1) return "Chờ xác nhận";
+        if (id === 2) return "Đã xác nhận";
+        return "Giao thành công";
+    };
+
     // Helper to check 3 days logic for auto-confirmation
     const isAutoConfirmed = (dateStr) => {
+        if (!dateStr) return false;
         try {
-            const [d, m, y] = dateStr.split('/').map(Number);
-            const deliveryDate = new Date(y, m - 1, d);
+            const deliveryDate = new Date(dateStr);
+            if (isNaN(deliveryDate.getTime())) return false;
             const now = new Date();
             const diffDays = Math.floor((now - deliveryDate) / (1000 * 60 * 60 * 24));
             return diffDays >= 3;
@@ -32,7 +59,7 @@ export default function DeliveryProgressSection({
         return sum + sizeKeys.reduce((sSum, k) => sSum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
     }, 0);
 
-    const totalDelivered = deliveries.reduce((sum, d) => sum + (d.quantity || 0), 0);
+    const totalDelivered = deliveries.reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
     const totalRemaining = Math.max(0, totalOrdered - totalDelivered);
     const overallProgress = totalOrdered > 0 ? Math.round((totalDelivered / totalOrdered) * 100) : 0;
 
@@ -126,9 +153,17 @@ export default function DeliveryProgressSection({
                             const rowOrdered = sizeKeys.reduce((sum, k) => sum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
                             if (rowOrdered === 0) return null;
 
+                            // Calculate row delivery based on color OR orderSizeIds in this row
+                            // First, identify all orderSizeIds in this row if possible
+                            // For simplicity, we keep color-based grouping if that's what's in 'v'
                             const rowDelivered = deliveries
-                                .filter(d => d.color === v.color)
-                                .reduce((sum, d) => sum + (d.quantity || 0), 0);
+                                .filter(d => 
+                                    // Match by color (legacy/ui model)
+                                    d.color === v.color ||
+                                    // Match by orderSizeId if it exists in any of the sizes of this variant row
+                                    (d.orderSizeId && v.orderSizes && v.orderSizes.some(os => String(os.id) === String(d.orderSizeId)))
+                                )
+                                .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
 
                             const rowProgress = Math.round((rowDelivered / rowOrdered) * 100);
 
@@ -141,9 +176,19 @@ export default function DeliveryProgressSection({
                                     </div>
                                     {sizeKeys.map(k => {
                                         const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
+                                        
+                                        // Find the specific orderSizeId for this color/size back in the raw data if available
+                                        // But 'v' is already flattened. We need to match precisely.
                                         const delivered = deliveries
-                                            .filter(d => d.color === v.color && d.size?.toLowerCase() === k)
-                                            .reduce((sum, d) => sum + (d.quantity || 0), 0);
+                                            .filter(d => {
+                                                // Legacy match
+                                                const matchesLegacy = d.color === v.color && d.size?.toLowerCase() === k;
+                                                // New API match (if we had the ID mapped to the matrix cell)
+                                                // Since we don't have IDs here easily, we fallback to legacy logic for matrix UI
+                                                // or hope the backend delivery object has color/size
+                                                return matchesLegacy || (d.colorName === v.color && d.sizeName?.toLowerCase() === k);
+                                            })
+                                            .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
 
                                         const cellProgress = ordered > 0 ? (delivered / ordered) * 100 : 0;
 
@@ -228,8 +273,14 @@ export default function DeliveryProgressSection({
                             <div className="relative pl-8 space-y-6 before:content-[''] before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-px before:bg-gray-200/60">
                                 {deliveries.slice().reverse().map((d, i) => {
                                     const originalIdx = deliveries.length - 1 - i;
-                                    const autoConfirmed = isAutoConfirmed(d.date);
-                                    const confirmed = d.isConfirmed || autoConfirmed;
+                                    const { color, size } = getDetailedInfo(d);
+                                    const dateStr = d.deliveredAt || d.receivedDate || d.date || "";
+                                    const autoConfirmed = isAutoConfirmed(dateStr);
+                                    const confirmed = d.isConfirmed || autoConfirmed || String(d.deliverStatusId) === "2";
+                                    
+                                    const qtyDisp = d.deliverQuantity || d.quantity || 0;
+                                    const statusLabel = d.deliverStatusName || getStatusLabel(d.deliverStatusId);
+
                                     return (
                                         <div key={i} className="relative group">
                                             <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${confirmed ? 'bg-[#1e6e43]' : 'bg-amber-400'}`} />
@@ -238,16 +289,16 @@ export default function DeliveryProgressSection({
                                                     <div className="space-y-4 flex-1">
                                                         <div className="flex items-center gap-4">
                                                             <div className="px-3 py-1 bg-[#f0f9f4] rounded-lg border border-[#d4e3da]/30">
-                                                                <span className="text-[10px] font-black text-[#1e6e43] uppercase">{d.color} — {d.size?.toUpperCase()}</span>
+                                                                <span className="text-[10px] font-black text-[#1e6e43] uppercase">{color} {size && `— ${size}`}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                                                <span>{d.date}</span>
+                                                                <span>{dateStr.replace('T', ' ').slice(0, 16)}</span>
                                                                 <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                                                <span className="text-gray-900 font-black">+{d.quantity} SP</span>
+                                                                <span className="text-gray-900 font-black">+{qtyDisp} SP</span>
                                                             </div>
                                                         </div>
-                                                        <div className="bg-gray-50/50 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-600 font-medium leading-relaxed italic">
-                                                            "{d.note || 'Không có ghi chú nào cho đợt giao này.'}"
+                                                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                                            Trạng thái: <span className={confirmed ? "text-emerald-600" : "text-amber-500"}>{statusLabel}</span>
                                                         </div>
                                                     </div>
                                                     <div className="flex flex-col items-end gap-2">

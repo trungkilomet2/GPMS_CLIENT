@@ -12,9 +12,10 @@ import MaterialsTable from '@/components/orders/MaterialsTable';
 import CustomerInfoCard from '@/components/orders/CustomerInfoCard';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
 import { formatOrderDate } from '@/lib/orders/formatters';
-import { getOrderCustomerId } from '@/lib/orders/customerInfo';
+import { getOrderCustomerId, getOrderCustomerInfo } from '@/lib/orders/customerInfo';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
+import ProductionPartService from '@/services/ProductionPartService';
 import { userService } from '@/services/userService';
 import { getStoredUser } from '@/lib/authStorage';
 import DeliveryProgressSection from '@/components/orders/DeliveryProgressSection';
@@ -65,7 +66,6 @@ export default function OrderDetail() {
     const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
     const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
     const [pendingStatus, setPendingStatus] = useState('');
-    const [customerProfile, setCustomerProfile] = useState(null);
     const [showDenyConfirm, setShowDenyConfirm] = useState(false);
     const [denyLoading, setDenyLoading] = useState(false);
     const [denyError, setDenyError] = useState(null);
@@ -77,11 +77,9 @@ export default function OrderDetail() {
     const [isCheckingProduction, setIsCheckingProduction] = useState(false);
     const [isRecordDeliveryModalOpen, setIsRecordDeliveryModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('specification'); // specification, delivery, materials
-    const [deliveries, setDeliveries] = useState([
-        { color: 'Đỏ Đô', size: 'M', quantity: 15, date: '08/04/2026', note: 'Đợt giao đầu tiên - Đã tự động xác nhận sau 3 ngày', isConfirmed: false },
-        { color: 'Đỏ Đô', size: 'L', quantity: 20, date: '10/04/2026', note: 'Đợt giao thứ 2 - Đã được khách xác nhận thủ công', isConfirmed: true },
-        { color: 'Xám Khói', size: 'XL', quantity: 10, date: '12/04/2026', note: 'Đợt vừa giao hôm nay - Đang chờ xác nhận', isConfirmed: false },
-    ]);
+    const [deliveries, setDeliveries] = useState([]);
+    const [criticalIssues, setCriticalIssues] = useState([]);
+    const [linkedProductionId, setLinkedProductionId] = useState(null);
 
     const user = getStoredUser();
     const roles = splitRoles(user?.role);
@@ -96,7 +94,24 @@ export default function OrderDetail() {
             setLoading(true);
             const response = await OrderService.getOrderDetail(id);
             console.log('Order Detail Response:', response);
-            setOrder(response.data.data || response.data);
+            const orderData = response.data.data || response.data;
+            setOrder(orderData);
+            
+            // 1. First try fetching from dedicated delivery history API
+            try {
+                const deliveryRes = await ProductionPartService.getDeliveryHistory(id);
+                const apiDeliveries = deliveryRes.data.data || deliveryRes.data || [];
+                setDeliveries(apiDeliveries);
+            } catch (delErr) {
+                console.warn('Could not fetch dedicated delivery history, falling back to order object:', delErr);
+                // 2. Fallback to extracting from order object
+                const fallbackDeliveries = 
+                    orderData.orderDeliveries || 
+                    orderData.deliveries || 
+                    orderData.order_details?.flatMap(d => d.deliveries || []) || [];
+                setDeliveries(fallbackDeliveries);
+            }
+            
             setError(null);
         } catch (err) {
             console.error('Lỗi khi tải chi tiết đơn hàng:', err.response?.data || err.message);
@@ -111,25 +126,6 @@ export default function OrderDetail() {
         if (id) fetchOrderDetail();
     }, [id]);
 
-    useEffect(() => {
-        let isMounted = true;
-        const loadCustomerProfile = async () => {
-            const customerId = getOrderCustomerId(order);
-            if (!canModerate || !customerId) {
-                if (isMounted) setCustomerProfile(null);
-                return;
-            }
-            try {
-                const profile = await userService.getProfileById(customerId);
-                if (isMounted) setCustomerProfile(profile || null);
-            } catch (err) {
-                if (isMounted) setCustomerProfile(null);
-                console.error('Không thể tải hồ sơ khách hàng:', err);
-            }
-        };
-        loadCustomerProfile();
-        return () => { isMounted = false; };
-    }, [order, canModerate]);
 
     useEffect(() => {
         let isMounted = true;
@@ -176,7 +172,13 @@ export default function OrderDetail() {
                     const normalizedProdStatus = getProductionStatusLabel(statusVal);
                     return String(oid) === String(orderId) && normalizedProdStatus !== 'Từ Chối';
                 });
-                if (isMounted) setHasProduction(exists);
+                if (isMounted) {
+                    setHasProduction(exists);
+                    if (exists) {
+                        const found = list.find(item => String(item?.order?.id ?? item?.orderId) === String(orderId));
+                        setLinkedProductionId(found?.productionId ?? found?.id);
+                    }
+                }
             } catch (err) {
                 console.error('Error checking existing production:', err);
             } finally {
@@ -186,6 +188,28 @@ export default function OrderDetail() {
         checkExistingProduction();
         return () => { isMounted = false; };
     }, [order?.id, id]);
+
+    useEffect(() => {
+        if (!linkedProductionId) return;
+        const fetchIssues = async () => {
+            try {
+                const response = await ProductionService.getProductionIssues(linkedProductionId);
+                const allIssues = response?.data?.data ?? response?.data ?? [];
+                // ONLY filter issues that are confirmed as "UNFIXABLE" (Status 4)
+                const unfixable = allIssues.filter(issue => 
+                    String(issue.status) === "4" && 
+                    issue.quantity > 0
+                );
+                setCriticalIssues(unfixable);
+            } catch (err) {
+                console.error('Error fetching production issues:', err);
+            }
+        };
+        fetchIssues();
+    }, [linkedProductionId]);
+
+    const workshopErrorQuantity = criticalIssues.reduce((sum, issue) => sum + (issue.quantity || 0), 0);
+    const finalQuantity = Math.max(0, (order?.quantity || 0) - workshopErrorQuantity);
 
     // --- DERIVED CONSTANTS ---
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
@@ -405,10 +429,61 @@ export default function OrderDetail() {
                         <div className="lg:col-span-2 space-y-8">
 
                             {activeTab === 'specification' && (
-                                <OrderSpecificationCard
-                                    order={order}
-                                    onImageClick={(url) => { setZoomImageUrl(url); setIsImageModalOpen(true); }}
-                                />
+                                <div className="space-y-8">
+                                    <OrderSpecificationCard
+                                        order={order}
+                                        onImageClick={(url) => { setZoomImageUrl(url); setIsImageModalOpen(true); }}
+                                    />
+
+                                    {/* Workshop Quality Summary for Customer & Owner */}
+                                    {hasProduction && (
+                                        <div className="bg-[#f0f9f4] border border-[#d4e3da] rounded-2xl p-8 relative overflow-hidden group transition-all hover:bg-[#e8f4ec]">
+                                            <div className="absolute top-0 right-0 p-8 text-[#1e6e43]/10 group-hover:scale-110 transition-transform">
+                                                <AlertCircle size={80} />
+                                            </div>
+                                            <div className="relative z-10 space-y-6">
+                                                <div>
+                                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#1e6e43] mb-1">Kiểm soát chất lượng xưởng</h3>
+                                                    <p className="text-xl font-black text-gray-900 tracking-tight uppercase">Tóm tắt sản lượng thực tế</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                                    <div className="space-y-1">
+                                                        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Tổng đặt hàng</p>
+                                                        <p className="text-3xl font-black text-gray-900">{order?.quantity?.toLocaleString()} <span className="text-xs text-gray-400">SP</span></p>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest">Lỗi xưởng khấu trừ</p>
+                                                        <p className="text-3xl font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <span className="text-xs text-rose-300">SP</span></p>
+                                                        {workshopErrorQuantity > 0 && (
+                                                            <p className="text-[8px] font-bold text-rose-400 italic font-sans italic">* Phẩn phẩm bị lỗi nghiêm trọng không đủ điều kiện giao hàng</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-[9px] font-bold text-[#1e6e43] uppercase tracking-widest">Thực giao dự kiến</p>
+                                                        <p className="text-3xl font-black text-[#1e6e43]">{finalQuantity.toLocaleString()} <span className="text-xs text-[#1e6e43]/40">SP</span></p>
+                                                    </div>
+                                                </div>
+
+                                                {criticalIssues.length > 0 && (
+                                                    <div className="pt-6 border-t border-[#1e6e43]/10">
+                                                        <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                            <AlertTriangle size={12} /> Chi tiết lỗi không thể khắc phục:
+                                                        </p>
+                                                        <div className="space-y-2">
+                                                            {criticalIssues.map((issue, idx) => (
+                                                                <div key={idx} className="flex items-center justify-between text-[11px] font-bold text-gray-600 bg-rose-50/30 p-2 rounded-lg border border-rose-100">
+                                                                    <span>{issue.title || issue.description}</span>
+                                                                    <span className="text-rose-600">-{issue.quantity} SP</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             )}
 
                             {activeTab === 'delivery' && (
@@ -416,6 +491,15 @@ export default function OrderDetail() {
                                     <div className="bg-white rounded-xl border border-black shadow-sm p-4">
                                         <DeliveryProgressSection
                                             variants={processedVariants}
+                                            rawOrderSizes={
+                                                order.orderSizes || 
+                                                order.orderSize || 
+                                                order.sizes || 
+                                                order.orderDetails || 
+                                                order.orderDetailsList || 
+                                                order.order_details || 
+                                                []
+                                            }
                                             deliveries={deliveries}
                                             isOwner={isOwner || canModerate}
                                             isCustomer={isCustomer}
@@ -454,9 +538,12 @@ export default function OrderDetail() {
 
                         <div className="space-y-8">
                             <div className="rounded-xl border border-black bg-white shadow-sm p-8 space-y-8 sticky top-8">
-                                {canModerate && (customerProfile || order?.guest || order?.guestName || order?.customerName) && (
+                                {canModerate && (order?.userFullName || order?.userPhone || order?.userLocation) && (
                                     <div className="pb-8 border-b border-black">
-                                        <CustomerInfoCard order={order} profile={customerProfile} />
+                                        <CustomerInfoCard
+                                            order={order}
+                                            className="p-0 border-none bg-transparent shadow-none"
+                                        />
                                     </div>
                                 )}
                                 <div className="space-y-6">
@@ -549,12 +636,22 @@ export default function OrderDetail() {
             <RecordDeliveryModal
                 isOpen={isRecordDeliveryModalOpen}
                 onClose={() => setIsRecordDeliveryModalOpen(false)}
-                variants={processedVariants}
+                orderId={order.id}
+                variants={
+                    order.orderSizes || 
+                    order.orderSize || 
+                    order.sizes || 
+                    order.size || 
+                    order.orderDetails || 
+                    order.orderDetailsList || 
+                    order.order_details || 
+                    order.variants || 
+                    order.variantMatrix ||
+                    order.items || 
+                    []
+                }
                 deliveries={deliveries}
-                onSubmit={(news) => {
-                    setDeliveries(prev => [...prev, ...news]);
-                    toast.success("Đã ghi nhận đợt giao hàng!");
-                }}
+                onRefresh={fetchOrderDetail}
             />
         </OwnerLayout >
     );

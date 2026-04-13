@@ -184,6 +184,7 @@ export default function ProductionPlanDetail() {
 
         const steps = partList.map((part) => ({
           partId: part?.id ?? part?.partId ?? null,
+          partOrderSizeId: part?.partOrderSizeId ?? part?.id ?? null,
           partName: part?.name ?? part?.partName ?? part?.title ?? "-",
           cpu: part?.cpu ?? part?.unitPrice ?? part?.price ?? 0,
           startDate: part?.startDate ?? part?.planStartDate ?? "-",
@@ -314,7 +315,7 @@ export default function ProductionPlanDetail() {
     }
 
     try {
-      const res = await ProductionPartService.getWorkLogs(row.partId);
+      const res = await ProductionPartService.getWorkLogs(row.partId, row.partOrderSizeId);
       const logs = res?.data?.data || res?.data || [];
       if (!Array.isArray(logs) || logs.length === 0) {
         toast.info("Công đoạn này chưa có báo cáo sản lượng, không thể báo cáo lỗi.");

@@ -147,14 +147,7 @@ export default function Orders({
           if (recordCount != null && allItems.length >= recordCount) break;
           pageIndex += 1;
         }
-        const mockOrders = [
-          { id: 101, orderName: 'Áo sơ mi nam công sở', quantity: 150, size: 'M/L', color: 'Trắng/Xanh', endDate: '2026-04-20', status: 'Approved' },
-          { id: 102, orderName: 'Quần tây Âu premium', quantity: 200, size: '30/32/34', color: 'Đen', endDate: '2026-04-25', status: 'Pending' },
-          { id: 103, orderName: 'Váy midi hoa nhí', quantity: 80, size: 'S/M', color: 'Hồng/Vàng', endDate: '2026-04-15', status: 'Completed' },
-          { id: 104, orderName: 'Áo khoác gió thể thao', quantity: 120, size: 'L/XL', color: 'Xanh Navy', endDate: '2026-04-30', status: 'Rejected' },
-        ];
-
-        const finalOrders = (allItems.length > 0 ? allItems : mockOrders).map((o, idx) => {
+        const finalOrders = allItems.map((o, idx) => {
           const id = o.id || o.orderId || `tmp-${idx}`;
 
           // Nuclear safety: extract string/number from any value

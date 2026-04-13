@@ -21,6 +21,7 @@ export const getOrderCustomerId = (order) => {
 
 export const getOrderCustomerInfo = (order, profile = null) => ({
   name: pickFirstNonEmpty(
+    order?.userFullName,
     profile?.fullName,
     profile?.name,
     order?.guest?.fullName,
@@ -32,6 +33,7 @@ export const getOrderCustomerInfo = (order, profile = null) => ({
     order?.user?.name
   ),
   phone: pickFirstNonEmpty(
+    order?.userPhone,
     profile?.phoneNumber,
     profile?.phone,
     order?.guest?.phoneNumber,
@@ -43,6 +45,7 @@ export const getOrderCustomerInfo = (order, profile = null) => ({
     order?.user?.phone
   ),
   address: pickFirstNonEmpty(
+    order?.userLocation,
     profile?.location,
     profile?.address,
     order?.guest?.address,

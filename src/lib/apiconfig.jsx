@@ -69,13 +69,17 @@ export const API_ENDPOINTS = {
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
     UPDATE_ASSIGN_WORKERS: (partId, partOrderSizeId) =>
       `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${partId}/${partOrderSizeId}`,
-    CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
-    UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
+    CREATE_WORK_LOGS: (partId, partOrderSizeId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}/${partOrderSizeId}`,
+    UPDATE_WORK_LOGS: (partId, partOrderSizeId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${partOrderSizeId}/${logId}`,
     GET_WORK_LOGS: (partId, partOrderSizeId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}/${partOrderSizeId}`,
+    DELETE_WORK_LOGS: (logId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${logId}`,
+    APPROVE_WORK_LOG: (partId, partOrderSizeId, logId) => `${BASE_URL}/api/ProductionPart/parts/approve-work-log/${partId}/${partOrderSizeId}/${logId}`,
     CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/create/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
     COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
+    GET_PRODUCTION_WORK_LOGS: (productionId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${productionId}`,
+    RECORD_DELIVERY: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/${orderId}`,
   },
 
   CUTTING_NOTEBOOK: {

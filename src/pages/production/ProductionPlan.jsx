@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical, Save, LogOut, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical, Save, LogOut, CheckCircle, Info } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
@@ -1276,7 +1276,13 @@ export default function ProductionPlan() {
             <div className="px-6 py-4 border-b border-black flex items-center justify-between bg-emerald-50/20">
               <div>
                 <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Danh sách công đoạn</h2>
-                <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest mt-1">Quản lý định mức nhân công cho từng bước sản xuất.</p>
+                <div className="flex flex-col gap-1 mt-1">
+                  <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest">Quản lý định mức nhân công cho từng bước sản xuất.</p>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+                    <Info size={12} className="text-blue-600" />
+                    Lưu ý: Công đoạn cuối cùng là công đoạn hoàn thành sản phẩm.
+                  </p>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -1334,7 +1340,14 @@ export default function ProductionPlan() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-[13px] font-black text-black uppercase tracking-tight">{row.partName || "-"}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-black text-black uppercase tracking-tight">{row.partName || "-"}</span>
+                          {idx === rows.length - 1 && rows.length > 0 && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-[9px] font-black text-blue-600 uppercase shadow-sm">
+                              <CheckCircle size={10} strokeWidth={3} /> Công đoạn hoàn tất
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span className="text-[13px] font-mono font-black text-black">
@@ -1441,6 +1454,14 @@ export default function ProductionPlan() {
                 </p>
               </div>
             )}
+            <div className="px-5 pt-2">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                 <Info size={14} className="text-blue-600 flex-shrink-0" />
+                 <p className="text-[10px] font-bold text-blue-700 uppercase leading-relaxed">
+                   Hệ thống sẽ tính công đoạn nằm cuối danh sách là bước hoàn thành sản phẩm.
+                 </p>
+              </div>
+            </div>
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-500 uppercase">Tên công đoạn</label>

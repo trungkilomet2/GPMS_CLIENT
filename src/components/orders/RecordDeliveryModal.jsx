@@ -1,39 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Edit3, Truck, CheckCircle } from 'lucide-react';
+import { X, Calendar, Edit3, Truck, CheckCircle, Loader2, Info } from 'lucide-react';
+import ProductionPartService from '@/services/ProductionPartService';
+import { toast } from 'react-toastify';
 
-export default function RecordDeliveryModal({ isOpen, onClose, variants = [], deliveries = [], onSubmit }) {
+export default function RecordDeliveryModal({ isOpen, onClose, orderId, variants = [], deliveries = [], onRefresh }) {
     const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-    const [note, setNote] = useState('');
     const [items, setItems] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        if (isOpen && variants.length > 0) {
-            // Initialize items based on remaining quantities
-            const activeItems = [];
-            variants.forEach(v => {
-                const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
-                sizeKeys.forEach(size => {
-                    const ordered = Number(v[size] || v[size.toUpperCase()] || 0);
-                    if (ordered > 0) {
-                        const delivered = deliveries
-                            .filter(d => d.color === v.color && d.size?.toLowerCase() === size)
-                            .reduce((sum, d) => sum + (d.quantity || 0), 0);
-                        
-                        const remaining = Math.max(0, ordered - delivered);
-                        if (remaining > 0) {
-                            activeItems.push({
-                                color: v.color,
-                                colorCode: v.colorCode,
-                                size: size.toUpperCase(),
-                                totalOrdered: ordered,
-                                alreadyDelivered: delivered,
-                                remaining: remaining,
-                                quantity: 0 // User input
-                            });
-                        }
-                    }
-                });
-            });
+        if (isOpen && variants && variants.length > 0) {
+            const SIZE_ID_TO_LABEL = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: '2XL', 7: '3XL' };
+
+            const activeItems = variants.map(v => {
+                const ordered = Number(v.quantity || v.amount || v.qty || 0);
+                const itemSizeId = v.id || v.orderSizeId || v.orderSizeID || v.order_size_id;
+                
+                // Get size display name
+                let sizeDisp = v.sizeName || v.sizeValue || v.sizeValueName;
+                if (!sizeDisp && v.size) {
+                    sizeDisp = typeof v.size === 'string' ? v.size : (v.size.sizeName || v.size.sizeValue);
+                }
+                if (!sizeDisp && v.sizeId) {
+                    sizeDisp = SIZE_ID_TO_LABEL[v.sizeId];
+                }
+                if (!sizeDisp && v.orderSize && v.orderSize.size) {
+                     sizeDisp = v.orderSize.size.sizeName || v.orderSize.size.sizeValue;
+                }
+                
+                // Calculate already delivered for this specific orderSizeId
+                const delivered = (deliveries || [])
+                    .filter(d => {
+                        const dId = d.orderSizeId || d.orderSizeID || d.order_size_id;
+                        return String(dId) === String(itemSizeId);
+                    })
+                    .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
+                
+                const remaining = Math.max(0, ordered - delivered);
+                
+                return {
+                    id: itemSizeId,
+                    color: v.colorName || v.color || v.colorCode || 'Mặc định',
+                    colorCode: v.colorCode || '#cbd5e1',
+                    size: sizeDisp || '-',
+                    totalOrdered: ordered,
+                    alreadyDelivered: delivered,
+                    remaining: remaining,
+                    quantity: 0 // User input for this batch
+                };
+            }).filter(item => item.totalOrdered > 0 && item.id);
+
             setItems(activeItems);
         }
     }, [isOpen, variants, deliveries]);
@@ -41,32 +57,46 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
     if (!isOpen) return null;
 
     const handleQtyChange = (index, value) => {
-        const newQty = Math.max(0, Math.min(items[index].remaining, Number(value) || 0));
+        const val = Number(value);
+        if (isNaN(val)) return;
+        const newQty = Math.max(0, Math.min(items[index].remaining, val));
         const newItems = [...items];
         newItems[index].quantity = newQty;
         setItems(newItems);
     };
 
-    const totalThisBatch = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalThisBatch = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
-    const handleSubmit = () => {
-        const deliveryData = items
+    const handleSubmit = async () => {
+        const deliveryDetails = items
             .filter(item => item.quantity > 0)
             .map(item => ({
-                color: item.color,
-                size: item.size,
-                quantity: item.quantity,
-                date: deliveryDate,
-                note: note
+                orderSizeId: item.id,
+                deliverQuantity: item.quantity,
+                deliverStatusId: 1 // Default status for new delivery
             }));
         
-        if (deliveryData.length === 0) {
-            alert('Vui lòng nhập số lượng giao ít nhất cho một sản phẩm.');
+        if (deliveryDetails.length === 0) {
+            toast.warn('Vui lòng nhập số lượng giao ít nhất cho một sản phẩm.');
             return;
         }
-        
-        onSubmit(deliveryData);
-        onClose();
+
+        const payload = {
+            deliveries: deliveryDetails
+        };
+
+        try {
+            setIsSubmitting(true);
+            await ProductionPartService.recordDelivery(orderId, payload);
+            toast.success('Đã ghi nhận đợt giao hàng thành công!');
+            if (onRefresh) onRefresh();
+            onClose();
+        } catch (err) {
+            console.error('Delivery Error:', err);
+            toast.error(err.response?.data?.message || 'Không thể ghi nhận giao hàng.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -122,7 +152,7 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-slate-50">
-                                    {items.map((item, idx) => (
+                                    {items.length > 0 ? items.map((item, idx) => (
                                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -148,21 +178,24 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                                                 />
                                             </td>
                                         </tr>
-                                    ))}
+                                    )) : (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-20 text-center">
+                                                <div className="flex flex-col items-center gap-4 text-slate-400">
+                                                    <Info size={40} className="opacity-20" />
+                                                    <p className="text-sm font-bold uppercase tracking-widest italic">
+                                                        Không tìm thấy dữ liệu biến thể sản phẩm để giao hàng.
+                                                    </p>
+                                                    <p className="text-[10px] font-medium max-w-xs">
+                                                        Vui lòng kiểm tra lại cấu trúc đơn hàng hoặc liên hệ quản trị viên.
+                                                    </p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-
-                    {/* Note */}
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Ghi chú</label>
-                        <textarea 
-                            value={note}
-                            onChange={(e) => setNote(e.target.value)}
-                            placeholder="Thông tin bổ sung đợt giao..."
-                            className="w-full h-24 p-6 rounded-xl bg-slate-50 border border-slate-100 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e6e43]/20 resize-none placeholder:text-gray-400"
-                        />
                     </div>
                 </div>
 
@@ -180,10 +213,11 @@ export default function RecordDeliveryModal({ isOpen, onClose, variants = [], de
                         </button>
                         <button 
                             onClick={handleSubmit}
-                            className="flex items-center gap-3 px-10 py-4 bg-[#1e6e43] text-white rounded-xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-green-100/50 transition-all hover:bg-[#155232] hover:-translate-y-0.5"
+                            disabled={isSubmitting}
+                            className={`flex items-center gap-3 px-10 py-4 bg-[#1e6e43] text-white rounded-xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-green-100/50 transition-all ${isSubmitting ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[#155232] hover:-translate-y-0.5'}`}
                         >
-                            <CheckCircle size={18} />
-                            Xác nhận giao hàng
+                            {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle size={18} />}
+                            {isSubmitting ? 'Đang gửi...' : 'Xác nhận giao hàng'}
                         </button>
                     </div>
                 </div>

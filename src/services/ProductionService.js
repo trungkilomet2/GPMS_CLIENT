@@ -47,6 +47,10 @@ const ProductionService = {
   completeProduction(id, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION.COMPLETE(id), payload);
   },
+  updateIssueStatus(issueId, payload) {
+    // Format payload as { status: number, note?: string }
+    return axiosClient.patch(`${API_ENDPOINTS.PRODUCTION.ISSUES}/${issueId}/status`, payload);
+  },
 };
 
 export default ProductionService;

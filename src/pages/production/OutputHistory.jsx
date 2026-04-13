@@ -76,7 +76,7 @@ export default function OutputHistory() {
             await Promise.all(
               partsList.map(async (part) => {
                 try {
-                  const logsRes = await ProductionPartService.getWorkLogs(part.id);
+                  const logsRes = await ProductionPartService.getWorkLogs(part.id, part.partOrderSizeId);
                   const logs = logsRes?.data?.data ?? logsRes?.data ?? [];
                   logs.forEach(log => {
                     const logId = log.id || log.workLogId || log.wlId;
@@ -271,8 +271,8 @@ export default function OutputHistory() {
                   </div>
                   <div className="relative">
                     <div className="flex items-center justify-between mb-2">
-                       <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Ngày báo cáo</span>
-                       <label className="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-tight cursor-pointer">
+                      <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Ngày báo cáo</span>
+                      <label className="flex items-center gap-2 text-[11px] font-bold text-slate-500 uppercase tracking-tight cursor-pointer">
                         <input
                           type="checkbox"
                           checked={allDates}
@@ -306,95 +306,95 @@ export default function OutputHistory() {
               </div>
 
               <div className="leave-table-card overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-xl shadow-slate-100/50">
-              <div className="leave-table-card__header">
-                <div>
-                  <h2 className="leave-table-card__title">Danh sách báo cáo</h2>
-                  <p className="leave-table-card__subtitle">Theo dõi sản lượng theo ngày và thợ thực hiện.</p>
+                <div className="leave-table-card__header">
+                  <div>
+                    <h2 className="leave-table-card__title">Danh sách báo cáo</h2>
+                    <p className="leave-table-card__subtitle">Theo dõi sản lượng theo ngày và thợ thực hiện.</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <ClipboardCheck size={16} />
+                    <span className="text-xs font-semibold uppercase">Tổng: {filtered.length}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-slate-500">
-                  <ClipboardCheck size={16} />
-                  <span className="text-xs font-semibold uppercase">Tổng: {filtered.length}</span>
-                </div>
-              </div>
-              <div className="overflow-x-auto scrollbar-hide">
-                <table className="w-full min-w-[800px] border-separate border-spacing-0 text-sm">
-                  <thead>
-                    <tr className="bg-slate-50/80">
-                      <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">STT</th>
-                      <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Đơn sản xuất</th>
-                      <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Sản phẩm / Đơn hàng</th>
-                      <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Công đoạn thực hiện</th>
-                      {primaryRole !== "worker" && <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Thợ</th>}
-                      <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">Đơn giá</th>
-                      <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">SL</th>
-                      <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">Ngày ghi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={primaryRole === "worker" ? 7 : 8} className="py-24 text-center">
-                          <div className="flex flex-col items-center justify-center gap-3">
-                            <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
-                            <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
-                          </div>
-                        </td>
+                <div className="overflow-x-auto scrollbar-hide">
+                  <table className="w-full min-w-[800px] border-separate border-spacing-0 text-sm">
+                    <thead>
+                      <tr className="bg-slate-50/80">
+                        <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">STT</th>
+                        <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Đơn sản xuất</th>
+                        <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Sản phẩm / Đơn hàng</th>
+                        <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Công đoạn thực hiện</th>
+                        {primaryRole !== "worker" && <th className="border-b border-slate-100 px-4 py-5 text-left font-bold uppercase tracking-widest text-slate-400 text-[10px]">Thợ</th>}
+                        <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">Đơn giá</th>
+                        <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">SL</th>
+                        <th className="border-b border-slate-100 px-4 py-5 text-center font-bold uppercase tracking-widest text-slate-400 text-[10px]">Ngày ghi</th>
                       </tr>
-                    ) : filtered.length === 0 ? (
-                      <tr>
-                        <td colSpan={primaryRole === "worker" ? 7 : 8} className="py-24 text-center">
-                          <div className="flex flex-col items-center justify-center gap-3">
-                            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
-                              <ClipboardCheck size={32} />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-800">Không có dữ liệu phù hợp</p>
-                              <p className="text-xs text-slate-400 mt-1">Hãy thử thay đổi bộ lọc hoặc tìm kiếm theo từ khóa khác.</p>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      pageItems.map((item, index) => (
-                        <tr key={item.id} className="group hover:bg-slate-50/80 transition-all duration-200">
-                          <td className="border-b border-slate-100 px-4 py-5 text-center text-slate-400 font-bold tracking-tighter italic text-xs">{(currentPage - 1) * pageSize + index + 1}</td>
-                          <td className="border-b border-slate-100 px-4 py-5 font-black text-slate-900 tracking-tight text-xs uppercase">
-                            #PR-{item.productionId}
-                          </td>
-                          <td className="border-b border-slate-100 px-4 py-5">
-                            <div className="font-extrabold text-slate-700 line-clamp-1 text-sm">{item.orderName}</div>
-                            {item.orderId && <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1 opacity-60">ID: {item.orderId}</div>}
-                          </td>
-                          <td className="border-b border-slate-100 px-4 py-5 text-slate-600 font-bold text-sm tracking-tight">{item.partName}</td>
-                          {primaryRole !== "worker" && (
-                            <td className="border-b border-slate-100 px-4 py-5">
-                              <span className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                {item.workerName}
-                              </span>
-                            </td>
-                          )}
-                          <td className="border-b border-slate-100 px-4 py-5 text-center">
-                            <span className="font-bold text-slate-900 text-sm">
-                              {Number(item.cpu).toLocaleString("vi-VN")} <span className="text-[10px] text-slate-400 font-black ml-0.5">đ</span>
-                            </span>
-                          </td>
-                          <td className="border-b border-slate-100 px-4 py-5 text-center">
-                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50/50 border border-emerald-100 font-black text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-200 transition-all duration-300 transform group-hover:scale-110">
-                              {item.quantity}
-                            </span>
-                          </td>
-                          <td className="border-b border-slate-100 px-4 py-5 text-center text-slate-400 font-bold">
-                            <div className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-wider">
-                              <Calendar size={13} className="text-slate-300" />
-                              {item.reportDate}
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={primaryRole === "worker" ? 7 : 8} className="py-24 text-center">
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              <Loader2 className="h-10 w-10 animate-spin text-emerald-600" />
+                              <p className="text-slate-500 font-medium">Đang tải dữ liệu...</p>
                             </div>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                      ) : filtered.length === 0 ? (
+                        <tr>
+                          <td colSpan={primaryRole === "worker" ? 7 : 8} className="py-24 text-center">
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
+                                <ClipboardCheck size={32} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-800">Không có dữ liệu phù hợp</p>
+                                <p className="text-xs text-slate-400 mt-1">Hãy thử thay đổi bộ lọc hoặc tìm kiếm theo từ khóa khác.</p>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        pageItems.map((item, index) => (
+                          <tr key={item.id} className="group hover:bg-slate-50/80 transition-all duration-200">
+                            <td className="border-b border-slate-100 px-4 py-5 text-center text-slate-400 font-bold tracking-tighter italic text-xs">{(currentPage - 1) * pageSize + index + 1}</td>
+                            <td className="border-b border-slate-100 px-4 py-5 font-black text-slate-900 tracking-tight text-xs uppercase">
+                              #PR-{item.productionId}
+                            </td>
+                            <td className="border-b border-slate-100 px-4 py-5">
+                              <div className="font-extrabold text-slate-700 line-clamp-1 text-sm">{item.orderName}</div>
+                              {item.orderId && <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1 opacity-60">ID: {item.orderId}</div>}
+                            </td>
+                            <td className="border-b border-slate-100 px-4 py-5 text-slate-600 font-bold text-sm tracking-tight">{item.partName}</td>
+                            {primaryRole !== "worker" && (
+                              <td className="border-b border-slate-100 px-4 py-5">
+                                <span className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                                  {item.workerName}
+                                </span>
+                              </td>
+                            )}
+                            <td className="border-b border-slate-100 px-4 py-5 text-center">
+                              <span className="font-bold text-slate-900 text-sm">
+                                {Number(item.cpu).toLocaleString("vi-VN")} <span className="text-[10px] text-slate-400 font-black ml-0.5">đ</span>
+                              </span>
+                            </td>
+                            <td className="border-b border-slate-100 px-4 py-5 text-center">
+                              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50/50 border border-emerald-100 font-black text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-emerald-200 transition-all duration-300 transform group-hover:scale-110">
+                                {item.quantity}
+                              </span>
+                            </td>
+                            <td className="border-b border-slate-100 px-4 py-5 text-center text-slate-400 font-bold">
+                              <div className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-wider">
+                                <Calendar size={13} className="text-slate-300" />
+                                {item.reportDate}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
                 <div className="p-6 border-t border-slate-100 bg-slate-50/30">
                   <Pagination
                     currentPage={currentPage}

@@ -30,6 +30,20 @@ const TYPE_ISSUE_LABELS = {
   3: "Lỗi khác",
 };
 
+const ISSUE_STATUS_LABELS = {
+  1: "Chờ xử lý",
+  2: "Đang xử lý",
+  3: "Đã khắc phục",
+  4: "Không thể sửa",
+};
+
+const ISSUE_STATUS_STYLES = {
+  1: "bg-amber-50 text-amber-700 border-amber-200",
+  2: "bg-blue-50 text-blue-700 border-blue-200",
+  3: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  4: "bg-rose-50 text-rose-700 border-rose-200",
+};
+
 const SEVERITY_ORDER = ["low", "medium", "high", "critical"];
 
 const getSeverityFromPriority = (priority, fallbackSeverity) => {
@@ -96,6 +110,7 @@ const normalizeIssue = (item, index) => {
 
   return {
     id: item?.issueId ?? item?.id ?? `issue-${index}`,
+    rawId: item?.id ?? item?.issueId,
     partName,
     typeIssue: item?.typeIssue,
     typeIssueLabel: typeLabel,
@@ -106,6 +121,8 @@ const normalizeIssue = (item, index) => {
     quantity: Number(item?.quantity) || 0,
     imageUrl: item?.imageUrl ?? "",
     createdAt: item?.createdAt ?? "",
+    status: item?.status ?? 1,
+    statusName: ISSUE_STATUS_LABELS[item?.status] ?? "Chờ xử lý",
   };
 };
 
@@ -121,6 +138,9 @@ export default function ProductionErrorSummary() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [zoomImageUrl, setZoomImageUrl] = useState("");
+  const [isHandlingModalOpen, setIsHandlingModalOpen] = useState(false);
+  const [targetIssue, setTargetIssue] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const pageSize = 10;
 
   useEffect(() => {
@@ -188,6 +208,32 @@ export default function ProductionErrorSummary() {
       active = false;
     };
   }, [id]);
+
+  const handleUpdateIssueStatus = async (statusId) => {
+    if (!targetIssue) return;
+    try {
+      setIsUpdating(true);
+      await ProductionService.updateIssueStatus(targetIssue.rawId || targetIssue.id, {
+        status: statusId,
+      });
+
+      // Update local state
+      setErrors((prev) =>
+        prev.map((err) =>
+          err.id === targetIssue.id
+            ? { ...err, status: statusId, statusName: ISSUE_STATUS_LABELS[statusId] }
+            : err
+        )
+      );
+      setIsHandlingModalOpen(false);
+      setTargetIssue(null);
+    } catch (err) {
+      console.error("Error updating issue status:", err);
+      // Optional: Add toast notification here
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const severityCounts = useMemo(
     () =>
@@ -375,9 +421,10 @@ export default function ProductionErrorSummary() {
                     <th className="px-4 py-3 text-left">Công đoạn</th>
                     <th className="px-4 py-3 text-left">Tiêu đề</th>
                     <th className="px-4 py-3 text-center">Minh chứng</th>
-                    <th className="px-4 py-3 text-center">Mức độ</th>
                     <th className="px-4 py-3 text-center">Số lượng</th>
+                    <th className="px-4 py-3 text-center">Trạng thái</th>
                     <th className="px-4 py-3 text-center">Thời gian</th>
+                    <th className="px-4 py-3 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -423,7 +470,28 @@ export default function ProductionErrorSummary() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                            ISSUE_STATUS_STYLES[item.status] ?? ISSUE_STATUS_STYLES[1]
+                          }`}
+                        >
+                          {item.statusName}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => {
+                            setTargetIssue(item);
+                            setIsHandlingModalOpen(true);
+                          }}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+                          disabled={item.status === 3 || item.status === 4}
+                        >
+                          Xác nhận
+                        </button>
+                      </td>
                     </tr>
                   ))}
                     {errors.length === 0 && (
@@ -465,6 +533,53 @@ export default function ProductionErrorSummary() {
           setZoomImageUrl("");
         }}
       />
+
+      {/* Handling Modal */}
+      {isHandlingModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-sm rounded-[2rem] bg-white p-8 shadow-2xl border border-slate-100">
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
+                <ClipboardList size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 tracking-tight">Xử lý báo cáo lỗi</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Lỗi tại: <strong>{targetIssue?.partName}</strong>
+                <br />
+                Số lượng: <span className="font-bold text-rose-600">{targetIssue?.quantity} sản phẩm</span>
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => handleUpdateIssueStatus(3)}
+                disabled={isUpdating}
+                className="w-full rounded-xl bg-emerald-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-emerald-500 hover:bg-emerald-100 group"
+              >
+                <div className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Đã khắc phục</div>
+                <div className="text-[10px] font-medium text-emerald-600/70">Có thể tiếp tục sản xuất và giao nhận</div>
+              </button>
+
+              <button
+                onClick={() => handleUpdateIssueStatus(4)}
+                disabled={isUpdating}
+                className="w-full rounded-xl bg-rose-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-rose-500 hover:bg-rose-100 group"
+              >
+                <div className="text-[11px] font-black uppercase tracking-widest text-rose-700">Không thể sửa</div>
+                <div className="text-[10px] font-medium text-rose-600/70 text-center">Sản phẩm bị loại bỏ, trừ vào số lượng đơn</div>
+              </button>
+
+              <button
+                onClick={() => setIsHandlingModalOpen(false)}
+                className="w-full mt-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                disabled={isUpdating}
+              >
+                Đóng lại
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </OwnerLayout>
   );
 }

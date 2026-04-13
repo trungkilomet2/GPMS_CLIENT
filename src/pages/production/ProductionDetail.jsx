@@ -163,9 +163,9 @@ export default function ProductionDetail() {
               if (e.id) {
                 const sid = String(e.id);
                 // Ưu tiên fullName thực sự > userName > fallback Thợ #id
-                const realName = (e.fullName && e.fullName !== "Chưa cập nhật") 
-                   ? e.fullName 
-                   : (e.userName || `Thợ #${e.id}`);
+                const realName = (e.fullName && e.fullName !== "Chưa cập nhật")
+                  ? e.fullName
+                  : (e.userName || `Thợ #${e.id}`);
                 map[sid] = realName;
               }
             });
@@ -243,6 +243,14 @@ export default function ProductionDetail() {
   const isRejectedProduction = statusName === "Từ Chối";
   const isActionLocked = ["Từ Chối", "Hoàn Thành", "Hết Hạn"].includes(statusName);
 
+  const isAssignedWorker = useMemo(() => {
+    if (!steps.length || !currentUserId) return false;
+    const uid = String(currentUserId);
+    return steps.some(step =>
+      step.assignees?.some(a => String(a.id) === uid)
+    );
+  }, [steps, currentUserId]);
+
   const allStepsCompleted = steps.length > 0 && steps.every(s => {
     const label = s.statusName || getPlanStatusLabel(s.statusId || s.status);
     return label === "Đã Hoàn Thành" || label === "Hoàn Thành";
@@ -276,6 +284,26 @@ export default function ProductionDetail() {
 
     return { total, completed: completedCount, inProgress: inProgressCount, pending: pendingCount, issues: issuesCount, percent: total > 0 ? Math.round((completedCount / total) * 100) : 0 };
   }, [steps]);
+
+  const financialSummary = useMemo(() => {
+    // 1. Doanh thu = Đơn giá đơn hàng * Tổng số lượng
+    const revenue = order.totalPrice || 0;
+
+    // 2. Tổng chi phí nhân công = Tổng (Đơn giá từng công đoạn * Số lượng công đoạn đó)
+    const laborCost = steps.reduce((sum, s) => sum + ((Number(s.unitPrice) || 0) * (Number(s.quantity) || 0)), 0);
+
+    const totalCost = laborCost; 
+    const profit = revenue - totalCost;
+    const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
+
+    return { 
+      revenue, 
+      laborCost, 
+      totalCost, 
+      profit, 
+      profitMargin 
+    };
+  }, [order, steps]);
 
   // --- HANDLERS ---
   const handleApproveProduction = () => setIsApproveOrderConfirmOpen(true);
@@ -346,6 +374,8 @@ export default function ProductionDetail() {
           productionId: production.productionId,
           orderName: order.orderName,
           partName: row.partName || row.name,
+          colorName: row.colorName || row.color,
+          sizeName: row.sizeName || row.size,
           startDate: row.startDate,
           endDate: row.endDate,
           errorType: 0,
@@ -497,6 +527,15 @@ export default function ProductionDetail() {
                             <Users size={14} /> Phân công thợ
                           </Link>
                         )}
+                        {isInProduction && isAssignedWorker && (
+                          <Link
+                            to="/worker/daily-report"
+                            state={{ plan: { production, steps } }}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-emerald-700 hover:scale-105 active:scale-95 shadow-lg shadow-emerald-100 ring-4 ring-emerald-50"
+                          >
+                            <ClipboardCheck size={16} /> Báo cáo sản lượng
+                          </Link>
+                        )}
                       </div>
                     </div>
 
@@ -528,15 +567,20 @@ export default function ProductionDetail() {
                       <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{totalParts} <span className="text-sm text-gray-400 ml-1">PHẦN</span></h5>
                     </div>
 
-                    <div className="p-8 rounded-xl bg-white border border-black-100 shadow-sm space-y-4 group transition-all hover:border-rose-100">
+                    <div 
+                      onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                      className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-rose-50/30 hover:border-rose-300 cursor-pointer text-center md:text-left"
+                    >
                       <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-rose-50 rounded-2xl text-rose-500">
+                        <div className="p-3 bg-rose-50 rounded-2xl text-rose-500 group-hover:bg-rose-100 transition-colors">
                           <AlertTriangle size={24} />
                         </div>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500 bg-rose-50 px-3 py-1 rounded-full">KCS / Kiểm soát</span>
                       </div>
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng số lỗi ghi nhận</p>
-                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{reportedErrorCount} <span className="text-sm text-gray-400 ml-1">LỖI SP</span></h5>
+                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">
+                        {reportedErrorCount} <span className="text-sm text-gray-400 ml-1">LỖI SP</span>
+                      </h5>
                     </div>
                   </div>
                 </div>
@@ -563,16 +607,48 @@ export default function ProductionDetail() {
                           <h3 className="text-2xl font-bold text-gray-900 tracking-tight uppercase leading-tight">{order.orderName}</h3>
                         </div>
                         <div className="grid grid-cols-2 gap-x-12 gap-y-8 border-t border-gray-50 pt-8">
-                          <DetailItem label="Tổng số lượng" value={`${order.quantity?.toLocaleString() || 0} Sản phẩm`} isBold isGreen />
+                          <DetailItem label="Tổng số lượng đặt" value={`${order.quantity?.toLocaleString() || 0} Sản phẩm`} isBold isGreen />
                           <DetailItem label="Thời hạn sản xuất" value={`${formatOrderDate(order.startDate)} - ${formatOrderDate(order.endDate)} (${getProductionDurationText(order.startDate, order.endDate)})`} />
                         </div>
+
+                        {/* Financial Card moved here */}
+                        {financialSummary && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan || isInProduction) && (
+                          <div className="p-6 rounded-[2rem] bg-[#f0f9f4] border border-[#1e6e43]/20 shadow-lg shadow-[#1e6e43]/5 grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in zoom-in-95 duration-500">
+                             <div className="space-y-1 flex flex-col items-center sm:items-start text-center sm:text-left">
+                               <p className="text-[9px] font-black text-[#1e6e43]/60 uppercase tracking-widest">Lợi nhuận gộp dự kiến</p>
+                               <p className={`text-2xl font-black ${financialSummary.profit >= 0 ? 'text-[#1e6e43]' : 'text-rose-600'}`}>
+                                  {financialSummary.profit >= 0 ? '+' : ''}₫{financialSummary.profit.toLocaleString()}
+                               </p>
+                               <span className={`text-[9px] font-black px-2 py-1 rounded-full ${financialSummary.profit >= 0 ? 'bg-[#1e6e43] text-white' : 'bg-rose-500 text-white'} uppercase mt-1`}>
+                                  Tỷ suất: {financialSummary.profitMargin.toFixed(1)}%
+                               </span>
+                             </div>
+                             <div className="space-y-3 border-t sm:border-t-0 sm:border-l border-[#1e6e43]/10 pt-4 sm:pt-0 sm:pl-6">
+                                <div className="flex justify-between items-center text-[10px] font-bold">
+                                   <span className="text-[#1e6e43]/60 uppercase">Doanh thu</span>
+                                   <span className="text-slate-900">₫{financialSummary.revenue.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] font-bold">
+                                   <span className="text-[#1e6e43]/60 uppercase">Tổng chi phí</span>
+                                   <span className="text-rose-600">₫{financialSummary.totalCost.toLocaleString()}</span>
+                                </div>
+                                <div className="pt-2 border-t border-[#1e6e43]/5 flex justify-between gap-2 text-[8px] font-bold text-[#1e6e43]/40 uppercase">
+                                  <span>Chi phí nhân công: ₫{financialSummary.laborCost.toLocaleString()}</span>
+                                </div>
+                             </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="space-y-6 pt-10 border-t border-gray-100">
+                    <div className="space-y-6 pt-10 border-t border-gray-100 italic font-medium text-slate-400 text-[10px] uppercase text-right">
+                       * Lưu ý: Tiến độ hoàn thành được tính dựa trên số lượng đã nghiệm thu của công đoạn cuối cùng.
+                    </div>
+
+                    <div className="space-y-6 pt-4">
                       <div className="flex items-center gap-3 mb-6">
                         <div className="w-2 h-6 bg-emerald-500 rounded-full" />
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600">Phân bổ Màu & Size</h4>
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-600">Phân bổ Màu & Size vs Tiến độ thực tế</h4>
                       </div>
 
                       <div className="border border-black overflow-hidden bg-white shadow-sm">
@@ -582,7 +658,7 @@ export default function ProductionDetail() {
                           {['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'].map(s => (
                             <div key={s} className="col-span-1 py-4 text-center text-[10px] font-black text-black uppercase tracking-widest flex items-center justify-center">{s}</div>
                           ))}
-                          <div className="col-span-2 py-4 px-6 text-right text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Tổng cộng</div>
+                          <div className="col-span-2 py-4 px-6 text-right text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Tổng (Đạt/Đặt)</div>
                         </div>
 
                         {/* Matrix Body */}
@@ -591,20 +667,53 @@ export default function ProductionDetail() {
                             processedVariants.map((v, idx) => {
                               const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
                               const rowTotal = sizeKeys.reduce((acc, k) => acc + (v[k] || 0), 0);
+                              
+                              // Calculate actual reported for this color (from the last stage basically)
+                              // We'll look at steps where partId is the last one
+                              const lastStageId = rawParts[rawParts.length - 1]?.id;
+                              
+                              const rowActual = sizeKeys.reduce((acc, k) => {
+                                const variantStep = steps.find(s => 
+                                  s.partId === lastStageId && 
+                                  String(s.colorName).toLowerCase() === String(v.color).toLowerCase() && 
+                                  String(s.sizeName).toLowerCase() === String(k).toLowerCase()
+                                );
+                                return acc + (variantStep?.actualQuantity || 0);
+                              }, 0);
+
                               return (
                                 <div key={idx} className="grid grid-cols-11 items-stretch hover:bg-slate-50/50 transition-all divide-x divide-black">
                                   <div className="col-span-2 py-4 px-6 flex items-center bg-slate-50/10">
                                     <span className="text-[12px] font-black text-black uppercase tracking-tight truncate">{v.color}</span>
                                   </div>
-                                  {sizeKeys.map(k => (
-                                    <div key={k} className="col-span-1 py-4 text-center flex items-center justify-center">
-                                      <span className={`text-[13px] font-black ${v[k] > 0 ? 'text-[#1e6e43]' : 'text-slate-300'}`}>
-                                        {v[k] > 0 ? v[k].toLocaleString() : '-'}
-                                      </span>
-                                    </div>
-                                  ))}
+                                  {sizeKeys.map(k => {
+                                    const variantStep = steps.find(s => 
+                                      s.partId === lastStageId && 
+                                      String(s.colorName).toLowerCase() === String(v.color).toLowerCase() && 
+                                      String(s.sizeName).toLowerCase() === String(k).toLowerCase()
+                                    );
+                                    const actual = variantStep?.actualQuantity || 0;
+                                    const target = v[k] || 0;
+
+                                    return (
+                                      <div key={k} className="col-span-1 py-3 text-center flex flex-col items-center justify-center">
+                                        {target > 0 ? (
+                                          <>
+                                            <span className={`text-[12px] font-black ${actual >= target ? 'text-emerald-600' : actual > 0 ? 'text-blue-600' : 'text-slate-900'}`}>{actual}</span>
+                                            <div className="w-4 h-[1px] bg-slate-200 my-0.5" />
+                                            <span className="text-[10px] font-bold text-slate-400">{target}</span>
+                                          </>
+                                        ) : (
+                                          <span className="text-slate-200">-</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                   <div className="col-span-2 py-4 px-6 text-right flex items-center justify-end bg-slate-50/10">
-                                    <span className="text-[14px] font-black text-black">{rowTotal.toLocaleString()}</span>
+                                    <div className="flex flex-col items-end">
+                                      <span className={`text-[14px] font-black ${rowActual >= rowTotal && rowTotal > 0 ? 'text-emerald-600' : 'text-slate-900'}`}>{rowActual.toLocaleString()}</span>
+                                      <span className="text-[10px] font-bold text-slate-400">/ {rowTotal.toLocaleString()}</span>
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -717,18 +826,18 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
 
   const STATUS_CONFIG = {
     // Stage-level (PPS)
-    "Đã Hoàn Thành":   { color: "text-emerald-700", bg: "bg-emerald-50",  dot: "bg-emerald-500", label: "Đã hoàn thành" },
-    "Hoàn Thành":      { color: "text-emerald-700", bg: "bg-emerald-50",  dot: "bg-emerald-500", label: "Đã hoàn thành" },
-    "Đang Sản Xuất":   { color: "text-blue-700",    bg: "bg-blue-50",    dot: "bg-blue-500",    label: "Đang sản xuất" },
+    "Đã Hoàn Thành": { color: "text-emerald-700", bg: "bg-emerald-50", dot: "bg-emerald-500", label: "Đã hoàn thành" },
+    "Hoàn Thành": { color: "text-emerald-700", bg: "bg-emerald-50", dot: "bg-emerald-500", label: "Đã hoàn thành" },
+    "Đang Sản Xuất": { color: "text-blue-700", bg: "bg-blue-50", dot: "bg-blue-500", label: "Đang sản xuất" },
     // Variant-level (PPOSS)
-    "Đang Thực Hiện":  { color: "text-amber-700",   bg: "bg-amber-50",   dot: "bg-amber-500",   label: "Đang thực hiện" },
-    "Chờ Nghiệm Thu":  { color: "text-indigo-700",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Chờ nghiệm thu" },
+    "Đang Thực Hiện": { color: "text-amber-700", bg: "bg-amber-50", dot: "bg-amber-500", label: "Đang thực hiện" },
+    "Chờ Nghiệm Thu": { color: "text-indigo-700", bg: "bg-indigo-50", dot: "bg-indigo-400", label: "Chờ nghiệm thu" },
     // Common
-    "Chưa Thực Hiện":  { color: "text-gray-400",    bg: "bg-gray-50",    dot: "bg-gray-300",    label: "Chưa thực hiện" },
-    "Báo Lỗi":         { color: "text-rose-600",    bg: "bg-rose-50",    dot: "bg-rose-500",    label: "Báo lỗi" },
-    "Sự Cố":           { color: "text-rose-600",    bg: "bg-rose-50",    dot: "bg-rose-500",    label: "Sự cố" },
-    "Đợi Xác Nhận":    { color: "text-indigo-600",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Đợi xác nhận" },
-    "Chờ Chấp Nhận":   { color: "text-indigo-600",  bg: "bg-indigo-50",  dot: "bg-indigo-400",  label: "Đợi xác nhận" },
+    "Chưa Thực Hiện": { color: "text-gray-400", bg: "bg-gray-50", dot: "bg-gray-300", label: "Chưa thực hiện" },
+    "Báo Lỗi": { color: "text-rose-600", bg: "bg-rose-50", dot: "bg-rose-500", label: "Báo lỗi" },
+    "Sự Cố": { color: "text-rose-600", bg: "bg-rose-50", dot: "bg-rose-500", label: "Sự cố" },
+    "Đợi Xác Nhận": { color: "text-indigo-600", bg: "bg-indigo-50", dot: "bg-indigo-400", label: "Đợi xác nhận" },
+    "Chờ Chấp Nhận": { color: "text-indigo-600", bg: "bg-indigo-50", dot: "bg-indigo-400", label: "Đợi xác nhận" },
   };
 
   if (steps.length === 0) {
@@ -768,9 +877,9 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
         return (
           <div key={group.key} className="group/stage">
             {/* Stage Row */}
-            <button
+            <div
               onClick={() => toggleStage(group.key)}
-              className="w-full grid grid-cols-12 items-center px-6 py-2.5 hover:bg-emerald-50/30 transition-all text-left gap-2"
+              className="w-full grid grid-cols-12 items-center px-6 py-2.5 hover:bg-emerald-50/30 transition-all text-left gap-2 cursor-pointer"
             >
               {/* Stage Name */}
               <div className="col-span-4 flex items-center gap-3 min-w-0">
@@ -796,7 +905,7 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                   return (
                     <span
                       key={vi}
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold uppercase border ${vDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : `${vCfg.bg} border-${vCfg.dot.replace('bg-','')} ${vCfg.color}`}`}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-bold uppercase border ${vDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : `${vCfg.bg} border-${vCfg.dot.replace('bg-', '')} ${vCfg.color}`}`}
                     >
                       <span>{v.colorName || v.color || '?'}</span>
                       <span className="text-slate-300 font-normal">/</span>
@@ -834,7 +943,7 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                   {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 </span>
               </div>
-            </button>
+            </div>
 
             {/* Expanded Variants */}
             {isExpanded && (
@@ -899,16 +1008,6 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                       </div>
                       {/* Actions */}
                       <div className="col-span-2 flex items-center justify-end gap-1 opacity-0 group-hover/row:opacity-100 transition-all">
-                        {/* Báo cáo ngày (chỉ hiện khi đã phân công) */}
-                        {isInProduction && (row.assignees || []).length > 0 && (
-                          <button 
-                            onClick={() => navigate(`/worker/daily-report`, { state: { targetPartId: row.partId, targetVariantId: row.id } })}
-                            title="Báo cáo sản lượng ngày" 
-                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-all"
-                          >
-                            <ClipboardCheck size={14} />
-                          </button>
-                        )}
                         <button onClick={() => navigate(`/production/part/${row.partId}/${row.id}/history`)} title="Lịch sử" className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-all">
                           <History size={14} />
                         </button>

@@ -17,18 +17,17 @@ const ProductionPartService = {
   updatePart(partId, payload) {
     return axiosClient.put(API_ENDPOINTS.PRODUCTION_PART.UPDATE_PART(partId), payload);
   },
-  createWorkLog(partId, payload) {
-    return axiosClient.post(API_ENDPOINTS.PRODUCTION_PART.CREATE_WORK_LOGS(partId), payload);
+  createWorkLog(partId, partOrderSizeId, payload) {
+    return axiosClient.post(API_ENDPOINTS.PRODUCTION_PART.CREATE_WORK_LOGS(partId, partOrderSizeId), payload);
   },
-  updateWorkLog(partId, logId, payload) {
-    return axiosClient.request({
-      method: "PUT",
-      url: API_ENDPOINTS.PRODUCTION_PART.UPDATE_WORK_LOGS(partId, logId),
-      data: payload,
-    });
+  updateWorkLog(partId, partOrderSizeId, logId, payload) {
+    return axiosClient.put(API_ENDPOINTS.PRODUCTION_PART.UPDATE_WORK_LOGS(partId, partOrderSizeId, logId), payload);
   },
   getWorkLogs(partId, partOrderSizeId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_WORK_LOGS(partId, partOrderSizeId));
+  },
+  deleteWorkLog(logId) {
+    return axiosClient.delete(API_ENDPOINTS.PRODUCTION_PART.DELETE_WORK_LOGS(logId));
   },
   createIssue(partId, formData) {
     return axiosClient.post(
@@ -49,6 +48,18 @@ const ProductionPartService = {
   },
   completePayment(partId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.COMPLETE_PAYMENT(partId), payload);
+  },
+  getProductionWorkLogs(productionId, params) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_PRODUCTION_WORK_LOGS(productionId), { params });
+  },
+  approveWorkLog(partId, partOrderSizeId, logId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.APPROVE_WORK_LOG(partId, partOrderSizeId, logId), payload);
+  },
+  recordDelivery(orderId, payload) {
+    return axiosClient.post(API_ENDPOINTS.PRODUCTION_PART.RECORD_DELIVERY(orderId), payload);
+  },
+  getDeliveryHistory(orderId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.RECORD_DELIVERY(orderId));
   },
 };
 
