@@ -6,7 +6,7 @@ import { getStoredUser } from "@/lib/authStorage";
 import "@/styles/dashboard-sidebar.css";
 
 const NAV_ITEMS = [
-  { to: "/production-plan", label: "Kế hoạch sản xuất", icon: ClipboardList },
+  { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList },
   { to: "/production-plan/assign", label: "Phân công thợ", icon: Users },
   { to: "/output-history", label: "Lịch sử sản lượng", icon: ClipboardList },
   { to: "/leave-requests", label: "Đơn nghỉ phép", icon: ClipboardCheck },
@@ -117,8 +117,8 @@ export default function TeamLeaderSidebar({ mobileOpen = false, onClose = () => 
               const currentPath = location.pathname;
               let isCategoryActive = isActive;
               
-              if (to === "/production-plan") {
-                isCategoryActive = isActive || currentPath.startsWith("/production-plan");
+              if (to === "/production") {
+                isCategoryActive = isActive || currentPath.startsWith("/production-plan") || currentPath.startsWith("/production");
               }
 
               if (to === "/output-history") {

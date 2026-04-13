@@ -1,6 +1,7 @@
-import React from 'react';
-import { Truck, CheckCircle, Clock, Plus, BarChart2, Info, History } from 'lucide-react';
-
+import React, { useState } from 'react';
+import { Truck, CheckCircle, Clock, Plus, BarChart2, Info, History, AlertCircle } from 'lucide-react';
+import ProductionService from '@/services/ProductionService';
+import { toast } from 'react-toastify';
 export default function DeliveryProgressSection({
     variants = [],
     rawOrderSizes = [],
@@ -14,7 +15,49 @@ export default function DeliveryProgressSection({
     const sizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
     const SIZE_ID_TO_LABEL = { 1: 'XS', 2: 'S', 3: 'M', 4: 'L', 5: 'XL', 6: '2XL', 7: '3XL' };
 
-    const [isDiaryOpen, setIsDiaryOpen] = React.useState(false);
+    const [isDiaryOpen, setIsDiaryOpen] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [targetDelivery, setTargetDelivery] = useState(null);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [confirmationInput, setConfirmationInput] = useState("");
+
+    const handleConfirmAction = async () => {
+        if (!targetDelivery || !confirmationInput) return;
+        
+        // Map input text to backend values
+        let backendValue = confirmationInput.trim();
+        if (backendValue.toUpperCase() === 'OK') backendValue = 'Yes';
+        if (backendValue.toUpperCase() === 'NO') backendValue = 'No';
+
+        try {
+            setIsConfirming(true);
+            const deliveryId = targetDelivery.id || targetDelivery.deliverId || targetDelivery.deliverID;
+            await ProductionService.confirmDelivery(deliveryId, backendValue);
+            
+            toast.success("Xác nhận thành công!");
+            setIsConfirmModalOpen(false);
+            setTargetDelivery(null);
+            setConfirmationInput("");
+            
+            if (typeof onConfirmDelivery === 'function') {
+                onConfirmDelivery();
+            } else {
+                window.location.reload();
+            }
+        } catch (err) {
+            console.error("Error confirming delivery:", err.response?.data || err);
+            const errorData = err.response?.data;
+            let errorMsg = "Lỗi xác nhận giao nhận.";
+            
+            if (typeof errorData === 'string') errorMsg = errorData;
+            else if (errorData?.errors) errorMsg = Object.values(errorData.errors).flat().join(", ");
+            else if (errorData?.message) errorMsg = errorData.message;
+            
+            toast.error(errorMsg);
+        } finally {
+            setIsConfirming(false);
+        }
+    };
 
     // Helpers for history mapping
     const getDetailedInfo = (d) => {
@@ -33,11 +76,26 @@ export default function DeliveryProgressSection({
         };
     };
 
+    const DELIVERY_STATUS = {
+        SENDING: 1,
+        NOT_RECEIVED: 2,
+        RECEIVED: 3
+    };
+
+    const DELIVERY_STATUS_LABELS = {
+        [DELIVERY_STATUS.SENDING]: "Đang gửi hàng",
+        [DELIVERY_STATUS.NOT_RECEIVED]: "Chưa nhận được hàng",
+        [DELIVERY_STATUS.RECEIVED]: "Đã nhận được hàng"
+    };
+
+    const DELIVERY_STATUS_STYLES = {
+        [DELIVERY_STATUS.SENDING]: "text-amber-500 bg-amber-50 border-amber-100",
+        [DELIVERY_STATUS.NOT_RECEIVED]: "text-rose-500 bg-rose-50 border-rose-100",
+        [DELIVERY_STATUS.RECEIVED]: "text-emerald-600 bg-emerald-50 border-emerald-100"
+    };
+
     const getStatusLabel = (sId) => {
-        const id = Number(sId);
-        if (id === 1) return "Chờ xác nhận";
-        if (id === 2) return "Đã xác nhận";
-        return "Giao thành công";
+        return DELIVERY_STATUS_LABELS[Number(sId)] || "Giao thành công";
     };
 
     // Helper to check 3 days logic for auto-confirmation
@@ -59,7 +117,10 @@ export default function DeliveryProgressSection({
         return sum + sizeKeys.reduce((sSum, k) => sSum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
     }, 0);
 
-    const totalDelivered = deliveries.reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
+    const totalDelivered = deliveries.reduce((sum, d) => {
+        const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
+        return sum + (isActuallyReceived ? Number(d.deliverQuantity || d.quantity || 0) : 0);
+    }, 0);
     const totalRemaining = Math.max(0, totalOrdered - totalDelivered);
     const overallProgress = totalOrdered > 0 ? Math.round((totalDelivered / totalOrdered) * 100) : 0;
 
@@ -159,6 +220,9 @@ export default function DeliveryProgressSection({
                             const rowDelivered = deliveries
                                 .filter(d => {
                                     const dOsId = String(d.orderSizeId || d.orderSizeID || d.order_size_id || "");
+                                    const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
+                                    if (!isActuallyReceived) return false;
+
                                     // Match if this delivery's orderSizeId matches ANY ID in this row's idMap
                                     if (v.idMap && dOsId) {
                                         return Object.values(v.idMap).some(id => String(id) === dOsId);
@@ -185,6 +249,9 @@ export default function DeliveryProgressSection({
                                         const delivered = deliveries
                                             .filter(d => {
                                                 const dOsId = d.orderSizeId || d.orderSizeID || d.order_size_id;
+                                                const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
+                                                if (!isActuallyReceived) return false;
+
                                                 // If we have an ID for this cell, match strictly by ID
                                                 if (osId && dOsId) {
                                                     return String(osId) === String(dOsId);
@@ -281,50 +348,56 @@ export default function DeliveryProgressSection({
                                     const { color, size } = getDetailedInfo(d);
                                     const dateStr = d.deliveredAt || d.receivedDate || d.date || "";
                                     const autoConfirmed = isAutoConfirmed(dateStr);
-                                    const confirmed = d.isConfirmed || autoConfirmed || String(d.deliverStatusId) === "2";
+                                    const statusId = Number(d.deliverStatusId);
+                                    const confirmed = statusId === DELIVERY_STATUS.RECEIVED || autoConfirmed;
 
                                     const qtyDisp = d.deliverQuantity || d.quantity || 0;
-                                    const statusLabel = d.deliverStatusName || getStatusLabel(d.deliverStatusId);
+                                    const statusLabel = getStatusLabel(statusId);
 
                                     return (
                                         <div key={i} className="relative group">
-                                            <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${confirmed ? 'bg-[#1e6e43]' : 'bg-amber-400'}`} />
-                                            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:border-[#d4e3da] hover:shadow-md transition-all">
-                                                <div className="flex flex-wrap items-start justify-between gap-4">
-                                                    <div className="space-y-4 flex-1">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="px-3 py-1 bg-[#f0f9f4] rounded-lg border border-[#d4e3da]/30">
-                                                                <span className="text-[10px] font-black text-[#1e6e43] uppercase">{color} {size && `— ${size}`}</span>
+                                             <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${statusId === DELIVERY_STATUS.RECEIVED ? 'bg-emerald-500' : statusId === DELIVERY_STATUS.NOT_RECEIVED ? 'bg-rose-500' : 'bg-amber-400'}`} />
+                                             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:border-[#d4e3da] hover:shadow-md transition-all">
+                                                 <div className="flex flex-wrap items-start justify-between gap-4">
+                                                     <div className="space-y-4 flex-1">
+                                                         <div className="flex items-center gap-4">
+                                                             <div className="px-3 py-1 bg-[#f0f9f4] rounded-lg border border-[#d4e3da]/30">
+                                                                 <span className="text-[10px] font-black text-[#1e6e43] uppercase">{color} {size && `— ${size}`}</span>
+                                                             </div>
+                                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                                 <span>{dateStr.replace('T', ' ').slice(0, 16)}</span>
+                                                                 <div className="w-1 h-1 rounded-full bg-gray-200" />
+                                                                 <span className="text-gray-900 font-black">+{qtyDisp} SP</span>
+                                                             </div>
+                                                         </div>
+                                                         <div className="flex items-center gap-2">
+                                                            <div className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest ${DELIVERY_STATUS_STYLES[statusId] || 'text-slate-400 bg-slate-50 border-slate-100'}`}>
+                                                                {statusLabel}
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                                                <span>{dateStr.replace('T', ' ').slice(0, 16)}</span>
-                                                                <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                                                <span className="text-gray-900 font-black">+{qtyDisp} SP</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                                                            Trạng thái: <span className={confirmed ? "text-emerald-600" : "text-amber-500"}>{statusLabel}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end gap-2">
-                                                        {confirmed ? (
-                                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && !d.isConfirmed ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
-                                                                <CheckCircle size={12} />
-                                                                {autoConfirmed && !d.isConfirmed ? 'Đã nhận (Tự động)' : 'Đã xác nhận'}
-                                                            </div>
-                                                        ) : (
-                                                            isCustomer && (
-                                                                <button
-                                                                    onClick={() => onConfirmDelivery(originalIdx)}
-                                                                    className="px-5 h-8 bg-[#1e6e43] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-md shadow-green-100 hover:bg-[#155232] active:scale-95 transition-all"
-                                                                >
-                                                                    Xác nhận ngay
-                                                                </button>
-                                                            )
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                         </div>
+                                                     </div>
+                                                     <div className="flex flex-col items-end gap-2">
+                                                         {confirmed ? (
+                                                             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
+                                                                 <CheckCircle size={12} />
+                                                                 {autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'Đã nhận (Tự động)' : 'Đã nhận hàng'}
+                                                             </div>
+                                                         ) : (
+                                                             isCustomer && statusId !== DELIVERY_STATUS.NOT_RECEIVED && (
+                                                                 <button
+                                                                     onClick={() => {
+                                                                         setTargetDelivery(d);
+                                                                         setIsConfirmModalOpen(true);
+                                                                     }}
+                                                                     className="px-5 h-8 bg-[#1e6e43] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-md shadow-green-100 hover:bg-[#155232] active:scale-95 transition-all"
+                                                                 >
+                                                                     Xác nhận ngay
+                                                                 </button>
+                                                             )
+                                                         )}
+                                                     </div>
+                                                 </div>
+                                             </div>
                                         </div>
                                     );
                                 })}
@@ -344,6 +417,55 @@ export default function DeliveryProgressSection({
                                 Đóng nhật ký
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Confirmation Action Modal */}
+            {isConfirmModalOpen && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6 animate-in zoom-in-95">
+                        <div className="flex flex-col items-center text-center gap-4">
+                            <div className="w-16 h-16 bg-[#f0f9f4] rounded-2xl flex items-center justify-center text-[#1e6e43]">
+                                <AlertCircle size={32} />
+                            </div>
+                            <div className="space-y-2">
+                                <h4 className="text-lg font-black text-slate-900 uppercase">Xác nhận giao hàng</h4>
+                                <p className="text-xs font-medium text-slate-500">
+                                    Vui lòng nhập <span className="text-[#1e6e43] font-bold">OK</span> nếu khớp hoặc <span className="text-rose-500 font-bold">No</span> nếu có lỗi
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <input
+                                type="text"
+                                placeholder="..."
+                                value={confirmationInput}
+                                onChange={(e) => setConfirmationInput(e.target.value)}
+                                className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 text-center text-lg font-black uppercase tracking-[0.2em] focus:border-[#1e6e43] focus:bg-white outline-none transition-all placeholder:text-slate-200"
+                                autoFocus
+                            />
+
+                            <button
+                                onClick={handleConfirmAction}
+                                disabled={isConfirming || !confirmationInput.trim()}
+                                className="w-full h-14 bg-[#1e6e43] text-white rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-lg shadow-green-100 hover:bg-[#155232] transition-all active:scale-95 disabled:opacity-50"
+                            >
+                                {isConfirming ? "Đang xử lý..." : "Xác nhận chốt đợt này"}
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => {
+                                setIsConfirmModalOpen(false);
+                                setTargetDelivery(null);
+                                setConfirmationInput("");
+                            }}
+                            className="w-full py-2 text-[10px] font-black uppercase text-slate-300 hover:text-slate-500 transition-colors"
+                        >
+                            Để sau / Hủy
+                        </button>
                     </div>
                 </div>
             )}

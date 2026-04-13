@@ -564,8 +564,7 @@ export default function WorkerDailyReport() {
                 onClick={() => {
                   const prodId = plan?.production?.productionId ?? assignment?.productionId;
                   if (prodId) {
-                    const isWorkerRole = hasAnyRole(roleValue, ["Worker", "KCS"]);
-                    const target = isWorkerRole ? `/worker/production-plan/${prodId}` : `/production/${prodId}`;
+                    const target = `/production/${prodId}`;
                     navigate(target);
                   } else {
                     navigate(-1);

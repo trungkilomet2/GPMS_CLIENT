@@ -29,8 +29,8 @@ const ProductionList = lazy(() => import("@/pages/production/ProductionList"));
 const ProductionDetail = lazy(() => import("@/pages/production/ProductionDetail"));
 const UpdateProduction = lazy(() => import("@/pages/production/UpdateProduction"));
 const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
-const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
-const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionPlanDetail"));
+// const ProductionPlanList = lazy(() => import("@/pages/production/ProductionPlanList"));
+const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionDetail"));
 const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
 const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
@@ -105,13 +105,13 @@ export const routes = [
   { path: "/orders/detail/:id", element: guardByRoles(["Owner", "PM", "Customer"], <OrderDetail />) },
   { path: "/production/create", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
   { path: "/production/create/:orderId", element: guardByRoles(["Owner", "PM"], <CreateProduction />) },
-  { path: "/production", element: guardByRoles(["Owner", "PM"], <ProductionList />) },
-  { path: "/production/:id", element: guardByRoles(["Owner", "PM"], <ProductionDetail />) },
+  { path: "/production", element: guardByRoles(["Owner", "PM", "Worker", "KCS", "Team Leader", "Manager"], <ProductionList />) },
+  { path: "/production/:id", element: guardByRoles(["Owner", "PM", "Worker", "KCS", "Manager", "Team Leader"], <ProductionDetail />) },
   { path: "/production/:id/edit", element: guardByRoles(["Owner", "PM"], <UpdateProduction />) },
   { path: "/production/:id/errors", element: guardByRoles(["Owner", "PM"], <ProductionErrorSummary />) },
-  { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanList />) },
+  { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
   { path: "/production-plan/create", element: guardByRoles(["Owner", "PM"], <ProductionPlan />) },
-  { path: "/production-plan/:id", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionPlanDetail />) },
+
   { path: "/production-plan/assign", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/worker/daily-report", element: guardByRoles(["Owner", "PM", "Worker", "KCS"], <WorkerDailyReport />) },
@@ -120,8 +120,8 @@ export const routes = [
   { path: "/worker/cutting-book", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBook />) },
   { path: "/worker/cutting-book/detail/:id", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBookDetail />) },
   { path: "/worker/assignments", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <WorkerAssignment />) },
-  { path: "/worker/production-plan", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <ProductionPlanList />) },
-  { path: "/worker/production-plan/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <ProductionPlanDetail />) },
+  { path: "/worker/production-plan", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <ProductionList />) },
+
   { path: "/worker/output-history", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <OutputHistory />) },
   { path: "/worker/leave-requests", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequests />) },
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },

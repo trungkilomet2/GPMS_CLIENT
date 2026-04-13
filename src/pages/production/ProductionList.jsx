@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { CheckCircle2, Clock3, FileText, Filter, Search, XCircle } from "lucide-react";
 import Pagination from "@/components/Pagination";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionService from "@/services/ProductionService";
 import WorkerService from "@/services/WorkerService";
 import { userService } from "@/services/UserService";
@@ -28,12 +29,13 @@ function getPmName(item) {
 }
 
 export default function ProductionList() {
-  const { isOwner, isPm, currentUserId } = useAuth();
+  const { isOwner, isPm, isWorker, currentUserId } = useAuth();
+  const LayoutComponent = isWorker ? WorkerLayout : OwnerLayout;
   const { productions, loading, error, totalCount } = useProductionList();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [onlyMyOrders, setOnlyMyOrders] = useState(true);
+  const [onlyMyOrders, setOnlyMyOrders] = useState(!isWorker); // Default false for workers so they see everything if discovery hasn't finished
   const [involvedProdIds, setInvolvedProdIds] = useState(() => {
     try {
       const saved = localStorage.getItem(`involved_prods_${currentUserId}`);
@@ -48,9 +50,11 @@ export default function ProductionList() {
 
 
   const baseProductions = useMemo(() => {
-    // Owner sees all, PM sees filtered by default
+    // Owner sees all
     if (isOwner || currentUserId == null) return productions;
-    if (!isPm) return productions;
+    
+    // If not PM and not Worker, we show everything (fallback)
+    if (!isPm && !isWorker) return productions;
 
     // Toggle off: see everything
     if (!onlyMyOrders) return productions;
@@ -58,6 +62,9 @@ export default function ProductionList() {
     // Toggle on: see only main PM orders or those where you are involved
     const uid = String(currentUserId);
     return productions.filter((item) => {
+      // If "My Orders" is off, show everything
+      if (!onlyMyOrders) return true;
+
       const isMainPm = String(getPmId(item)) === uid;
       const isPartAssignee = involvedProdIds.has(item.productionId);
       return isMainPm || isPartAssignee;
@@ -128,21 +135,43 @@ export default function ProductionList() {
               const list = Array.isArray(payload) ? payload : [];
               
               const uid = String(currentUserId);
-              const isUserInvolved = list.some(part => {
-                const workers = [
-                  ...(Array.isArray(part.workerIds) ? part.workerIds : []),
-                  ...(Array.isArray(part.assignedWorkers) ? part.assignedWorkers : []),
-                  ...(Array.isArray(part.assignees) ? part.assignees : []),
-                  ...(Array.isArray(part.workers) ? part.workers : []),
-                  part.workerId,
-                  part.userId
-                ].filter(Boolean);
+                const collectWorkers = (p) => {
+                  const items = [
+                    ...(Array.isArray(p.workerIds) ? p.workerIds : []),
+                    ...(Array.isArray(p.assignedWorkers) ? p.assignedWorkers : []),
+                    ...(Array.isArray(p.assignees) ? p.assignees : []),
+                    ...(Array.isArray(p.workers) ? p.workers : []),
+                    ...(Array.isArray(p.listWorker) ? p.listWorker : []),
+                    p.workerId,
+                    p.workerIdRaw,
+                    p.userId,
+                    p.worker?.id,
+                    p.worker?.userId,
+                    p.workerInfo?.id,
+                    p.workerInfo?.userId
+                  ].filter(Boolean);
+                  return items;
+                };
 
-                return workers.some(w => {
-                  const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
-                  return String(wid) === uid;
+                // Check both part level and all variants (listPartOrderSizes)
+                const isUserInvolved = list.some(part => {
+                  const partWorkers = collectWorkers(part);
+                  const isPartWorker = partWorkers.some(w => {
+                    const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
+                    return String(wid) === uid;
+                  });
+                  if (isPartWorker) return true;
+
+                  // Check variants
+                  const variants = part.listPartOrderSizes || part.partOrderSizes || [];
+                  return variants.some(v => {
+                    const variantWorkers = collectWorkers(v);
+                    return variantWorkers.some(w => {
+                      const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
+                      return String(wid) === uid;
+                    });
+                  });
                 });
-              });
 
               const completed = list.filter(p => p.status === 'Hoàn thành').length;
               const display = list.length > 0 ? `${completed} / ${list.length}` : "0";
@@ -179,12 +208,12 @@ export default function ProductionList() {
       }
     };
 
-    if (productions.length > 0) discoverAllInvolvement();
+    if (productions.length > 0 && currentUserId) discoverAllInvolvement();
     return () => { isMounted = false; };
-  }, [pageData, partCounts]);
+  }, [productions, currentUserId]);
 
   return (
-    <OwnerLayout>
+    <LayoutComponent>
       <div className="leave-page leave-list-page">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -192,7 +221,7 @@ export default function ProductionList() {
               <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Danh sách đơn sản xuất</h1>
               <p className="text-slate-600">Theo dõi các đơn sản xuất và trạng thái triển khai.</p>
             </div>
-            {(!isPm || isOwner) && (
+            {(isPm || isOwner) && (
               <Link className="order-create-btn" to="/production/create">
                 + Tạo đơn sản xuất
               </Link>
@@ -295,7 +324,7 @@ export default function ProductionList() {
                 </select>
               </label>
               
-              {isPm && !isOwner && (
+              {(isPm || isWorker) && !isOwner && (
                 <div className="flex items-center gap-3 h-[45px] pb-1">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <div className="relative">
@@ -415,6 +444,6 @@ export default function ProductionList() {
           )}
         </div>
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }
