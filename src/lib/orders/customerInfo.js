@@ -13,6 +13,10 @@ export const getOrderCustomerId = (order) => {
     order.userId ??
     order.customerId ??
     order.ownerId ??
+    order.createdBy ??
+    order.userId ??
+    order.uId ??
+    order.customer_id ??
     order.user?.id ??
     order.user?.userId ??
     null

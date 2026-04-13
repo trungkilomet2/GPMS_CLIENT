@@ -28,11 +28,30 @@ export default function RecordDeliveryModal({ isOpen, onClose, orderId, variants
                      sizeDisp = v.orderSize.size.sizeName || v.orderSize.size.sizeValue;
                 }
                 
+                // Helper to check 3 days logic for auto-confirmation
+                const isAutoConfirmed = (dateStr) => {
+                    if (!dateStr) return false;
+                    try {
+                        const deliveryDate = new Date(dateStr);
+                        if (isNaN(deliveryDate.getTime())) return false;
+                        const now = new Date();
+                        const diffDays = Math.floor((now - deliveryDate) / (1000 * 60 * 60 * 24));
+                        return diffDays >= 3;
+                    } catch (e) {
+                        return false;
+                    }
+                };
+
                 // Calculate already delivered for this specific orderSizeId
                 const delivered = (deliveries || [])
                     .filter(d => {
                         const dId = d.orderSizeId || d.orderSizeID || d.order_size_id;
-                        return String(dId) === String(itemSizeId);
+                        const statusId = Number(d.deliverStatusId);
+                        const dateStr = d.deliveredAt || d.receivedDate || d.date;
+                        const autoConfirmed = isAutoConfirmed(dateStr);
+                        
+                        // Strict filter: only count if actually received (3) or auto-confirmed
+                        return String(dId) === String(itemSizeId) && (statusId === 3 || autoConfirmed);
                     })
                     .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
                 

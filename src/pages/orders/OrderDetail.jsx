@@ -96,7 +96,7 @@ export default function OrderDetail() {
             console.log('Order Detail Response:', response);
             const orderData = response.data.data || response.data;
             setOrder(orderData);
-            
+
             // 1. First try fetching from dedicated delivery history API
             try {
                 const deliveryRes = await ProductionPartService.getDeliveryHistory(id);
@@ -105,13 +105,13 @@ export default function OrderDetail() {
             } catch (delErr) {
                 console.warn('Could not fetch dedicated delivery history, falling back to order object:', delErr);
                 // 2. Fallback to extracting from order object
-                const fallbackDeliveries = 
-                    orderData.orderDeliveries || 
-                    orderData.deliveries || 
+                const fallbackDeliveries =
+                    orderData.orderDeliveries ||
+                    orderData.deliveries ||
                     orderData.order_details?.flatMap(d => d.deliveries || []) || [];
                 setDeliveries(fallbackDeliveries);
             }
-            
+
             setError(null);
         } catch (err) {
             console.error('Lỗi khi tải chi tiết đơn hàng:', err.response?.data || err.message);
@@ -195,10 +195,10 @@ export default function OrderDetail() {
             try {
                 const response = await ProductionService.getProductionIssues(linkedProductionId);
                 const allIssues = response?.data?.data ?? response?.data ?? [];
-                // ONLY filter issues that are confirmed as "UNFIXABLE" (Status 4)
-                const unfixable = allIssues.filter(issue => 
-                    String(issue.status) === "4" && 
-                    issue.quantity > 0
+                // Filter issues with Status 4 (Irreparable/Unfixable)
+                const unfixable = allIssues.filter(issue =>
+                    String(issue.statusId) === "4" &&
+                    (issue.confirmedQuantity > 0 || issue.quantity > 0)
                 );
                 setCriticalIssues(unfixable);
             } catch (err) {
@@ -208,15 +208,23 @@ export default function OrderDetail() {
         fetchIssues();
     }, [linkedProductionId]);
 
-    const workshopErrorQuantity = criticalIssues.reduce((sum, issue) => sum + (issue.quantity || 0), 0);
+    // --- DERIVED CONSTANTS ---
+    const workshopErrorQuantity = criticalIssues.reduce((sum, issue) => sum + (issue.confirmedQuantity || issue.quantity || 0), 0);
     const finalQuantity = Math.max(0, (order?.quantity || 0) - workshopErrorQuantity);
 
-    // --- DERIVED CONSTANTS ---
     const templates = order?.templates ?? order?.template ?? order?.files ?? [];
     const orderStatusValue = order?.statusName ?? order?.status;
     const orderOwnerId = getOrderCustomerId(order);
     const currentUserId = user?.userId ?? user?.id ?? null;
-    const isOrderOwner = currentUserId && orderOwnerId && String(currentUserId) === String(orderOwnerId);
+    const currentUserPhone = user?.phone ?? user?.phoneNumber ?? user?.userPhone ?? "";
+    const orderPhone = order?.userPhone ?? "";
+
+    // Robust ownership check: compare IDs OR compare phones as fallback
+    const isOrderOwner = (currentUserId && orderOwnerId && String(currentUserId) === String(orderOwnerId)) ||
+        (currentUserPhone && orderPhone && String(currentUserPhone).replace(/\D/g, '') === String(orderPhone).replace(/\D/g, ''));
+
+    // Safety fallback: if user is customer and order was likely their but ID check is tricky
+    const isLikelyOwner = isCustomer && isOrderOwner;
 
     const normalizedStatus = normalizeOrderStatus(orderStatusValue);
     const isRejected = normalizedStatus === 'Đã từ chối';
@@ -225,8 +233,9 @@ export default function OrderDetail() {
     const isProcessing = normalizedStatus === 'Đang sản xuất';
     const isCompleted = normalizedStatus === 'Đã hoàn thành';
 
-    // Permission rules
-    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
+    // Permission rules: ONLY the order owner (customer) can edit when requested
+    const canEdit = isCustomer && isOrderOwner &&
+        (normalizedStatus === 'Chờ xét duyệt' || normalizedStatus === 'Yêu cầu chỉnh sửa');
     const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;
@@ -434,55 +443,6 @@ export default function OrderDetail() {
                                         order={order}
                                         onImageClick={(url) => { setZoomImageUrl(url); setIsImageModalOpen(true); }}
                                     />
-
-                                    {/* Workshop Quality Summary for Customer & Owner */}
-                                    {hasProduction && (
-                                        <div className="bg-[#f0f9f4] border border-[#d4e3da] rounded-2xl p-8 relative overflow-hidden group transition-all hover:bg-[#e8f4ec]">
-                                            <div className="absolute top-0 right-0 p-8 text-[#1e6e43]/10 group-hover:scale-110 transition-transform">
-                                                <AlertCircle size={80} />
-                                            </div>
-                                            <div className="relative z-10 space-y-6">
-                                                <div>
-                                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#1e6e43] mb-1">Kiểm soát chất lượng xưởng</h3>
-                                                    <p className="text-xl font-black text-gray-900 tracking-tight uppercase">Tóm tắt sản lượng thực tế</p>
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                                    <div className="space-y-1">
-                                                        <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Tổng đặt hàng</p>
-                                                        <p className="text-3xl font-black text-gray-900">{order?.quantity?.toLocaleString()} <span className="text-xs text-gray-400">SP</span></p>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="text-[9px] font-bold text-rose-500 uppercase tracking-widest">Lỗi xưởng khấu trừ</p>
-                                                        <p className="text-3xl font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <span className="text-xs text-rose-300">SP</span></p>
-                                                        {workshopErrorQuantity > 0 && (
-                                                            <p className="text-[8px] font-bold text-rose-400 italic font-sans italic">* Phẩn phẩm bị lỗi nghiêm trọng không đủ điều kiện giao hàng</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="text-[9px] font-bold text-[#1e6e43] uppercase tracking-widest">Thực giao dự kiến</p>
-                                                        <p className="text-3xl font-black text-[#1e6e43]">{finalQuantity.toLocaleString()} <span className="text-xs text-[#1e6e43]/40">SP</span></p>
-                                                    </div>
-                                                </div>
-
-                                                {criticalIssues.length > 0 && (
-                                                    <div className="pt-6 border-t border-[#1e6e43]/10">
-                                                        <p className="text-[9px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                            <AlertTriangle size={12} /> Chi tiết lỗi không thể khắc phục:
-                                                        </p>
-                                                        <div className="space-y-2">
-                                                            {criticalIssues.map((issue, idx) => (
-                                                                <div key={idx} className="flex items-center justify-between text-[11px] font-bold text-gray-600 bg-rose-50/30 p-2 rounded-lg border border-rose-100">
-                                                                    <span>{issue.title || issue.description}</span>
-                                                                    <span className="text-rose-600">-{issue.quantity} SP</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
@@ -492,24 +452,19 @@ export default function OrderDetail() {
                                         <DeliveryProgressSection
                                             variants={processedVariants}
                                             rawOrderSizes={
-                                                order.orderSizes || 
-                                                order.orderSize || 
-                                                order.sizes || 
-                                                order.orderDetails || 
-                                                order.orderDetailsList || 
-                                                order.order_details || 
+                                                order.orderSizes ||
+                                                order.orderSize ||
+                                                order.sizes ||
+                                                order.orderDetails ||
+                                                order.orderDetailsList ||
+                                                order.order_details ||
                                                 []
                                             }
                                             deliveries={deliveries}
                                             isOwner={isOwner || canModerate}
                                             isCustomer={isCustomer}
                                             onAddDelivery={() => setIsRecordDeliveryModalOpen(true)}
-                                            onConfirmDelivery={(idx) => {
-                                                const newDeliveries = [...deliveries];
-                                                newDeliveries[idx].isConfirmed = true;
-                                                setDeliveries(newDeliveries);
-                                                toast.success('Đã xác nhận nhận hàng thành công!');
-                                            }}
+                                            onConfirmDelivery={fetchOrderDetail}
                                         />
                                     </div>
                                 </div>
@@ -549,6 +504,54 @@ export default function OrderDetail() {
                                 <div className="space-y-6">
                                     <DesignTemplatesSection templates={templates} title="TÀI LIỆU ĐÍNH KÈM" />
                                 </div>
+
+                                {/* Workshop Quality Summary in Sidebar */}
+                                {hasProduction && (
+                                    <div className="pt-8 border-t border-gray-100 space-y-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-1.5 h-4 bg-[#1e6e43] rounded-full" />
+                                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Kiểm soát chất lượng</h3>
+                                        </div>
+
+                                        <div className="bg-[#f0f9f4]/50 rounded-2xl p-6 border border-[#d4e3da] space-y-5">
+                                            <div className="space-y-1">
+                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Tóm tắt sản lượng</p>
+                                                <h4 className="text-lg font-black text-center text-slate-900 uppercase tracking-tight">Thực tế xuất xưởng</h4>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng đặt hàng</span>
+                                                    <span className="text-sm font-black text-slate-800">{order?.quantity?.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Lỗi khấu trừ</span>
+                                                        <span className="text-[8px] font-medium text-rose-400 italic">(Không thể sửa)</span>
+                                                    </div>
+                                                    <span className="text-sm font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                </div>
+                                                <div className="pt-4 border-t border-[#d4e3da] flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-widest">Thực giao dự kiến</span>
+                                                    <span className="text-xl font-black text-[#1e6e43]">{finalQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                </div>
+                                            </div>
+
+                                            {criticalIssues.length > 0 && (
+                                                <div className="space-y-2 pt-2">
+                                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Chi tiết lỗi không thể sửa:</p>
+                                                    {criticalIssues.map((issue, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between text-[10px] font-bold text-gray-600 bg-white/50 p-2 rounded-lg border border-[#d4e3da]/30">
+                                                            <span className="truncate max-w-[120px]">{issue.title || issue.description || 'Lỗi không tên'}</span>
+                                                            <span className="text-rose-600">-{issue.confirmedQuantity || issue.quantity}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex flex-col gap-3 pt-6 border-t border-gray-100">
                                     <button onClick={() => setIsCommentModalOpen(true)} className="h-12 flex items-center justify-center gap-3 rounded-xl bg-white border border-black text-gray-700 hover:bg-gray-50 transition-all active:scale-95 shadow-sm">
                                         <MessageSquare size={18} className="text-[#1e6e43]" />
@@ -638,16 +641,16 @@ export default function OrderDetail() {
                 onClose={() => setIsRecordDeliveryModalOpen(false)}
                 orderId={order.id}
                 variants={
-                    order.orderSizes || 
-                    order.orderSize || 
-                    order.sizes || 
-                    order.size || 
-                    order.orderDetails || 
-                    order.orderDetailsList || 
-                    order.order_details || 
-                    order.variants || 
+                    order.orderSizes ||
+                    order.orderSize ||
+                    order.sizes ||
+                    order.size ||
+                    order.orderDetails ||
+                    order.orderDetailsList ||
+                    order.order_details ||
+                    order.variants ||
                     order.variantMatrix ||
-                    order.items || 
+                    order.items ||
                     []
                 }
                 deliveries={deliveries}

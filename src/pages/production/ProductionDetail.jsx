@@ -84,6 +84,8 @@ export default function ProductionDetail() {
   const [steps, setSteps] = useState([]);
   const [rawParts, setRawParts] = useState([]);
   const [totalParts, setTotalParts] = useState(0);
+  const [reportCount, setReportCount] = useState(0);
+  const [allLogs, setAllLogs] = useState([]);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const [activeTab, setActiveTab] = useState('production');
   const [workerMap, setWorkerMap] = useState({}); // id -> fullName
@@ -195,6 +197,23 @@ export default function ProductionDetail() {
         setRawParts(rawList);
         setTotalParts(rawList.length);
       });
+
+    // Fetch combined issues for reportedErrorCount
+    ProductionService.getProductionIssues(production.productionId)
+      .then(res => {
+        const issues = res?.data?.data ?? res?.data ?? [];
+        setReportedErrorCount(issues.length);
+      })
+      .catch(err => console.error("Error fetching issue count:", err));
+
+    // Fetch total report logs for reportCount
+    ProductionPartService.getProductionWorkLogs(production.productionId)
+      .then(res => {
+        const data = res?.data?.data ?? res?.data ?? [];
+        setAllLogs(Array.isArray(data) ? data : []);
+        setReportCount(Array.isArray(data) ? data.length : 0);
+      })
+      .catch(err => console.error("Error fetching logs count:", err));
   }, [production?.productionId]);
 
   // Flatten rawParts + workerMap → steps, tự re-compute khi worker map load xong
@@ -286,8 +305,10 @@ export default function ProductionDetail() {
   }, [steps]);
 
   const financialSummary = useMemo(() => {
-    // 1. Doanh thu = Đơn giá đơn hàng * Tổng số lượng
-    const revenue = order.totalPrice || 0;
+    // 1. Doanh thu = Đơn giá sản phẩm * Tổng số lượng (ưu tiên cpu và quantity từ order)
+    const totalQty = Number(order?.totalQuantity ?? order?.quantity ?? 0);
+    const unitPrice = Number(order?.cpu ?? order?.unitPrice ?? 0);
+    const revenue = order?.totalPrice || (totalQty * unitPrice);
 
     // 2. Tổng chi phí nhân công = Tổng (Đơn giá từng công đoạn * Số lượng công đoạn đó)
     const laborCost = steps.reduce((sum, s) => sum + ((Number(s.unitPrice) || 0) * (Number(s.quantity) || 0)), 0);
@@ -420,7 +441,7 @@ export default function ProductionDetail() {
       <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
         <Package size={48} className="text-slate-200 mb-4" />
         <p className="font-bold">{error || "Không tìm thấy dữ liệu đơn sản xuất."}</p>
-        <button onClick={() => navigate(-1)} className="mt-4 text-emerald-600 font-black uppercase text-[10px] tracking-widest hover:underline italic">Quay lại</button>
+        <button onClick={() => navigate("/production")} className="mt-4 text-emerald-600 font-black uppercase text-[10px] tracking-widest hover:underline italic">Quay lại</button>
       </div>
     </OwnerLayout>
   );
@@ -433,7 +454,7 @@ export default function ProductionDetail() {
           {/* HERO HEADER */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
-              <button onClick={() => navigate(-1)} className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-gray-200 text-gray-400 transition-all hover:border-[#1e6e43] hover:text-[#1e6e43] shadow-sm active:scale-95">
+              <button onClick={() => navigate("/production")} className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-gray-200 text-gray-400 transition-all hover:border-[#1e6e43] hover:text-[#1e6e43] shadow-sm active:scale-95">
                 <ArrowLeft size={22} />
               </button>
               <div className="space-y-1">
@@ -542,6 +563,7 @@ export default function ProductionDetail() {
                     <div className="overflow-y-auto max-h-[480px] scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                       <StageMatrix
                         steps={steps}
+                        allLogs={allLogs}
                         isInProduction={isInProduction}
                         isOwner={isOwner}
                         isPM={isPM}
@@ -567,7 +589,7 @@ export default function ProductionDetail() {
                         <span className="text-[10px] font-bold uppercase tracking-widest text-[#1e6e43] bg-[#f0f9f4] px-3 py-1 rounded-full">Sản lượng</span>
                       </div>
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Lịch sử báo cáo sản lượng</p>
-                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{totalParts} <span className="text-sm text-gray-400 ml-1">CÔNG ĐOẠN</span></h5>
+                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{reportCount} <span className="text-sm text-gray-400 ml-1">LƯỢT BÁO CÁO</span></h5>
                     </div>
 
                     <div 
@@ -804,7 +826,7 @@ export default function ProductionDetail() {
   );
 }
 
-function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDonePart, handleBaoLoi, getPlanStatusLabel, getVariantStatusLabel, toast }) {
+function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navigate, handleDonePart, handleBaoLoi, getPlanStatusLabel, getVariantStatusLabel, toast }) {
   const [expandedStageIds, setExpandedStageIds] = useState(new Set());
 
   // Group flat steps by partName/partId
@@ -879,7 +901,19 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
         const stageStatus = getStageStatus(group.variants, getPlanStatusLabel);
         const cfg = STATUS_CONFIG[stageStatus] || STATUS_CONFIG["Chưa Thực Hiện"];
         const totalQty = group.variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0);
-        const actualQty = group.variants.reduce((s, v) => s + (Number(v.actualQuantity) || 0), 0);
+        
+        // Calculate dynamic actual quantity from allLogs
+        const actualQty = group.variants.reduce((sum, v) => {
+          const variantLogs = allLogs.filter(log => 
+             String(log.productionPartId || log.partId) === String(v.partId) &&
+             String(log.partOrderSizeId || log.orderSizeId) === String(v.id)
+          );
+          const logTotal = variantLogs
+            .filter(log => log.isReadOnly === true || log.isReadOnly === 1)
+            .reduce((acc, log) => acc + (log.quantity || 0), 0);
+          return sum + (logTotal || 0);
+        }, 0);
+
         const pct = totalQty > 0 ? Math.min(100, Math.round((actualQty / totalQty) * 100)) : 0;
         const allAssignees = [];
         const seenIds = new Set();
@@ -903,7 +937,9 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                 <div className="min-w-0">
                   <p className="text-sm font-black text-gray-900 uppercase tracking-tight truncate leading-snug">{group.partName}</p>
                   {group.unitPrice > 0 && (
-                    <p className="text-[10px] font-semibold text-gray-400 mt-0.5">₫{Number(group.unitPrice).toLocaleString()}/sp</p>
+                    <p className="text-[11px] font-black text-rose-600 mt-1.5 bg-rose-50 px-2 py-0.5 rounded-md inline-flex items-center gap-1 border border-rose-100 shadow-sm">
+                      <span className="text-[10px] opacity-70">₫</span>{Number(group.unitPrice).toLocaleString()}<span className="text-[8px] opacity-60 ml-0.5">/sp</span>
+                    </p>
                   )}
                 </div>
               </div>
@@ -993,10 +1029,26 @@ function StageMatrix({ steps, isInProduction, isOwner, isPM, navigate, handleDon
                       </div>
                       {/* Quantity */}
                       <div className="col-span-2 flex flex-col items-center gap-1">
-                        <span className="text-sm font-black text-[#1e6e43]">{row.actualQuantity || 0}/{row.quantity || 0}</span>
-                        <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-400 transition-all" style={{ width: `${vPct}%` }} />
-                        </div>
+                        {(() => {
+                          const variantLogs = allLogs.filter(log => 
+                             String(log.productionPartId || log.partId) === String(row.partId) &&
+                             String(log.partOrderSizeId || log.orderSizeId) === String(row.id)
+                          );
+                          const logTotal = variantLogs
+                            .filter(log => log.isReadOnly === true || log.isReadOnly === 1)
+                            .reduce((acc, log) => acc + (log.quantity || 0), 0);
+                          const liveActual = logTotal || 0;
+                          const rowPct = (row.quantity > 0) ? Math.min(100, Math.round((liveActual / row.quantity) * 100)) : 0;
+
+                          return (
+                            <>
+                              <span className="text-sm font-black text-[#1e6e43]">{liveActual}/{row.quantity || 0}</span>
+                              <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-400 transition-all" style={{ width: `${rowPct}%` }} />
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                       {/* Assignees */}
                       <div className="col-span-2 flex flex-wrap gap-1.5 justify-center">
