@@ -108,7 +108,7 @@ export const routes = [
   { path: "/production", element: guardByRoles(["Owner", "PM", "Worker", "KCS", "Team Leader", "Manager"], <ProductionList />) },
   { path: "/production/:id", element: guardByRoles(["Owner", "PM", "Worker", "KCS", "Manager", "Team Leader"], <ProductionDetail />) },
   { path: "/production/:id/edit", element: guardByRoles(["Owner", "PM"], <UpdateProduction />) },
-  { path: "/production/:id/errors", element: guardByRoles(["Owner", "PM"], <ProductionErrorSummary />) },
+  { path: "/production/:id/errors", element: guardByRoles(["Owner", "PM", "Worker"], <ProductionErrorSummary />) },
   { path: "/production-plan", element: guardByRoles(["Owner", "PM", "Team Leader"], <ProductionList />) },
   { path: "/production-plan/create", element: guardByRoles(["Owner", "PM"], <ProductionPlan />) },
 
@@ -122,12 +122,11 @@ export const routes = [
   { path: "/worker/assignments", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <WorkerAssignment />) },
   { path: "/worker/production-plan", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <ProductionList />) },
 
-  { path: "/worker/output-history", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <OutputHistory />) },
+  { path: "/worker/output-history", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS", "Team Leader"], <OutputHistory />) },
   { path: "/worker/leave-requests", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequests />) },
   { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
-  { path: "/output-history", element: guardByRoles(["Owner", "PM", "Team Leader"], <OutputHistory />) },
   { path: "/production/part/:partId/:variantId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
-  { path: "/production-plan/:productionId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
+  { path: "/production-plan/:productionId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader", "Worker"], <ProductionPartHistory />) },
   { path: "/leave-requests", element: guardByRoles(["PM", "Team Leader"], <LeaveRequests />) },
   { path: "/customers", element: guardByRoles(["Owner"], <CustomerManagement />) },
   { path: "/payroll", element: guardByRoles(["Owner"], <PayrollList />) },

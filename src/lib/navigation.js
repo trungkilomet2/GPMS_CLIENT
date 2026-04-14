@@ -33,7 +33,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/worker-roles", label: "Vai trò thợ", parent: "/home" },
   { path: "/worker-roles/create", label: "Thêm vai trò thợ", parent: "/worker-roles" },
   { path: "/worker/assignments", label: "Công việc được giao", parent: "/home" },
-  { path: "/worker/output-history", label: "Lịch sử sản lượng", parent: "/home" },
+  { path: "/worker/output-history", label: "Sản lượng của tôi", parent: "/home" },
   {
     path: "/employees/:id/edit",
     label: ({ id }) => `Cập nhật nhân viên #${id}`,

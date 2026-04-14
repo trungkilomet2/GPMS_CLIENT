@@ -173,8 +173,7 @@ export default function ProductionList() {
                   });
                 });
 
-              const completed = list.filter(p => p.status === 'Hoàn thành').length;
-              const display = list.length > 0 ? `${completed} / ${list.length}` : "0";
+              const display = list.length > 0 ? `${list.length}` : "0";
               return { productionId, display, isUserInvolved };
             } catch (error) {
               return { productionId, display: "0", isUserInvolved: false };

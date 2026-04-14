@@ -234,8 +234,7 @@ export default function OrderDetail() {
     const isCompleted = normalizedStatus === 'Đã hoàn thành';
 
     // Permission rules: ONLY the order owner (customer) can edit when requested
-    const canEdit = isCustomer && isOrderOwner &&
-        (normalizedStatus === 'Chờ xét duyệt' || normalizedStatus === 'Yêu cầu chỉnh sửa');
+    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
     const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;
@@ -505,8 +504,8 @@ export default function OrderDetail() {
                                     <DesignTemplatesSection templates={templates} title="TÀI LIỆU ĐÍNH KÈM" />
                                 </div>
 
-                                {/* Workshop Quality Summary in Sidebar */}
-                                {hasProduction && (
+                                {/* Workshop Quality Summary in Sidebar - ONLY for Owner */}
+                                {hasProduction && isOwner && (
                                     <div className="pt-8 border-t border-gray-100 space-y-6">
                                         <div className="flex items-center gap-3">
                                             <div className="w-1.5 h-4 bg-[#1e6e43] rounded-full" />
@@ -514,34 +513,38 @@ export default function OrderDetail() {
                                         </div>
 
                                         <div className="bg-[#f0f9f4]/50 rounded-2xl p-6 border border-[#d4e3da] space-y-5">
-                                            <div className="space-y-1">
-                                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest text-center">Tóm tắt sản lượng</p>
-                                                <h4 className="text-lg font-black text-center text-slate-900 uppercase tracking-tight">Thực tế xuất xưởng</h4>
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Tóm tắt sản lượng</p>
+                                                <h4 className="text-xl font-black text-center text-slate-900 uppercase tracking-tight">Thực tế xuất xưởng</h4>
                                             </div>
 
                                             <div className="space-y-4">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng đặt hàng</span>
-                                                    <span className="text-sm font-black text-slate-800">{order?.quantity?.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tổng đặt hàng</span>
+                                                    <span className="text-xl font-black text-slate-800">{order?.quantity?.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <div className="flex flex-col">
-                                                        <span className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Lỗi khấu trừ</span>
-                                                        <span className="text-[8px] font-medium text-rose-400 italic">(Không thể sửa)</span>
+                                                        <span className="text-xs font-bold text-rose-500 uppercase tracking-widest">Lỗi khấu trừ</span>
+                                                        <span className="text-[9px] font-medium text-rose-400 italic">(Không thể sửa)</span>
                                                     </div>
-                                                    <span className="text-sm font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                    <span className="text-xl font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
                                                 </div>
                                                 <div className="pt-4 border-t border-[#d4e3da] flex items-center justify-between">
-                                                    <span className="text-[10px] font-bold text-[#1e6e43] uppercase tracking-widest">Thực giao dự kiến</span>
+                                                    <span className="text-xs font-bold text-[#1e6e43] uppercase tracking-widest">Thực giao dự kiến</span>
                                                     <span className="text-xl font-black text-[#1e6e43]">{finalQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-[#1e6e43] uppercase tracking-widest">Doanh thu thực tế (Dự kiến)</span>
+                                                    <span className="text-xl font-black text-[#1e6e43]">₫{(finalQuantity * (order?.cpu || 0)).toLocaleString()}</span>
                                                 </div>
                                             </div>
 
                                             {criticalIssues.length > 0 && (
                                                 <div className="space-y-2 pt-2">
-                                                    <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Chi tiết lỗi không thể sửa:</p>
+                                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Chi tiết lỗi không thể sửa:</p>
                                                     {criticalIssues.map((issue, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-[10px] font-bold text-gray-600 bg-white/50 p-2 rounded-lg border border-[#d4e3da]/30">
+                                                        <div key={idx} className="flex items-center justify-between text-[15px] font-bold text-gray-600 bg-white/50 p-2 rounded-lg border border-[#d4e3da]/30">
                                                             <span className="truncate max-w-[120px]">{issue.title || issue.description || 'Lỗi không tên'}</span>
                                                             <span className="text-rose-600">-{issue.confirmedQuantity || issue.quantity}</span>
                                                         </div>
@@ -655,6 +658,7 @@ export default function OrderDetail() {
                 }
                 deliveries={deliveries}
                 onRefresh={fetchOrderDetail}
+                productionId={linkedProductionId}
             />
         </OwnerLayout >
     );

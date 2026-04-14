@@ -20,8 +20,19 @@ import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
 import OrderService from "@/services/OrderService";
 import { toast } from "react-toastify";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
+import WorkerLayout from "@/layouts/WorkerLayout";
+import Pagination from "@/components/Pagination";
+import "@/styles/homepage.css";
+import "@/styles/leave.css";
 
 export default function ProductionPartHistory() {
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isWorker = primaryRole === "worker";
+  const LayoutComponent = isWorker ? WorkerLayout : OwnerLayout;
+
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,6 +43,8 @@ export default function ProductionPartHistory() {
   const [variantLookup, setVariantLookup] = useState({});
   const [orderSizeLookup, setOrderSizeLookup] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Management State
   const [editingId, setEditingId] = useState(null);
@@ -54,7 +67,7 @@ export default function ProductionPartHistory() {
   const getLogIdentity = (log = {}) => {
     // WorkLogId is the ID of the record itself
     const finalLogId = toPositiveInt(log.id || log.workLogId);
-    
+
     // PartOrderSizeId is the variant/link ID
     const variantIdValue = log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || 0;
     const finalVariantId = toPositiveInt(variantIdValue);
@@ -76,13 +89,6 @@ export default function ProductionPartHistory() {
     if (finalPartId === 0) {
       finalPartId = toPositiveInt(params.partId);
     }
-
-    console.log("GPMS - Mapped Identity:", {
-      partId: finalPartId,
-      partOrderSizeId: finalVariantId,
-      workLogId: finalLogId,
-      rawLog: log
-    });
 
     return {
       partId: finalPartId,
@@ -110,18 +116,21 @@ export default function ProductionPartHistory() {
       try {
         setLoading(true);
         // A. Fetch Production Detail
-        const prodRes = await ProductionService.getProductionDetail(activeProdId);
-        const prodData = prodRes?.data?.data || prodRes?.data || {};
-        console.log("GPMS - RAW Production:", prodData);
+        let prodData = {};
+        try {
+          const prodRes = await ProductionService.getProductionDetail(activeProdId);
+          prodData = prodRes?.data?.data || prodRes?.data || {};
+        } catch (e) {
+          console.error("Error Production Detail API:", e);
+        }
 
         const orderId = prodData?.orderId || prodData?.order?.id || prodData?.orderID;
 
         // B. Fetch Order Detail
-        if (orderId) {
+        if (orderId && hasAnyRole(user?.role, ["Owner", "PM", "Manager", "Team Leader"])) {
           try {
             const orderRes = await OrderService.getOrderDetail(orderId);
             const orderData = orderRes?.data?.data || orderRes?.data || {};
-            console.log("GPMS - RAW Order:", orderData);
             const orderDetails = orderData?.orderDetails || orderData?.orderItems || [];
 
             const osLookup = {};
@@ -143,30 +152,41 @@ export default function ProductionPartHistory() {
           } catch (err) { console.error("Error Order API:", err); }
         }
 
-        // C. Fetch Parts
-        const partsRes = await ProductionPartService.getPartsByProduction(activeProdId);
-        const partsList = partsRes?.data?.data || partsRes?.data || [];
-        console.log("GPMS - RAW Parts:", partsList);
+        // C. Fetch Parts & Logs in parallel
+        const [partsRes, logsRes] = await Promise.allSettled([
+          ProductionPartService.getPartsByProduction(activeProdId),
+          ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: 0, PageSize: 100 })
+        ]);
 
-        const pLookup = {};
-        const vLookup = {};
+        if (partsRes.status === 'fulfilled') {
+          const partsList = partsRes.value?.data?.data || partsRes.value?.data || [];
+          const pLookup = {};
+          const vLookup = {};
 
-        partsList.forEach((p) => {
-          const pid = String(p.id || p.partId || p.productionPartId || "");
-          const vlinkId = String(p.partOrderSizeId || p.orderSizeId || p.productionPartOrderSizeId || "");
+          partsList.forEach((p) => {
+            const pid = String(p.id || p.partId || p.productionPartId || "");
+            const vlinkId = String(p.partOrderSizeId || p.orderSizeId || p.productionPartOrderSizeId || "");
 
-          if (pid && pid !== "0") pLookup[pid] = p;
-          if (vlinkId && vlinkId !== "0") vLookup[vlinkId] = p;
-        });
-        setPartsLookup(pLookup);
-        setVariantLookup(vLookup);
+            if (pid && pid !== "0") pLookup[pid] = p;
+            if (vlinkId && vlinkId !== "0") vLookup[vlinkId] = p;
+          });
+          setPartsLookup(pLookup);
+          setVariantLookup(vLookup);
+        } else {
+          console.error("Error Parts API:", partsRes.reason);
+        }
 
-        // D. Fetch Logs
-        const logsRes = await ProductionPartService.getProductionWorkLogs(activeProdId);
-        const logData = logsRes?.data?.data || logsRes?.data || [];
-        console.log("GPMS - RAW Logs:", logData);
-        setLogs(Array.isArray(logData) ? logData : []);
+        if (logsRes.status === 'fulfilled') {
+          const logData = logsRes.value?.data?.data || logsRes.value?.data || [];
+          setLogs(Array.isArray(logData) ? logData : []);
+        } else {
+          console.error("Error Logs API:", logsRes.reason);
+          // Only show toast if the MAIN data fails
+          toast.error("Không thể tải danh sách bản ghi.");
+        }
+
       } catch (err) {
+        console.error("Critical Fetch Error:", err);
         toast.error("Lỗi dữ liệu hệ thống.");
       } finally {
         setLoading(false);
@@ -177,15 +197,20 @@ export default function ProductionPartHistory() {
 
   const stats = useMemo(() => {
     const totalLogs = logs.length;
-    const pendingCount = logs.filter(log =>
-      !(log.status === 2 || log.statusName === "Đã nghiệm thu" || log.status === 4 || log.statusName === "Đã hoàn thành")
-    ).length;
+    const pendingCount = logs.filter(log => !log.isReadOnly).length;
 
     return {
       totalLogs,
       pendingCount
     };
   }, [logs]);
+
+  const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
+
+  const pageLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return logs.slice(start, start + pageSize);
+  }, [logs, currentPage, pageSize]);
 
   // --- ACTIONS ---
 
@@ -213,17 +238,14 @@ export default function ProductionPartHistory() {
     setIsProcessing(true);
     try {
       const payload = { approvedQuantity };
-      console.log("GPMS - Executing Approve with IDs:", { partId, partOrderSizeId, workLogId });
-      console.log("GPMS - Payload:", payload);
       await ProductionPartService.approveWorkLog(partId, partOrderSizeId, workLogId, payload);
       setLogs((prev) => prev.map((item) => (
         getLogIdentity(item).workLogId === workLogId
-          ? { ...item, quantity: approvedQuantity, status: 2, statusName: "Đã nghiệm thu" }
+          ? { ...item, quantity: approvedQuantity, status: 2, statusName: "Đã nghiệm thu", isReadOnly: true }
           : item
       )));
       toast.success("Đã nghiệm thu sản lượng thành công.");
     } catch (err) {
-      console.error("Full Error Response:", err.response);
       let msg = "Lỗi nghiệm thu: ";
       const data = err.response?.data;
       if (data?.errors) {
@@ -307,8 +329,9 @@ export default function ProductionPartHistory() {
   };
 
   return (
-    <OwnerLayout>
-      <div className="min-h-screen bg-[#f0f9f4] font-sans selection:bg-[#1e6e43]/10 selection:text-[#1e6e43] pb-20">
+    <LayoutComponent>
+
+      <div className="leave-page min-h-screen font-sans selection:bg-[#1e6e43]/10 selection:text-[#1e6e43] pb-20">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
 
           {/* HEADER SECTION */}
@@ -328,12 +351,6 @@ export default function ProductionPartHistory() {
                   Mã sản xuất: #PR-{productionId || "..."}
                 </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-4 py-2 bg-[#f0f9f4] text-[#1e6e43] border border-[#d4e3da] rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
-                {stats.totalLogs} Lượt báo cáo
-              </span>
             </div>
           </div>
 
@@ -374,7 +391,7 @@ export default function ProductionPartHistory() {
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Số lượng</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Ngày ghi</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Trạng thái</th>
-                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>
+                    {!isWorker && <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 border-black">
@@ -387,7 +404,8 @@ export default function ProductionPartHistory() {
                         </div>
                       </td>
                     </tr>
-                  ) : logs.map((log, index) => {
+                  ) : pageLogs.map((log, index) => {
+                    const globalIndex = (currentPage - 1) * pageSize + index + 1;
                     const logPosId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
                     const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.id || "");
 
@@ -409,7 +427,7 @@ export default function ProductionPartHistory() {
 
                     return (
                       <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
-                        <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(index + 1).padStart(2, "0")}</td>
+                        <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(globalIndex).padStart(2, "0")}</td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{partName}</div>
                         </td>
@@ -441,67 +459,73 @@ export default function ProductionPartHistory() {
                         </td>
                         <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-600 uppercase tracking-tighter italic">{formatDate(log.createDate || log.workDate)}</td>
                         <td className="px-6 py-4 text-center">
-                          {log.status === 4 || log.statusName === "Đã hoàn thành" ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-emerald-600 shadow-sm">
-                              <CheckCircle2 size={11} /> Hoàn nhận
-                            </span>
-                          ) : log.status === 2 || log.statusName === "Đã nghiệm thu" ? (
+                          {log.isReadOnly ? (
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-300 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-indigo-700 shadow-sm">
                               <ClipboardCheck size={11} /> Đã nghiệm thu
                             </span>
-                          ) : log.status === 3 || log.statusName === "Chờ Nghiệm Thu" ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
-                              <Zap size={11} className="animate-pulse" /> Chờ duyệt
-                            </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-slate-600">
-                              Đang xử lý
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
+                              <Zap size={11} className="animate-pulse" /> Chờ nghiệm thu
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            {isEditing ? (
-                              <>
-                                <button onClick={() => openEditConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all"><Check size={18} /></button>
-                                <button onClick={() => setEditingId(null)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all"><X size={18} /></button>
-                              </>
-                            ) : (
-                              <>
-                                {!isDone && !log.isReadOnly && (
+                        {!isWorker && (
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              {isEditing ? (
+                                <>
+                                  <button onClick={() => openEditConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all"><Check size={18} /></button>
+                                  <button onClick={() => setEditingId(null)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all"><X size={18} /></button>
+                                </>
+                              ) : (
+                                <>
+                                  {!isDone && !log.isReadOnly && (
+                                    <button
+                                      onClick={() => handleOpenApprove(log)}
+                                      title="Xác nhận Nghiệm thu"
+                                      className="w-10 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-[#1e6e43] flex items-center justify-center transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95"
+                                    >
+                                      <Zap size={16} />
+                                    </button>
+                                  )}
                                   <button
-                                    onClick={() => handleOpenApprove(log)}
-                                    title="Xác nhận Nghiệm thu"
-                                    className="w-10 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-[#1e6e43] flex items-center justify-center transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95"
+                                    onClick={() => !log.isReadOnly && (setEditingId(rowId), setEditValue(String(log.quantity)))}
+                                    disabled={log.isReadOnly || isDone}
+                                    className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-300' : 'text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95'}`}
+                                    title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Sửa"}
                                   >
-                                    <Zap size={16} />
+                                    <Pencil size={15} />
                                   </button>
-                                )}
-                                <button 
-                                  onClick={() => !log.isReadOnly && (setEditingId(rowId), setEditValue(String(log.quantity)))} 
-                                  disabled={log.isReadOnly || isDone}
-                                  className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-300' : 'text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95'}`} 
-                                  title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Sửa"}
-                                >
-                                  <Pencil size={15} />
-                                </button>
-                                <button 
-                                  onClick={() => !log.isReadOnly && openDeleteConfirm(log)} 
-                                  disabled={log.isReadOnly || isDone}
-                                  className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-200' : 'text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95'}`} 
-                                  title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Xóa"}
-                                >
-                                  <Trash size={15} />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
+                                  <button
+                                    onClick={() => !log.isReadOnly && openDeleteConfirm(log)}
+                                    disabled={log.isReadOnly || isDone}
+                                    className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-200' : 'text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95'}`}
+                                    title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Xóa"}
+                                  >
+                                    <Trash size={15} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* PAGINATION FOOTER */}
+            <div className="px-8 py-5 border-t border-black bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Hiển thị {Math.min(logs.length, (currentPage - 1) * pageSize + 1)}-{Math.min(logs.length, currentPage * pageSize)} trên {logs.length} bản ghi
+              </p>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           </div>
         </div>
@@ -574,7 +598,7 @@ export default function ProductionPartHistory() {
           </div>
         )}
       </div>
-    </OwnerLayout>
+    </LayoutComponent>
   );
 }
 

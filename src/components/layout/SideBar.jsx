@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import logoMGC from "@/assets/logo_brand.png";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -18,8 +19,7 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel } from "@/lib/orgHierarchy";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -32,7 +32,7 @@ const OPERATION_NAV_ITEMS = [
   { to: "/dashboard", label: "Bảng điều khiển", icon: ChartPie, disabled: false, allowedRoles: ["Owner"] },
   { to: "/orders/owner", label: "Danh sách đơn hàng", icon: BriefcaseBusiness, disabled: false, allowedRoles: ["Owner"] },
   { to: "/production", label: "Quản lý sản xuất", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
-  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
+  { to: "/worker/output-history", label: "Sản lượng của tôi", icon: ClipboardCheck, disabled: false, allowedRoles: ["Owner", "PM"] },
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
   { to: "/customers", label: "Khách hàng", icon: ContactRound, disabled: false, allowedRoles: ["Owner"] },
   { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
@@ -69,7 +69,7 @@ function getInitials(name = "") {
     .toUpperCase();
 }
 
-export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
+export default function Sidebar({ mobileOpen = false, onClose = () => { } }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -103,10 +103,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
     location.pathname.startsWith("/worker/production-plan"),
     location.pathname.includes("/cutting-book"),
   ].some(Boolean);
-  const userRoleLabel = splitRoles(user?.role)
-    .map((role) => getSystemRoleLabel(role))
-    .join(", ");
-
   useEffect(() => {
     try {
       localStorage.setItem("gpms-sidebar-collapsed", JSON.stringify(collapsed));
@@ -144,100 +140,99 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
         className={`dashboard-sidebar ${effectiveCollapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
         aria-expanded={isMobileViewport ? mobileOpen : !effectiveCollapsed}
       >
-      <div className="dashboard-sidebar__brand">
-        <button
-          type="button"
-          className="dashboard-sidebar__logo"
-          onClick={() => {
-            if (isMobileViewport) return;
-            setCollapsed((prev) => !prev);
-          }}
-          title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
-        >
-          <span className="dashboard-sidebar__logo-mark">GP</span>
-        </button>
+        <div className="dashboard-sidebar__brand">
+          <button
+            type="button"
+            className="dashboard-sidebar__logo"
+            onClick={() => {
+              if (isMobileViewport) return;
+              setCollapsed((prev) => !prev);
+            }}
+            title={isMobileViewport ? "May Gia Công" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
+          >
+            <img src={logoMGC} alt="Logo" />
+          </button>
 
-        {!effectiveCollapsed && (
-          <div className="dashboard-sidebar__brand-text">
-            <div className="dashboard-sidebar__brand-title">GPMS</div>
-            <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
-          </div>
-        )}
+          {!effectiveCollapsed && (
+            <div className="dashboard-sidebar__brand-text">
+              <div className="dashboard-sidebar__brand-title text-sm font-bold">May Gia Công</div>
+              <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
+            </div>
+          )}
 
-        <button
-          type="button"
-          className="dashboard-sidebar__mobile-close"
-          onClick={onClose}
-          aria-label="Đóng menu"
-        >
-          <X size={18} />
-        </button>
-      </div>
+          <button
+            type="button"
+            className="dashboard-sidebar__mobile-close"
+            onClick={onClose}
+            aria-label="Đóng menu"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-      <nav className="dashboard-sidebar__nav">
-        {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, allowedRoles }) => {
-          if (!hasRequiredRole(user, allowedRoles)) return null;
+        <nav className="dashboard-sidebar__nav">
+          {navItems.map(({ to, label, icon: Icon, disabled, compactLabel, allowedRoles }) => {
+            if (!hasRequiredRole(user, allowedRoles)) return null;
 
-          if (disabled) {
+            if (disabled) {
+              return (
+                <div
+                  key={to}
+                  className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
+                  title={label}
+                >
+                  {createElement(Icon, { size: 22 })}
+                  {!effectiveCollapsed && <span>{label}</span>}
+                </div>
+              );
+            }
+
             return (
-              <div
+              <NavLink
                 key={to}
-                className={`dashboard-sidebar__item is-disabled ${compactLabel ? "dashboard-sidebar__item--compact" : ""}`}
+                to={to}
                 title={label}
+                onClick={onClose}
+                className={({ isActive }) => {
+                  const isForcedActive = (to === "/orders/owner" && isOrdersSection) || (to === "/production" && isProductionSection);
+                  const active = isActive || isForcedActive;
+                  return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
+                }}
               >
                 {createElement(Icon, { size: 22 })}
                 {!effectiveCollapsed && <span>{label}</span>}
-              </div>
+              </NavLink>
             );
-          }
+          })}
+        </nav>
 
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              title={label}
-              onClick={onClose}
-              className={({ isActive }) => {
-                const isForcedActive = (to === "/orders/owner" && isOrdersSection) || (to === "/production" && isProductionSection);
-                const active = isActive || isForcedActive;
-                return `dashboard-sidebar__item ${compactLabel ? "dashboard-sidebar__item--compact" : ""} ${active ? "is-active" : ""}`;
-              }}
-            >
-              {createElement(Icon, { size: 22 })}
-              {!effectiveCollapsed && <span>{label}</span>}
-            </NavLink>
-          );
-        })}
-      </nav>
-
-      <div className="dashboard-sidebar__footer">
-        <NavLink
-          to="/profile"
-          title="Hồ sơ cá nhân"
-          onClick={onClose}
-          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
-        >
-          <div className="dashboard-sidebar__avatar">
-            {getInitials(user?.fullName || user?.name || "GP")}
-          </div>
-          {!effectiveCollapsed && (
-            <div className="dashboard-sidebar__user">
-              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
+        <div className="dashboard-sidebar__footer">
+          <NavLink
+            to="/profile"
+            title="Hồ sơ cá nhân"
+            onClick={onClose}
+            className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+          >
+            <div className="dashboard-sidebar__avatar">
+              {getInitials(user?.fullName || user?.name || "GP")}
             </div>
-          )}
-        </NavLink>
+            {!effectiveCollapsed && (
+              <div className="dashboard-sidebar__user">
+                <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
+              </div>
+            )}
+          </NavLink>
 
-        <button
-          type="button"
-          className="dashboard-sidebar__logout"
-          onClick={handleLogout}
-          title="Đăng xuất"
-        >
-          <LogOut size={18} />
-          {!effectiveCollapsed && <span>Đăng xuất</span>}
-        </button>
-      </div>
+          <button
+            type="button"
+            className="dashboard-sidebar__logout"
+            onClick={handleLogout}
+            title="Đăng xuất"
+          >
+            <LogOut size={18} />
+            {!effectiveCollapsed && <span>Đăng xuất</span>}
+          </button>
+        </div>
       </aside>
     </>
   );

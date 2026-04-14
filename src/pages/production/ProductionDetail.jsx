@@ -210,8 +210,22 @@ export default function ProductionDetail() {
     ProductionPartService.getProductionWorkLogs(production.productionId)
       .then(res => {
         const data = res?.data?.data ?? res?.data ?? [];
-        setAllLogs(Array.isArray(data) ? data : []);
-        setReportCount(Array.isArray(data) ? data.length : 0);
+        const logs = Array.isArray(data) ? data : [];
+        setAllLogs(logs);
+        setReportCount(logs.length);
+
+        // Supplemental name resolution: Extract names from logs to bypass directory restrictions
+        setWorkerMap(prev => {
+          const newMap = { ...prev };
+          logs.forEach(log => {
+            const uid = log.userId || log.uId || log.accountId;
+            const name = log.workerName || log.fullName;
+            if (uid && name && !newMap[String(uid)]) {
+              newMap[String(uid)] = name;
+            }
+          });
+          return newMap;
+        });
       })
       .catch(err => console.error("Error fetching logs count:", err));
   }, [production?.productionId]);
@@ -313,16 +327,16 @@ export default function ProductionDetail() {
     // 2. Tổng chi phí nhân công = Tổng (Đơn giá từng công đoạn * Số lượng công đoạn đó)
     const laborCost = steps.reduce((sum, s) => sum + ((Number(s.unitPrice) || 0) * (Number(s.quantity) || 0)), 0);
 
-    const totalCost = laborCost; 
+    const totalCost = laborCost;
     const profit = revenue - totalCost;
     const profitMargin = revenue > 0 ? (profit / revenue) * 100 : 0;
 
-    return { 
-      revenue, 
-      laborCost, 
-      totalCost, 
-      profit, 
-      profitMargin 
+    return {
+      revenue,
+      laborCost,
+      totalCost,
+      profit,
+      profitMargin
     };
   }, [order, steps]);
 
@@ -578,7 +592,7 @@ export default function ProductionDetail() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div 
+                    <div
                       onClick={() => navigate(`/production-plan/${production.productionId}/history`)}
                       className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-emerald-50/30 hover:border-[#1e6e43] cursor-pointer"
                     >
@@ -592,7 +606,7 @@ export default function ProductionDetail() {
                       <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{reportCount} <span className="text-sm text-gray-400 ml-1">LƯỢT BÁO CÁO</span></h5>
                     </div>
 
-                    <div 
+                    <div
                       onClick={() => navigate(`/production/${production.productionId}/errors`)}
                       className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-rose-50/30 hover:border-rose-300 cursor-pointer text-center md:text-left"
                     >
@@ -639,36 +653,41 @@ export default function ProductionDetail() {
                         </div>
 
                         {/* Financial Card moved here */}
-                        {financialSummary && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan || isInProduction) && (
-                          <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/40 p-6 sm:p-7 shadow-sm animate-in zoom-in-95 duration-500">
-                            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-5">
-                              <div className="rounded-2xl border border-emerald-100 bg-white/85 p-5 space-y-3">
-                                <p className="text-[11px] font-extrabold text-[#1e6e43]/75 uppercase tracking-[0.14em]">Lợi nhuận gộp dự kiến</p>
-                                <p className={`text-4xl leading-none font-black tracking-tight tabular-nums ${financialSummary.profit >= 0 ? 'text-[#1e6e43]' : 'text-rose-600'}`}>
-                                  {financialSummary.profit >= 0 ? '+' : ''}₫{financialSummary.profit.toLocaleString()}
-                                </p>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className={`text-[10px] font-black px-3 py-1 rounded-full ${financialSummary.profit >= 0 ? 'bg-[#1e6e43] text-white' : 'bg-rose-500 text-white'} uppercase`}>
-                                    Tỷ suất: {financialSummary.profitMargin.toFixed(1)}%
-                                  </span>
-                                  <span className="text-[11px] font-semibold text-slate-500 tracking-wide">
-                                    Lợi nhuận = Doanh thu - Tổng chi phí
+                        {isOwner && financialSummary && (isPendingApproval || isAccepted || isPendingPlanApproval || isNeedUpdatePlan || isInProduction) && (
+                          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-5 sm:p-6 shadow-sm animate-in zoom-in-95 duration-500">
+                            <div className="flex flex-col sm:flex-row items-center sm:items-stretch gap-6">
+                              {/* Left Side: Profit & Margin */}
+                              <div className="flex-1 flex flex-col justify-center text-center sm:text-left space-y-1">
+                                <p className="text-[10px] font-bold text-emerald-800/60 uppercase tracking-widest">Lợi nhuận gộp dự kiến</p>
+                                <div className="flex items-center justify-center sm:justify-start gap-2">
+                                  <p className={`text-2xl sm:text-3xl font-black tracking-tighter tabular-nums ${financialSummary.profit >= 0 ? 'text-[#1e6e43]' : 'text-rose-600'}`}>
+                                    {financialSummary.profit >= 0 ? '+' : ''}₫{financialSummary.profit.toLocaleString()}
+                                  </p>
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${financialSummary.profit >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-500 text-white'} uppercase`}>
+                                    {financialSummary.profitMargin.toFixed(1)}%
                                   </span>
                                 </div>
+                                <p className="text-[9px] font-medium text-slate-400 italic">
+                                  (Doanh thu - Nhân công)
+                                </p>
                               </div>
 
-                              <div className="rounded-2xl border border-emerald-100/70 bg-white/80 p-4 sm:p-5 space-y-3">
-                                <div className="flex items-center justify-between gap-3 border-b border-emerald-100 pb-2">
-                                  <p className="text-[11px] font-bold text-[#1e6e43]/70 uppercase tracking-wide">Doanh thu</p>
-                                  <p className="text-lg font-black text-slate-900 tabular-nums whitespace-nowrap">₫{financialSummary.revenue.toLocaleString()}</p>
+                              {/* Divider */}
+                              <div className="hidden sm:block w-px bg-emerald-100" />
+                              <div className="sm:hidden h-px w-full bg-emerald-100" />
+
+                              {/* Right Side: Breakdown */}
+                              <div className="flex-1 w-full space-y-2 flex flex-col justify-center">
+                                <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+                                  <span className="font-bold text-slate-500 uppercase tracking-wider">Doanh thu dự kiến</span>
+                                  <span className="font-black text-slate-900">₫{financialSummary.revenue.toLocaleString()}</span>
                                 </div>
-                                <div className="flex items-center justify-between gap-3 border-b border-rose-100 pb-2">
-                                  <p className="text-[11px] font-bold text-rose-500/90 uppercase tracking-wide">Tổng chi phí</p>
-                                  <p className="text-lg font-black text-rose-600 tabular-nums whitespace-nowrap">₫{financialSummary.totalCost.toLocaleString()}</p>
+                                <div className="flex items-center justify-between text-[10px] sm:text-[11px]">
+                                  <span className="font-bold text-rose-500 uppercase tracking-wider">Chi phí nhân công</span>
+                                  <span className="font-black text-rose-600 text-xs">- ₫{financialSummary.laborCost.toLocaleString()}</span>
                                 </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Chi phí nhân công</p>
-                                  <p className="text-lg font-black text-slate-700 tabular-nums whitespace-nowrap">₫{financialSummary.laborCost.toLocaleString()}</p>
+                                <div className="mt-1 pt-1 border-t border-emerald-100/50 flex items-center justify-between text-[8px] sm:text-[9px]">
+                                  <span className="font-medium text-slate-400 uppercase tracking-wider italic">Ghi chú: Tính trên đơn giá các công đoạn</span>
                                 </div>
                               </div>
                             </div>
@@ -678,7 +697,7 @@ export default function ProductionDetail() {
                     </div>
 
                     <div className="space-y-6 pt-10 border-t border-gray-100 italic font-medium text-slate-400 text-[10px] uppercase text-right">
-                       * Lưu ý: Tiến độ hoàn thành được tính dựa trên số lượng đã nghiệm thu của công đoạn cuối cùng.
+                      * Lưu ý: Tiến độ hoàn thành được tính dựa trên số lượng đã nghiệm thu của công đoạn cuối cùng.
                     </div>
 
                     <div className="space-y-6 pt-4">
@@ -704,33 +723,61 @@ export default function ProductionDetail() {
                               const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
                               const rowTotal = sizeKeys.reduce((acc, k) => acc + (v[k] || 0), 0);
                               
-                              // Calculate actual reported for this color (from the last stage basically)
-                              // We'll look at steps where partId is the last one
-                              const lastStageId = rawParts[rawParts.length - 1]?.id;
-                              
-                              const rowActual = sizeKeys.reduce((acc, k) => {
-                                const variantStep = steps.find(s => 
-                                  s.partId === lastStageId && 
-                                  String(s.colorName).toLowerCase() === String(v.color).toLowerCase() && 
-                                  String(s.sizeName).toLowerCase() === String(k).toLowerCase()
-                                );
-                                return acc + (variantStep?.actualQuantity || 0);
-                              }, 0);
+                              // Helper to normalize strings for matching
+                              const normalize = (str) => {
+                                if (!str) return "";
+                                return str.toString()
+                                  .toLowerCase()
+                                  .normalize("NFD")
+                                  .replace(/[\u0300-\u036f]/g, "")
+                                  .replace(/đ/g, "d")
+                                  .trim();
+                              };
+
+                              // Calculate bottleneck (MIN) across all stages
+                              const stageData = sizeKeys.map(k => {
+                                const targetSize = normalize(k);
+                                const targetColor = normalize(v.color);
+                                const targetQty = v[k] || 0;
+
+                                if (targetQty === 0) return { actual: 0, target: 0 };
+
+                                const countsPerStage = rawParts.map(part => {
+                                  const partId = String(part.id || "");
+                                  const variantLink = (part.listPartOrderSizes || []).find(l => 
+                                     normalize(l.color || l.colorName || "") === targetColor &&
+                                     normalize(l.size || l.sizeName || "") === targetSize
+                                  );
+                                  const linkId = String(variantLink?.id || "");
+
+                                  return allLogs
+                                    .filter(log => {
+                                      const logPartId = String(log.productionPartId || log.partId || "");
+                                      const logLinkId = String(log.partOrderSizeId || log.productionPartOrderSizeId || "");
+                                      const logColor = normalize(log.color || log.colorName || "");
+                                      const logSize = normalize(log.size || log.sizeName || "");
+                                      
+                                      const isMatch = (logPartId === partId) && 
+                                                      (logLinkId === linkId || (logColor === targetColor && logSize === targetSize));
+                                      const isApproved = log.isReadOnly === true || log.isReadOnly === 1 || [2, 4].includes(Number(log.status));
+                                      return isMatch && isApproved;
+                                    })
+                                    .reduce((sum, l) => sum + (Number(l.confirmedQuantity || l.quantity || 0)), 0);
+                                });
+
+                                const actual = Math.min(...countsPerStage);
+                                return { actual, target: targetQty };
+                              });
+
+                              const rowActual = stageData.reduce((sum, d) => sum + d.actual, 0);
 
                               return (
                                 <div key={idx} className="grid grid-cols-11 items-stretch hover:bg-slate-50/50 transition-all divide-x divide-black">
                                   <div className="col-span-2 py-4 px-6 flex items-center bg-slate-50/10">
                                     <span className="text-[12px] font-black text-black uppercase tracking-tight truncate">{v.color}</span>
                                   </div>
-                                  {sizeKeys.map(k => {
-                                    const variantStep = steps.find(s => 
-                                      s.partId === lastStageId && 
-                                      String(s.colorName).toLowerCase() === String(v.color).toLowerCase() && 
-                                      String(s.sizeName).toLowerCase() === String(k).toLowerCase()
-                                    );
-                                    const actual = variantStep?.actualQuantity || 0;
-                                    const target = v[k] || 0;
-
+                                  {sizeKeys.map((k, sIdx) => {
+                                    const { actual, target } = stageData[sIdx];
                                     return (
                                       <div key={k} className="col-span-1 py-3 text-center flex flex-col items-center justify-center">
                                         {target > 0 ? (
@@ -813,11 +860,56 @@ export default function ProductionDetail() {
         </div>
       </div>
 
-      <ConfirmModal isOpen={isApproveOrderConfirmOpen} onClose={() => setIsApproveOrderConfirmOpen(false)} onConfirm={confirmApproveProduction} title="Chấp nhận đơn sản xuất" message="Hành động này sẽ chuyển trạng thái đơn sang 'Chấp Nhận'." />
-      <ConfirmModal isOpen={isApprovePlanConfirmOpen} onClose={() => setIsApprovePlanConfirmOpen(false)} onConfirm={confirmApprovePlan} title="Phê duyệt kế hoạch" message="Kế hoạch sản xuất sẽ được phê duyệt." />
-      <ConfirmModal isOpen={isRequestPlanUpdateConfirmOpen} onClose={() => setIsRequestPlanUpdateConfirmOpen(false)} onConfirm={confirmRequestPlanUpdate} title="Yêu cầu sửa kế hoạch" message="Gửi yêu cầu yêu cầu PM chỉnh sửa kế hoạch." />
-      <ConfirmModal isOpen={isDonePartModalOpen} onClose={() => setIsDonePartModalOpen(false)} onConfirm={confirmDonePart} title="Xác nhận hoàn thành" message="Xác nhận hoàn thành công đoạn này?" />
-      <ConfirmModal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} onConfirm={confirmCompleteProduction} title="Hoàn thành dự án" message="Toàn bộ quy trình sản xuất sẽ được đóng lại." />
+      <ConfirmModal 
+        isOpen={isApproveOrderConfirmOpen} 
+        onClose={() => setIsApproveOrderConfirmOpen(false)} 
+        onConfirm={confirmApproveProduction} 
+        title="Chấp nhận đơn sản xuất" 
+        description="Bạn có chắc chắn muốn chấp nhận đơn sản xuất này? Đơn sẽ chuyển sang trạng thái dự kiến sản xuất."
+        variant="success"
+        primaryLabel="Xác nhận chấp nhận"
+        confirmIcon={CheckCircle2}
+      />
+      <ConfirmModal 
+        isOpen={isApprovePlanConfirmOpen} 
+        onClose={() => setIsApprovePlanConfirmOpen(false)} 
+        onConfirm={confirmApprovePlan} 
+        title="Phê duyệt kế hoạch" 
+        description="Hành động này sẽ phê duyệt kế hoạch sản xuất hiện tại."
+        variant="success"
+        primaryLabel="Phê duyệt"
+        confirmIcon={CheckCircle2}
+      />
+      <ConfirmModal 
+        isOpen={isRequestPlanUpdateConfirmOpen} 
+        onClose={() => setIsRequestPlanUpdateConfirmOpen(false)} 
+        onConfirm={confirmRequestPlanUpdate} 
+        title="Yêu cầu sửa kế hoạch" 
+        description="Gửi yêu cầu yêu cầu PM chỉnh sửa lại kế hoạch sản xuất."
+        variant="warning"
+        primaryLabel="Gửi yêu cầu"
+        confirmIcon={RotateCcw}
+      />
+      <ConfirmModal 
+        isOpen={isDonePartModalOpen} 
+        onClose={() => setIsDonePartModalOpen(false)} 
+        onConfirm={confirmDonePart} 
+        title="Xác nhận hoàn thành" 
+        description="Bạn có chắc chắn muốn đánh dấu công đoạn này đã hoàn thành?"
+        variant="success"
+        primaryLabel="Xác nhận xong"
+        confirmIcon={CheckCircle2}
+      />
+      <ConfirmModal 
+        isOpen={isCompleteModalOpen} 
+        onClose={() => setIsCompleteModalOpen(false)} 
+        onConfirm={confirmCompleteProduction} 
+        title="Hoàn thành dự án" 
+        description="Mọi hoạt động sản xuất cho mã đơn này sẽ được đóng lại và đánh dấu là Hoàn Thành."
+        variant="success"
+        primaryLabel="Hoàn thành dự án"
+        confirmIcon={CheckCircle2}
+      />
 
       <OrderStatusReasonModal isOpen={isReasonModalOpen} onClose={() => setIsReasonModalOpen(false)} onSubmit={handleRejectProduction} title="Từ chối đơn sản xuất" requireReason={true} />
       <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message="Chấp nhận đơn sản xuất thành công!" />
@@ -901,12 +993,12 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
         const stageStatus = getStageStatus(group.variants, getPlanStatusLabel);
         const cfg = STATUS_CONFIG[stageStatus] || STATUS_CONFIG["Chưa Thực Hiện"];
         const totalQty = group.variants.reduce((s, v) => s + (Number(v.quantity) || 0), 0);
-        
+
         // Calculate dynamic actual quantity from allLogs
         const actualQty = group.variants.reduce((sum, v) => {
-          const variantLogs = allLogs.filter(log => 
-             String(log.productionPartId || log.partId) === String(v.partId) &&
-             String(log.partOrderSizeId || log.orderSizeId) === String(v.id)
+          const variantLogs = allLogs.filter(log =>
+            String(log.productionPartId || log.partId) === String(v.partId) &&
+            String(log.partOrderSizeId || log.orderSizeId) === String(v.id)
           );
           const logTotal = variantLogs
             .filter(log => log.isReadOnly === true || log.isReadOnly === 1)
@@ -1030,9 +1122,9 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
                       {/* Quantity */}
                       <div className="col-span-2 flex flex-col items-center gap-1">
                         {(() => {
-                          const variantLogs = allLogs.filter(log => 
-                             String(log.productionPartId || log.partId) === String(row.partId) &&
-                             String(log.partOrderSizeId || log.orderSizeId) === String(row.id)
+                          const variantLogs = allLogs.filter(log =>
+                            String(log.productionPartId || log.partId) === String(row.partId) &&
+                            String(log.partOrderSizeId || log.orderSizeId) === String(row.id)
                           );
                           const logTotal = variantLogs
                             .filter(log => log.isReadOnly === true || log.isReadOnly === 1)

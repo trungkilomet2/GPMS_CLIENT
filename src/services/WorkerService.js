@@ -1,5 +1,6 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
+import { getAuthItem, getStoredUser } from "@/lib/authStorage";
 import {
   getAllowedManagerRoles,
   getManagerRoleHint,
@@ -192,6 +193,54 @@ const dedupeEmployees = (employees = []) => {
   return Array.from(uniqueEmployees.values());
 };
 
+const normalizeCreateEmployeePayload = (payload = {}) => {
+  const parsedManagerId = Number(payload?.managerId);
+  const normalizedRoleIds = Array.from(
+    new Set(
+      (Array.isArray(payload?.roleIds) ? payload.roleIds : [])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value > 0)
+    )
+  );
+
+  return {
+    userName: String(payload?.userName ?? "").trim(),
+    password: String(payload?.password ?? ""),
+    fullName: String(payload?.fullName ?? "").trim(),
+    managerId: Number.isInteger(parsedManagerId) && parsedManagerId > 0 ? parsedManagerId : null,
+    roleIds: normalizedRoleIds,
+  };
+};
+
+const buildCurrentOwnerManager = () => {
+  const currentUser = getStoredUser();
+  const currentRole = pickPrimarySystemRole(currentUser?.role ?? currentUser?.roles ?? "");
+
+  if (currentRole !== "Owner") {
+    return null;
+  }
+
+  const rawId = currentUser?.userId ?? currentUser?.id ?? null;
+  const parsedId = Number(rawId);
+
+  if (!Number.isFinite(parsedId) || parsedId <= 0) {
+    return null;
+  }
+
+  return normalizeEmployee({
+    id: parsedId,
+    userName: currentUser?.userName ?? "",
+    fullName: currentUser?.fullName ?? currentUser?.name ?? "Chủ xưởng",
+    avatarUrl: currentUser?.avatarUrl ?? currentUser?.avartarUrl ?? "",
+    email: currentUser?.email ?? "",
+    phoneNumber: currentUser?.phoneNumber ?? currentUser?.phone ?? "",
+    location: currentUser?.location ?? currentUser?.address ?? "",
+    role: "Owner",
+    status: "active",
+    statusId: 1,
+  });
+};
+
 async function fetchEmployeePages(endpoint, options = {}) {
   const pageSize = Number(options?.pageSize ?? 100);
   const startPageIndex = Number(options?.pageIndex ?? 0);
@@ -305,16 +354,18 @@ const WorkerService = {
   },
 
   async getManagerDirectory(options = {}) {
-    const users = await fetchEmployeePages(API_ENDPOINTS.USER.LIST, {
+    const users = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, {
       ...options,
       includeHidden: true,
     });
+    const currentOwner = buildCurrentOwnerManager();
+    const managers = currentOwner ? dedupeEmployees([currentOwner, ...users]) : users;
 
     return {
-      data: users,
+      data: managers,
       pageIndex: 0,
-      pageSize: users.length,
-      recordCount: users.length,
+      pageSize: managers.length,
+      recordCount: managers.length,
     };
   },
 
@@ -348,8 +399,58 @@ const WorkerService = {
   },
 
   async createEmployee(payload) {
-    const rawResponse = await axiosClient.post(API_ENDPOINTS.WORKER.CREATE, payload);
-    return normalizeEmployeeResponse(parseApiPayload(rawResponse));
+    const normalizedPayload = normalizeCreateEmployeePayload(payload);
+    const token = getAuthItem("token");
+
+    try {
+      const response = await fetch(API_ENDPOINTS.WORKER.CREATE, {
+        method: "POST",
+        headers: {
+          Accept: "*/*",
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(normalizedPayload),
+      });
+
+      const rawPayload = await response.text().catch(() => "");
+      const parsedPayload = rawPayload
+        ? (() => {
+            try {
+              return JSON.parse(rawPayload);
+            } catch {
+              return rawPayload;
+            }
+          })()
+        : {};
+
+      if (!response.ok) {
+        throw {
+          response: {
+            status: response.status,
+            data: parsedPayload,
+          },
+        };
+      }
+
+      return normalizeEmployeeResponse(parseApiPayload(parsedPayload));
+    } catch (error) {
+      if (error?.response?.status === 404) {
+        throw {
+          ...error,
+          response: {
+            ...error.response,
+            data: {
+              ...error.response?.data,
+              message:
+                "Không tìm thấy API tạo nhân viên trên backend hiện tại. Hãy kiểm tra lại môi trường đang trỏ tới hoặc route /api/Worker/create-employee trên server.",
+            },
+          },
+        };
+      }
+
+      throw error;
+    }
   },
 
   async updateEmployee(id, payload) {
