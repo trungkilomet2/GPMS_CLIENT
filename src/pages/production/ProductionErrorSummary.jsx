@@ -190,9 +190,11 @@ export default function ProductionErrorSummary() {
         if (!active) return;
         const payload = response?.data?.data ?? response?.data ?? {};
         const order = payload?.order ?? {};
+        const totalQty = Number(order?.totalQuantity ?? order?.quantity ?? payload?.quantity ?? 0);
         setProduction({
           productionId: payload?.productionId ?? payload?.id ?? id,
           orderName: order?.orderName ?? order?.name ?? "",
+          totalQuantity: totalQty,
         });
       } catch {
         if (!active) return;
@@ -700,13 +702,14 @@ export default function ProductionErrorSummary() {
                         <input
                           type="number"
                           min="1"
-                          max={targetIssue?.quantity}
+                          max={production?.totalQuantity}
                           value={confirmedQuantity}
                           onChange={(e) => {
                             const val = parseInt(e.target.value);
-                            if (val > targetIssue?.quantity) {
-                              toast.warning(`Tối đa ${targetIssue.quantity}`);
-                              setConfirmedQuantity(targetIssue.quantity);
+                            const maxLimit = production?.totalQuantity || targetIssue?.quantity || 0;
+                            if (val > maxLimit) {
+                              toast.warning(`Tối đa ${maxLimit}`);
+                              setConfirmedQuantity(maxLimit);
                             } else setConfirmedQuantity(e.target.value);
                           }}
                           className="w-full rounded-2xl border border-orange-200 bg-white px-6 py-4 text-center text-3xl font-bold text-orange-900 outline-none focus:border-orange-500 transition-all shadow-inner"
