@@ -19,7 +19,7 @@ import {
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
-import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
+import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -219,7 +219,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => { } }) {
             {!effectiveCollapsed && (
               <div className="dashboard-sidebar__user">
                 <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-                <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
               </div>
             )}
           </NavLink>
