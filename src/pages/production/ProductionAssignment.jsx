@@ -41,7 +41,10 @@ export default function ProductionAssignment() {
             if (p) setFetchedProduction({
                productionId: p.productionId ?? p.id,
                orderName: p.order?.orderName || p.orderName || "Kế hoạch sản xuất",
-               product: p.order || {}
+               product: p.order || {},
+               pmId: p.pm?.id ?? p.pmId,
+               startDate: p.startDate || p.order?.startDate,
+               endDate: p.endDate || p.order?.endDate,
             });
          }).catch(() => { });
          ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 })
@@ -52,42 +55,43 @@ export default function ProductionAssignment() {
 
    useEffect(() => {
       const loadWorkers = async () => {
+         if (!fetchedProduction?.pmId) return;
          try {
-            let res;
-            const userRoles = currentUser?.roles || [];
-            const isOwner = userRoles.some(r => r.toLowerCase().includes("owner") || r.toLowerCase().includes("admin") || r.toLowerCase().includes("manager"));
-            if (isOwner) {
-               res = await WorkerService.getEmployeeDirectory();
-            } else {
-               try {
-                  res = await WorkerService.getEmployeeDirectoryByPmScope();
-                  if (!res?.data?.length) throw new Error("No PM data");
-               } catch {
-                  res = await WorkerService.getEmployeeDirectory();
-               }
-            }
-            const list = (res?.data || []).filter(e => e.status === "active");
-            const mapped = list.map(e => ({
-               id: String(e.id),
-               fullName: e.fullName || "—",
-               role: e.primaryRoleLabel || "Nhân viên",
-               managerName: e.managerName || "Nhóm sản xuất",
+            setWorkers([]);
+            setWorkerGroups([]);
+
+            const params = {
+               PMId: fetchedProduction.pmId,
+               fromDate: fetchedProduction.startDate,
+               toDate: fetchedProduction.endDate,
+            };
+
+            const res = await ProductionPartService.getAssignWorkers(params);
+            const rawData = res?.data?.data || res?.data || [];
+
+            const mapped = rawData.map(item => ({
+               id: String(item.workerInfo?.workerId || item.workerId),
+               fullName: item.workerInfo?.workerName || item.workerName || "—",
+               skills: item.workerSkillInfo?.map(s => s.skillName) || [],
+               role: item.workerSkillInfo?.[0]?.skillName || "Thợ",
+               managerName: "Nhóm sản xuất",
             }));
+
             const ownerId = currentUser?.id || currentUser?.userId;
-            if (ownerId) {
-               const existingIdx = mapped.findIndex(w => String(w.id) === String(ownerId));
-               if (existingIdx > -1) {
-                  const o = mapped.splice(existingIdx, 1)[0];
-                  o.fullName = `${o.fullName} (Bạn)`;
-                  mapped.unshift(o);
-               } else {
-                  mapped.unshift({ id: String(ownerId), fullName: currentUser.fullName || "Chủ xưởng (Bạn)", role: "Chủ quản", managerName: "Ban Quản Trị" });
-               }
+            if (ownerId && !mapped.some(w => String(w.id) === String(ownerId))) {
+               mapped.unshift({
+                  id: String(ownerId),
+                  fullName: currentUser.fullName || "Chủ quản (Bạn)",
+                  role: "Chủ quản",
+                  managerName: "Ban Quản Trị",
+                  skills: ["Quản lý"]
+               });
             }
+
             setWorkers(mapped);
             const groups = {};
             mapped.forEach(w => {
-               const gName = w.managerName && w.managerName !== "Chưa cập nhật" ? w.managerName : "Khác";
+               const gName = w.managerName || "Khác";
                if (!groups[gName]) groups[gName] = { name: gName, members: [] };
                groups[gName].members.push(w);
             });
@@ -103,7 +107,7 @@ export default function ProductionAssignment() {
          }
       };
       loadWorkers();
-   }, [currentUser]);
+   }, [currentUser, fetchedProduction?.pmId, fetchedProduction?.startDate, fetchedProduction?.endDate]);
 
    const rows = useMemo(() => {
       if (!backendParts || !backendParts.length) return [];
@@ -261,7 +265,7 @@ export default function ProductionAssignment() {
          // Re-fetch nền để đồng bộ server
          ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 })
             .then(res => { const p = res?.data?.data ?? res?.data ?? []; if (p.length) setBackendParts(p); })
-            .catch(() => {});
+            .catch(() => { });
       } catch { toast.error("Có lỗi xảy ra khi lưu."); } finally { setIsSaving(false); }
    };
 
@@ -464,7 +468,7 @@ export default function ProductionAssignment() {
                                                             )}
                                                          </div>
                                                          <span className={`text-xs font-black uppercase ${staff.length === 0 ? (isActive ? 'text-rose-500' : 'text-gray-300') : 'text-[#1e6e43]'}`}>
-                                                            {staff.length === 0 ? (isActive ? 'Chờ gán' : 'Trống') : `${staff.length} thợ`}
+                                                            {staff.length === 0 ? 'Trống' : `${staff.length} thợ`}
                                                          </span>
                                                       </div>
                                                       {/* Green check badge if assigned */}
@@ -492,7 +496,7 @@ export default function ProductionAssignment() {
                      <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/30 space-y-2">
                         <div className="flex items-center gap-2">
                            <Users size={16} className="text-[#1e6e43]" />
-                           <h2 className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Nhân phẩm GPMS</h2>
+                           <h2 className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Danh sách thợ</h2>
                         </div>
                         {activeRow && (
                            <div className="flex items-center gap-2 flex-wrap">
@@ -539,9 +543,24 @@ export default function ProductionAssignment() {
                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black uppercase flex-shrink-0 ${sel ? 'bg-[#1e6e43] text-white' : 'bg-gray-100 text-gray-600'}`}>
                                                 {String(w.fullName || "?").charAt(0)}
                                              </div>
-                                             <div className="min-w-0">
-                                                <p className="text-sm font-bold text-gray-900 uppercase truncate">{w.fullName}</p>
-                                                <p className="text-[10px] font-semibold text-gray-400 uppercase">{w.role}</p>
+                                             <div className="min-w-0 mt-0.5">
+                                                <p className="text-sm font-bold text-gray-900 uppercase truncate leading-none">{w.fullName}</p>
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                   {w.skills && w.skills.length > 0 ? (
+                                                      w.skills.map((skill, idx) => (
+                                                         <span 
+                                                            key={idx} 
+                                                            className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-tight"
+                                                         >
+                                                            {skill}
+                                                         </span>
+                                                      ))
+                                                   ) : (
+                                                      <span className="text-[10px] font-bold text-rose-400 uppercase tracking-tighter">
+                                                         {w.role === "Thợ" || w.role === "Nhân viên" ? "Cần gán chuyên môn..." : w.role}
+                                                      </span>
+                                                   )}
+                                                </div>
                                              </div>
                                           </div>
                                           <div className="flex gap-1.5 flex-shrink-0 ml-2">

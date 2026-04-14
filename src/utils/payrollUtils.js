@@ -56,18 +56,28 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
   }
 
   try {
-    // 1. Fetch Productions and Worker Profiles
-    const [prodRes, workerDicRes] = await Promise.all([
+    // 1. Fetch Productions and Worker Profiles (including managers)
+    const [prodRes, workerDicRes, managerDicRes] = await Promise.all([
       ProductionService.getProductionList({ PageIndex: 0, PageSize: 100 }),
       WorkerService.getEmployeeDirectory({ includeHidden: true }),
+      WorkerService.getManagerDirectory({ includeHidden: true }),
     ]);
-
+    
     const rawProductions = prodRes?.data?.data || prodRes?.data || [];
-    const workerDirectory = workerDicRes?.data || [];
+    const workerDirectory = [
+      ...(workerDicRes?.data || []),
+      ...(managerDicRes?.data || [])
+    ];
+    
     const workerProfileMap = new Map();
     workerDirectory.forEach(w => {
-      const key = String(w.id || w.userName);
-      workerProfileMap.set(key, w);
+      if (!w.id) return;
+      const key = String(w.id);
+      // Prefer profiles with actual full names if we have duplicates
+      const existing = workerProfileMap.get(key);
+      if (!existing || (w.fullName && w.fullName !== "Chưa cập nhật")) {
+        workerProfileMap.set(key, w);
+      }
     });
 
     if (!Array.isArray(rawProductions)) return [];
@@ -122,9 +132,11 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       const rawLogs = res?.data?.data || res?.data || [];
       if (Array.isArray(rawLogs)) {
         rawLogs.forEach(log => {
-          // Use createDate as per new schema
           const d = new Date(log.createDate || log.workDate || log.reportDate);
           if (d.getMonth() + 1 === month && d.getFullYear() === year) {
+            const uid = log.userId || log.uId || log.accountId;
+            if (!uid) return;
+
             const logEntry = {
               ...log,
               id: log.id || log.workLogId,
@@ -137,8 +149,8 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
               productionId: part.productionId,
               orderName: part.orderName,
               orderId: part.orderId,
-              workerId: log.userId,
-              workerName: log.workerName || log.userName || `Thợ #${log.userId}`,
+              workerId: uid,
+              workerName: log.workerName || log.userName || `Thợ #${uid}`,
               quantity: log.quantity || 0,
               reportDate: log.createDate || log.workDate || log.reportDate,
               isPayment: log.isPayment || !!log.paidAt,
@@ -147,11 +159,17 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
               workerAvatar: null,
             };
 
-            // Enhance with profile from directory map
-            const profile = workerProfileMap.get(String(log.userId));
-            if (profile) {
+            // Enhanced lookup: check directory first
+            const profile = workerProfileMap.get(String(uid));
+            if (profile && profile.fullName && profile.fullName !== "Chưa cập nhật") {
               logEntry.workerFullName = profile.fullName;
               logEntry.workerAvatar = profile.avatarUrl;
+            } else if (log.workerName || log.fullName) {
+              // Fallback to name in log if it looks better than "Thợ #id"
+              const nameInLog = log.workerName || log.fullName;
+              if (nameInLog && !nameInLog.includes("Thợ #")) {
+                logEntry.workerFullName = nameInLog;
+              }
             }
 
             allLogs.push(logEntry);
