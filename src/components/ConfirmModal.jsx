@@ -1,17 +1,22 @@
 import { useEffect } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, CheckCircle, Info, HelpCircle } from "lucide-react";
 import "@/styles/SuccessModal.css";
 
+/**
+ * ConfirmModal
+ * @param {string} variant - 'danger' | 'warning' | 'success' | 'info'
+ */
 export default function ConfirmModal({
   isOpen,
   title = "Xác nhận",
-  description = "Bạn có chắc chắn muốn thực hiện hành động này? Hành động này không thể hoàn tác.",
-  primaryLabel = "Xác nhận xóa",
+  description = "Bạn có chắc chắn muốn thực hiện hành động này?",
+  primaryLabel = "Xác nhận",
   secondaryLabel = "Hủy",
   onConfirm,
   onClose,
-  confirmIcon: ConfirmIcon = Trash2,
+  confirmIcon: ConfirmIconProp,
   showConfirmIcon = true,
+  variant = "danger", // default to 'danger' for backward compatibility but encourage override
 }) {
   useEffect(() => {
     if (!isOpen) return;
@@ -32,6 +37,24 @@ export default function ConfirmModal({
 
   if (!isOpen) return null;
 
+  // Determine icon and color based on variant
+  let BigIcon = AlertTriangle;
+  let iconClass = "gpms-modal__icon--danger";
+  let btnClass = "gpms-modal__btn--primary"; // this often maps to red in current CSS
+
+  if (variant === "success") {
+    BigIcon = CheckCircle;
+    iconClass = "gpms-modal__icon--success";
+    btnClass = "gpms-modal__btn--success";
+  } else if (variant === "info" || variant === "warning") {
+    BigIcon = variant === "info" ? Info : HelpCircle;
+    iconClass = `gpms-modal__icon--${variant}`;
+    btnClass = `gpms-modal__btn--${variant}`;
+  }
+
+  // Determine the small icon inside the button
+  const FinalConfirmIcon = ConfirmIconProp || (variant === "danger" ? Trash2 : null);
+
   return (
     <div className="gpms-modal" role="dialog" aria-modal="true" onMouseDown={onClose}>
       <div className="gpms-modal__card" onMouseDown={(e) => e.stopPropagation()}>
@@ -39,8 +62,8 @@ export default function ConfirmModal({
           ×
         </button>
 
-        <div className="gpms-modal__icon gpms-modal__icon--danger" aria-hidden="true">
-          <AlertTriangle size={28} strokeWidth={2.5} />
+        <div className={`gpms-modal__icon ${iconClass}`} aria-hidden="true">
+          <BigIcon size={28} strokeWidth={2.5} />
         </div>
         
         <h3 className="gpms-modal__title">{title}</h3>
@@ -50,8 +73,8 @@ export default function ConfirmModal({
           <button type="button" className="gpms-modal__btn gpms-modal__btn--ghost" onClick={onClose}>
             {secondaryLabel}
           </button>
-          <button type="button" className="gpms-modal__btn gpms-modal__btn--primary" onClick={onConfirm}>
-            {showConfirmIcon && ConfirmIcon && <ConfirmIcon size={18} />}
+          <button type="button" className={`gpms-modal__btn ${btnClass}`} onClick={onConfirm}>
+            {showConfirmIcon && FinalConfirmIcon && <FinalConfirmIcon size={18} />}
             {primaryLabel}
           </button>
         </div>

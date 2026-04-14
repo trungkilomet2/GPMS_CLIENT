@@ -52,7 +52,6 @@ const overlapsMonth = (startStr, endStr, month, year) => {
 export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) => {
   const cacheKey = `${month}-${year}`;
   if (!forceRefresh && payrollCache.has(cacheKey)) {
-    console.debug(`[Payroll] Returning cached data for ${cacheKey}`);
     return payrollCache.get(cacheKey);
   }
 
@@ -78,8 +77,6 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       overlapsMonth(p.startDate || p.pStartDate, p.endDate || p.pEndDate, month, year)
     );
 
-    console.debug(`[Payroll] Processing ${productions.length}/${rawProductions.length} productions for ${month}/${year}`);
-
     // 2. Fetch all parts for relevant productions in parallel
     const partsResults = await Promise.all(
       productions.map(p => ProductionPartService.getPartsByProduction(p.productionId || p.id, { PageSize: 100 }))
@@ -103,8 +100,6 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
         });
       }
     });
-
-    console.debug(`[Payroll] Processing ${relevantParts.length} parts for ${month}/${year}`);
 
     // 3. Fetch all work logs for EACH VARIANT of relevant parts in parallel
     const logPromises = [];
@@ -132,9 +127,12 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
           if (d.getMonth() + 1 === month && d.getFullYear() === year) {
             const logEntry = {
               ...log,
-              partId: part.id,
-              partName: part.partName || part.name,
-              variantName: `${variant.color || ""} / ${variant.size || ""}`,
+              id: log.id || log.workLogId,
+              partId: part.id, 
+              productionPartId: part.id,
+              partOrderSizeId: variant.id,
+              partName: log.partName || part.partName || part.name,
+              variantName: log.color && log.size ? `${log.color} / ${log.size}` : `${variant.color || ""} / ${variant.size || ""}`,
               cpu: part.cpu || 0,
               productionId: part.productionId,
               orderName: part.orderName,
@@ -143,6 +141,8 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
               workerName: log.workerName || log.userName || `Thợ #${log.userId}`,
               quantity: log.quantity || 0,
               reportDate: log.createDate || log.workDate || log.reportDate,
+              isPayment: log.isPayment || !!log.paidAt,
+              isReadOnly: log.isReadOnly,
               workerFullName: null,
               workerAvatar: null,
             };
@@ -179,8 +179,14 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       const stats = workerMap.get(key);
       const qty = Number(log.quantity || 0);
       const cpu = Number(log.cpu || 0);
+      
+      // NEW LOGIC: Only count salary if approved (isReadOnly)
+      const isApproved = log.isReadOnly === true;
+      
       stats.totalQuantity += qty;
-      stats.totalSalary += qty * cpu;
+      if (isApproved) {
+        stats.totalSalary += qty * cpu;
+      }
       stats.logCount += 1;
       if (log.partId) stats.uniqueParts.add(log.partId);
       stats.uniquePartCount = stats.uniqueParts.size;

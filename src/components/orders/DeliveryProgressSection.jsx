@@ -23,22 +23,22 @@ export default function DeliveryProgressSection({
 
     const handleConfirmAction = async () => {
         if (!targetDelivery || !confirmationInput) return;
-        
-        // Map input text to backend values
-        let backendValue = confirmationInput.trim();
-        if (backendValue.toUpperCase() === 'OK') backendValue = 'Yes';
-        if (backendValue.toUpperCase() === 'NO') backendValue = 'No';
+
+        // Map Vietnamese input keywords to backend expected values
+        let backendValue = confirmationInput.trim().toUpperCase();
+        if (backendValue === 'KHỚP') backendValue = 'Yes';
+        else if (backendValue === 'LỖI') backendValue = 'No';
 
         try {
             setIsConfirming(true);
             const deliveryId = targetDelivery.id || targetDelivery.deliverId || targetDelivery.deliverID;
             await ProductionService.confirmDelivery(deliveryId, backendValue);
-            
+
             toast.success("Xác nhận thành công!");
             setIsConfirmModalOpen(false);
             setTargetDelivery(null);
             setConfirmationInput("");
-            
+
             if (typeof onConfirmDelivery === 'function') {
                 onConfirmDelivery();
             } else {
@@ -48,11 +48,11 @@ export default function DeliveryProgressSection({
             console.error("Error confirming delivery:", err.response?.data || err);
             const errorData = err.response?.data;
             let errorMsg = "Lỗi xác nhận giao nhận.";
-            
+
             if (typeof errorData === 'string') errorMsg = errorData;
             else if (errorData?.errors) errorMsg = Object.values(errorData.errors).flat().join(", ");
             else if (errorData?.message) errorMsg = errorData.message;
-            
+
             toast.error(errorMsg);
         } finally {
             setIsConfirming(false);
@@ -201,33 +201,29 @@ export default function DeliveryProgressSection({
                 <div className="border border-black overflow-hidden bg-white shadow-sm">
                     {/* Grid Header */}
                     <div className="grid grid-cols-11 bg-slate-50 border-b border-black divide-x divide-black">
-                        <div className="col-span-2 py-4 px-6 text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Phân loại Màu</div>
+                        <div className="col-span-2 py-4 px-6 text-xs font-black text-black uppercase tracking-widest bg-slate-100/30">Phân loại Màu</div>
                         {sizeLabels.map(s => (
-                            <div key={s} className="col-span-1 py-4 text-center text-[10px] font-black text-black uppercase tracking-widest flex items-center justify-center">{s}</div>
+                            <div key={s} className="col-span-1 py-4 text-center text-xs font-black text-black uppercase tracking-widest flex items-center justify-center">{s}</div>
                         ))}
-                        <div className="col-span-2 py-4 px-6 text-right text-[10px] font-black text-black uppercase tracking-widest bg-slate-100/30">Tiến độ dòng</div>
+                        <div className="col-span-2 py-4 px-6 text-right text-xs font-black text-black uppercase tracking-widest bg-slate-100/30">Tiến độ dòng</div>
                     </div>
 
                     {/* Grid Body */}
-                    <div className="divide-y divide-black font-mono text-[13px]">
+                    <div className="divide-y divide-black font-sans text-[14px]">
                         {variants.map((v, idx) => {
                             const rowOrdered = sizeKeys.reduce((sum, k) => sum + (Number(v[k] || v[k.toUpperCase()] || 0)), 0);
                             if (rowOrdered === 0) return null;
 
-                            // Calculate row delivery based on color OR orderSizeIds in this row
-                            // First, identify all orderSizeIds in this row if possible
-                            // For simplicity, we keep color-based grouping if that's what's in 'v'
+                            // Calculate row delivery
                             const rowDelivered = deliveries
                                 .filter(d => {
                                     const dOsId = String(d.orderSizeId || d.orderSizeID || d.order_size_id || "");
                                     const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
                                     if (!isActuallyReceived) return false;
 
-                                    // Match if this delivery's orderSizeId matches ANY ID in this row's idMap
                                     if (v.idMap && dOsId) {
                                         return Object.values(v.idMap).some(id => String(id) === dOsId);
                                     }
-                                    // Fallback
                                     return d.color === v.color || d.colorName === v.color;
                                 })
                                 .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
@@ -236,27 +232,24 @@ export default function DeliveryProgressSection({
 
                             return (
                                 <div key={idx} className="grid grid-cols-11 items-stretch hover:bg-slate-50/50 transition-all divide-x divide-black">
-                                    <div className="col-span-2 py-4 px-6 flex items-center bg-slate-50/10">
+                                    <div className="col-span-2 py-5 px-6 flex items-center bg-slate-50/10">
                                         <div className="flex items-center gap-2 truncate">
-                                            <span className="font-bold text-slate-800 uppercase truncate">{v.color}</span>
+                                            <span className="text-[14px] font-black text-slate-800 uppercase truncate">{v.color}</span>
                                         </div>
                                     </div>
                                     {sizeKeys.map(k => {
                                         const ordered = Number(v[k] || v[k.toUpperCase()] || 0);
                                         const osId = v.idMap ? v.idMap[k] : null;
 
-                                        // Precise match using orderSizeId
                                         const delivered = deliveries
                                             .filter(d => {
                                                 const dOsId = d.orderSizeId || d.orderSizeID || d.order_size_id;
                                                 const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
                                                 if (!isActuallyReceived) return false;
 
-                                                // If we have an ID for this cell, match strictly by ID
                                                 if (osId && dOsId) {
                                                     return String(osId) === String(dOsId);
                                                 }
-                                                // Fallback to legacy color/size naming match
                                                 const matchesLegacy = d.color === v.color && (d.size?.toLowerCase() === k || d.sizeName?.toLowerCase() === k);
                                                 return matchesLegacy;
                                             })
@@ -265,17 +258,17 @@ export default function DeliveryProgressSection({
                                         const cellProgress = ordered > 0 ? (delivered / ordered) * 100 : 0;
 
                                         return (
-                                            <div key={k} className="col-span-1 py-4 flex items-center justify-center">
+                                            <div key={k} className="col-span-1 py-5 flex items-center justify-center">
                                                 {ordered > 0 ? (
                                                     <div className="flex flex-col items-center gap-1 w-full px-1">
-                                                        <div className="flex items-baseline gap-0.5 justify-center">
-                                                            <span className={`font-black ${delivered === ordered ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                                        <div className="flex items-baseline gap-1 justify-center">
+                                                            <span className={`text-[15px] font-black ${delivered === ordered ? 'text-emerald-600' : 'text-slate-900'}`}>
                                                                 {delivered}
                                                             </span>
-                                                            <span className="text-[9px] font-bold text-slate-300">/</span>
-                                                            <span className="text-[10px] font-bold text-slate-400">{ordered}</span>
+                                                            <span className="text-[11px] font-bold text-slate-300">/</span>
+                                                            <span className="text-[12px] font-bold text-slate-400">{ordered}</span>
                                                         </div>
-                                                        <div className="w-full max-w-[32px] h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div className="w-full max-w-[40px] h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                             <div
                                                                 className={`h-full ${delivered === ordered ? 'bg-emerald-500' : 'bg-amber-400'} transition-all`}
                                                                 style={{ width: `${cellProgress}%` }}
@@ -283,16 +276,16 @@ export default function DeliveryProgressSection({
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-slate-200 font-bold">-</span>
+                                                    <span className="text-slate-200 font-bold text-[14px]">-</span>
                                                 )}
                                             </div>
                                         );
                                     })}
-                                    <div className="col-span-2 py-4 px-6 flex flex-col items-end justify-center bg-slate-50/10 space-y-1">
-                                        <span className={`font-black ${rowProgress === 100 ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                    <div className="col-span-2 py-5 px-6 flex flex-col items-end justify-center bg-slate-50/10 space-y-1.5">
+                                        <span className={`text-lg font-black ${rowProgress === 100 ? 'text-emerald-600' : 'text-slate-700'}`}>
                                             {rowProgress}%
                                         </span>
-                                        <div className="w-full h-1 bg-slate-200/50 rounded-full overflow-hidden">
+                                        <div className="w-full h-1.5 bg-slate-200/50 rounded-full overflow-hidden">
                                             <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${rowProgress}%` }} />
                                         </div>
                                     </div>
@@ -356,48 +349,48 @@ export default function DeliveryProgressSection({
 
                                     return (
                                         <div key={i} className="relative group">
-                                             <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${statusId === DELIVERY_STATUS.RECEIVED ? 'bg-emerald-500' : statusId === DELIVERY_STATUS.NOT_RECEIVED ? 'bg-rose-500' : 'bg-amber-400'}`} />
-                                             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:border-[#d4e3da] hover:shadow-md transition-all">
-                                                 <div className="flex flex-wrap items-start justify-between gap-4">
-                                                     <div className="space-y-4 flex-1">
-                                                         <div className="flex items-center gap-4">
-                                                             <div className="px-3 py-1 bg-[#f0f9f4] rounded-lg border border-[#d4e3da]/30">
-                                                                 <span className="text-[10px] font-black text-[#1e6e43] uppercase">{color} {size && `— ${size}`}</span>
-                                                             </div>
-                                                             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                                                 <span>{dateStr.replace('T', ' ').slice(0, 16)}</span>
-                                                                 <div className="w-1 h-1 rounded-full bg-gray-200" />
-                                                                 <span className="text-gray-900 font-black">+{qtyDisp} SP</span>
-                                                             </div>
-                                                         </div>
-                                                         <div className="flex items-center gap-2">
+                                            <div className={`absolute -left-[40px] top-4 w-5 h-5 rounded-full border-4 border-[#fff] shadow-sm z-10 transition-colors ${statusId === DELIVERY_STATUS.RECEIVED ? 'bg-emerald-500' : statusId === DELIVERY_STATUS.NOT_RECEIVED ? 'bg-rose-500' : 'bg-amber-400'}`} />
+                                            <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:border-[#d4e3da] hover:shadow-md transition-all">
+                                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                                    <div className="space-y-4 flex-1">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="px-3 py-1 bg-[#f0f9f4] rounded-lg border border-[#d4e3da]/30">
+                                                                <span className="text-[10px] font-black text-[#1e6e43] uppercase">{color} {size && `— ${size}`}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                                <span>{dateStr.replace('T', ' ').slice(0, 16)}</span>
+                                                                <div className="w-1 h-1 rounded-full bg-gray-200" />
+                                                                <span className="text-gray-900 font-black">+{qtyDisp} SP</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
                                                             <div className={`px-2 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-widest ${DELIVERY_STATUS_STYLES[statusId] || 'text-slate-400 bg-slate-50 border-slate-100'}`}>
                                                                 {statusLabel}
                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                     <div className="flex flex-col items-end gap-2">
-                                                         {confirmed ? (
-                                                             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
-                                                                 <CheckCircle size={12} />
-                                                                 {autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'Đã nhận (Tự động)' : 'Đã nhận hàng'}
-                                                             </div>
-                                                         ) : (
-                                                             isCustomer && statusId !== DELIVERY_STATUS.NOT_RECEIVED && (
-                                                                 <button
-                                                                     onClick={() => {
-                                                                         setTargetDelivery(d);
-                                                                         setIsConfirmModalOpen(true);
-                                                                     }}
-                                                                     className="px-5 h-8 bg-[#1e6e43] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-md shadow-green-100 hover:bg-[#155232] active:scale-95 transition-all"
-                                                                 >
-                                                                     Xác nhận ngay
-                                                                 </button>
-                                                             )
-                                                         )}
-                                                     </div>
-                                                 </div>
-                                             </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-col items-end gap-2">
+                                                        {confirmed ? (
+                                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
+                                                                <CheckCircle size={12} />
+                                                                {autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'Đã nhận (Tự động)' : 'Đã nhận hàng'}
+                                                            </div>
+                                                        ) : (
+                                                            isCustomer && statusId !== DELIVERY_STATUS.NOT_RECEIVED && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setTargetDelivery(d);
+                                                                        setIsConfirmModalOpen(true);
+                                                                    }}
+                                                                    className="px-5 h-8 bg-[#1e6e43] text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-md shadow-green-100 hover:bg-[#155232] active:scale-95 transition-all"
+                                                                >
+                                                                    Xác nhận ngay
+                                                                </button>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -432,7 +425,7 @@ export default function DeliveryProgressSection({
                             <div className="space-y-2">
                                 <h4 className="text-lg font-black text-slate-900 uppercase">Xác nhận giao hàng</h4>
                                 <p className="text-xs font-medium text-slate-500">
-                                    Vui lòng nhập <span className="text-[#1e6e43] font-bold">OK</span> nếu khớp hoặc <span className="text-rose-500 font-bold">No</span> nếu có lỗi
+                                    Vui lòng nhập <span className="text-[#1e6e43] font-bold">KHỚP</span> nếu đúng hoặc <span className="text-rose-500 font-bold">LỖI</span> nếu có sai sót
                                 </p>
                             </div>
                         </div>

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ClipboardCheck, Edit, Eraser, Loader2, Plus, Save, Trash2 } from "lucide-react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ClipboardCheck, Edit, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import OwnerLayout from "@/layouts/OwnerLayout";
@@ -30,17 +30,15 @@ export default function WorkerCuttingBookDetail() {
   const [records, setRecords] = useState([]);
   const [meta, setMeta] = useState(DEFAULT_META);
   const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
   const [collapseMeta, setCollapseMeta] = useState(false);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [editingRecordId, setEditingRecordId] = useState(null);
   const [record, setRecord] = useState(DEFAULT_RECORD);
   const [recordErrors, setRecordErrors] = useState({});
   const [isSavingRecord, setIsSavingRecord] = useState(false);
-  const [savedAt, setSavedAt] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  const Layout = useMemo(() => {
+  const LayoutComponent = useMemo(() => {
     const roleValue = user?.role ?? user?.roles ?? user?.roleName ?? "";
     if (hasAnyRole(roleValue, ["Owner", "PM"])) return OwnerLayout;
     return WorkerLayout;
@@ -252,13 +250,6 @@ export default function WorkerCuttingBookDetail() {
       }
 
       clearRecord();
-      setSavedAt(new Date().toLocaleString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric"
-      }));
       return true;
     } catch (err) {
       console.error("Error saving log:", err);
@@ -271,17 +262,18 @@ export default function WorkerCuttingBookDetail() {
 
   if (loading) {
     return (
-      <Layout>
+      <LayoutComponent>
         <div className="flex h-64 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
         </div>
-      </Layout>
+      </LayoutComponent>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
+    <LayoutComponent>
+      <div className="leave-page min-h-screen pb-20">
+        <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -324,7 +316,7 @@ export default function WorkerCuttingBookDetail() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-slate-600 mb-4">
             <ClipboardCheck size={16} />
-            <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin chung</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-emerald-800">Thông tin chung</h2>
           </div>
           <button
             type="button"
@@ -347,7 +339,7 @@ export default function WorkerCuttingBookDetail() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-slate-600">
               <ClipboardCheck size={16} />
-              <h2 className="text-xs font-bold uppercase tracking-widest">Ghi sản lượng</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-emerald-800">Ghi sản lượng</h2>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -364,12 +356,12 @@ export default function WorkerCuttingBookDetail() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-slate-600 mb-4">
             <ClipboardCheck size={16} />
-            <h2 className="text-xs font-bold uppercase tracking-widest">Lịch sử ghi</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-emerald-800">Lịch sử ghi</h2>
           </div>
           {records.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full divide-y divide-slate-200 table-fixed text-sm">
-                <thead className="leave-table-head">
+                <thead className="bg-slate-50/50">
                   <tr>
                     <th className="px-3 py-3 text-center w-14">STT</th>
                     <th className="px-3 py-3 text-left w-24">Màu</th>
@@ -543,7 +535,8 @@ export default function WorkerCuttingBookDetail() {
           </div>
         </div>
       )}
-    </Layout>
+      </div>
+    </LayoutComponent>
   );
 }
 

@@ -1,13 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { AlertTriangle, ArrowLeft, ClipboardList } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ClipboardList,
+  History,
+  Info,
+  Package,
+  ShieldAlert,
+  Zap,
+  Loader2,
+  Image as ImageIcon,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Settings2
+} from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionService from "@/services/ProductionService";
 import Pagination from "@/components/Pagination";
 import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
-import "@/styles/homepage.css";
-import "@/styles/leave.css";
+import { getStoredUser } from "@/lib/authStorage";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
+import WorkerLayout from "@/layouts/WorkerLayout";
 
 const SEVERITY_LABELS = {
   low: "Thấp",
@@ -139,9 +155,16 @@ const normalizeIssue = (item, index) => {
   };
 };
 
+import "@/styles/homepage.css";
+import "@/styles/leave.css";
+
 export default function ProductionErrorSummary() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const user = getStoredUser();
+  const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const isWorker = primaryRole === "worker";
+  const LayoutComponent = isWorker ? WorkerLayout : OwnerLayout;
 
   const [production, setProduction] = useState(null);
   const [productionLoading, setProductionLoading] = useState(false);
@@ -343,223 +366,266 @@ export default function ProductionErrorSummary() {
   const loading = productionLoading || issuesLoading;
 
   return (
-    <OwnerLayout>
-      <div className="leave-page leave-list-page">
-        <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
+    <LayoutComponent>
+      <div className="leave-page min-h-screen pb-20">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
+
+          {/* HEADER SECTION */}
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex items-start gap-4">
               <button
                 onClick={() => navigate(-1)}
-                className="mt-1 rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
-                aria-label="Quay lại"
+                className="group flex items-center justify-center w-12 h-12 rounded-xl bg-white border border-slate-200 text-slate-600 transition-all hover:border-[#1e6e43] hover:text-[#1e6e43] shadow-sm active:scale-95"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={22} />
               </button>
-              <div className="flex flex-col gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
-                  Tổng hợp lỗi đơn sản xuất #{production?.productionId ?? id}
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none uppercase">
+                  Tổng hợp lỗi đơn sản xuất
                 </h1>
-                <p className="text-slate-600">
-                  {production?.orderName
-                    ? `Đơn hàng: ${production.orderName}`
-                    : "Theo dõi lỗi theo từng công đoạn."}
+                <p className="text-[10px] font-bold text-slate-600 tracking-widest uppercase mt-1">
+                  Mã sản xuất: #PR-{production?.productionId ?? id}
+                  {production?.orderName && ` • Đơn hàng: ${production.orderName}`}
                 </p>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                Tổng lỗi: {errors.length}
+              <span className="px-4 py-2 bg-[#f0f9f4] text-[#1e6e43] border border-[#d4e3da] rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
+                {errors.length} Lỗi ghi nhận
               </span>
             </div>
           </div>
 
           {issueError && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 font-bold flex items-center gap-2">
+              <AlertTriangle size={18} />
               {issueError}
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            {[
-              { key: "low", label: "Thấp", value: severityCounts.low },
-              { key: "medium", label: "Trung bình", value: severityCounts.medium },
-              { key: "high", label: "Cao", value: severityCounts.high },
-              { key: "critical", label: "Nghiêm trọng", value: severityCounts.critical },
-            ].map((item) => (
-              <div key={item.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-400">{item.label}</div>
-                <div className="mt-2 text-2xl font-bold text-slate-900">{item.value}</div>
-              </div>
-            ))}
+          {/* STATS SECTION */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              icon={<Info size={24} />}
+              label="Mức độ Thấp"
+              value={loading ? "..." : `${severityCounts.low}`}
+              color="emerald"
+            />
+            <StatCard
+              icon={<Zap size={24} />}
+              label="Trung bình"
+              value={loading ? "..." : `${severityCounts.medium}`}
+              color="emerald"
+            />
+            <StatCard
+              icon={<AlertTriangle size={24} />}
+              label="Mức độ Cao"
+              value={loading ? "..." : `${severityCounts.high}`}
+              color="emerald"
+            />
+            <StatCard
+              icon={<ShieldAlert size={24} />}
+              label="Nghiêm trọng"
+              value={loading ? "..." : `${severityCounts.critical}`}
+              color="emerald"
+            />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div className="flex items-center gap-2 text-slate-600">
-                <ClipboardList size={16} />
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Theo công đoạn</div>
-                  <div className="text-sm text-slate-500 mt-1">Tổng hợp nhanh theo công đoạn.</div>
-                </div>
+          {/* BY PART SUMMARY TABLE */}
+          <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
+            <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-[#1e6e43] rounded-full" />
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Tổng hợp theo công đoạn</h2>
               </div>
-              <div className="text-xs text-slate-500">Gộp lỗi theo công đoạn</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tóm tắt nhanh</div>
             </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Công đoạn</th>
-                    <th className="px-4 py-2 text-left">Tóm tắt</th>
-                    <th className="px-4 py-2 text-center">Mức độ cao nhất</th>
+              <table className="w-full border border-black">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-black">
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Công đoạn</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Tóm tắt lỗi</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Cao nhất</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Cập nhật cuối</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {byPart.map((row) => (
-                    <tr key={row.partName} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-2">
-                        <div className="font-semibold text-slate-800">{row.partName}</div>
-                        <div className="text-[10px] text-slate-400">
-                          Lỗi gần nhất: {formatDateTime(row.latestAt)}
+                <tbody className="divide-y divide-black border-black">
+                  {byPart.length === 0 && !loading ? (
+                    <tr>
+                      <td colSpan={4} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-4 text-slate-200">
+                          <Package size={48} />
+                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Không có dữ liệu</p>
                         </div>
                       </td>
-                      <td className="px-4 py-2">
-                        <div className="flex flex-wrap items-center gap-2 text-slate-700">
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold">
+                    </tr>
+                  ) : byPart.map((row) => (
+                    <tr key={row.partName} className="hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{row.partName}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase text-slate-700">
                             {row.count} lỗi
                           </span>
-                          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold">
-                            {row.totalQuantity} sản phẩm lỗi
+                          <span className="rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[10px] font-bold uppercase border border-black">
+                            {row.totalQuantity} SP lỗi
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-2 text-center">
+                      <td className="px-6 py-4 text-center">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[9px] font-bold uppercase shadow-sm ${SEVERITY_STYLES[row.highestSeverity] || SEVERITY_STYLES.default
                             }`}
                         >
                           {SEVERITY_LABELS[row.highestSeverity] || "-"}
                         </span>
                       </td>
-                    </tr>
-                  ))}
-                  {byPart.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-500">
-                        Chưa có lỗi nào cho đơn sản xuất này.
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic">
+                          {formatDateTime(row.latestAt)}
+                        </span>
                       </td>
                     </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div className="flex items-center gap-2 text-slate-600">
-                <AlertTriangle size={16} />
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Danh sách lỗi</div>
-                  <div className="text-sm text-slate-500 mt-1">Chi tiết từng báo cáo lỗi.</div>
-                </div>
+          {/* DETAILED ISSUE TABLE */}
+          <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
+            <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-[#1e6e43] rounded-full" />
+                <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Danh sách lỗi chi tiết</h2>
               </div>
+              {loading && <Loader2 className="animate-spin text-slate-400" size={18} />}
             </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full divide-y divide-slate-100 text-sm">
-                <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="px-4 py-3 text-left">Công đoạn</th>
-                    <th className="px-4 py-3 text-left">Tiêu đề</th>
-                    <th className="px-4 py-3 text-center">Minh chứng</th>
-                    <th className="px-4 py-3 text-center">Mức độ</th>
-                    <th className="px-4 py-3 text-center">Số lượng</th>
-                    <th className="px-4 py-3 text-center">Trạng thái</th>
-                    <th className="px-4 py-3 text-center">Thời gian</th>
-                    <th className="px-4 py-3 text-center">Thao tác</th>
+              <table className="w-full min-w-[1000px] border border-black">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-black">
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black w-16">STT</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Công đoạn / Tiêu đề</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Mô tả</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Minh chứng</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Mức độ</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Số lượng</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Trạng thái</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Thời gian</th>
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {pagedErrors.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70">
-                      <td className="px-4 py-3 font-semibold text-slate-800">{item.partName || "-"}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-800">{item.title || "Không có tiêu đề"}</div>
-                        <div className="text-[11px] text-slate-400">{item.description || ""}</div>
+                <tbody className="divide-y divide-black border-black">
+                  {pagedErrors.length === 0 && !loading ? (
+                    <tr>
+                      <td colSpan={9} className="py-32 text-center">
+                        <div className="flex flex-col items-center gap-4 text-slate-200">
+                          <AlertTriangle size={64} />
+                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Không có lỗi nào được ghi nhận</p>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                    </tr>
+                  ) : pagedErrors.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0">
+                      <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">
+                        {String((currentPage - 1) * pageSize + index + 1).padStart(2, "0")}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{item.partName || "-"}</div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 line-clamp-1">{item.title}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-[10px] font-medium text-slate-600 line-clamp-2 max-w-[200px]">{item.description || "-"}</div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
                         {item.imageUrl ? (
                           <button
-                            type="button"
                             onClick={() => {
                               setZoomImageUrl(item.imageUrl);
                               setIsImageModalOpen(true);
                             }}
-                            className="group relative inline-block overflow-hidden rounded-lg border border-slate-100 shadow-sm transition hover:border-emerald-500"
+                            className="group relative inline-block overflow-hidden rounded-xl border border-black shadow-sm transition hover:scale-105 active:scale-95"
                           >
                             <img
                               src={item.imageUrl}
                               alt="Minh chứng"
-                              className="h-10 w-10 object-cover transition duration-300 group-hover:scale-110"
+                              className="h-10 w-10 object-cover"
                             />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
-                              <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-                              </svg>
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <ImageIcon size={14} className="text-white" />
                             </div>
                           </button>
                         ) : (
-                          <span className="text-[10px] italic text-slate-300">Không có ảnh</span>
+                          <span className="text-[9px] font-bold text-slate-300 uppercase italic">N/A</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-6 py-4 text-center">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase shadow-sm ${SEVERITY_STYLES[item.severity] || SEVERITY_STYLES.default
                             }`}
                         >
                           {SEVERITY_LABELS[item.severity] || "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-700">{item.quantity ?? "-"}</td>
-                      <td className="px-4 py-3 text-center">
-                        {item.status && item.status !== "-" ? (
-                          <span
-                            className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${ISSUE_STATUS_STYLES[item.statusId] ?? "bg-slate-50 text-slate-600 border-slate-200"
-                              }`}
-                          >
-                            {item.status}
+                      <td className="px-6 py-4 text-center font-bold text-slate-800 text-sm">
+                        <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl font-bold text-sm border border-black bg-white">
+                          {item.quantity}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {item.statusId === 3 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-emerald-600 shadow-sm">
+                            <CheckCircle2 size={11} /> {item.status}
+                          </span>
+                        ) : item.statusId === 4 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-rose-600 shadow-sm">
+                            <XCircle size={11} /> {item.status}
+                          </span>
+                        ) : item.statusId === 2 ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-blue-600 shadow-sm">
+                            <Settings2 size={11} className="animate-spin-slow" /> {item.status}
                           </span>
                         ) : (
-                          <span className="text-[10px] italic text-slate-300">-</span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
+                            <Clock size={11} /> {item.status}
+                          </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-600">{formatDateTime(item.createdAt)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button
-                          onClick={() => {
-                            setTargetIssue(item);
-                            setConfirmedQuantity(item.quantity || 0);
-                            setIsHandlingModalOpen(true);
-                          }}
-                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:opacity-50"
-                          disabled={item.statusId === 3}
-                        >
-                          Xác nhận
-                        </button>
+                      <td className="px-6 py-4 text-center">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic whitespace-nowrap">
+                          {formatDateTime(item.createdAt)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        {(!isWorker || item.statusId !== 4) && (
+                          <button
+                            onClick={() => {
+                              setTargetIssue(item);
+                              setConfirmedQuantity(item.quantity || 0);
+                              setIsHandlingModalOpen(true);
+                            }}
+                            className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-[#1e6e43] flex items-center gap-2 transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed mx-auto"
+                            disabled={item.statusId === 3}
+                          >
+                            <Zap size={14} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Xác nhận</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
-                  {errors.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-500">
-                        Chưa có lỗi nào được ghi nhận.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
             {errors.length > 0 && (
-              <div className="px-5 py-4">
+              <div className="px-8 py-6 border-t border-slate-100 bg-slate-50/30">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
@@ -571,131 +637,157 @@ export default function ProductionErrorSummary() {
             )}
           </div>
         </div>
-      </div>
 
-      {loading && (
-        <div className="fixed bottom-6 right-6 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500 shadow">
-          Đang tải dữ liệu đơn sản xuất...
-        </div>
-      )}
+        <OrderImageZoomModal
+          isOpen={isImageModalOpen}
+          imageUrl={zoomImageUrl}
+          onClose={() => {
+            setIsImageModalOpen(false);
+            setZoomImageUrl("");
+          }}
+        />
 
-      <OrderImageZoomModal
-        isOpen={isImageModalOpen}
-        imageUrl={zoomImageUrl}
-        onClose={() => {
-          setIsImageModalOpen(false);
-          setZoomImageUrl("");
-        }}
-      />
-
-      {/* Handling Modal */}
-      {isHandlingModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="w-full max-w-sm rounded-[2rem] bg-white p-8 shadow-2xl border border-slate-100">
-            <div className="mb-6 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-400">
-                <ClipboardList size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 tracking-tight">Xử lý báo cáo lỗi</h3>
-              <p className="mt-2 text-sm text-slate-500">
-                Lỗi tại: <strong>{targetIssue?.partName}</strong>
-                <br />
-                Số lượng: <span className="font-bold text-rose-600">{targetIssue?.quantity} sản phẩm</span>
-                <br />
-                Trạng thái: <span className="font-bold text-slate-700 uppercase">{targetIssue?.status}</span>
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {/* Nếu là Chờ xử lý (1), hiển thị nút Bắt đầu xử lý (2) */}
-              {(targetIssue?.statusId === 1 || !targetIssue?.statusId) && (
-                <button
-                  onClick={() => handleUpdateIssueStatus(2)}
-                  disabled={isUpdating}
-                  className="w-full rounded-xl bg-blue-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-blue-500 hover:bg-blue-100 group"
-                >
-                  <div className="text-[11px] font-black uppercase tracking-widest text-blue-700">Bắt đầu xử lý</div>
-                  <div className="text-[10px] font-medium text-blue-600/70">Xác nhận đang tiến hành sửa chữa</div>
-                </button>
-              )}
-
-              {/* Nếu là Đang xử lý (2), hiển thị nút Đã khắc phục (3) */}
-              {targetIssue?.statusId === 2 && (
-                <button
-                  onClick={() => handleUpdateIssueStatus(3)}
-                  disabled={isUpdating}
-                  className="w-full rounded-xl bg-emerald-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-emerald-500 hover:bg-emerald-100 group"
-                >
-                  <div className="text-[11px] font-black uppercase tracking-widest text-emerald-700">Đã khắc phục</div>
-                  <div className="text-[10px] font-medium text-emerald-600/70">Có thể tiếp tục sản xuất và giao nhận</div>
-                </button>
-              )}
-
-              {/* Nếu là Đang ở trạng thái Không thể sửa (4) */}
-              {targetIssue?.statusId === 4 && (
-                <div className="space-y-4 rounded-2xl bg-orange-50/50 p-4 border border-orange-100">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-orange-700 ml-1">
-                      Số lượng xác nhận hủy
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="1"
-                        max={targetIssue?.quantity}
-                        value={confirmedQuantity}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          if (val > targetIssue?.quantity) {
-                            toast.warning(`Không được vượt quá ${targetIssue?.quantity}`);
-                            setConfirmedQuantity(targetIssue?.quantity);
-                          } else {
-                            setConfirmedQuantity(e.target.value);
-                          }
-                        }}
-                        className="w-full rounded-xl border-2 border-orange-200 bg-white px-4 py-3 text-sm font-bold text-orange-900 focus:border-orange-500 focus:ring-0 transition-all"
-                      />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-orange-400">
-                        MAX: {targetIssue?.quantity}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleConfirmUnfixable(Number(confirmedQuantity))}
-                    disabled={isUpdating || !confirmedQuantity || confirmedQuantity <= 0}
-                    className="w-full rounded-xl bg-orange-600 px-6 py-4 text-center shadow-lg shadow-orange-200 transition-all hover:bg-orange-700 active:scale-[0.98] disabled:opacity-50"
-                  >
-                    <div className="text-[11px] font-black uppercase tracking-widest text-white">Xác nhận chốt số lượng</div>
-                    <div className="text-[10px] font-medium text-orange-100">
-                      Chốt {confirmedQuantity} sản phẩm bị loại bỏ
-                    </div>
-                  </button>
+        {/* Handling Modal */}
+        {isHandlingModalOpen && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl bg-white p-8 border border-black shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="text-center mb-8">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 text-black mb-4">
+                  <ClipboardList size={32} />
                 </div>
-              )}
+                <h3 className="text-xl font-black text-black uppercase tracking-tight">Xử lý báo cáo lỗi</h3>
+                <div className="mt-3 flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    Lỗi tại: {targetIssue?.partName}
+                  </span>
+                  <div className="mt-2 px-3 py-1 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-[10px] font-bold uppercase tracking-widest">
+                    Số lượng: {targetIssue?.quantity} SP
+                  </div>
+                </div>
+              </div>
 
-              {targetIssue?.statusId !== 4 && (
+              <div className="grid grid-cols-1 gap-3">
+                {/* 1 -> 2: Chờ xử lý -> Đang xử lý */}
+                {(targetIssue?.statusId === 1 || !targetIssue?.statusId) && (
+                  <ModalActionBtn
+                    onClick={() => handleUpdateIssueStatus(2)}
+                    disabled={isUpdating}
+                    title="Bắt đầu xử lý"
+                    subtitle="Xác nhận đang tiến hành sửa chữa"
+                    theme="blue"
+                  />
+                )}
+
+                {/* 2 -> 3: Đang xử lý -> Đã khắc phục */}
+                {targetIssue?.statusId === 2 && (
+                  <ModalActionBtn
+                    onClick={() => handleUpdateIssueStatus(3)}
+                    disabled={isUpdating}
+                    title="Đã khắc phục"
+                    subtitle="Tiếp tục sản xuất & giao nhận"
+                    theme="emerald"
+                  />
+                )}
+
+                {/* Status 4 flow */}
+                {targetIssue?.statusId === 4 ? (
+                  !isWorker && (
+                    <div className="space-y-4 rounded-2xl bg-orange-50/50 p-6 border border-orange-200">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-orange-700 ml-1 block text-center">
+                          Số lượng xác nhận hủy
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max={targetIssue?.quantity}
+                          value={confirmedQuantity}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            if (val > targetIssue?.quantity) {
+                              toast.warning(`Tối đa ${targetIssue.quantity}`);
+                              setConfirmedQuantity(targetIssue.quantity);
+                            } else setConfirmedQuantity(e.target.value);
+                          }}
+                          className="w-full rounded-2xl border border-orange-200 bg-white px-6 py-4 text-center text-3xl font-bold text-orange-900 outline-none focus:border-orange-500 transition-all shadow-inner"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => handleConfirmUnfixable(Number(confirmedQuantity))}
+                        disabled={isUpdating || !confirmedQuantity || confirmedQuantity <= 0}
+                        className="w-full rounded-xl bg-orange-600 py-4 text-white font-bold uppercase text-[11px] tracking-widest hover:bg-orange-700 shadow-lg shadow-orange-100 transition-all active:scale-[0.98]"
+                      >
+                        Xác nhận chốt số lượng
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  !isWorker && (
+                    <ModalActionBtn
+                      onClick={() => handleUpdateIssueStatus(4)}
+                      disabled={isUpdating}
+                      title="Không thể sửa"
+                      subtitle="Sản phẩm bị loại bỏ"
+                      theme="rose"
+                    />
+                  )
+                )}
+
                 <button
-                  onClick={() => handleUpdateIssueStatus(4)}
+                  onClick={() => setIsHandlingModalOpen(false)}
+                  className="mt-4 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
                   disabled={isUpdating}
-                  className="w-full rounded-xl bg-rose-50 px-6 py-4 text-center border-2 border-transparent transition-all hover:border-rose-500 hover:bg-rose-100 group"
                 >
-                  <div className="text-[11px] font-black uppercase tracking-widest text-rose-700">Không thể sửa</div>
-                  <div className="text-[10px] font-medium text-rose-600/70 text-center">Sản phẩm bị loại bỏ, trừ vào số lượng đơn</div>
+                  Đóng lại
                 </button>
-              )}
-
-              <button
-                onClick={() => setIsHandlingModalOpen(false)}
-                className="w-full mt-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
-                disabled={isUpdating}
-              >
-                Đóng lại
-              </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </OwnerLayout>
+        )}
+
+        {isUpdating && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/5 backdrop-blur-[2px]">
+            <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-xl flex items-center gap-4">
+              <Loader2 className="animate-spin text-black" size={24} />
+              <span className="text-xs font-black text-black uppercase tracking-widest">Đang cập nhật...</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </LayoutComponent>
+  );
+}
+
+function StatCard({ icon, label, value, color }) {
+  const colorMap = {
+    emerald: "bg-[#f0f9f4] border-[#d4e3da] text-[#1e6e43]",
+  };
+  return (
+    <div className="flex items-center gap-6 rounded-2xl border border-black bg-white p-6 shadow-sm transition-all hover:translate-y-[-2px] hover:shadow-md">
+      <div className={`flex h-14 w-14 items-center justify-center rounded-xl border shadow-sm ${colorMap[color] || colorMap.emerald}`}>{icon}</div>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</p>
+        <p className="text-2xl font-black text-slate-900 tracking-tighter">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ModalActionBtn({ onClick, disabled, title, subtitle, theme }) {
+  const themes = {
+    blue: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-400",
+    emerald: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400",
+    rose: "bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:border-rose-400",
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full rounded-2xl border-2 px-6 py-5 text-center transition-all active:scale-[0.98] ${themes[theme]}`}
+    >
+      <div className="text-[11px] font-black uppercase tracking-widest">{title}</div>
+      <div className="text-[10px] font-bold opacity-70 mt-0.5">{subtitle}</div>
+    </button>
   );
 }

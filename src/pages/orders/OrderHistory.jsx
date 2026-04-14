@@ -336,7 +336,7 @@ export default function Orders({
             </div>
             {isOwner && (
               <Link
-                to="/orders/manual-create"
+                to="/orders/create-manual"
                 className="order-create-btn"
               >
                 + Tạo đơn hàng thủ công

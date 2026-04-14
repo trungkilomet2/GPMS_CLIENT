@@ -8,7 +8,7 @@ import "@/styles/dashboard-sidebar.css";
 
 const WORKER_NAV_ITEMS = [
   { to: "/production", label: "Danh sách sản xuất", icon: ClipboardList },
-  { to: "/worker/output-history", label: "Lịch sử sản lượng", icon: ClipboardCheck },
+  { to: "/worker/output-history", label: "Sản lượng của tôi", icon: ClipboardCheck },
   { to: "/worker/leave-requests", label: "Xin nghỉ phép", icon: CalendarDays },
 ];
 

@@ -257,7 +257,7 @@ export function OrderFormSections({
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
             <div className="w-1.5 h-6 bg-green-600 rounded-full" />
-            <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Mẫu thiết kế (Tech pack)</h2>
+            <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Mẫu thiết kế & tài liệu</h2>
           </div>
 
           <div className="space-y-6">
