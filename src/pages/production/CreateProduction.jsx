@@ -11,7 +11,7 @@ import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import DesignTemplatesSection from "@/components/orders/DesignTemplatesSection";
 import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import { normalizeOrderStatus, getOrderStatusLabel } from "@/lib/orders/status";
 import { getOrderCustomerId } from "@/lib/orders/customerInfo";

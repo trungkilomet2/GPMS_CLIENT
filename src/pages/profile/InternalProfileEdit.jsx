@@ -4,7 +4,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
 import { authService } from "@/services/authService";
 import { locationService } from "@/services/locationService";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import { getStoredUser, setStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import {

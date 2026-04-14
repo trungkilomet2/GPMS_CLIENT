@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import WorkerLayout from "@/layouts/WorkerLayout";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import WorkerService from "@/services/WorkerService";
 import LeaveService from "@/services/LeaveService";
 import { getStoredUser } from "@/lib/authStorage";
