@@ -1,5 +1,6 @@
 import { createElement, useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import logoMGC from "@/assets/logo_brand.png";
 import { CalendarDays, ClipboardCheck, ClipboardList, LogOut, X } from "lucide-react";
 import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
@@ -22,7 +23,7 @@ function getInitials(name = "") {
     .toUpperCase();
 }
 
-export default function WorkerSidebar({ mobileOpen = false, onClose = () => {} }) {
+export default function WorkerSidebar({ mobileOpen = false, onClose = () => { } }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -82,100 +83,100 @@ export default function WorkerSidebar({ mobileOpen = false, onClose = () => {} }
         className={`dashboard-sidebar ${effectiveCollapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
         aria-expanded={isMobileViewport ? mobileOpen : !effectiveCollapsed}
       >
-      <div className="dashboard-sidebar__brand">
-        <button
-          type="button"
-          className="dashboard-sidebar__logo"
-          onClick={() => {
-            if (isMobileViewport) return;
-            setCollapsed((prev) => !prev);
-          }}
-          title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
-        >
-          <span className="dashboard-sidebar__logo-mark">GP</span>
-        </button>
-
-        {!effectiveCollapsed && (
-          <div className="dashboard-sidebar__brand-text">
-            <div className="dashboard-sidebar__brand-title">GPMS</div>
-            <div className="dashboard-sidebar__brand-subtitle">{brandSubtitle}</div>
-          </div>
-        )}
-
-        <button
-          type="button"
-          className="dashboard-sidebar__mobile-close"
-          onClick={onClose}
-          aria-label="Đóng menu"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <nav className="dashboard-sidebar__nav">
-        {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => {
-              const currentPath = location.pathname;
-              let isCategoryActive = isActive;
-
-              if (to === "/production") {
-                isCategoryActive = isActive || 
-                  currentPath.startsWith("/worker/error-report") || 
-                  currentPath.startsWith("/worker/daily-report") ||
-                  currentPath.startsWith("/worker/cutting-book") ||
-                  currentPath.startsWith("/worker/production-plan") ||
-                  currentPath.startsWith("/production");
-              }
-              
-              if (to === "/worker/output-history") {
-                isCategoryActive = isActive || currentPath.startsWith("/worker/output-history");
-              }
-
-              if (to === "/worker/leave-requests") {
-                isCategoryActive = isActive || currentPath.startsWith("/worker/leave-requests");
-              }
-
-              return `dashboard-sidebar__item ${isCategoryActive ? "is-active" : ""}`;
+        <div className="dashboard-sidebar__brand">
+          <button
+            type="button"
+            className="dashboard-sidebar__logo"
+            onClick={() => {
+              if (isMobileViewport) return;
+              setCollapsed((prev) => !prev);
             }}
-            title={label}
-            onClick={onClose}
+            title={isMobileViewport ? "May Gia Công" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
           >
-            {createElement(Icon, { size: 22 })}
-            {!effectiveCollapsed && <span>{label}</span>}
-          </NavLink>
-        ))}
-      </nav>
+            <img src={logoMGC} alt="Logo" />
+          </button>
 
-      <div className="dashboard-sidebar__footer">
-        <NavLink
-          to="/profile"
-          title="Hồ sơ cá nhân"
-          onClick={onClose}
-          className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
-        >
-          <div className="dashboard-sidebar__avatar">
-            {getInitials(user?.fullName || user?.name || "NV")}
-          </div>
           {!effectiveCollapsed && (
-            <div className="dashboard-sidebar__user">
-              <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || defaultName}</div>
+            <div className="dashboard-sidebar__brand-text">
+              <div className="dashboard-sidebar__brand-title text-sm font-bold">May Gia Công</div>
+              <div className="dashboard-sidebar__brand-subtitle">{brandSubtitle}</div>
             </div>
           )}
-        </NavLink>
 
-        <button
-          type="button"
-          className="dashboard-sidebar__logout"
-          onClick={handleLogout}
-          title="Đăng xuất"
-        >
-          <LogOut size={18} />
-          {!effectiveCollapsed && <span>Đăng xuất</span>}
-        </button>
-      </div>
+          <button
+            type="button"
+            className="dashboard-sidebar__mobile-close"
+            onClick={onClose}
+            aria-label="Đóng menu"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <nav className="dashboard-sidebar__nav">
+          {navItems.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => {
+                const currentPath = location.pathname;
+                let isCategoryActive = isActive;
+
+                if (to === "/production") {
+                  isCategoryActive = isActive ||
+                    currentPath.startsWith("/worker/error-report") ||
+                    currentPath.startsWith("/worker/daily-report") ||
+                    currentPath.startsWith("/worker/cutting-book") ||
+                    currentPath.startsWith("/worker/production-plan") ||
+                    currentPath.startsWith("/production");
+                }
+
+                if (to === "/worker/output-history") {
+                  isCategoryActive = isActive || currentPath.startsWith("/worker/output-history");
+                }
+
+                if (to === "/worker/leave-requests") {
+                  isCategoryActive = isActive || currentPath.startsWith("/worker/leave-requests");
+                }
+
+                return `dashboard-sidebar__item ${isCategoryActive ? "is-active" : ""}`;
+              }}
+              title={label}
+              onClick={onClose}
+            >
+              {createElement(Icon, { size: 22 })}
+              {!effectiveCollapsed && <span>{label}</span>}
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="dashboard-sidebar__footer">
+          <NavLink
+            to="/profile"
+            title="Hồ sơ cá nhân"
+            onClick={onClose}
+            className={({ isActive }) => `dashboard-sidebar__account ${isActive ? "is-active" : ""}`}
+          >
+            <div className="dashboard-sidebar__avatar">
+              {getInitials(user?.fullName || user?.name || "NV")}
+            </div>
+            {!effectiveCollapsed && (
+              <div className="dashboard-sidebar__user">
+                <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || defaultName}</div>
+              </div>
+            )}
+          </NavLink>
+
+          <button
+            type="button"
+            className="dashboard-sidebar__logout"
+            onClick={handleLogout}
+            title="Đăng xuất"
+          >
+            <LogOut size={18} />
+            {!effectiveCollapsed && <span>Đăng xuất</span>}
+          </button>
+        </div>
       </aside>
     </>
   );

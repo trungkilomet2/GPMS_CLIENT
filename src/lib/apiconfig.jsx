@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
     COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
     GET_PRODUCTION_WORK_LOGS: (productionId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${productionId}`,
     RECORD_DELIVERY: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/${orderId}`,
+    GET_DELIVERY_PLANNING: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/planning/${orderId}`,
     UPDATE_ISSUE_STATUS: (issueId) => `${BASE_URL}/api/ProductionPart/parts/issues/update-status/${issueId}`,
     CONFIRM_UNFIXABLE: (issueId) => `${BASE_URL}/api/ProductionPart/parts/issues/confirm-unfixable/${issueId}`,
     CONFIRM_DELIVERY: (deliveryId) => `${BASE_URL}/api/ProductionPart/delivery/confirm/${deliveryId}`,

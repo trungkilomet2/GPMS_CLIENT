@@ -20,14 +20,15 @@ export default function DeliveryProgressSection({
     const [targetDelivery, setTargetDelivery] = useState(null);
     const [isConfirming, setIsConfirming] = useState(false);
     const [confirmationInput, setConfirmationInput] = useState("");
+    const [localError, setLocalError] = useState("");
 
     const handleConfirmAction = async () => {
         if (!targetDelivery || !confirmationInput) return;
 
         // Map Vietnamese input keywords to backend expected values
         let backendValue = confirmationInput.trim().toUpperCase();
-        if (backendValue === 'KHỚP') backendValue = 'Yes';
-        else if (backendValue === 'LỖI') backendValue = 'No';
+        if (backendValue === 'Y') backendValue = 'Yes';
+        else if (backendValue === 'N') backendValue = 'No';
 
         try {
             setIsConfirming(true);
@@ -46,14 +47,18 @@ export default function DeliveryProgressSection({
             }
         } catch (err) {
             console.error("Error confirming delivery:", err.response?.data || err);
+            
             const errorData = err.response?.data;
-            let errorMsg = "Lỗi xác nhận giao nhận.";
+            let errorMsg = "Mã xác nhận không chính xác. Vui lòng thử lại.";
 
             if (typeof errorData === 'string') errorMsg = errorData;
             else if (errorData?.errors) errorMsg = Object.values(errorData.errors).flat().join(", ");
             else if (errorData?.message) errorMsg = errorData.message;
 
-            toast.error(errorMsg);
+            // Normalize error message to use Y/N instead of YES/NO
+            errorMsg = errorMsg.replace(/YES/gi, 'Y').replace(/NO/gi, 'N');
+
+            setLocalError(errorMsg);
         } finally {
             setIsConfirming(false);
         }
@@ -314,7 +319,7 @@ export default function DeliveryProgressSection({
 
             {/* Diary Modal */}
             {isDiaryOpen && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-[#fcfdfc] w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
                         {/* Modal Header */}
                         <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white">
@@ -336,8 +341,10 @@ export default function DeliveryProgressSection({
                         </div>
                         <div className="flex-1 overflow-y-auto p-8 bg-gray-50/20">
                             <div className="relative pl-8 space-y-6 before:content-[''] before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-px before:bg-gray-200/60">
-                                {deliveries.slice().reverse().map((d, i) => {
-                                    const originalIdx = deliveries.length - 1 - i;
+                                {deliveries
+                                    .slice()
+                                    .sort((a, b) => new Date(b.deliveredAt || b.receivedDate || b.date || 0) - new Date(a.deliveredAt || a.receivedDate || a.date || 0))
+                                    .map((d, i) => {
                                     const { color, size } = getDetailedInfo(d);
                                     const dateStr = d.deliveredAt || d.receivedDate || d.date || "";
                                     const autoConfirmed = isAutoConfirmed(dateStr);
@@ -416,7 +423,7 @@ export default function DeliveryProgressSection({
 
             {/* Confirmation Action Modal */}
             {isConfirmModalOpen && (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[9000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
                     <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6 animate-in zoom-in-95">
                         <div className="flex flex-col items-center text-center gap-4">
                             <div className="w-16 h-16 bg-[#f0f9f4] rounded-2xl flex items-center justify-center text-[#1e6e43]">
@@ -425,7 +432,7 @@ export default function DeliveryProgressSection({
                             <div className="space-y-2">
                                 <h4 className="text-lg font-black text-slate-900 uppercase">Xác nhận giao hàng</h4>
                                 <p className="text-xs font-medium text-slate-500">
-                                    Vui lòng nhập <span className="text-[#1e6e43] font-bold">KHỚP</span> nếu đúng hoặc <span className="text-rose-500 font-bold">LỖI</span> nếu có sai sót
+                                    Vui lòng nhập <span className="text-[#1e6e43] font-bold">Y</span> nếu đúng hoặc <span className="text-rose-500 font-bold">N</span> nếu có sai sót
                                 </p>
                             </div>
                         </div>
@@ -433,12 +440,22 @@ export default function DeliveryProgressSection({
                         <div className="space-y-4">
                             <input
                                 type="text"
-                                placeholder="..."
+                                placeholder="Y / N"
+                                maxLength={1}
                                 value={confirmationInput}
-                                onChange={(e) => setConfirmationInput(e.target.value)}
-                                className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 text-center text-lg font-black uppercase tracking-[0.2em] focus:border-[#1e6e43] focus:bg-white outline-none transition-all placeholder:text-slate-200"
+                                onChange={(e) => {
+                                    setConfirmationInput(e.target.value);
+                                    setLocalError("");
+                                }}
+                                className={`w-full h-14 border-2 rounded-2xl px-6 text-center text-lg font-black uppercase tracking-[0.2em] outline-none transition-all placeholder:text-slate-200 ${localError ? 'border-rose-300 bg-rose-50' : 'bg-slate-50 border-slate-100 focus:border-[#1e6e43] focus:bg-white'}`}
                                 autoFocus
                             />
+
+                            {localError && (
+                                <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest text-center animate-in fade-in slide-in-from-top-1 px-4">
+                                    {localError}
+                                </p>
+                            )}
 
                             <button
                                 onClick={handleConfirmAction}

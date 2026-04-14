@@ -723,58 +723,51 @@ export default function ProductionDetail() {
                               const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
                               const rowTotal = sizeKeys.reduce((acc, k) => acc + (v[k] || 0), 0);
                               
-                              // A. Identify the Final Stage (concluding step)
-                              const FINAL_KEYWORDS = ["là", "ủi", "đóng gói", "hoàn thiện", "kcs", "finishing", "packing", "giao khách"];
-                              let lastStage = [...rawParts].reverse().find(p => 
-                                FINAL_KEYWORDS.some(kw => (p.partName || p.name || "").toLowerCase().includes(kw))
-                              ) || rawParts[rawParts.length - 1];
+                              // Helper to normalize strings for matching
+                              const normalize = (str) => {
+                                if (!str) return "";
+                                return str.toString()
+                                  .toLowerCase()
+                                  .normalize("NFD")
+                                  .replace(/[\u0300-\u036f]/g, "")
+                                  .replace(/đ/g, "d")
+                                  .trim();
+                              };
 
-                              const lastStageId = String(lastStage?.id || lastStage?.partId || "");
+                              // Calculate bottleneck (MIN) across all stages
+                              const stageData = sizeKeys.map(k => {
+                                const targetSize = normalize(k);
+                                const targetColor = normalize(v.color);
+                                const targetQty = v[k] || 0;
 
-                                // Helper to normalize strings for matching (lowercase, no accents, no spaces)
-                                const normalize = (str) => {
-                                  if (!str) return "";
-                                  return str.toString()
-                                    .toLowerCase()
-                                    .normalize("NFD")
-                                    .replace(/[\u0300-\u036f]/g, "") // Remove accents
-                                    .replace(/đ/g, "d")               // Handle 'đ'
-                                    .trim();
-                                };
+                                if (targetQty === 0) return { actual: 0, target: 0 };
 
-                                // Calculate actual finished quantity for each cell in this color row
-                                const stageData = sizeKeys.map(k => {
-                                  const targetSize = normalize(k);
-                                  const targetColor = normalize(v.color);
-                                  const targetQty = v[k] || 0;
-
-                                  if (targetQty === 0) return { actual: 0, target: 0 };
-
-                                  // Find the specific variant link ID for THIS stage and THIS variant
-                                  const variantLink = (lastStage?.listPartOrderSizes || []).find(l => 
+                                const countsPerStage = rawParts.map(part => {
+                                  const partId = String(part.id || "");
+                                  const variantLink = (part.listPartOrderSizes || []).find(l => 
                                      normalize(l.color || l.colorName || "") === targetColor &&
                                      normalize(l.size || l.sizeName || "") === targetSize
                                   );
                                   const linkId = String(variantLink?.id || "");
 
-                                  // Sum logs for this specific link + stage combo
-                                  const actual = allLogs
+                                  return allLogs
                                     .filter(log => {
                                       const logPartId = String(log.productionPartId || log.partId || "");
                                       const logLinkId = String(log.partOrderSizeId || log.productionPartOrderSizeId || "");
                                       const logColor = normalize(log.color || log.colorName || "");
                                       const logSize = normalize(log.size || log.sizeName || "");
                                       
-                                      const isMatch = (logPartId === lastStageId) && 
+                                      const isMatch = (logPartId === partId) && 
                                                       (logLinkId === linkId || (logColor === targetColor && logSize === targetSize));
                                       const isApproved = log.isReadOnly === true || log.isReadOnly === 1 || [2, 4].includes(Number(log.status));
-                                      
                                       return isMatch && isApproved;
                                     })
                                     .reduce((sum, l) => sum + (Number(l.confirmedQuantity || l.quantity || 0)), 0);
-
-                                  return { actual, target: targetQty };
                                 });
+
+                                const actual = Math.min(...countsPerStage);
+                                return { actual, target: targetQty };
+                              });
 
                               const rowActual = stageData.reduce((sum, d) => sum + d.actual, 0);
 
@@ -785,7 +778,6 @@ export default function ProductionDetail() {
                                   </div>
                                   {sizeKeys.map((k, sIdx) => {
                                     const { actual, target } = stageData[sIdx];
-
                                     return (
                                       <div key={k} className="col-span-1 py-3 text-center flex flex-col items-center justify-center">
                                         {target > 0 ? (

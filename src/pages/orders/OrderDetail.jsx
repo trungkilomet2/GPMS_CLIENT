@@ -234,8 +234,7 @@ export default function OrderDetail() {
     const isCompleted = normalizedStatus === 'Đã hoàn thành';
 
     // Permission rules: ONLY the order owner (customer) can edit when requested
-    const canEdit = isCustomer && isOrderOwner &&
-        (normalizedStatus === 'Chờ xét duyệt' || normalizedStatus === 'Yêu cầu chỉnh sửa');
+    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
     const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
     const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;

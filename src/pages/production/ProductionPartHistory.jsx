@@ -23,6 +23,7 @@ import { toast } from "react-toastify";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
 import WorkerLayout from "@/layouts/WorkerLayout";
+import Pagination from "@/components/Pagination";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -42,6 +43,8 @@ export default function ProductionPartHistory() {
   const [variantLookup, setVariantLookup] = useState({});
   const [orderSizeLookup, setOrderSizeLookup] = useState({});
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Management State
   const [editingId, setEditingId] = useState(null);
@@ -152,7 +155,7 @@ export default function ProductionPartHistory() {
         // C. Fetch Parts & Logs in parallel
         const [partsRes, logsRes] = await Promise.allSettled([
           ProductionPartService.getPartsByProduction(activeProdId),
-          ProductionPartService.getProductionWorkLogs(activeProdId)
+          ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: 0, PageSize: 100 })
         ]);
 
         if (partsRes.status === 'fulfilled') {
@@ -201,6 +204,13 @@ export default function ProductionPartHistory() {
       pendingCount
     };
   }, [logs]);
+
+  const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
+
+  const pageLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return logs.slice(start, start + pageSize);
+  }, [logs, currentPage, pageSize]);
 
   // --- ACTIONS ---
 
@@ -342,12 +352,6 @@ export default function ProductionPartHistory() {
                 </p>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-4 py-2 bg-[#f0f9f4] text-[#1e6e43] border border-[#d4e3da] rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-sm">
-                {stats.totalLogs} Lượt báo cáo
-              </span>
-            </div>
           </div>
 
           {/* STATS SECTION */}
@@ -400,7 +404,8 @@ export default function ProductionPartHistory() {
                         </div>
                       </td>
                     </tr>
-                  ) : logs.map((log, index) => {
+                  ) : pageLogs.map((log, index) => {
+                    const globalIndex = (currentPage - 1) * pageSize + index + 1;
                     const logPosId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
                     const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.id || "");
 
@@ -422,7 +427,7 @@ export default function ProductionPartHistory() {
 
                     return (
                       <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
-                        <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(index + 1).padStart(2, "0")}</td>
+                        <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(globalIndex).padStart(2, "0")}</td>
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{partName}</div>
                         </td>
@@ -509,6 +514,18 @@ export default function ProductionPartHistory() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* PAGINATION FOOTER */}
+            <div className="px-8 py-5 border-t border-black bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Hiển thị {Math.min(logs.length, (currentPage - 1) * pageSize + 1)}-{Math.min(logs.length, currentPage * pageSize)} trên {logs.length} bản ghi
+              </p>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </div>
           </div>
         </div>

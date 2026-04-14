@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import logoMGC from "@/assets/logo_brand.png";
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -152,14 +153,14 @@ export default function Sidebar({ mobileOpen = false, onClose = () => { } }) {
               if (isMobileViewport) return;
               setCollapsed((prev) => !prev);
             }}
-            title={isMobileViewport ? "GPMS" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
+            title={isMobileViewport ? "May Gia Công" : collapsed ? "Mở sidebar" : "Thu gọn sidebar"}
           >
-            <span className="dashboard-sidebar__logo-mark">GP</span>
+            <img src={logoMGC} alt="Logo" />
           </button>
 
           {!effectiveCollapsed && (
             <div className="dashboard-sidebar__brand-text">
-              <div className="dashboard-sidebar__brand-title">GPMS</div>
+              <div className="dashboard-sidebar__brand-title text-sm font-bold">May Gia Công</div>
               <div className="dashboard-sidebar__brand-subtitle">Quản lý sản xuất</div>
             </div>
           )}

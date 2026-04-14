@@ -63,6 +63,9 @@ const ProductionPartService = {
   getDeliveryHistory(orderId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.RECORD_DELIVERY(orderId));
   },
+  getDeliveryPlanning(orderId) {
+    return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_DELIVERY_PLANNING(orderId));
+  },
 };
 
 export default ProductionPartService;
