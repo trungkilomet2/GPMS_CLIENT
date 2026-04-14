@@ -107,6 +107,43 @@ function streamReplyText(text, onChunk) {
   });
 }
 
+function renderMessageContent(content) {
+  const normalized = String(content ?? "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/\r\n/g, "\n");
+
+  const lines = normalized.split("\n");
+
+  return lines.map((line, lineIndex) => {
+    const segments = [];
+    const pattern = /\*\*(.*?)\*\*/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        segments.push(line.slice(lastIndex, match.index));
+      }
+
+      segments.push(
+        <strong key={`strong-${lineIndex}-${match.index}`}>{match[1]}</strong>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < line.length) {
+      segments.push(line.slice(lastIndex));
+    }
+
+    return (
+      <span key={`line-${lineIndex}`}>
+        {segments.length ? segments : line}
+        {lineIndex < lines.length - 1 ? <br /> : null}
+      </span>
+    );
+  });
+}
+
 export default function ChatWidget() {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
@@ -305,7 +342,7 @@ export default function ChatWidget() {
                 <div className="gpms-chat-message__label">
                   {message.role === "assistant" ? chatConfig.assistantLabel : "Bạn"}
                 </div>
-                <div className="gpms-chat-message__content">{message.content}</div>
+                <div className="gpms-chat-message__content">{renderMessageContent(message.content)}</div>
               </article>
             ))}
 
