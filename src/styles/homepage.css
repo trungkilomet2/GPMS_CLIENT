@@ -1573,8 +1573,10 @@ body {
 
   .navbar-dark nav {
     width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    overflow: visible;
     scrollbar-width: none;
   }
 
@@ -1583,11 +1585,14 @@ body {
   }
 
   .mnav-item {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
+    min-width: max-content;
     padding-bottom: 0;
   }
 
   .mnav-a {
+    width: 100%;
+    justify-content: center;
     min-height: 46px;
     padding: .7rem .85rem;
     font-size: .76rem;
@@ -1598,9 +1603,11 @@ body {
   }
 
   .mnav-dropdown {
-    left: .5rem;
-    right: .5rem;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
     min-width: 0;
+    z-index: 700;
   }
 
   .hero-section {

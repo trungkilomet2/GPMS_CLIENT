@@ -275,8 +275,40 @@
   transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
 }
 
+.employee-create-field__control--with-toggle {
+  padding-right: 3.4rem;
+}
+
 .employee-create-field select.employee-create-field__control {
   padding-right: 2.6rem;
+}
+
+.employee-create-field__toggle {
+  position: absolute;
+  top: 3.25rem;
+  right: 0.85rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #6f8478;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.employee-create-field__toggle:hover {
+  background: rgba(45, 144, 88, 0.08);
+  color: #1f6b42;
+}
+
+.employee-create-field__toggle:focus-visible {
+  outline: 2px solid rgba(45, 144, 88, 0.28);
+  outline-offset: 2px;
 }
 
 .employee-create-field__control:focus {

@@ -19,7 +19,6 @@ import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
 import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -103,10 +102,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
     location.pathname.startsWith("/worker/production-plan"),
     location.pathname.includes("/cutting-book"),
   ].some(Boolean);
-  const userRoleLabel = splitRoles(user?.role)
-    .map((role) => getSystemRoleLabel(role))
-    .join(", ");
-
   useEffect(() => {
     try {
       localStorage.setItem("gpms-sidebar-collapsed", JSON.stringify(collapsed));
@@ -223,7 +218,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => {} }) {
           {!effectiveCollapsed && (
             <div className="dashboard-sidebar__user">
               <div className="dashboard-sidebar__user-name">{user?.fullName || user?.name || "Người dùng"}</div>
-              <div className="dashboard-sidebar__user-role">{userRoleLabel || "Chủ xưởng / Quản lý sản xuất"}</div>
             </div>
           )}
         </NavLink>
