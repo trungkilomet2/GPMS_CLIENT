@@ -1513,6 +1513,7 @@ export default function ProductionPlan() {
         onClose={() => setIsConfirmSaveOpen(false)}
         primaryLabel="Xác nhận cập nhật"
         confirmIcon={Save}
+        variant="warning"
       />
       <ConfirmModal
         isOpen={isConfirmDeleteOpen}
@@ -1611,6 +1612,7 @@ export default function ProductionPlan() {
         }}
         primaryLabel="Xác nhận xóa"
         confirmIcon={Trash2}
+        variant="danger"
       />
 
       <ConfirmModal
@@ -1622,6 +1624,7 @@ export default function ProductionPlan() {
         primaryLabel="Xác nhận thoát"
         secondaryLabel="Quay lại"
         confirmIcon={LogOut}
+        variant="warning"
       />
       <ConfirmModal
         isOpen={isConfirmApplyOpen}
@@ -1634,6 +1637,7 @@ export default function ProductionPlan() {
         }}
         primaryLabel="Xác nhận áp dụng"
         confirmIcon={CheckCircle}
+        variant="warning"
       />
     </OwnerLayout>
   );

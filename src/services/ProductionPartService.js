@@ -46,8 +46,10 @@ const ProductionPartService = {
   getIssueWorkers(partId) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_ISSUE_WORKERS(partId));
   },
-  completePayment(partId, payload) {
-    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.COMPLETE_PAYMENT(partId), payload);
+  completePayment(partId, partOrderSizeId, payload) {
+    return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.COMPLETE_PAYMENT(partId), payload, {
+      params: { partOrderSizeId }
+    });
   },
   getProductionWorkLogs(productionId, params) {
     return axiosClient.get(API_ENDPOINTS.PRODUCTION_PART.GET_PRODUCTION_WORK_LOGS(productionId), { params });

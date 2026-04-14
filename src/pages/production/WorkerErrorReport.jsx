@@ -3,9 +3,11 @@ import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
 import { getAuthItem, getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -609,9 +611,16 @@ export default function WorkerErrorReport() {
     }
   };
 
+  const currentUser = getStoredUser();
+  const LayoutComponent = useMemo(() => {
+    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+    if (hasAnyRole(roleValue, ["Owner", "PM"])) return OwnerLayout;
+    return WorkerLayout;
+  }, [currentUser]);
+
   return (
-    <OwnerLayout>
-      <div className="leave-page leave-list-page">
+    <LayoutComponent>
+      <div className="leave-page min-h-screen pb-20">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
@@ -871,11 +880,11 @@ export default function WorkerErrorReport() {
               </div>
             </div>
           </div>
-        </div>
       </div>
-    </OwnerLayout>
-  );
-}
+        </div>
+      </LayoutComponent>
+    );
+  }
 
 function InfoItem({ label, value }) {
   return (

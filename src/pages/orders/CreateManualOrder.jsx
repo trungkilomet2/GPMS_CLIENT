@@ -25,6 +25,8 @@ export default function CreateManualOrder() {
     customerAddress: '',
   });
 
+  const [parsingAddress, setParsingAddress] = useState(""); // Track original address for auto-matching
+
   const [provinces, setProvinces] = useState([]);
   const [wards, setWards] = useState([]);
 
@@ -52,15 +54,57 @@ export default function CreateManualOrder() {
     }
   }, [customerData.province]);
 
-  // Auto-concatenate address
+  // Auto-concatenate address or keep reused string if no parts selected
   useEffect(() => {
-    const parts = [
-      customerData.detail,
-      customerData.ward?.name,
-      customerData.province?.name
-    ].filter(Boolean);
-    setCustomerData(prev => ({ ...prev, customerAddress: parts.join(', ') }));
+    // If we have selected parts, generate the string
+    if (customerData.province || customerData.ward || customerData.detail) {
+      const parts = [
+        customerData.detail,
+        customerData.ward?.name,
+        customerData.province?.name
+      ].filter(Boolean);
+      setCustomerData(prev => ({ ...prev, customerAddress: parts.join(', ') }));
+    }
   }, [customerData.detail, customerData.ward, customerData.province]);
+
+  // AUTO-MATCH PROVINCE/WARD from reused string
+  useEffect(() => {
+    if (parsingAddress && provinces.length > 0 && !customerData.province) {
+      const addr = parsingAddress;
+      const foundP = provinces.find(p => addr.toLowerCase().includes(p.name.toLowerCase()));
+      if (foundP) {
+        setCustomerData(prev => ({ ...prev, province: foundP }));
+      }
+    }
+  }, [provinces, parsingAddress]);
+
+  useEffect(() => {
+    if (parsingAddress && wards.length > 0 && customerData.province && !customerData.ward) {
+      const addr = parsingAddress;
+      
+      // Sort by length descending to match most specific name
+      const sortedWards = [...wards].sort((a, b) => b.name.length - a.name.length);
+      const foundW = sortedWards.find(w => addr.toLowerCase().includes(w.name.toLowerCase()));
+      
+      if (foundW) {
+        // Extract Detail: everything before the ward name
+        const wardIndex = addr.toLowerCase().indexOf(foundW.name.toLowerCase());
+        let extractedDetail = "";
+        if (wardIndex > 0) {
+          extractedDetail = addr.substring(0, wardIndex).replace(/[,-]\s*$/, "").trim();
+        }
+
+        setCustomerData(prev => ({
+          ...prev,
+          ward: foundW,
+          detail: extractedDetail || prev.detail
+        }));
+        
+        // Clear parsing flag after successful ward match to stop over-writing
+        setParsingAddress(""); 
+      }
+    }
+  }, [wards, parsingAddress, customerData.province]);
 
   const [materials, setMaterials] = useState([]);
   const [orderData, setOrderData] = useState({
@@ -140,11 +184,26 @@ export default function CreateManualOrder() {
     // 1. Basic Order Info
     setOrderData(prev => ({
       ...prev,
-      orderName: `${reuse.orderName || ''}`,
+      orderName: reuse.orderName || '',
       image: reuse.image || '',
       note: reuse.note || '',
       cpu: reuse.cpu || '',
     }));
+
+    // Identify reuse address for smarter parsing
+    let prefAddress = '';
+    if (reuse.guest) {
+        prefAddress = reuse.guest.address || '';
+    } else if (reuse.userFullName || reuse.userPhone || reuse.userLocation) {
+        prefAddress = reuse.userLocation || '';
+    } else if (reuse.guestName || reuse.customerName) {
+        prefAddress = reuse.guestAddress || reuse.customerAddress || '';
+    }
+
+    if (prefAddress) {
+        setParsingAddress(prefAddress);
+        setCustomerData(prev => ({ ...prev, customerAddress: prefAddress }));
+    }
 
     // 2. Materials
     if (reuse.materials && Array.isArray(reuse.materials)) {
@@ -193,13 +252,20 @@ export default function CreateManualOrder() {
       })));
     }
 
-    // 5. Guest Info (if any)
+    // 5. Customer / Guest Info extraction
     if (reuse.guest) {
       setCustomerData(prev => ({
         ...prev,
-        customerName: reuse.guest.fullName || '',
-        customerPhone: reuse.guest.phoneNumber || '',
-        customerAddress: reuse.guest.address || '',
+        customerName: reuse.guest.fullName || reuse.guest.fullName || '',
+        customerPhone: reuse.guest.phoneNumber || reuse.guest.phoneNumber || '',
+        customerAddress: reuse.guest.address || reuse.guest.address || '',
+      }));
+    } else if (reuse.userFullName || reuse.userPhone || reuse.userLocation) {
+      setCustomerData(prev => ({
+        ...prev,
+        customerName: reuse.userFullName || '',
+        customerPhone: reuse.userPhone || '',
+        customerAddress: reuse.userLocation || '',
       }));
     } else if (reuse.guestName || reuse.customerName) {
       setCustomerData(prev => ({
