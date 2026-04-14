@@ -1,7 +1,7 @@
 import { getAuthItem } from "@/lib/authStorage";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 
-const CHAT_API_URL = import.meta.env.VITE_GPMS_AI_CHAT_URL || API_ENDPOINTS.AI.GEMINI_CHAT;
+const CHAT_API_URL = import.meta.env.VITE_GPMS_AI_CHAT_URL || API_ENDPOINTS.AI.OPENROUTER_CHAT;
 const CHAT_API_KEY = import.meta.env.VITE_GPMS_AI_CHAT_API_KEY || "";
 
 function extractReply(payload) {
@@ -41,13 +41,28 @@ export async function sendGpmsAiPrompt({ message, history, user, pathname, assis
     headers["x-api-key"] = CHAT_API_KEY;
   }
 
-  const response = await fetch(CHAT_API_URL, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      message,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(CHAT_API_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        message,
+        history,
+        pathname,
+        assistantMode,
+        user: user
+          ? {
+              userId: user.userId ?? user.id ?? null,
+              fullName: user.fullName ?? user.name ?? "",
+              role: user.role ?? "",
+            }
+          : null,
+      }),
+    });
+  } catch {
+    throw new Error("Không thể kết nối tới máy chủ trợ lý AI. Vui lòng kiểm tra lại API.");
+  }
 
   const rawText = await response.text();
   let payload = rawText;
@@ -59,6 +74,10 @@ export async function sendGpmsAiPrompt({ message, history, user, pathname, assis
   }
 
   if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("API trợ lý AI chưa được bật trên máy chủ hiện tại.");
+    }
+
     const errorMessage =
       extractReply(payload) ||
       payload?.error ||

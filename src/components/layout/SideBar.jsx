@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { createElement } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import logoMGC from "@/assets/logo_brand.png";
@@ -20,7 +20,6 @@ import { authService } from "@/services/authService";
 import { getStoredUser } from "@/lib/authStorage";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
 import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import "@/styles/dashboard-sidebar.css";
 
 const ADMIN_NAV_ITEMS = [
@@ -104,10 +103,6 @@ export default function Sidebar({ mobileOpen = false, onClose = () => { } }) {
     location.pathname.startsWith("/worker/production-plan"),
     location.pathname.includes("/cutting-book"),
   ].some(Boolean);
-  const userRoleLabel = splitRoles(user?.role)
-    .map((role) => getSystemRoleLabel(role))
-    .join(", ");
-
   useEffect(() => {
     try {
       localStorage.setItem("gpms-sidebar-collapsed", JSON.stringify(collapsed));

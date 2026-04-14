@@ -1,18 +1,11 @@
 // API Configuration
-// const BASE_URL = 'http://localhost:5229';
-
-//main URL
-const BASE_URL = 'http://26.250.4.244:5229';
-
-// sub URL
-// const BASE_URL = 'http://26.93.63.192:8000';
-
-// const BASE_URL = 'https://localhost:7096';
-// const BASE_URL = '';
+const BASE_URL =
+  String(import.meta.env.VITE_API_BASE_URL ?? "").trim() ||
+  "http://26.250.4.244:5229";
 
 export const API_ENDPOINTS = {
   AI: {
-    GEMINI_CHAT: `${BASE_URL}/ai/gemini/chat`,
+    OPENROUTER_CHAT: `${BASE_URL}/ai/openrouter/chat`,
   },
 
   ACCOUNT: {

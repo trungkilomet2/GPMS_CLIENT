@@ -245,14 +245,6 @@
   color: #1a2e23;
 }
 
-.dashboard-sidebar__user-role {
-  margin-top: 0.2rem;
-  font-size: 0.8rem;
-  color: #4a5e53;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
 .dashboard-sidebar__logout {
   display: inline-flex;
   align-items: center;

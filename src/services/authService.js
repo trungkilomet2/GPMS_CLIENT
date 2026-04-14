@@ -126,6 +126,27 @@ async function loadProfileAfterLogin(token) {
   }
 }
 
+function decodeJwtPayload(token) {
+  const payload64 = String(token ?? "").split(".")[1];
+  if (!payload64) {
+    throw new Error("Missing token payload");
+  }
+
+  const normalized = payload64
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .padEnd(Math.ceil(payload64.length / 4) * 4, "=");
+
+  const decodedBinary = atob(normalized);
+  const decodedText = decodeURIComponent(
+    Array.from(decodedBinary)
+      .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+      .join("")
+  );
+
+  return JSON.parse(decodedText);
+}
+
 export const authService = {
   async login(payload) {
     const res = await fetch(API_ENDPOINTS.ACCOUNT.LOGIN, {
@@ -156,9 +177,7 @@ export const authService = {
     const token = rawToken.replace(/^"|"$/g, "").trim();
     let decoded;
     try {
-      const payload64 = token.split(".")[1];
-      if (!payload64) throw new Error("Missing token payload");
-      decoded = JSON.parse(atob(payload64));
+      decoded = decodeJwtPayload(token);
     } catch {
       clearAuthStorage();
       throw {
