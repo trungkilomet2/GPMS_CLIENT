@@ -107,41 +107,188 @@ function streamReplyText(text, onChunk) {
   });
 }
 
-function renderMessageContent(content) {
-  const normalized = String(content ?? "")
+function convertHtmlReplyToPlainText(content) {
+  const normalized = String(content ?? "").trim();
+  if (!normalized) return "";
+
+  return normalized
+    .replace(/\r\n/g, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/\r\n/g, "\n");
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<p[^>]*>/gi, "")
+    .replace(/<ul[^>]*>/gi, "\n")
+    .replace(/<\/ul>/gi, "\n")
+    .replace(/<ol[^>]*>/gi, "\n")
+    .replace(/<\/ol>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n- ")
+    .replace(/<\/li>/gi, "")
+    .replace(/<(strong|b)[^>]*>/gi, "**")
+    .replace(/<\/(strong|b)>/gi, "**")
+    .replace(/<(em|i)[^>]*>/gi, "*")
+    .replace(/<\/(em|i)>/gi, "*")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
-  const lines = normalized.split("\n");
+function formatAssistantReplyForDisplay(content) {
+  let text = String(content ?? "").replace(/\r\n/g, "\n").trim();
+  if (!text) return "";
 
-  return lines.map((line, lineIndex) => {
-    const segments = [];
-    const pattern = /\*\*(.*?)\*\*/g;
-    let lastIndex = 0;
-    let match;
+  text = text
+    .replace(/\s{2,}/g, " ")
+    .replace(/(Quy\s*trình\s*\d+\s*:|Quy\s*trình:)/gi, "\n\n$1")
+    .replace(/(B[uư][oơ]c\s*\d+\s*:)/gi, "\n$1")
+    .replace(/\.\s*(?=B[uư][oơ]c\s*\d+\s*:)/gi, ".\n")
+    .replace(/\.\s*(?=Quy\s*trình\s*\d+\s*:)/gi, ".\n")
+    .replace(/\.\s*(?=Bạn\s+có\s+muốn)/gi, ".\n");
 
-    while ((match = pattern.exec(line)) !== null) {
-      if (match.index > lastIndex) {
-        segments.push(line.slice(lastIndex, match.index));
-      }
+  text = text.replace(
+    /((?:Owner|PM|Khách hàng|Bạn)\s+có\s+thể:)\s*([^\n.]+)\./gi,
+    (_, prefix, listPart) => {
+      const items = listPart
+        .replace(/\s+hoặc\s+/gi, ", ")
+        .split(/\s*,\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean);
 
-      segments.push(
-        <strong key={`strong-${lineIndex}-${match.index}`}>{match[1]}</strong>
-      );
-      lastIndex = match.index + match[0].length;
+      if (!items.length) return `${prefix}`;
+      return `${prefix}\n${items.map((item) => `- ${item}`).join("\n")}.`;
     }
+  );
 
-    if (lastIndex < line.length) {
-      segments.push(line.slice(lastIndex));
-    }
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
 
-    return (
-      <span key={`line-${lineIndex}`}>
-        {segments.length ? segments : line}
-        {lineIndex < lines.length - 1 ? <br /> : null}
-      </span>
-    );
+function looksTruncatedReply(content) {
+  const normalized = String(content ?? "").trim();
+  if (!normalized || normalized.length < 40) return false;
+
+  if (/[.!?…"”'"')\]]$/.test(normalized)) {
+    return false;
+  }
+
+  return /(\b(nếu|khi|để|và|hoặc|sau khi|trường hợp|bước|if|then|because|with)\b|[:,;\-])$/i.test(normalized)
+    || /[a-zA-ZÀ-ỹ0-9]$/.test(normalized);
+}
+
+async function fetchContinuationReply({ currentReply, history, user, pathname, assistantMode }) {
+  const continuationPrompt =
+    "Câu trả lời trước của bạn đang bị dừng giữa chừng. Hãy tiếp tục đúng phần còn dang dở, không lặp lại nội dung đã trả lời.";
+
+  return sendGpmsAiPrompt({
+    message: continuationPrompt,
+    history: [
+      ...history,
+      { role: "assistant", content: currentReply },
+    ],
+    user,
+    pathname,
+    assistantMode,
   });
+}
+
+function renderInlineText(text, keyPrefix) {
+  const normalized = String(text ?? "");
+  const segments = [];
+  const pattern = /\*\*(.*?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(normalized)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push(normalized.slice(lastIndex, match.index));
+    }
+
+    segments.push(
+      <strong key={`${keyPrefix}-strong-${match.index}`}>{match[1]}</strong>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < normalized.length) {
+    segments.push(normalized.slice(lastIndex));
+  }
+
+  return segments.length ? segments : normalized;
+}
+
+function renderMessageContent(content) {
+  const normalized = String(content ?? "").replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  const elements = [];
+  let paragraphLines = [];
+  let listItems = [];
+  let listType = null;
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    const text = paragraphLines.join(" ").trim();
+    if (text) {
+      elements.push(
+        <p key={`paragraph-${elements.length}`} className="gpms-chat-message__paragraph">
+          {renderInlineText(text, `paragraph-${elements.length}`)}
+        </p>
+      );
+    }
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    const Tag = listType === "ol" ? "ol" : "ul";
+    elements.push(
+      <Tag
+        key={`list-${elements.length}`}
+        className={`gpms-chat-message__list${listType === "ol" ? " gpms-chat-message__list--ordered" : ""}`}
+      >
+        {listItems.map((item, index) => (
+          <li key={`item-${index}`}>{renderInlineText(item, `item-${elements.length}-${index}`)}</li>
+        ))}
+      </Tag>
+    );
+    listItems = [];
+    listType = null;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      return;
+    }
+
+    const orderedMatch = line.match(/^(\d+)\.\s+(.+)$/);
+    if (orderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ol") flushList();
+      listType = "ol";
+      listItems.push(orderedMatch[2]);
+      return;
+    }
+
+    const unorderedMatch = line.match(/^[-*•]\s+(.+)$/);
+    if (unorderedMatch) {
+      flushParagraph();
+      if (listType && listType !== "ul") flushList();
+      listType = "ul";
+      listItems.push(unorderedMatch[1]);
+      return;
+    }
+
+    if (listItems.length) {
+      flushList();
+    }
+
+    paragraphLines.push(line);
+  });
+
+  flushParagraph();
+  flushList();
+
+  return elements.length ? elements : renderInlineText(normalized, "fallback");
 }
 
 export default function ChatWidget() {
@@ -262,7 +409,29 @@ export default function ChatWidget() {
         },
       ]);
 
-      await streamReplyText(reply, (partialContent) => {
+      let displayReply = convertHtmlReplyToPlainText(reply);
+
+      if (looksTruncatedReply(displayReply)) {
+        try {
+          const continuationReply = await fetchContinuationReply({
+            currentReply: displayReply,
+            history: normalizeHistory(nextMessages),
+            user,
+            pathname: typeof window !== "undefined" ? window.location.pathname : "",
+            assistantMode: chatMode,
+          });
+          const continuationText = convertHtmlReplyToPlainText(continuationReply);
+          if (continuationText) {
+            displayReply = `${displayReply}\n${continuationText}`.trim();
+          }
+        } catch {
+          // Keep the original reply if the follow-up continuation request fails.
+        }
+      }
+
+      const formattedReply = formatAssistantReplyForDisplay(displayReply);
+
+      await streamReplyText(formattedReply, (partialContent) => {
         setMessages((prev) =>
           prev.map((item) =>
             item.id === assistantId
