@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { userService } from "@/services/userService";
 import OrderService from "@/services/OrderService";
+import { authService } from "@/services/authService";
 import Header from "@/components/Header";
 import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";
 
@@ -186,14 +187,46 @@ function SectionSecurity() {
   const [form,setForm] = useState({current:"",next:"",confirm:""});
   const [msg,setMsg]   = useState(null);
   const [show,setShow] = useState({current:false,next:false,confirm:false});
+  const [submitting,setSubmitting] = useState(false);
   const handle = e => setForm(p=>({...p,[e.target.name]:e.target.value}));
-  const submit = e => {
+
+  const getErrorMessage = (error) => {
+    const data = error?.response?.data;
+    if (typeof data === "string" && data.trim()) return data.trim();
+    if (typeof data?.message === "string" && data.message.trim()) return data.message.trim();
+    if (typeof data?.title === "string" && data.title.trim()) return data.title.trim();
+
+    const errors = data?.errors;
+    if (errors && typeof errors === "object") {
+      const firstEntry = Object.values(errors).find((value) => Array.isArray(value) && value.length > 0);
+      if (firstEntry) return String(firstEntry[0]);
+    }
+
+    return "Không thể đổi mật khẩu lúc này. Vui lòng thử lại.";
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
+    if(!form.current.trim())     return setMsg({ok:false,text:"Vui lòng nhập mật khẩu hiện tại."});
     if(form.next!==form.confirm) return setMsg({ok:false,text:"Mật khẩu mới không khớp."});
     if(form.next.length<6)       return setMsg({ok:false,text:"Mật khẩu phải ít nhất 6 ký tự."});
-    setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
-    setForm({current:"",next:"",confirm:""});
-    setTimeout(()=>setMsg(null),3000);
+
+    try {
+      setSubmitting(true);
+      setMsg(null);
+      await authService.changePassword({
+        currentPassword: form.current,
+        newPassword: form.next,
+        confirmPassword: form.confirm,
+      });
+      setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
+      setForm({current:"",next:"",confirm:""});
+      setTimeout(()=>setMsg(null),3000);
+    } catch (error) {
+      setMsg({ ok:false, text:getErrorMessage(error) });
+    } finally {
+      setSubmitting(false);
+    }
   };
   const fields = [
     {name:"current",label:"Mật khẩu hiện tại", placeholder:"Nhập mật khẩu hiện tại"},
@@ -218,11 +251,13 @@ function SectionSecurity() {
                 value={form[f.name]}
                 onChange={handle}
                 placeholder={f.placeholder}
+                disabled={submitting}
                 style={{width:"100%",padding:".65rem 2.8rem .65rem .9rem",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:".88rem",outline:"none",background:T.white}}
               />
               <button
                 type="button"
                 onClick={() => setShow((p) => ({ ...p, [f.name]: !p[f.name] }))}
+                disabled={submitting}
                 style={{
                   position:"absolute",
                   right:10,
@@ -241,7 +276,7 @@ function SectionSecurity() {
             </div>
           </div>
         ))}
-        <BtnPrimary>🔒 Cập nhật mật khẩu</BtnPrimary>
+        <BtnPrimary disabled={submitting}>{submitting ? "Đang cập nhật..." : "🔒 Cập nhật mật khẩu"}</BtnPrimary>
       </form>
     </CardSection>
   );
