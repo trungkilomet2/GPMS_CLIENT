@@ -135,9 +135,13 @@ export default function CustomerManagement() {
 
         if (!mounted) return;
 
-        const nextCustomers = response?.data ?? [];
+        const nextCustomers = (response?.data ?? []).filter((customer) => {
+          const role = String(customer?.role || "").toLowerCase();
+          return !role.includes("admin");
+        });
+
         setCustomers(nextCustomers);
-        setCustomerRecordCount(response?.recordCount ?? nextCustomers.length);
+        setCustomerRecordCount(nextCustomers.length);
 
         setSelectedCustomerId((current) => {
           if (nextCustomers.length === 0) return null;
@@ -315,7 +319,7 @@ export default function CustomerManagement() {
                   <input
                     value={customerSearchInput}
                     onChange={(event) => setCustomerSearchInput(event.target.value)}
-                    placeholder="Tìm theo tên, user, điện thoại, email..."
+                    placeholder="Tìm theo tên, số điện thoại, email..."
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </label>
@@ -371,7 +375,6 @@ export default function CustomerManagement() {
                                 </span>
                               ) : null}
                             </div>
-                            <div className="mt-1 truncate text-sm text-slate-500">@{customer.userName || "chua-cap-nhat"}</div>
                             <div className="mt-3 grid gap-1 text-xs text-slate-500">
                               <span>{customer.phoneNumber || "Chưa có số điện thoại"}</span>
                               <span className="truncate">{customer.email || "Chưa có email"}</span>
@@ -409,7 +412,6 @@ export default function CustomerManagement() {
                     <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>
                         <div className="font-semibold text-slate-900">{selectedCustomer.fullName}</div>
-                        <div>@{selectedCustomer.userName || "chua-cap-nhat"}</div>
                       </div>
                       <div>
                         <div>{selectedCustomer.phoneNumber || "Chưa có số điện thoại"}</div>
