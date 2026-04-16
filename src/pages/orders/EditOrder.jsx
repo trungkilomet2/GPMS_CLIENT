@@ -7,7 +7,7 @@ import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
-import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
@@ -188,7 +188,7 @@ export default function EditOrder() {
             }))
             .filter((t) => t.file);
         setTemplateItems(items);
-        
+
         // Save initial state for comparison
         setInitialState({
             orderData: { ...formattedData },
@@ -222,13 +222,13 @@ export default function EditOrder() {
             type: 'variant',
             index: index,
             title: 'Xóa phối màu',
-            desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các size của phối màu này sẽ bị mất.'
+            desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các kích thước của phối màu này sẽ bị mất.'
         });
     };
 
     const handleVariantChange = (index, field, value) => {
         setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
-        
+
         if (errors.variantsGlobal) {
             setErrors(prev => {
                 const next = { ...prev };
@@ -301,7 +301,7 @@ export default function EditOrder() {
             }
             const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
             if (sum > 0) hasAnyQuantity = true;
-            
+
             if (Object.keys(vErrs).length > 0) {
                 variantErrors[idx] = vErrs;
             }
@@ -562,7 +562,7 @@ export default function EditOrder() {
                 let reason = "Định dạng không hỗ trợ";
                 if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
                 else if (!isNameOk) reason = "Tên file quá 255 ký tự";
-                
+
                 invalid.push(`${file.name} (${reason})`);
             }
         });
@@ -930,18 +930,10 @@ export default function EditOrder() {
                         />
                     </form>
 
-                    <OrderSuccessModal
+                    <SuccessModal
                         isOpen={isSuccessOpen}
-                        title="Cập nhật thành công!"
-                        description={`Đơn hàng #${id} đã được cập nhật thông tin.`}
-                        onClose={() => {
-                            setIsSuccessOpen(false);
-                            navigate(`/orders/detail/${id}`);
-                        }}
-                        onConfirm={() => {
-                            setIsSuccessOpen(false);
-                            navigate(`/orders/detail/${id}`);
-                        }}
+                        onClose={() => navigate(`/orders/detail/${id}`)}
+                        message="Đơn hàng đã được cập nhật thành công!"
                     />
 
                     <ConfirmModal
@@ -950,6 +942,7 @@ export default function EditOrder() {
                         description={deleteConfirm.desc}
                         onConfirm={executeDelete}
                         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+                        variant="danger"
                     />
                 </div>
             </div>

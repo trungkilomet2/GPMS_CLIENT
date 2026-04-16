@@ -22,7 +22,7 @@ import DeliveryProgressSection from '@/components/orders/DeliveryProgressSection
 import { hasAnyRole, splitRoles } from '@/lib/authRouting';
 import OrderImageZoomModal from '@/pages/orders/components/OrderImageZoomModal';
 import DesignTemplatesSection from '@/components/orders/DesignTemplatesSection';
-import OrderStatusReasonModal from '@/components/orders/OrderStatusReasonModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import "@/styles/leave.css";
 import RecordDeliveryModal from '@/components/orders/RecordDeliveryModal';
@@ -335,9 +335,23 @@ export default function OrderDetail() {
                                         {order.statusName || order.status}
                                     </div>
                                 </div>
-                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">Quản lý & Theo dõi tiến độ sản xuất</p>
                             </div>
                         </div>
+
+                        {/* Order Rejection Reason Display */}
+                        {(normalizedStatus === 'Từ chối' || normalizedStatus === 'Rejected' || normalizedStatus === 'Cancelled' || normalizedStatus === 'Hủy đơn') && (order.statusReason || order.rejectReason || order.note) && (
+                            <div className="flex items-center gap-4 px-8 py-5 bg-rose-50 border border-rose-200 rounded-2xl animate-in zoom-in-95 duration-500 shadow-sm border-l-4 border-l-rose-500">
+                                <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-sm">
+                                    <AlertCircle size={20} />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] opacity-70">Lý do từ chối / Hủy đơn</h5>
+                                    <p className="text-sm font-bold text-rose-900 leading-snug italic font-serif">
+                                        "{order.statusReason || order.rejectReason || order.note}"
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex flex-col items-end gap-3 flex-1">
                             {/* Actions and Tabs unified box */}
@@ -582,10 +596,10 @@ export default function OrderDetail() {
             <OrderHistoryUpdateModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} orderId={order.id} />
             <OrderImageZoomModal isOpen={isImageModalOpen} imageUrl={zoomImageUrl} onClose={() => setIsImageModalOpen(false)} />
 
-            <OrderStatusReasonModal
+            <ConfirmModal
                 isOpen={isReasonModalOpen}
                 onClose={() => setIsReasonModalOpen(false)}
-                onSubmit={async (reason) => {
+                onConfirm={async (reason) => {
                     if (pendingStatus === 'Yêu cầu chỉnh sửa') {
                         try {
                             setIsUpdatingStatus(true);
@@ -615,30 +629,32 @@ export default function OrderDetail() {
                 title={pendingStatus}
                 requireReason={pendingStatus === 'Từ chối'}
                 loading={isUpdatingStatus}
+                variant={pendingStatus === 'Từ chối' ? 'danger' : 'warning'}
+                primaryLabel="Xác nhận"
             />
-            <OrderStatusReasonModal
+
+            <ConfirmModal
                 isOpen={isApproveModalOpen}
                 onClose={() => setIsApproveModalOpen(false)}
-                onSubmit={handleApproveOrder}
+                onConfirm={handleApproveOrder}
                 title="Chấp nhận đơn hàng"
                 description="Hành động này sẽ xác nhận đơn hàng bắt đầu đi vào quy trình sản xuất."
                 requireReason={false}
                 loading={isUpdatingStatus}
+                variant="success"
             />
-            {
-                showDenyConfirm && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <div className="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl">
-                            <h3 className="text-xl font-bold text-gray-900 mb-4">Hủy đơn hàng?</h3>
-                            <p className="text-sm text-gray-500 mb-8">Bạn có chắc muốn hủy đơn hàng này không? Hành động này không thể hoàn tác.</p>
-                            <div className="flex justify-end gap-3">
-                                <button onClick={() => setShowDenyConfirm(false)} className="px-6 py-2 text-[10px] font-bold uppercase text-gray-400 hover:text-gray-900 transition-colors">Quay lại</button>
-                                <button onClick={handleCustomerDenyOrder} disabled={denyLoading} className="px-6 py-2 rounded-xl bg-rose-600 text-white text-[10px] font-bold uppercase hover:bg-rose-700 shadow-md transition-colors">{denyLoading ? '...' : 'Xác nhận hủy'}</button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+
+            <ConfirmModal
+                isOpen={showDenyConfirm}
+                onClose={() => setShowDenyConfirm(false)}
+                onConfirm={handleCustomerDenyOrder}
+                title="Hủy đơn hàng?"
+                description="Bạn có chắc muốn hủy đơn hàng này không? Hành động này không thể hoàn tác."
+                primaryLabel={denyLoading ? 'Đang xử lý...' : 'Xác nhận hủy'}
+                secondaryLabel="Quay lại"
+                variant="danger"
+            />
+
             <RecordDeliveryModal
                 isOpen={isRecordDeliveryModalOpen}
                 onClose={() => setIsRecordDeliveryModalOpen(false)}

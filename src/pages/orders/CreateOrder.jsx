@@ -9,7 +9,7 @@ import { getStoredUser } from '@/lib/authStorage';
 import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
-import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import { getPrimaryWorkspaceRole, splitRoles } from '@/lib/internalRoleFlow';
 import '@/styles/homepage.css';
@@ -169,7 +169,7 @@ export default function CreateOrder() {
       type: 'variant',
       index: index,
       title: 'Xóa phối màu',
-      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các size của phối màu này sẽ bị mất.'
+      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các kích thước của phối màu này sẽ bị mất.'
     });
   };
 
@@ -890,16 +890,10 @@ export default function CreateOrder() {
             </>
           )}
 
-          <OrderSuccessModal
+          <SuccessModal
             isOpen={isSuccessOpen}
-            onClose={() => {
-              setIsSuccessOpen(false);
-              navigate('/orders');
-            }}
-            onConfirm={() => {
-              setIsSuccessOpen(false);
-              navigate('/orders');
-            }}
+            onClose={() => navigate('/orders')}
+            message="Đơn hàng của bạn đã được gửi thành công!"
           />
         </div>
       </div>
@@ -910,6 +904,7 @@ export default function CreateOrder() {
         description={deleteConfirm.desc}
         onConfirm={executeDelete}
         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+        variant="danger"
       />
     </OwnerLayout>
   );

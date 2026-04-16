@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections, OrderInput } from '@/pages/orders/components/OrderFormSections';
-import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
@@ -81,11 +81,11 @@ export default function CreateManualOrder() {
   useEffect(() => {
     if (parsingAddress && wards.length > 0 && customerData.province && !customerData.ward) {
       const addr = parsingAddress;
-      
+
       // Sort by length descending to match most specific name
       const sortedWards = [...wards].sort((a, b) => b.name.length - a.name.length);
       const foundW = sortedWards.find(w => addr.toLowerCase().includes(w.name.toLowerCase()));
-      
+
       if (foundW) {
         // Extract Detail: everything before the ward name
         const wardIndex = addr.toLowerCase().indexOf(foundW.name.toLowerCase());
@@ -99,9 +99,9 @@ export default function CreateManualOrder() {
           ward: foundW,
           detail: extractedDetail || prev.detail
         }));
-        
+
         // Clear parsing flag after successful ward match to stop over-writing
-        setParsingAddress(""); 
+        setParsingAddress("");
       }
     }
   }, [wards, parsingAddress, customerData.province]);
@@ -138,7 +138,7 @@ export default function CreateManualOrder() {
       type: 'variant',
       index: index,
       title: 'Xác nhận xóa phối màu',
-      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các size của phối màu này sẽ bị mất.'
+      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các kích thước của phối màu này sẽ bị mất.'
     });
   };
 
@@ -193,16 +193,16 @@ export default function CreateManualOrder() {
     // Identify reuse address for smarter parsing
     let prefAddress = '';
     if (reuse.guest) {
-        prefAddress = reuse.guest.address || '';
+      prefAddress = reuse.guest.address || '';
     } else if (reuse.userFullName || reuse.userPhone || reuse.userLocation) {
-        prefAddress = reuse.userLocation || '';
+      prefAddress = reuse.userLocation || '';
     } else if (reuse.guestName || reuse.customerName) {
-        prefAddress = reuse.guestAddress || reuse.customerAddress || '';
+      prefAddress = reuse.guestAddress || reuse.customerAddress || '';
     }
 
     if (prefAddress) {
-        setParsingAddress(prefAddress);
-        setCustomerData(prev => ({ ...prev, customerAddress: prefAddress }));
+      setParsingAddress(prefAddress);
+      setCustomerData(prev => ({ ...prev, customerAddress: prefAddress }));
     }
 
     // 2. Materials
@@ -925,18 +925,10 @@ export default function CreateManualOrder() {
         </div>
       </div>
 
-      <OrderSuccessModal
+      <SuccessModal
         isOpen={isSuccessOpen}
-        title="Tạo đơn thủ công thành công"
-        description="Đơn hàng thủ công đã được ghi nhận."
-        onClose={() => {
-          setIsSuccessOpen(false);
-          navigate('/orders');
-        }}
-        onConfirm={() => {
-          setIsSuccessOpen(false);
-          navigate('/orders');
-        }}
+        onClose={() => navigate('/orders')}
+        message="Đơn hàng thủ công đã được tạo thành công!"
       />
 
       <ConfirmModal
@@ -945,6 +937,7 @@ export default function CreateManualOrder() {
         description={deleteConfirm.desc}
         onConfirm={executeDelete}
         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+        variant="danger"
       />
     </OwnerLayout>
   );
