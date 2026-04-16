@@ -357,7 +357,6 @@ export default function CreateManualOrder() {
       const materialErrors = [];
       materials.forEach((m, idx) => {
         const mErrs = {};
-        if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
         if (!m.materialName?.trim()) {
           mErrs.materialName = 'Tên vật liệu là bắt buộc';
         }

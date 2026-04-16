@@ -19,6 +19,7 @@ export default function ConfirmModal({
   variant = "success", // 'danger' | 'warning' | 'success'
   tone = "",           // alias for variant
   requireReason = false,
+  confirmIcon = null,  // New support for custom icon
 }) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
@@ -38,24 +39,24 @@ export default function ConfirmModal({
   const toneStyles =
     finalVariant === "danger"
       ? {
-        badge: "bg-rose-50 text-rose-600 border-rose-200",
-        button: "bg-rose-600 text-white border-black hover:brightness-110",
-        border: "focus:ring-rose-500 focus:border-rose-500",
-        icon: <HelpCircle size={32} strokeWidth={2.5} />
+        badge: "bg-rose-50 text-rose-500 border-rose-100",
+        button: "bg-rose-500 text-white border-black/10 hover:brightness-105",
+        border: "focus:ring-rose-500/20 focus:border-rose-400",
+        icon: confirmIcon || <AlertTriangle size={32} strokeWidth={2.5} />
       }
       : finalVariant === "warning"
-      ? {
-        badge: "bg-amber-50 text-amber-600 border-amber-200",
-        button: "bg-amber-500 text-white border-black hover:brightness-110",
-        border: "focus:ring-amber-500 focus:border-amber-500",
-        icon: <AlertTriangle size={32} strokeWidth={2.5} />
-      }
-      : {
-        badge: "bg-emerald-50 text-emerald-600 border-emerald-200",
-        button: "bg-[#1e6e43] text-white border-black hover:brightness-110",
-        border: "focus:ring-emerald-500 focus:border-emerald-500",
-        icon: <ClipboardCheck size={32} strokeWidth={2.5} />
-      };
+        ? {
+          badge: "bg-amber-50 text-amber-600 border-amber-200",
+          button: "bg-amber-500 text-white border-black hover:brightness-110",
+          border: "focus:ring-amber-500 focus:border-amber-500",
+          icon: confirmIcon || <AlertTriangle size={32} strokeWidth={2.5} />
+        }
+        : {
+          badge: "bg-emerald-50 text-emerald-600 border-emerald-200",
+          button: "bg-[#1e6e43] text-white border-black hover:brightness-110",
+          border: "focus:ring-emerald-500 focus:border-emerald-500",
+          icon: confirmIcon || <ClipboardCheck size={32} strokeWidth={2.5} />
+        };
 
   const handleSubmit = () => {
     const trimmed = reason.trim();
@@ -71,14 +72,14 @@ export default function ConfirmModal({
       setError("Lý do không được vượt quá 150 ký tự.");
       return;
     }
-    
+
     // Call both handlers for maximum compatibility
     if (requireReason) {
-        onSubmit?.(trimmed);
-        onConfirm?.(trimmed);
+      onSubmit?.(trimmed);
+      onConfirm?.(trimmed);
     } else {
-        onSubmit?.();
-        onConfirm?.();
+      onSubmit?.();
+      onConfirm?.();
     }
   };
 
@@ -98,7 +99,7 @@ export default function ConfirmModal({
           <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center mb-6 shadow-sm ${toneStyles.badge}`}>
             {toneStyles.icon}
           </div>
-          
+
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">
             {title}
           </h3>

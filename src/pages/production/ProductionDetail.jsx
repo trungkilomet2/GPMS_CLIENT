@@ -339,11 +339,9 @@ export default function ProductionDetail() {
   const confirmApproveProduction = async () => {
     try {
       await ProductionService.approveProduction(production.productionId, { userId: currentUserId });
-      setProduction(prev => ({ ...prev, status: "Chấp Nhận" }));
+      toast.success("Chấp nhận đơn sản xuất thành công!");
       setIsApproveOrderConfirmOpen(false);
-      setSuccessMessage("Chấp nhận đơn sản xuất thành công!");
-      setIsSuccessModalOpen(true);
-      setTimeout(() => window.location.reload(), 2000);
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) { toast.error("Phê duyệt thất bại."); }
   };
 
@@ -924,7 +922,14 @@ export default function ProductionDetail() {
         requireReason={false}
       />
 
-      <ConfirmModal isOpen={isReasonModalOpen} onClose={() => setIsReasonModalOpen(false)} onConfirm={handleRejectProduction} title="Từ chối đơn sản xuất" requireReason={true} variant="danger" />
+      <ConfirmModal 
+        isOpen={isReasonModalOpen} 
+        onClose={() => setIsReasonModalOpen(false)} 
+        onConfirm={handleRejectProduction} 
+        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"} 
+        requireReason={true} 
+        variant="danger" 
+      />
     </OwnerLayout>
   );
 }
