@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, AlertTriangle, ClipboardCheck, HelpCircle } from "lucide-react";
 
 /**
@@ -97,7 +97,12 @@ export default function ConfirmModal({
           </button>
 
           <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center mb-6 shadow-sm ${toneStyles.badge}`}>
-            {toneStyles.icon}
+            {(() => {
+              const IconComponent = toneStyles.icon;
+              return React.isValidElement(IconComponent)
+                ? IconComponent
+                : (IconComponent ? <IconComponent size={32} strokeWidth={2.5} /> : null);
+            })()}
           </div>
 
           <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight mb-2">
