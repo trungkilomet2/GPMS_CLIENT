@@ -16,6 +16,7 @@ import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { formatLeaveDateTime } from "@/lib/leaveDateTime";
 import { canManageLeaveRequests } from "@/lib/roleAccess";
+import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
 import LeaveService, { getLeaveErrorMessage } from "@/services/LeaveService";
 import WorkerService from "@/services/WorkerService";
 import "@/styles/leave.css";
@@ -191,7 +192,17 @@ export default function LeaveDetail() {
   );
   const timelineItems = useMemo(() => getTimelineItems(leave), [leave]);
   const contactItems = useMemo(() => getContactItems(employeeInfo), [employeeInfo]);
-  const hasReviewPermission = canManageLeaveRequests(user?.role);
+  const hasReviewPermission = useMemo(() => {
+    const isSenderPM = employeeInfo?.primarySystemRole === "pm" || String(employeeInfo?.role || "").toLowerCase().includes("pm");
+    const currentUserRole = getPrimaryWorkspaceRole(user?.role);
+    
+    if (isSenderPM) {
+      return currentUserRole === "owner";
+    }
+    
+    return canManageLeaveRequests(user?.role);
+  }, [user?.role, employeeInfo]);
+
   const canReview = hasReviewPermission && leave?.status === "pending";
   const canConfirmCancel = hasReviewPermission && leave?.status === "cancel_requested";
 
