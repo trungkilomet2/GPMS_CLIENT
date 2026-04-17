@@ -135,6 +135,7 @@ export default function CustomerManagement() {
 
         if (!mounted) return;
 
+<<<<<<< Updated upstream
         const nextCustomers = (response?.data ?? []).filter((customer) => {
           const role = String(customer?.role || "").toLowerCase();
           return !role.includes("admin");
@@ -142,6 +143,14 @@ export default function CustomerManagement() {
 
         setCustomers(nextCustomers);
         setCustomerRecordCount(nextCustomers.length);
+=======
+        const rawCustomers = response?.data ?? [];
+        const nextCustomers = rawCustomers.filter(c => c.userName?.toLowerCase() !== 'admin');
+        const excludedCount = rawCustomers.length - nextCustomers.length;
+        
+        setCustomers(nextCustomers);
+        setCustomerRecordCount(Math.max(0, (response?.recordCount ?? rawCustomers.length) - excludedCount));
+>>>>>>> Stashed changes
 
         setSelectedCustomerId((current) => {
           if (nextCustomers.length === 0) return null;
