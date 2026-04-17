@@ -78,13 +78,13 @@ export default function WorkerErrorReport() {
   const normalizedAssignment = useMemo(() => {
     if (!assignment) return null;
     return {
-      partId: assignment?.partId ?? assignment?.id ?? "",
+      partId: assignment?.partId ?? "",
+      orderSizeId: assignment?.orderSizeId ?? assignment?.id ?? "",
       productionId: assignment?.productionId ?? "",
       orderName: assignment?.orderName ?? "",
       partName: assignment?.partName ?? "",
       colorName: assignment?.colorName ?? assignment?.color ?? "",
       sizeName: assignment?.sizeName ?? assignment?.size ?? "",
-      orderSizeId: assignment?.orderSizeId ?? assignment?.id ?? "",
       startDate: assignment?.startDate ?? "",
       endDate: assignment?.endDate ?? "",
       errorType: assignment?.errorType ?? 0,
@@ -214,6 +214,7 @@ export default function WorkerErrorReport() {
         String(normalizedAssignment.productionId) === productionId
         ? {
           id: normalizedAssignment.partId,
+          partOrderSizeId: normalizedAssignment.orderSizeId,
           productionId,
           orderName: normalizedAssignment.orderName,
           partName: normalizedAssignment.partName,
@@ -584,9 +585,8 @@ export default function WorkerErrorReport() {
         formData.append("Image", attachments[0].file);
       }
 
-      // API param is actually partOrderSizeId (or the ID we use in the URL)
-      // Check if we have orderSizeId from normalizedAssignment or the selected part
-      const finalId = selectedPart?.partOrderSizeId || form.orderSizeId || partId;
+      // API hoàn toàn dựa trên partOrderSizeId nếu có (ID 58), nếu không mới dùng ProductionPartId (ID 25)
+      const finalId = form.orderSizeId || selectedPart?.partOrderSizeId || partId;
 
       await ProductionPartService.createIssue(Number(finalId), formData);
 

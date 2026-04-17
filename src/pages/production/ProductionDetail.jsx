@@ -398,7 +398,8 @@ export default function ProductionDetail() {
     navigate("/worker/error-report", {
       state: {
         assignment: {
-          partId: row.id,
+          partId: row.partId,
+          orderSizeId: row.id,
           productionId: production.productionId,
           orderName: order.orderName,
           partName: row.partName || row.name,
