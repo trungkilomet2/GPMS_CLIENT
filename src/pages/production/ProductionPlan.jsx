@@ -305,7 +305,6 @@ export default function ProductionPlan() {
   }, [rows, initialRows.length]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [showProductionInfo, setShowProductionInfo] = useState(true);
   const [showProductInfo, setShowProductInfo] = useState(true);
@@ -859,7 +858,7 @@ export default function ProductionPlan() {
           if (currentStatus !== "Đang Sản Xuất") {
             // Directly approve for Owners (skipping submit)
             await ProductionService.approveProductionPlan(productionId);
-            finalMsg = "Đã lưu và phê duyệt kế hoạch tự động!";
+            finalMsg = "Lưu kế hoạch thành công.";
             setSelectedProduction(prev => prev ? { ...prev, status: "Đang Sản Xuất" } : prev);
           }
         } catch (autoErr) {
@@ -868,8 +867,11 @@ export default function ProductionPlan() {
       }
 
       toast.success(finalMsg);
-      setIsSuccessModalOpen(true);
       savePlan();
+      // Redirect to production detail
+      const isWorkerPath = location.pathname.startsWith("/worker/");
+      const basePath = isWorkerPath ? "/worker/production" : "/production";
+      navigate(`${basePath}/${selectedProductionId}`);
     } catch (error) {
       console.error("Save Error:", error);
       const errMsg = getErrorMessage(error, "Lưu công đoạn thất bại.");
@@ -1521,14 +1523,6 @@ export default function ProductionPlan() {
           </div>
         </div>
       )}
-      <SuccessModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        onPrimary={() => navigate("/production")}
-        title={hasExistingParts ? "Cập nhật thành công" : "Lưu thành công"}
-        description={hasExistingParts ? "Kế hoạch sản xuất đã được cập nhật bản ghi mới." : "Kế hoạch sản xuất đã được lưu vào hệ thống."}
-        primaryLabel="OK"
-      />
       <ConfirmModal
         isOpen={isConfirmSaveOpen}
         title="Xác nhận cập nhật kế hoạch"

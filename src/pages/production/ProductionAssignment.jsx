@@ -207,7 +207,7 @@ export default function ProductionAssignment() {
       if (!isEditing) return;
       // Tìm công đoạn chứa variant đang được chọn
       const activeRow = rows.find(r => r.ppId === activeRowId);
-      if (!activeRow) { toast.info("Vui lòng chọn một biến thể trước."); return; }
+      if (!activeRow) { toast.info("Vui lòng chọn một kích cỡ & màu sắc trước."); return; }
       const activeStageName = activeRow.partName;
       // Lấy tất cả variants của công đoạn đó
       const targetRows = rows.filter(r => r.partName === activeStageName);
@@ -226,7 +226,7 @@ export default function ProductionAssignment() {
       });
       toast.success(alreadyFull
          ? `Đã gỡ thợ khỏi công đoạn "${activeStageName}"`
-         : `Đã gán thợ cho toàn bộ ${targetRows.length} biến thể của "${activeStageName}"`
+         : `Đã gán thợ cho toàn bộ ${targetRows.length} kích cỡ & màu sắc của "${activeStageName}"`
       );
    };
 
@@ -249,7 +249,7 @@ export default function ProductionAssignment() {
                return ProductionPartService.updateAssignWorker(r.realPartId, r.variantId, { workerIds });
             })
          );
-         toast.success(`Đã lưu phân công cho ${dirty.length} biến thể!`);
+         toast.success(`Đã lưu phân công cho ${dirty.length} kích cỡ & màu sắc!`);
          setInitialAssignments({ ...assignments });
          setIsEditing(false);
 
@@ -399,7 +399,7 @@ export default function ProductionAssignment() {
                                        <div className="flex-1 min-w-0">
                                           <p className="text-sm font-black text-gray-900 uppercase tracking-tight truncate">{stage.name}</p>
                                           <p className="text-[10px] font-semibold text-gray-400 mt-0.5">
-                                             <span className="text-[#1e6e43] font-bold">{assignedCount}</span>/{totalVariants} biến thể đã gán
+                                             <span className="text-[#1e6e43] font-bold">{assignedCount}</span>/{totalVariants} kích cỡ & màu sắc đã gán
                                           </p>
                                        </div>
                                        {/* Variant chip preview */}
@@ -548,8 +548,8 @@ export default function ProductionAssignment() {
                                                 <div className="flex flex-wrap gap-1 mt-1.5">
                                                    {w.skills && w.skills.length > 0 ? (
                                                       w.skills.map((skill, idx) => (
-                                                         <span 
-                                                            key={idx} 
+                                                         <span
+                                                            key={idx}
                                                             className="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[9px] font-black uppercase tracking-tight"
                                                          >
                                                             {skill}
@@ -599,7 +599,7 @@ export default function ProductionAssignment() {
             onConfirm={handleSave}
             onClose={() => setIsConfirmOpen(false)}
             title="Lưu phân công?"
-            description="Cập nhật thợ cho các biến thể đã chọn."
+            description="Cập nhật thợ cho các kích cỡ & màu sắc đã chọn."
             confirmIcon={Save}
             primaryLabel="Lưu ngay"
          />

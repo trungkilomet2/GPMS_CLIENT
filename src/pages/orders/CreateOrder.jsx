@@ -851,16 +851,17 @@ export default function CreateOrder() {
                     setIsModalOpen(true);
                   }}
                   onEditMaterial={(i) => {
+                    const m = materials[i];
                     setEditingIndex(i);
                     setMaterialFormData({
-                      materialName: materials[i].materialName ?? materials[i].name ?? '',
-                      color: materials[i].color ?? '',
-                      value: materials[i].value ?? materials[i].quantity ?? '',
-                      uom: materials[i].uom ?? '',
-                      image: materials[i].image ?? '',
+                      materialName: m.materialName ?? m.name ?? '',
+                      color: m.color ?? '',
+                      value: m.value ?? m.quantity ?? '',
+                      uom: m.uom ?? '',
+                      image: m.image ?? '',
                       imageFile: null,
-                      imagePreview: '',
-                      note: materials[i].note ?? '',
+                      imagePreview: m.imagePreview || m.image || '',
+                      note: m.note ?? '',
                     });
                     setIsModalOpen(true);
                   }}

@@ -591,7 +591,7 @@ export default function CreateProduction() {
                     ))}
                     {currentUser && (hasAnyRole(roleValue, ["Owner"]) || hasAnyRole(roleValue, ["Admin"])) && (
                       <option value={currentUser.userId ?? currentUser.id}>
-                        Giao việc cho tôi ({currentUser.fullName || currentUser.userName}) ({managerCountMap[String(currentUser.userId ?? currentUser.id)] || 0} công nhân)
+                        Giao việc cho tôi ({currentUser.fullName || currentUser.userName})
                       </option>
                     )}
                   </select>
