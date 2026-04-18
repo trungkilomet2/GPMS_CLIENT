@@ -13,8 +13,6 @@ import CustomerInfoCard from "@/components/orders/CustomerInfoCard";
 import { MATERIALS_TABLE_EMPTY_TEXT } from "@/lib/orders/materials";
 import { formatOrderDate, formatDateTime } from "@/lib/orders/formatters";
 import { getOrderCustomerId } from "@/lib/orders/customerInfo";
-import OrderStatusReasonModal from "@/components/orders/OrderStatusReasonModal";
-import SuccessModal from "@/components/SuccessModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import ProductionService from "@/services/ProductionService";
 import {
@@ -36,7 +34,6 @@ import { getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/roleAccess";
 import DesignTemplatesSection from '@/components/orders/DesignTemplatesSection';
 import '@/styles/homepage.css';
-import '@/styles/leave.css';
 import { processOrderVariants } from '@/lib/orders/variants';
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -62,14 +59,12 @@ export default function ProductionDetail() {
   const location = useLocation();
 
   // --- MODAL STATES ---
+  const [isRecordDeliveryModalOpen, setIsRecordDeliveryModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("production");
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [isRejectSuccessModalOpen, setIsRejectSuccessModalOpen] = useState(false);
   const [isApproveOrderConfirmOpen, setIsApproveOrderConfirmOpen] = useState(false);
   const [isApprovePlanConfirmOpen, setIsApprovePlanConfirmOpen] = useState(false);
   const [isRequestPlanUpdateConfirmOpen, setIsRequestPlanUpdateConfirmOpen] = useState(false);
-  const [isSubmitPlanConfirmOpen, setIsSubmitPlanConfirmOpen] = useState(false);
   const [checkingCuttingBook, setCheckingCuttingBook] = useState(false);
   const [isDonePartModalOpen, setIsDonePartModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
@@ -87,7 +82,6 @@ export default function ProductionDetail() {
   const [reportCount, setReportCount] = useState(0);
   const [allLogs, setAllLogs] = useState([]);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('production');
   const [workerMap, setWorkerMap] = useState({}); // id -> fullName
 
   const currentUser = getStoredUser();
@@ -345,20 +339,19 @@ export default function ProductionDetail() {
   const confirmApproveProduction = async () => {
     try {
       await ProductionService.approveProduction(production.productionId, { userId: currentUserId });
-      setProduction(prev => ({ ...prev, status: "Chấp Nhận" }));
+      toast.success("Chấp nhận đơn sản xuất thành công!");
       setIsApproveOrderConfirmOpen(false);
-      setIsSuccessModalOpen(true);
-      setTimeout(() => window.location.reload(), 2000);
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) { toast.error("Phê duyệt thất bại."); }
   };
 
   const handleRejectProduction = async (reason) => {
     try {
       await ProductionService.rejectProduction(production.productionId, { userId: currentUserId, reason });
-      setProduction(prev => ({ ...prev, status: "Từ Chối" }));
+      setProduction(prev => ({ ...prev, status: "Từ Chối", reason })); 
       setIsReasonModalOpen(false);
-      setIsRejectSuccessModalOpen(true);
-      setTimeout(() => window.location.reload(), 2000);
+      toast.success("Đã từ chối đơn sản xuất.");
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) { toast.error("Từ chối thất bại."); }
   };
 
@@ -405,7 +398,8 @@ export default function ProductionDetail() {
     navigate("/worker/error-report", {
       state: {
         assignment: {
-          partId: row.id,
+          partId: row.partId,
+          orderSizeId: row.id,
           productionId: production.productionId,
           orderName: order.orderName,
           partName: row.partName || row.name,
@@ -509,13 +503,16 @@ export default function ProductionDetail() {
                   {production.status}
                 </div>
 
-                {isPM && isPendingApproval && (
+                {(isOwner || isPM) && isPendingApproval && (
                   <>
-                    <button onClick={handleApproveProduction} className="h-10 rounded-full bg-[#1e6e43] px-6 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-[#155232] shadow-md">
-                      Chấp nhận đơn
-                    </button>
+                    {/* PM accepts, Owner just views or cancels */}
+                    {isPM && (
+                      <button onClick={handleApproveProduction} className="h-10 rounded-full bg-[#1e6e43] px-6 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-[#155232] shadow-md">
+                        Chấp nhận đơn
+                      </button>
+                    )}
                     <button onClick={() => setIsReasonModalOpen(true)} className="h-10 rounded-full bg-rose-50 px-6 text-[10px] font-bold uppercase tracking-widest text-rose-600 transition-all hover:bg-rose-100 shadow-sm">
-                      Từ chối
+                      {isOwner ? "Hủy giao việc" : "Từ chối"}
                     </button>
                   </>
                 )}
@@ -538,6 +535,21 @@ export default function ProductionDetail() {
                 )}
               </div>
             </div>
+
+            {/* Rejection Reason Display - Sticky Style */}
+            {production.status === "Từ Chối" && (production.reason || production.rejectReason) && (
+              <div className="flex items-center gap-4 px-8 py-5 bg-rose-50 border border-rose-200 rounded-2xl animate-in zoom-in-95 duration-500 shadow-sm border-l-4 border-l-rose-500">
+                <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-sm">
+                   <AlertTriangle size={20} />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] opacity-70">Lý do từ chối / Hủy đơn</h5>
+                  <p className="text-sm font-bold text-rose-900 leading-snug italic font-serif">
+                    "{production.reason || production.rejectReason}"
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -722,7 +734,7 @@ export default function ProductionDetail() {
                             processedVariants.map((v, idx) => {
                               const sizeKeys = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'];
                               const rowTotal = sizeKeys.reduce((acc, k) => acc + (v[k] || 0), 0);
-                              
+
                               // Helper to normalize strings for matching
                               const normalize = (str) => {
                                 if (!str) return "";
@@ -744,9 +756,9 @@ export default function ProductionDetail() {
 
                                 const countsPerStage = rawParts.map(part => {
                                   const partId = String(part.id || "");
-                                  const variantLink = (part.listPartOrderSizes || []).find(l => 
-                                     normalize(l.color || l.colorName || "") === targetColor &&
-                                     normalize(l.size || l.sizeName || "") === targetSize
+                                  const variantLink = (part.listPartOrderSizes || []).find(l =>
+                                    normalize(l.color || l.colorName || "") === targetColor &&
+                                    normalize(l.size || l.sizeName || "") === targetSize
                                   );
                                   const linkId = String(variantLink?.id || "");
 
@@ -756,16 +768,16 @@ export default function ProductionDetail() {
                                       const logLinkId = String(log.partOrderSizeId || log.productionPartOrderSizeId || "");
                                       const logColor = normalize(log.color || log.colorName || "");
                                       const logSize = normalize(log.size || log.sizeName || "");
-                                      
-                                      const isMatch = (logPartId === partId) && 
-                                                      (logLinkId === linkId || (logColor === targetColor && logSize === targetSize));
+
+                                      const isMatch = (logPartId === partId) &&
+                                        (logLinkId === linkId || (logColor === targetColor && logSize === targetSize));
                                       const isApproved = log.isReadOnly === true || log.isReadOnly === 1 || [2, 4].includes(Number(log.status));
                                       return isMatch && isApproved;
                                     })
                                     .reduce((sum, l) => sum + (Number(l.confirmedQuantity || l.quantity || 0)), 0);
                                 });
 
-                                const actual = Math.min(...countsPerStage);
+                                const actual = countsPerStage.length > 0 ? Math.min(...countsPerStage) : 0;
                                 return { actual, target: targetQty };
                               });
 
@@ -860,60 +872,65 @@ export default function ProductionDetail() {
         </div>
       </div>
 
-      <ConfirmModal 
-        isOpen={isApproveOrderConfirmOpen} 
-        onClose={() => setIsApproveOrderConfirmOpen(false)} 
-        onConfirm={confirmApproveProduction} 
-        title="Chấp nhận đơn sản xuất" 
+      <ConfirmModal
+        isOpen={isApproveOrderConfirmOpen}
+        onClose={() => setIsApproveOrderConfirmOpen(false)}
+        onConfirm={confirmApproveProduction}
+        title="Chấp nhận đơn sản xuất"
         description="Bạn có chắc chắn muốn chấp nhận đơn sản xuất này? Đơn sẽ chuyển sang trạng thái dự kiến sản xuất."
-        variant="success"
         primaryLabel="Xác nhận chấp nhận"
-        confirmIcon={CheckCircle2}
+        requireReason={false}
+        variant="success"
       />
-      <ConfirmModal 
-        isOpen={isApprovePlanConfirmOpen} 
-        onClose={() => setIsApprovePlanConfirmOpen(false)} 
-        onConfirm={confirmApprovePlan} 
-        title="Phê duyệt kế hoạch" 
+      <ConfirmModal
+        isOpen={isApprovePlanConfirmOpen}
+        onClose={() => setIsApprovePlanConfirmOpen(false)}
+        onConfirm={confirmApprovePlan}
+        title="Phê duyệt kế hoạch"
         description="Hành động này sẽ phê duyệt kế hoạch sản xuất hiện tại."
-        variant="success"
         primaryLabel="Phê duyệt"
-        confirmIcon={CheckCircle2}
+        requireReason={false}
+        variant="success"
       />
-      <ConfirmModal 
-        isOpen={isRequestPlanUpdateConfirmOpen} 
-        onClose={() => setIsRequestPlanUpdateConfirmOpen(false)} 
-        onConfirm={confirmRequestPlanUpdate} 
-        title="Yêu cầu sửa kế hoạch" 
+      <ConfirmModal
+        isOpen={isRequestPlanUpdateConfirmOpen}
+        onClose={() => setIsRequestPlanUpdateConfirmOpen(false)}
+        onConfirm={(reason) => {
+           confirmRequestPlanUpdate(reason);
+        }}
+        title="Yêu cầu sửa kế hoạch"
         description="Gửi yêu cầu yêu cầu PM chỉnh sửa lại kế hoạch sản xuất."
-        variant="warning"
         primaryLabel="Gửi yêu cầu"
-        confirmIcon={RotateCcw}
+        requireReason={false}
+        variant="warning"
       />
-      <ConfirmModal 
-        isOpen={isDonePartModalOpen} 
-        onClose={() => setIsDonePartModalOpen(false)} 
-        onConfirm={confirmDonePart} 
-        title="Xác nhận hoàn thành" 
+      <ConfirmModal
+        isOpen={isDonePartModalOpen}
+        onClose={() => setIsDonePartModalOpen(false)}
+        onConfirm={confirmDonePart}
+        title="Xác nhận hoàn thành"
         description="Bạn có chắc chắn muốn đánh dấu công đoạn này đã hoàn thành?"
-        variant="success"
         primaryLabel="Xác nhận xong"
-        confirmIcon={CheckCircle2}
+        requireReason={false}
       />
-      <ConfirmModal 
-        isOpen={isCompleteModalOpen} 
-        onClose={() => setIsCompleteModalOpen(false)} 
-        onConfirm={confirmCompleteProduction} 
-        title="Hoàn thành dự án" 
+      <ConfirmModal
+        isOpen={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        onConfirm={confirmCompleteProduction}
+        title="Hoàn thành dự án"
         description="Mọi hoạt động sản xuất cho mã đơn này sẽ được đóng lại và đánh dấu là Hoàn Thành."
-        variant="success"
         primaryLabel="Hoàn thành dự án"
-        confirmIcon={CheckCircle2}
+        requireReason={false}
       />
 
-      <OrderStatusReasonModal isOpen={isReasonModalOpen} onClose={() => setIsReasonModalOpen(false)} onSubmit={handleRejectProduction} title="Từ chối đơn sản xuất" requireReason={true} />
-      <SuccessModal isOpen={isSuccessModalOpen} onClose={() => setIsSuccessModalOpen(false)} message="Chấp nhận đơn sản xuất thành công!" />
-      <SuccessModal isOpen={isRejectSuccessModalOpen} onClose={() => setIsRejectSuccessModalOpen(false)} message="Đã từ chối đơn sản xuất." />
+      <ConfirmModal 
+        isOpen={isReasonModalOpen} 
+        onClose={() => setIsReasonModalOpen(false)} 
+        onConfirm={handleRejectProduction} 
+        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"} 
+        requireReason={true} 
+        variant="danger" 
+      />
     </OwnerLayout>
   );
 }

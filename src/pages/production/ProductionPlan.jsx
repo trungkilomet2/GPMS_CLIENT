@@ -267,16 +267,33 @@ export default function ProductionPlan() {
 
   const [rows, setRows] = useState(() => {
     if (incoming && Array.isArray(incoming.steps) && incoming.steps.length > 0) {
-      const initial = incoming.steps.map((s, idx) => ({
+      const stageGroups = {};
+      incoming.steps.forEach((s) => {
+        const name = String(s.partName || "").trim();
+        const key = name.toUpperCase();
+        if (!stageGroups[key]) {
+          stageGroups[key] = {
+            ...s,
+            allIds: [s.partId || s.id].filter(Boolean)
+          };
+        } else {
+          const id = s.partId || s.id;
+          if (id && !stageGroups[key].allIds.includes(id)) {
+            stageGroups[key].allIds.push(id);
+          }
+        }
+      });
+      const uniqueSteps = Object.values(stageGroups);
+      return uniqueSteps.map((s, idx) => ({
         ppId: 2000 + idx,
         productionId: Number(initialProductionId),
         partName: s.partName,
         cpu: String(s.cpu || ""),
         startDate: s.startDate || "",
         endDate: s.endDate || "",
-        ppsId: s.partId || "",
+        ppsId: s.partId || s.id || "",
+        allIds: s.allIds || []
       }));
-      return initial;
     }
     return [];
   });
@@ -446,14 +463,34 @@ export default function ProductionPlan() {
             setHasExistingParts(true);
             setRows(prev => {
               if (prev.length === 0) {
-                const fetched = res.data.map((s, idx) => ({
+                const stageGroups = {};
+                res.data.forEach((s) => {
+                  const name = String(s.partName || "").trim();
+                  const key = name.toUpperCase();
+                  if (!stageGroups[key]) {
+                    stageGroups[key] = {
+                      ...s,
+                      allIds: [s.id || s.partId].filter(Boolean)
+                    };
+                  } else {
+                    const id = s.id || s.partId;
+                    if (id && !stageGroups[key].allIds.includes(id)) {
+                      stageGroups[key].allIds.push(id);
+                    }
+                  }
+                });
+
+                const uniqueParts = Object.values(stageGroups);
+
+                const fetched = uniqueParts.map((s, idx) => ({
                   ppId: 2000 + idx,
                   productionId: Number(selectedProductionId),
                   partName: s.partName,
                   cpu: String(s.cpu || ""),
                   startDate: s.startDate || "",
                   endDate: s.endDate || "",
-                  ppsId: s.id || s.partId || ""
+                  ppsId: s.id || s.partId || "",
+                  allIds: s.allIds || []
                 }));
                 setInitialRows(fetched.map(r => ({ ...r })));
                 return fetched;
@@ -494,7 +531,7 @@ export default function ProductionPlan() {
           pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
           status: getProductionStatusLabel(payload.statusName || payload.status || "Chờ Xét Duyệt"),
           pmId: payload.pm?.id ?? payload.pmId,
-          pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
+          pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "Chưa phân công")),
           product: {
             productCode: order.id ? `MSP-${order.id}` : "MÃ-SP-KXD",
             productName: order.orderName,
@@ -794,9 +831,21 @@ export default function ProductionPlan() {
 
       // 2. Update existing parts if any
       if (existingParts.length > 0) {
-        await Promise.all(
-          existingParts.map((p) => ProductionPartService.updatePart(p.partId, p))
-        );
+        const updatePromises = [];
+        existingParts.forEach((p) => {
+          // Find the original row to get allIds
+          const row = rows.find(r => r.ppsId === String(p.partId) || Number(r.ppsId) === p.partId);
+          if (row && row.allIds && row.allIds.length > 0) {
+            // Update all siblings with the same data
+            row.allIds.forEach(id => {
+              updatePromises.push(ProductionPartService.updatePart(id, { ...p, partId: id }));
+            });
+          } else {
+            // Fallback for single ID
+            updatePromises.push(ProductionPartService.updatePart(p.partId, p));
+          }
+        });
+        await Promise.all(updatePromises);
       }
 
       setHasExistingParts(true);
@@ -1106,14 +1155,6 @@ export default function ProductionPlan() {
                 <p className="text-sm font-black text-emerald-700 uppercase">{selectedProduction?.pmName || "Chưa phân công"}</p>
               </div>
             </div>
-
-            <OrderSpecificationCard
-              order={selectedProduction?.product?.originalOrder || selectedProduction?.product}
-              onImageClick={(url) => {
-                setZoomImageUrl(url);
-                setIsImageModalOpen(true);
-              }}
-            />
           </div>
 
           <div className="overflow-hidden border border-black bg-white shadow-sm">
@@ -1278,10 +1319,6 @@ export default function ProductionPlan() {
                 <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Danh sách công đoạn</h2>
                 <div className="flex flex-col gap-1 mt-1">
                   <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest">Quản lý định mức nhân công cho từng bước sản xuất.</p>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
-                    <Info size={12} className="text-blue-600" />
-                    Lưu ý: Công đoạn cuối cùng là công đoạn hoàn thành sản phẩm.
-                  </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1342,11 +1379,6 @@ export default function ProductionPlan() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[13px] font-black text-black uppercase tracking-tight">{row.partName || "-"}</span>
-                          {idx === rows.length - 1 && rows.length > 0 && (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-[9px] font-black text-blue-600 uppercase shadow-sm">
-                              <CheckCircle size={10} strokeWidth={3} /> Công đoạn hoàn tất
-                            </span>
-                          )}
                         </div>
                       </td>
                       <td className="px-3 py-4 text-center">
@@ -1454,14 +1486,6 @@ export default function ProductionPlan() {
                 </p>
               </div>
             )}
-            <div className="px-5 pt-2">
-              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                 <Info size={14} className="text-blue-600 flex-shrink-0" />
-                 <p className="text-[10px] font-bold text-blue-700 uppercase leading-relaxed">
-                   Hệ thống sẽ tính công đoạn nằm cuối danh sách là bước hoàn thành sản phẩm.
-                 </p>
-              </div>
-            </div>
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-500 uppercase">Tên công đoạn</label>
@@ -1523,6 +1547,7 @@ export default function ProductionPlan() {
         onClose={() => setIsConfirmDeleteOpen(false)}
         primaryLabel="Xác nhận xóa"
         confirmIcon={Trash2}
+        variant="danger"
       />
 
       {isSaveTemplateModalOpen && (

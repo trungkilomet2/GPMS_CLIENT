@@ -104,13 +104,6 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
           <h3 className="text-lg font-bold text-slate-900">
             {editingIndex === null ? 'Thêm vật liệu mới' : 'Chỉnh sửa vật liệu'}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 hover:text-slate-700"
-          >
-            Đóng
-          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 pt-5 space-y-5 custom-scrollbar">

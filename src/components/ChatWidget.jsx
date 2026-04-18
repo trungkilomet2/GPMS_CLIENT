@@ -2,78 +2,32 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, MessageSquare, SendHorizonal, Sparkles, X } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { getStoredUser } from "@/lib/authStorage";
-import { getPrimaryWorkspaceRole, hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
+import { hasAnyRole, splitRoles } from "@/lib/internalRoleFlow";
 import { sendGpmsAiPrompt } from "@/services/AiChatService";
 import "@/styles/chat-widget.css";
 
 const STORAGE_KEY = "gpms-ai-chat-open";
-const CHAT_MODES = {
-  customer: {
-    eyebrow: "Hỗ trợ khách hàng",
-    title: "Trợ lý AI cho đơn hàng và hồ sơ",
-    launcherLabel: "Hỏi trợ lý",
-    placeholder: "Nhập câu hỏi về đơn hàng, hồ sơ hoặc cách dùng GPMS...",
-    sendingLabel: "Đang xử lý câu hỏi của bạn...",
-    assistantLabel: "Trợ lý khách hàng",
-    quickPrompts: [
-      "Hướng dẫn tạo đơn hàng mới",
-      "Cách theo dõi trạng thái đơn hàng",
-      "Cách cập nhật hồ sơ của tôi",
-    ],
-    buildGreeting(user) {
-      const name = user?.fullName || user?.name || "bạn";
-      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ khách hàng trên GPMS. Bạn có thể hỏi cách tạo đơn hàng, theo dõi trạng thái đơn, cập nhật hồ sơ hoặc thao tác trên màn hình hiện tại.`;
-    },
-  },
-  owner: {
-    eyebrow: "Hỗ trợ quản lý",
-    title: "Trợ lý AI cho chủ xưởng và quản lý",
-    launcherLabel: "AI quản lý",
-    placeholder: "Nhập câu hỏi về nhân sự, sản xuất, nghỉ phép hoặc cách dùng hệ thống...",
-    sendingLabel: "Đang phân tích yêu cầu quản lý của bạn...",
-    assistantLabel: "Trợ lý quản lý",
-    quickPrompts: [
-      "Cách thêm nhân viên mới",
-      "Hướng dẫn gán chuyên môn cho thợ",
-      "Cách kiểm tra đơn nghỉ phép",
-    ],
-    buildGreeting(user) {
-      const name = user?.fullName || user?.name || "bạn";
-      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ quản lý GPMS cho chủ xưởng và quản lý sản xuất. Bạn có thể hỏi về nhân sự, chuyên môn thợ, nghỉ phép, kế hoạch sản xuất hoặc cách dùng hệ thống ở màn hình hiện tại.`;
-    },
-  },
-  operations: {
-    eyebrow: "Hỗ trợ thao tác",
-    title: "Trợ lý AI cho sản xuất và công việc hằng ngày",
-    launcherLabel: "AI hỗ trợ",
-    placeholder: "Nhập câu hỏi về công việc được giao, báo cáo, sản lượng hoặc thao tác trên hệ thống...",
-    sendingLabel: "Đang xử lý yêu cầu thao tác của bạn...",
-    assistantLabel: "Trợ lý thao tác",
-    quickPrompts: [
-      "Cách xem việc được giao hôm nay",
-      "Hướng dẫn báo cáo sản lượng",
-      "Cách xem lịch sử đơn nghỉ",
-    ],
-    buildGreeting(user) {
-      const name = user?.fullName || user?.name || "bạn";
-      return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ thao tác trên GPMS cho tổ trưởng, công nhân và bộ phận kiểm soát chất lượng. Bạn có thể hỏi về công việc được giao, báo cáo, đơn nghỉ hoặc cách thao tác trên màn hình hiện tại.`;
-    },
+
+const CUSTOMER_CHAT_CONFIG = {
+  eyebrow: "Hỗ trợ khách hàng",
+  title: "Trợ lý AI cho khách hàng",
+  launcherLabel: "Hỏi trợ lý",
+  placeholder: "Nhập câu hỏi về đặt hàng, sản phẩm, tiến độ đơn hoặc cách dùng hệ thống...",
+  sendingLabel: "Đang xử lý câu hỏi của bạn...",
+  assistantLabel: "Trợ lý khách hàng",
+  quickPrompts: [
+    "Quy trình đặt hàng như thế nào?",
+    "Tôi có thể may những loại quần áo nào?",
+    "Thời gian hoàn thành đơn hàng là bao lâu?",
+  ],
+  buildGreeting(user) {
+    const name = user?.fullName || user?.name || "bạn";
+    return `Xin chào ${name}. Mình là trợ lý AI hỗ trợ khách hàng trên GPMS. Bạn có thể hỏi về quy trình đặt hàng, loại sản phẩm có thể may, thời gian hoàn thành, cách theo dõi đơn hàng hoặc cách thao tác trên màn hình hiện tại.`;
   },
 };
 
-function resolveChatMode(user) {
-  if (!user) return "customer";
-
-  const primaryRole = getPrimaryWorkspaceRole(user.role);
-  if (primaryRole === "customer" || primaryRole === "guest") {
-    return "customer";
-  }
-
-  if (["owner", "pm", "admin", "manager"].includes(primaryRole)) {
-    return "owner";
-  }
-
-  return "operations";
+function resolveChatMode() {
+  return "customer";
 }
 
 function normalizeHistory(messages) {
@@ -144,7 +98,7 @@ function formatAssistantReplyForDisplay(content) {
     .replace(/\.\s*(?=Bạn\s+có\s+muốn)/gi, ".\n");
 
   text = text.replace(
-    /((?:Owner|PM|Khách hàng|Bạn)\s+có\s+thể:)\s*([^\n.]+)\./gi,
+    /((?:Khách hàng|Bạn)\s+có\s+thể:)\s*([^\n.]+)\./gi,
     (_, prefix, listPart) => {
       const items = listPart
         .replace(/\s+hoặc\s+/gi, ", ")
@@ -294,28 +248,20 @@ function renderMessageContent(content) {
 export default function ChatWidget() {
   const user = useMemo(() => getStoredUser(), []);
   const location = useLocation();
+
   const canShowChat = useMemo(() => {
     if (!user) return true;
 
     return hasAnyRole(splitRoles(user.role), [
       "customer",
-      "admin",
-      "owner",
-      "pm",
-      "project manager",
-      "team leader",
-      "teamleader",
-      "worker",
-      "sewer",
-      "tailor",
-      "kcs",
-      "qc",
-      "quality control",
+      "guest",
     ]);
   }, [user]);
-  const chatMode = useMemo(() => resolveChatMode(user), [user]);
-  const chatConfig = CHAT_MODES[chatMode];
+
+  const chatMode = useMemo(() => resolveChatMode(), []);
+  const chatConfig = CUSTOMER_CHAT_CONFIG;
   const isAuthPage = ["/login", "/register", "/forgot-password"].includes(location.pathname);
+
   const [open, setOpen] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(STORAGE_KEY) === "true";
@@ -327,9 +273,10 @@ export default function ChatWidget() {
     {
       id: "assistant-greeting",
       role: "assistant",
-      content: CHAT_MODES[resolveChatMode(getStoredUser())].buildGreeting(getStoredUser()),
+      content: CUSTOMER_CHAT_CONFIG.buildGreeting(getStoredUser()),
     },
   ]);
+
   const bodyRef = useRef(null);
 
   useEffect(() => {
@@ -362,12 +309,12 @@ export default function ChatWidget() {
   useEffect(() => {
     setMessages([
       {
-        id: `assistant-greeting-${chatMode}`,
+        id: "assistant-greeting-customer",
         role: "assistant",
         content: chatConfig.buildGreeting(user),
       },
     ]);
-  }, [chatConfig, chatMode, user]);
+  }, [chatConfig, user]);
 
   if (!canShowChat) {
     return null;
@@ -425,7 +372,7 @@ export default function ChatWidget() {
             displayReply = `${displayReply}\n${continuationText}`.trim();
           }
         } catch {
-          // Keep the original reply if the follow-up continuation request fails.
+          // Keep original reply
         }
       }
 
@@ -514,7 +461,6 @@ export default function ChatWidget() {
                 <div className="gpms-chat-message__content">{renderMessageContent(message.content)}</div>
               </article>
             ))}
-
           </div>
 
           <form

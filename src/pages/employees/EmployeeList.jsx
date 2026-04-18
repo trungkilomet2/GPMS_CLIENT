@@ -1,23 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
-  ArrowLeft,
-  BriefcaseBusiness,
   CircleAlert,
-  Lock,
   LoaderCircle,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
-  Unlock,
   UserRoundCheck,
   Users,
+  BriefcaseBusiness,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole } from "@/lib/internalRoleFlow";
-import { getSystemRoleLabel, pickPrimarySystemRole } from "@/lib/orgHierarchy";
 import WorkerService, { getEmployeeModuleErrorMessage } from "@/services/WorkerService";
 import "@/styles/employees.css";
 
@@ -33,12 +29,7 @@ const STATUS_MAP = {
 };
 
 const ROLE_GROUPS = {
-  management: ["PM"],
-};
-
-const VIEW_MODE_ROLE_FILTERS = {
-  management: ["PM"],
-  workers: ["Worker"],
+  management: ["Owner", "PM", "Admin"],
 };
 
 function getInitials(name = "") {
@@ -66,7 +57,10 @@ function getEmployeeSpecialty(employee) {
 
   if (labels.length) {
     return {
-      label: labels.length > 2 ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}` : labels.join(", "),
+      label:
+        labels.length > 2
+          ? `${labels.slice(0, 2).join(", ")} +${labels.length - 2}`
+          : labels.join(", "),
       className: "employee-status employee-status--new",
     };
   }
@@ -74,27 +68,6 @@ function getEmployeeSpecialty(employee) {
   return {
     label: "Chưa cập nhật",
     className: "employee-status employee-status--neutral",
-  };
-}
-
-function getRoleSummary(roleLabels = []) {
-  if (!roleLabels.length) {
-    return {
-      primary: "Chưa cập nhật",
-      secondary: "",
-    };
-  }
-
-  if (roleLabels.length === 1) {
-    return {
-      primary: roleLabels[0],
-      secondary: "",
-    };
-  }
-
-  return {
-    primary: roleLabels.slice(0, 2).join(", "),
-    secondary: `+${roleLabels.length - 2} vai trò khác`,
   };
 }
 
@@ -117,22 +90,18 @@ function SummaryCard({ icon: Icon, label, value, meta, tone }) {
 
 export default function EmployeeList() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const currentListPath = `${location.pathname}${location.search}`;
   const user = getStoredUser();
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
   const isOwner = primaryRole === "owner";
+
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
   const [specialtyFilter, setSpecialtyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [noticeTone, setNoticeTone] = useState("success");
-  const [statusActionId, setStatusActionId] = useState(null);
   const [reloadSeed, setReloadSeed] = useState(0);
+
   const viewMode = location.pathname.includes("/employees/management")
     ? "management"
     : location.pathname.includes("/employees/workers")
@@ -157,8 +126,8 @@ export default function EmployeeList() {
           : await WorkerService.getEmployeeDirectory({
               pageSize: 100,
             });
-        if (!mounted) return;
 
+        if (!mounted) return;
         setEmployees(response?.data ?? []);
       } catch (err) {
         if (!mounted) return;
@@ -173,86 +142,19 @@ export default function EmployeeList() {
       }
     };
 
-      fetchEmployees();
+    fetchEmployees();
 
     return () => {
       mounted = false;
     };
-  }, [reloadSeed]);
-
-  useEffect(() => {
-    if (!location.state?.notice) return;
-
-    setNotice(location.state.notice);
-    setNoticeTone(location.state.noticeTone === "error" ? "error" : "success");
-
-    navigate(location.pathname, { replace: true });
-  }, [location.pathname, location.state, navigate]);
+  }, [primaryRole, reloadSeed, viewMode]);
 
   const handleRetry = () => {
     setReloadSeed((current) => current + 1);
   };
 
-  const handleToggleEmployeeStatus = async (employee) => {
-    if (!isOwner || !employee?.id || statusActionId === employee.id) {
-      return;
-    }
-
-    const isActive = employee.status === "active";
-    const confirmed = window.confirm(
-      isActive
-        ? `Bạn có chắc muốn vô hiệu hóa tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
-        : `Bạn có chắc muốn kích hoạt lại tài khoản của ${employee.fullName || employee.userName || "nhân viên này"} không?`
-    );
-
-    if (!confirmed) return;
-
-    setStatusActionId(employee.id);
-    setNotice("");
-    setNoticeTone("success");
-
-    try {
-      if (isActive) {
-        await WorkerService.disableEmployeeAccount(employee.id);
-      } else {
-        await WorkerService.enableEmployeeAccount(employee.id);
-      }
-
-      setEmployees((current) =>
-        current.map((item) =>
-          item.id === employee.id
-            ? {
-                ...item,
-                status: isActive ? "inactive" : "active",
-                statusId: isActive ? 2 : 1,
-              }
-            : item
-        )
-      );
-      setNotice(
-        isActive
-          ? `Đã vô hiệu hóa tài khoản ${employee.fullName || employee.userName}.`
-          : `Đã kích hoạt lại tài khoản ${employee.fullName || employee.userName}.`
-      );
-      setNoticeTone("success");
-    } catch (err) {
-      setNotice(
-        getEmployeeModuleErrorMessage(
-          err,
-          isActive
-            ? "Không thể vô hiệu hóa tài khoản nhân viên. Vui lòng thử lại."
-            : "Không thể kích hoạt lại tài khoản nhân viên. Vui lòng thử lại."
-        )
-      );
-      setNoticeTone("error");
-    } finally {
-      setStatusActionId(null);
-    }
-  };
-
   const clearFilters = () => {
     setSearch("");
-    setRoleFilter("all");
     setSpecialtyFilter("all");
     setStatusFilter("all");
   };
@@ -290,61 +192,52 @@ export default function EmployeeList() {
           .filter(Boolean)
           .join(" ")
       );
-      const matchSearch =
-        !keyword || searchableText.includes(keyword);
-      const employeePrimaryRole = pickPrimarySystemRole(employee.roles);
-      const matchRole = roleFilter === "all" || employeePrimaryRole === roleFilter;
-      const matchSpecialty =
-        specialtyFilter === "all" || (Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.includes(specialtyFilter));
-      const matchStatus = statusFilter === "all" || employee.status === statusFilter;
 
-      return matchSearch && matchRole && matchSpecialty && matchStatus;
+      const matchSearch = !keyword || searchableText.includes(keyword);
+      const matchSpecialty =
+        specialtyFilter === "all" ||
+        (Array.isArray(employee.workerSkillNames) &&
+          employee.workerSkillNames.includes(specialtyFilter));
+      const matchStatus =
+        statusFilter === "all" || employee.status === statusFilter;
+
+      return matchSearch && matchSpecialty && matchStatus;
     });
-  }, [roleFilter, scopedEmployees, search, specialtyFilter, statusFilter]);
+  }, [scopedEmployees, search, specialtyFilter, statusFilter]);
 
   const stats = useMemo(() => {
     const total = scopedEmployees.length;
-    const active = scopedEmployees.filter((employee) => employee.status === "active").length;
+    const active = scopedEmployees.filter(
+      (employee) => employee.status === "active"
+    ).length;
     const management = scopedEmployees.filter((employee) =>
       employee.roles.some((role) => ROLE_GROUPS.management.includes(role))
     ).length;
-    const skilled = scopedEmployees.filter((employee) => Array.isArray(employee.workerSkillNames) && employee.workerSkillNames.length > 0).length;
+    const skilled = scopedEmployees.filter(
+      (employee) =>
+        Array.isArray(employee.workerSkillNames) &&
+        employee.workerSkillNames.length > 0
+    ).length;
 
     return { total, active, management, skilled };
   }, [scopedEmployees]);
-
-  const roleOptions = useMemo(() => {
-    const optionsMap = new Map();
-    const allowedRolesForView = VIEW_MODE_ROLE_FILTERS[viewMode] ?? null;
-
-    scopedEmployees.forEach((employee) => {
-      const primaryRole = pickPrimarySystemRole(employee.roles);
-      if (!primaryRole) return;
-      if (allowedRolesForView && !allowedRolesForView.includes(primaryRole)) return;
-      if (!optionsMap.has(primaryRole)) {
-        optionsMap.set(primaryRole, getSystemRoleLabel(primaryRole));
-      }
-    });
-
-    return [
-      { value: "all", label: "Tất cả" },
-      ...Array.from(optionsMap.entries())
-        .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
-        .map(([value, label]) => ({ value, label })),
-    ];
-  }, [scopedEmployees, viewMode]);
 
   const specialtyOptions = useMemo(() => {
     const optionsMap = new Map();
 
     scopedEmployees.forEach((employee) => {
-      (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : []).forEach((skillName, index) => {
-        optionsMap.set(skillName, employee.workerSkillLabels?.[index] || skillName);
-      });
+      (Array.isArray(employee.workerSkillNames) ? employee.workerSkillNames : []).forEach(
+        (skillName, index) => {
+          optionsMap.set(
+            skillName,
+            employee.workerSkillLabels?.[index] || skillName
+          );
+        }
+      );
     });
 
     return [
-      { value: "all", label: "Tất cả" },
+      { value: "all", label: "Tất cả chuyên môn" },
       ...Array.from(optionsMap.entries())
         .sort(([, labelA], [, labelB]) => labelA.localeCompare(labelB, "vi"))
         .map(([value, label]) => ({ value, label })),
@@ -353,45 +246,43 @@ export default function EmployeeList() {
 
   const hasActiveFilters =
     Boolean(search.trim()) ||
-    roleFilter !== "all" ||
     specialtyFilter !== "all" ||
     statusFilter !== "all";
+
   const hasAnyEmployee = scopedEmployees.length > 0;
-  const showRoleFilter = viewMode !== "management";
+
   const pageTitle =
     viewMode === "management"
       ? "Danh sách quản lý"
       : viewMode === "workers"
         ? "Danh sách nhân viên"
         : "Danh sách nhân viên";
+
   const pageSubtitle =
     viewMode === "management"
-      ? "Theo dõi danh sách quản lý sản xuất đang phụ trách nhân sự trong xưởng."
+      ? "Quản lý và theo dõi thông tin nhân sự có vai trò quản lý trong hệ thống."
       : viewMode === "workers"
-        ? "Theo dõi riêng nhóm nhân viên sản xuất và chuyên môn thợ trong hệ thống."
-        : "Theo dõi toàn bộ nhân sự nội bộ theo vai trò hệ thống và chuyên môn thợ.";
+        ? "Theo dõi riêng nhóm worker và chuyên môn thợ trong hệ thống."
+        : "Theo dõi toàn bộ nhân sự nội bộ, bao gồm cả quản lý và worker, cùng chuyên môn thợ và tuyến quản lý.";
+
   const tableTitle =
     viewMode === "management"
       ? "Nhóm quản lý"
       : viewMode === "workers"
         ? "Nhân viên sản xuất"
         : "Nhân sự trong xưởng";
+
   const tableSubtitle =
     viewMode === "management"
-      ? "Danh sách các tài khoản quản lý sản xuất hiện có trong xưởng."
+      ? "Danh sách các tài khoản quản lý và vai trò điều hành hiện có."
       : viewMode === "workers"
-        ? "Danh sách nhân viên sản xuất, chuyên môn thợ và tuyến quản lý hiện có."
-        : "Danh sách nhân viên, vai trò hệ thống, chuyên môn thợ và tuyến quản lý hiện có.";
+        ? "Danh sách worker, chuyên môn thợ và tuyến quản lý hiện có."
+        : "Danh sách nhân viên, chuyên môn thợ và tuyến quản lý hiện có.";
 
   return (
     <DashboardLayout>
       <div className="employee-page">
-        <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-          <Link to="/employees" className="employee-back">
-            <ArrowLeft size={18} />
-            <span>Quay lại danh sách nhân viên</span>
-          </Link>
-
+        <div className="employee-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="employee-hero">
             <div>
               <h1 className="employee-hero__title">{pageTitle}</h1>
@@ -399,21 +290,35 @@ export default function EmployeeList() {
             </div>
 
             {isOwner ? (
-              <Link
-                to="/employees/create"
-                state={{ from: currentListPath }}
-                className="employee-hero__action"
-              >
+              <Link to="/employees/create" className="employee-hero__action">
                 <Plus size={18} />
                 <span>Thêm nhân viên</span>
               </Link>
             ) : null}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard icon={Users} label="Tổng nhân viên" value={stats.total} meta="Toàn bộ nhân sự nội bộ" tone="primary" />
-            <SummaryCard icon={UserRoundCheck} label="Đang hoạt động" value={stats.active} meta="Nhân viên đang làm việc" tone="success" />
-            <SummaryCard icon={BriefcaseBusiness} label="Nhóm quản lý" value={stats.management} meta="Danh sách quản lý sản xuất trong xưởng" tone="warning" />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard
+              icon={Users}
+              label="Tổng nhân viên"
+              value={stats.total}
+              meta="Toàn bộ nhân sự nội bộ"
+              tone="primary"
+            />
+            <SummaryCard
+              icon={UserRoundCheck}
+              label="Đang hoạt động"
+              value={stats.active}
+              meta="Nhân viên đang làm việc"
+              tone="success"
+            />
+            <SummaryCard
+              icon={BriefcaseBusiness}
+              label="Nhóm quản lý"
+              value={stats.management}
+              meta="Chủ xưởng và quản lý sản xuất"
+              tone="warning"
+            />
             <SummaryCard
               icon={Sparkles}
               label="Có chuyên môn"
@@ -427,26 +332,12 @@ export default function EmployeeList() {
             />
           </div>
 
-          {notice ? (
-            <div
-              className={`employee-inline-banner ${
-                noticeTone === "error"
-                  ? "employee-inline-banner--error"
-                  : "employee-inline-banner--success"
-              }`}
-            >
-              <span>{notice}</span>
-            </div>
-          ) : null}
+          <p className="employee-summary-note">
+            Số liệu tổng quan phía trên được tính trên toàn bộ danh sách nhân viên và không thay đổi theo bộ lọc.
+          </p>
 
           <div className="employee-filter-card">
-            <div
-              className={
-                showRoleFilter
-                  ? "grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_220px_auto]"
-                  : "grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_220px_220px_auto]"
-              }
-            >
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_auto]">
               <label className="employee-filter-field employee-filter-field--search">
                 <span className="employee-filter-field__label">Tìm kiếm nhân viên</span>
                 <Search size={18} className="employee-filter-field__icon" />
@@ -457,24 +348,6 @@ export default function EmployeeList() {
                   className="employee-filter-field__control"
                 />
               </label>
-
-              {showRoleFilter ? (
-                <label className="employee-filter-field">
-                  <span className="employee-filter-field__label">Vai trò hệ thống</span>
-                  <BriefcaseBusiness size={17} className="employee-filter-field__icon" />
-                  <select
-                    value={roleFilter}
-                    onChange={(event) => setRoleFilter(event.target.value)}
-                    className="employee-filter-field__control"
-                  >
-                    {roleOptions.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ) : null}
 
               <label className="employee-filter-field">
                 <span className="employee-filter-field__label">Chuyên môn</span>
@@ -500,7 +373,7 @@ export default function EmployeeList() {
                   onChange={(event) => setStatusFilter(event.target.value)}
                   className="employee-filter-field__control"
                 >
-                  <option value="all">Tất cả</option>
+                  <option value="all">Tất cả trạng thái</option>
                   <option value="active">Đang hoạt động</option>
                   <option value="inactive">Ngừng hoạt động</option>
                 </select>
@@ -511,6 +384,7 @@ export default function EmployeeList() {
                   <Users size={16} />
                   <span>{filteredEmployees.length} kết quả</span>
                 </div>
+
                 {hasActiveFilters ? (
                   <button
                     type="button"
@@ -585,7 +459,6 @@ export default function EmployeeList() {
                     ) : isOwner ? (
                       <Link
                         to="/employees/create"
-                        state={{ from: currentListPath }}
                         className="employee-state-btn employee-state-btn--primary"
                       >
                         Thêm nhân viên
@@ -595,105 +468,88 @@ export default function EmployeeList() {
                 </div>
               ) : (
                 <table className="employee-table min-w-full divide-y divide-slate-200">
-                <thead className="employee-table-head">
-                  <tr>
-                    <th className="employee-table-th employee-table-th--person px-5 py-4 text-left">Nhân viên</th>
-                    <th className="employee-table-th employee-table-th--username px-5 py-4 text-left">Tên đăng nhập</th>
-                    <th className="employee-table-th employee-table-th--role px-5 py-4 text-left">Vai trò</th>
-                    <th className="employee-table-th employee-table-th--specialty px-5 py-4 text-left">Chuyên môn</th>
-                    <th className="employee-table-th employee-table-th--phone px-5 py-4 text-left">Điện thoại</th>
-                    <th className="employee-table-th employee-table-th--email px-5 py-4 text-left">Email</th>
-                    <th className="employee-table-th employee-table-th--status px-5 py-4 text-center">Trạng thái</th>
-                    <th className="employee-table-th employee-table-th--action px-5 py-4 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredEmployees.map((employee) => {
-                    const statusConfig = STATUS_MAP[employee.status] ?? STATUS_MAP.active;
-                    const specialty = getEmployeeSpecialty(employee);
-                    const roleSummary = getRoleSummary(employee.roleLabels);
+                  <thead className="employee-table-head">
+                    <tr>
+                      <th className="employee-table-th employee-table-th--person px-5 py-4 text-left">
+                        Nhân viên
+                      </th>
+                      <th className="employee-table-th employee-table-th--username px-5 py-4 text-left">
+                        Tên đăng nhập
+                      </th>
+                      <th className="employee-table-th employee-table-th--specialty px-5 py-4 text-left">
+                        Chuyên môn
+                      </th>
+                      <th className="employee-table-th employee-table-th--phone px-5 py-4 text-left">
+                        Điện thoại
+                      </th>
+                      <th className="employee-table-th employee-table-th--email px-5 py-4 text-left">
+                        Email
+                      </th>
+                      <th className="employee-table-th employee-table-th--status px-5 py-4 text-center">
+                        Trạng thái
+                      </th>
+                      <th className="employee-table-th employee-table-th--action px-5 py-4 text-center">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
 
-                    return (
-                      <tr key={employee.id} className="employee-table-row">
-                        <td className="employee-table-td employee-table-td--person px-5 py-5 align-middle">
-                          <div className="employee-person">
-                            <div className="employee-person__avatar">
-                              {employee.avatarUrl ? (
-                                <img
-                                  src={employee.avatarUrl}
-                                  alt={employee.fullName}
-                                  className="employee-person__avatar-image"
-                                />
-                              ) : (
-                                getInitials(employee.fullName)
-                              )}
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredEmployees.map((employee) => {
+                      const statusConfig = STATUS_MAP[employee.status] ?? STATUS_MAP.active;
+                      const specialty = getEmployeeSpecialty(employee);
+
+                      return (
+                        <tr key={employee.id} className="employee-table-row">
+                          <td className="employee-table-td employee-table-td--person px-5 py-5 align-middle">
+                            <div className="employee-person">
+                              <div className="employee-person__avatar">
+                                {employee.avatarUrl ? (
+                                  <img
+                                    src={employee.avatarUrl}
+                                    alt={employee.fullName}
+                                    className="employee-person__avatar-image"
+                                  />
+                                ) : (
+                                  getInitials(employee.fullName)
+                                )}
+                              </div>
+                              <div>
+                                <div className="employee-person__name">{employee.fullName}</div>
+                                <div className="employee-person__hint">{employee.hierarchyTag}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="employee-person__name">{employee.fullName}</div>
-                              <div className="employee-person__hint">{employee.hierarchyTag}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="employee-table-td employee-table-td--username px-5 py-5 align-middle text-sm font-semibold text-slate-700">
-                          {employee.userName || "Chưa cập nhật"}
-                        </td>
-                        <td className="employee-table-td employee-table-td--role px-5 py-5 align-middle text-sm text-slate-700">
-                          <div className="employee-role-cell">
-                            <div className="employee-role-cell__primary">{roleSummary.primary}</div>
-                            {roleSummary.secondary ? (
-                              <div className="employee-role-cell__secondary">{roleSummary.secondary}</div>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="employee-table-td employee-table-td--specialty px-5 py-5 align-middle">
-                          <span className={specialty.className}>{specialty.label}</span>
-                        </td>
-                        <td className="employee-table-td employee-table-td--phone px-5 py-5 align-middle text-sm text-slate-600">
-                          {employee.phoneNumber || "Chưa cập nhật"}
-                        </td>
-                        <td className="employee-table-td employee-table-td--email px-5 py-5 align-middle text-sm text-slate-600">
-                          {employee.email || "Chưa cập nhật"}
-                        </td>
-                        <td className="employee-table-td employee-table-td--status px-5 py-5 align-middle text-center">
-                          <span className={statusConfig.className}>{statusConfig.label}</span>
-                        </td>
-                        <td className="employee-table-td employee-table-td--action px-5 py-5 align-middle text-center">
-                          <div className="flex flex-wrap items-center justify-center gap-2">
-                            <Link
-                              to={`/employees/${employee.id}`}
-                              state={{ from: `${location.pathname}${location.search}` }}
-                              className="employee-action-btn"
-                            >
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--username px-5 py-5 align-middle text-sm font-semibold text-slate-700">
+                            {employee.userName || "Chưa cập nhật"}
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--specialty px-5 py-5 align-middle">
+                            <span className={specialty.className}>{specialty.label}</span>
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--phone px-5 py-5 align-middle text-sm text-slate-600">
+                            {employee.phoneNumber || "Chưa cập nhật"}
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--email px-5 py-5 align-middle text-sm text-slate-600">
+                            {employee.email || "Chưa cập nhật"}
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--status px-5 py-5 align-middle text-center">
+                            <span className={statusConfig.className}>{statusConfig.label}</span>
+                          </td>
+
+                          <td className="employee-table-td employee-table-td--action px-5 py-5 align-middle text-center">
+                            <Link to={`/employees/${employee.id}`} className="employee-action-btn">
                               Xem chi tiết
                             </Link>
-                            {isOwner ? (
-                              <button
-                                type="button"
-                                className="employee-action-btn"
-                                onClick={() => handleToggleEmployeeStatus(employee)}
-                                disabled={statusActionId === employee.id}
-                              >
-                                {statusActionId === employee.id ? (
-                                  employee.status === "active" ? "Đang khóa..." : "Đang kích hoạt..."
-                                ) : employee.status === "active" ? (
-                                  <>
-                                    <Lock size={14} />
-                                    <span>Vô hiệu hóa</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Unlock size={14} />
-                                    <span>Kích hoạt</span>
-                                  </>
-                                )}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               )}
             </div>

@@ -134,6 +134,7 @@ export default function LeaveRequestDetail() {
       {
         title: "Đơn đã được gửi",
         value: formatLeaveDateTime(leave?.dateCreate),
+        tone: "done",
       },
       {
         title: leave?.status === "pending" ? "Đang chờ xét duyệt" : isCancelRequested ? "Đang chờ duyệt hủy" : "Đã có phản hồi",
@@ -142,6 +143,7 @@ export default function LeaveRequestDetail() {
           : isCancelRequested
             ? leave?.cancelContent || "Yêu cầu hủy đang chờ được xác nhận."
             : formatLeaveDateTime(leave?.dateReply),
+        tone: leave?.status === "pending" ? "current" : "done",
       },
       {
         title: isApproved ? "Đã duyệt" : isRejected ? "Bị từ chối" : isCancelled ? "Đã hủy đơn" : "Kết quả xử lý",
@@ -152,6 +154,7 @@ export default function LeaveRequestDetail() {
             : isCancelled
               ? leave?.cancelContent || "Đơn nghỉ đã được hủy."
             : "Chưa có phản hồi cuối cùng.",
+        tone: isApproved || isCancelled ? "done" : isRejected ? "rejected" : "upcoming",
       },
     ];
   }, [leave]);
@@ -241,28 +244,29 @@ export default function LeaveRequestDetail() {
                   <StatusBadge status={leave.status} />
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 lg:grid-cols-4">
                   <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                     <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người gửi</div>
-                    <div className="mt-1.5 text-base font-semibold leading-snug">{leave.userFullName}</div>
+                    <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{leave.userFullName}</div>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                     <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày tạo đơn</div>
-                    <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateCreate)}</div>
+                    <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{formatLeaveDateTime(leave.dateCreate)}</div>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                     <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Ngày phản hồi</div>
-                    <div className="mt-1.5 text-base font-semibold leading-snug">{formatLeaveDateTime(leave.dateReply)}</div>
+                    <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{formatLeaveDateTime(leave.dateReply)}</div>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
                     <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Người phê duyệt</div>
-                    <div className="mt-1.5 text-base font-semibold leading-snug">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
+                    <div className="mt-1 text-[1.05rem] font-semibold leading-snug">{shouldShowApprover(leave) ? leave.approvedByName : "Chưa cập nhật"}</div>
                   </div>
-                  <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 md:col-span-3">
-                    <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
-                    <div className="mt-1.5 text-base font-semibold leading-snug">
-                      {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
-                    </div>
+                </div>
+
+                <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-wide text-emerald-100/80">Khung giờ nghỉ</div>
+                  <div className="mt-1 text-[1.05rem] font-semibold leading-snug">
+                    {formatLeaveDateTime(leave.fromDate)} - {formatLeaveDateTime(leave.toDate)}
                   </div>
                 </div>
               </div>
@@ -353,26 +357,25 @@ export default function LeaveRequestDetail() {
 
                 <div className="space-y-5">
                   <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-[1.1rem] font-bold text-slate-900">Thông tin đơn</h2>
-                    <div className="mt-4 grid gap-3">
-                      <DetailItem icon={UserRound} label="Người gửi" value={leave.userFullName} />
-                      <DetailItem icon={FileText} label="Trạng thái" value={STATUS_MAP[leave.status]?.label || "Chưa cập nhật"} />
-                      <DetailItem icon={CalendarClock} label="Ngày tạo" value={formatLeaveDateTime(leave.dateCreate)} />
-                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
-                      <DetailItem icon={UserRound} label="Người phê duyệt" value={shouldShowApprover(leave) ? leave.approvedByName : ""} />
-                      <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
-                      <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
-                    </div>
-                  </div>
-
-                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
                     <h2 className="text-[1.1rem] font-bold text-slate-900">Timeline xử lý</h2>
                     <div className="mt-4 space-y-3">
                       {timelineItems.map((item, index) => (
                         <div key={item.title} className="flex gap-3">
                           <div className="flex flex-col items-center">
-                            <div className="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                            {index < timelineItems.length - 1 && <div className="mt-2 h-full w-px bg-slate-200" />}
+                            <div
+                              className={`mt-1 h-2.5 w-2.5 rounded-full ${
+                                item.tone === "done"
+                                  ? "bg-emerald-500"
+                                  : item.tone === "current"
+                                    ? "bg-amber-500"
+                                    : item.tone === "rejected"
+                                      ? "bg-rose-500"
+                                      : "bg-slate-300"
+                              }`}
+                            />
+                            {index < timelineItems.length - 1 && (
+                              <div className="mt-2 h-full w-px bg-slate-200" />
+                            )}
                           </div>
                           <div className="pb-3">
                             <div className="text-sm font-semibold text-slate-800">{item.title}</div>

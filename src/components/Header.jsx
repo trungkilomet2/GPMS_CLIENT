@@ -130,14 +130,7 @@ export default function Header() {
 
             {user ? (
               <>
-                {/* Cart */}
-                <button
-                  onClick={() => navigate("/orders")}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: C.text, display: "flex", alignItems: "center", padding: ".3rem" }}
-                  title="Đơn hàng"
-                >
-                  <SvgIcon d={ICON_CART} size={22} />
-                </button>
+
 
                 {/* Avatar + dropdown */}
                 <div

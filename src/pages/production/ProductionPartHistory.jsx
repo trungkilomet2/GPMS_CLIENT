@@ -45,6 +45,7 @@ export default function ProductionPartHistory() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState("all"); // "all", "pending", "accepted"
 
   // Management State
   const [editingId, setEditingId] = useState(null);
@@ -205,12 +206,19 @@ export default function ProductionPartHistory() {
     };
   }, [logs]);
 
-  const totalPages = Math.max(1, Math.ceil(logs.length / pageSize));
+  const filteredLogs = useMemo(() => {
+    if (statusFilter === "all") return logs;
+    if (statusFilter === "pending") return logs.filter(log => !log.isReadOnly);
+    if (statusFilter === "accepted") return logs.filter(log => log.isReadOnly);
+    return logs;
+  }, [logs, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
 
   const pageLogs = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return logs.slice(start, start + pageSize);
-  }, [logs, currentPage, pageSize]);
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
 
   // --- ACTIONS ---
 
@@ -345,7 +353,7 @@ export default function ProductionPartHistory() {
               </button>
               <div className="space-y-1">
                 <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none uppercase">
-                  Lịch sử công đoạn
+                  Lịch sử báo cáo sản lượng
                 </h1>
                 <p className="text-[10px] font-bold text-slate-600 tracking-widest uppercase mt-1">
                   Mã sản xuất: #PR-{productionId || "..."}
@@ -377,7 +385,25 @@ export default function ProductionPartHistory() {
                 <div className="w-1.5 h-6 bg-[#1e6e43] rounded-full" />
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Bảng kê chi tiết thực hiện</h2>
               </div>
-              {loading && <Loader2 className="animate-spin text-slate-400" size={18} />}
+
+              <div className="flex items-center gap-2">
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-black shadow-sm mr-4">
+                  {[
+                    { id: "all", label: "Tất cả" },
+                    { id: "pending", label: "Chờ nghiệm thu" },
+                    { id: "accepted", label: "Đã nghiệm thu" }
+                  ].map(btn => (
+                    <button
+                      key={btn.id}
+                      onClick={() => { setStatusFilter(btn.id); setCurrentPage(1); }}
+                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${statusFilter === btn.id ? 'bg-[#1e6e43] text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+                {loading && <Loader2 className="animate-spin text-slate-400" size={18} />}
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -400,7 +426,9 @@ export default function ProductionPartHistory() {
                       <td colSpan={8} className="py-32 text-center">
                         <div className="flex flex-col items-center gap-4 text-slate-200">
                           <Package size={64} />
-                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Không có dữ liệu bản ghi</p>
+                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
+                            {statusFilter !== "all" ? "Không có bản ghi nào khớp với bộ lọc" : "Không có dữ liệu bản ghi"}
+                          </p>
                         </div>
                       </td>
                     </tr>
@@ -519,7 +547,7 @@ export default function ProductionPartHistory() {
             {/* PAGINATION FOOTER */}
             <div className="px-8 py-5 border-t border-black bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Hiển thị {Math.min(logs.length, (currentPage - 1) * pageSize + 1)}-{Math.min(logs.length, currentPage * pageSize)} trên {logs.length} bản ghi
+                Hiển thị {Math.min(filteredLogs.length, (currentPage - 1) * pageSize + 1)}-{Math.min(filteredLogs.length, currentPage * pageSize)} trên {filteredLogs.length} bản ghi
               </p>
               <Pagination
                 currentPage={currentPage}
@@ -586,7 +614,8 @@ export default function ProductionPartHistory() {
           onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
           primaryLabel={confirmConfig.type === "DELETE" ? "Đồng ý xóa" : "Xác nhận lưu"}
           secondaryLabel="Quay lại"
-          confirmIcon={confirmConfig.type === "DELETE" ? Trash : Check}
+          confirmIcon={confirmConfig.type === "DELETE" ? <Trash size={32} /> : <Check size={32} />}
+          variant={confirmConfig.type === "DELETE" ? "danger" : "success"}
         />
 
         {isProcessing && (

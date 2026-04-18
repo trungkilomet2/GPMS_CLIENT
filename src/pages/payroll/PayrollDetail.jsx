@@ -44,7 +44,7 @@ export default function PayrollDetail() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const aggregated = await fetchAggregatedPayroll(month, year);
+        const aggregated = await fetchAggregatedPayroll(month, year, refreshKey > 0);
         const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(workerId));
         if (active) {
           setLogs(workerData?.logs || []);
@@ -82,8 +82,7 @@ export default function PayrollDetail() {
 
       const unpaidLogs = workerLogs.filter(l =>
         !(l.isPayment || !!l.paidAt) &&
-        l.isReadOnly === true &&
-        (l.variantName && l.variantName !== " / ")
+        l.isReadOnly === true
       );
       if (unpaidLogs.length === 0) {
         toast.info("Không có công đoạn mới nào cần thanh toán.");
@@ -131,8 +130,9 @@ export default function PayrollDetail() {
   };
 
   const workerLogs = useMemo(() => {
-    // If we have logs from state but navigate directly, this ensures we filter correctly
-    return getWorkerMonthlyDetail(logs, workerId, month, year);
+    // Sort by reportDate descending (latest first)
+    const detailedLogs = getWorkerMonthlyDetail(logs, workerId, month, year);
+    return [...detailedLogs].sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
   }, [logs, workerId, month, year]);
 
   const filteredLogs = useMemo(() => {
@@ -175,7 +175,13 @@ export default function PayrollDetail() {
     if (!dateStr) return "-";
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("vi-VN");
+      return d.toLocaleDateString("vi-VN", {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch {
       return dateStr;
     }
@@ -331,8 +337,8 @@ export default function PayrollDetail() {
                       key={btn.id}
                       onClick={() => { setStatusFilter(btn.id); setCurrentPage(1); }}
                       className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-lg transition-all ${statusFilter === btn.id
-                          ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
-                          : 'text-slate-500 hover:bg-white/50'
+                        ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
+                        : 'text-slate-500 hover:bg-white/50'
                         }`}
                     >
                       {btn.label}
@@ -436,27 +442,14 @@ export default function PayrollDetail() {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-5 text-right font-black text-emerald-700 text-base">
-                            {log.isReadOnly ? (
-                              <>
-                                {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className="text-[10px] opacity-50 ml-0.5">VND</span>
-                              </>
-                            ) : (
-                              <span className="text-[10px] text-slate-400 italic">Chờ nghiệm thu</span>
-                            )}
+                          <td className={`px-6 py-5 text-right font-black text-base ${log.isReadOnly ? 'text-emerald-700' : 'text-slate-300'}`}>
+                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className={`text-[10px] uppercase ml-0.5 ${log.isReadOnly ? 'opacity-50' : 'opacity-30'}`}>VND</span>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                  <tfoot className="bg-slate-50/80 font-black">
-                    <tr>
-                      <td colSpan={6} className="px-6 py-4 text-right text-slate-400 uppercase tracking-widest text-[10px]">Tổng cộng thu nhập (Trên kết quả lọc)</td>
-                      <td className="px-6 py-4 text-right text-emerald-800 text-lg">
-                        {filteredLogs.reduce((sum, log) => sum + (log.quantity * log.cpu), 0).toLocaleString("vi-VN")} VND
-                      </td>
-                    </tr>
-                  </tfoot>
+
                 </table>
               )}
             </div>
