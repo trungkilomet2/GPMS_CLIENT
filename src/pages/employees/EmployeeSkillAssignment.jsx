@@ -62,7 +62,12 @@ export default function EmployeeSkillAssignment() {
 
       try {
         const [employeeResponse, directoryResponse, workerRoles] = await Promise.all([
-          WorkerService.getEmployeeById(id),
+          WorkerService.getEmployeeById(id).catch((err) => {
+            if (currentPrimaryRole === "pm" && err?.response?.status === 403) {
+              return null;
+            }
+            throw err;
+          }),
           currentPrimaryRole === "pm"
             ? WorkerService.getEmployeeDirectoryByPmScope({ pageSize: 100 }).catch(() => ({ data: [] }))
             : WorkerService.getEmployeeDirectory({ pageSize: 100 }).catch(() => ({ data: [] })),

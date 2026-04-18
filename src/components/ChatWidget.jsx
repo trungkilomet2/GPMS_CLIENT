@@ -255,11 +255,6 @@ export default function ChatWidget() {
     return hasAnyRole(splitRoles(user.role), [
       "customer",
       "guest",
-      "admin",
-      "owner",
-      "pm",
-      "project manager",
-      "manager",
     ]);
   }, [user]);
 

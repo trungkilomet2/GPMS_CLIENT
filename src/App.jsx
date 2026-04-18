@@ -17,7 +17,7 @@ export default function App() {
             ))}
           </Routes>
         </ProfileCompletionGuard>
-        {/* <ChatWidget /> */}
+        <ChatWidget />
         <ToastContainer position="top-right" autoClose={3000} />
       </Suspense>
     </BrowserRouter>
