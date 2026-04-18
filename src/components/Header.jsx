@@ -129,7 +129,7 @@ export default function Header() {
                     <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15 }}>
                         <span style={{ fontSize: ".68rem", color: C.textMid, fontWeight: 500 }}>
-                          Xin chào,
+                          {user?.role?.toLowerCase().includes("customer") ? "Khách hàng:" : "Xin chào,"}
                         </span>
                         <span style={{ fontSize: ".82rem", color: C.green, fontWeight: 700, maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {displayName}
