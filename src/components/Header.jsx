@@ -106,24 +106,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Contact — chỉ hiện khi chưa login */}
-          {!user && (
-            <div className="header-contact-area">
-              {PUBLIC_SITE_CONTENT.guestHeaderActions.map((action) => (
-                <button
-                  key={action.label}
-                  className="header-contact-btn"
-                  onClick={() => navigate(action.path)}
-                >
-                <div className="header-contact-icon">{action.icon}</div>
-                <div>
-                  <div className="header-contact-label">{action.label}</div>
-                  <div className="header-contact-value">{action.value}</div>
-                </div>
-              </button>
-              ))}
-            </div>
-          )}
+
 
           {/* Auth area */}
           <div className="header-auth-area">

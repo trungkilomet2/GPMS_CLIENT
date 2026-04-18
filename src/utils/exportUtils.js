@@ -49,7 +49,7 @@ export const exportPayrollToPDF = (data, month, year) => {
   if (!data || data.length === 0) return;
 
   const doc = new jsPDF();
-  
+
   // Tiêu đề
   doc.setFontSize(18);
   // doc.text(`Bảng lương tháng ${month}/${year}`, 14, 20); // Có thể lỗi font tiếng Việt
