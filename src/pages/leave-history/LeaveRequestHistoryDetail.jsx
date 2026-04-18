@@ -287,6 +287,7 @@ export default function LeaveRequestHistoryDetail() {
                   </div>
                 </div>
               </div>
+            </div>
             </>
           )}
         </div>
