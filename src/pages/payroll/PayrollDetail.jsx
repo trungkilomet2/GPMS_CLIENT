@@ -44,7 +44,7 @@ export default function PayrollDetail() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const aggregated = await fetchAggregatedPayroll(month, year, refreshKey > 0);
+        const aggregated = await fetchAggregatedPayroll(month, year);
         const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(workerId));
         if (active) {
           setLogs(workerData?.logs || []);
@@ -82,7 +82,7 @@ export default function PayrollDetail() {
 
       const unpaidLogs = workerLogs.filter(l =>
         !(l.isPayment || !!l.paidAt) &&
-        l.isReadOnly === true
+        !!l.isReadOnly
       );
       if (unpaidLogs.length === 0) {
         toast.info("Không có công đoạn mới nào cần thanh toán.");
@@ -99,7 +99,7 @@ export default function PayrollDetail() {
         if (!acc[groupKey]) {
           acc[groupKey] = {
             partId: pId,
-            variantId: variantId,
+            variantId: variantId || 0,
             logIds: []
           };
         }
@@ -108,7 +108,7 @@ export default function PayrollDetail() {
       }, {});
 
       const promises = Object.values(groups).map(group =>
-        ProductionPartService.completePayment(Number(group.partId), group.variantId, { workLogIds: group.logIds })
+        ProductionPartService.completePayment(Number(group.partId), Number(group.variantId), { workLogIds: group.logIds })
       );
 
       await Promise.all(promises);
@@ -366,7 +366,7 @@ export default function PayrollDetail() {
                     <tr className="bg-slate-50/50">
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Ngày ghi nhận</th>
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn hàng / Sản xuất</th>
-                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn & Biến thể</th>
+                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn giá</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số lượng</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Nghiệm thu</th>
@@ -473,10 +473,57 @@ export default function PayrollDetail() {
         title="Xác nhận thanh toán lương"
         primaryLabel="Xác nhận thanh toán"
         confirmIcon={CreditCard}
-        description={`Bạn có chắc chắn muốn thanh toán tổng số tiền chờ thanh toán là: ${stats.totalUnpaid.toLocaleString("vi-VN")} VND cho ${stats.workerName}?`}
+        description={`Bạn sắp thanh toán tổng số tiền: ${stats.totalUnpaid.toLocaleString("vi-VN")} VND cho ${stats.workerName}.`}
         onConfirm={confirmPaymentAll}
         onClose={() => setIsConfirmOpen(false)}
-      />
+      >
+        <div className="mt-2 px-4">
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+            <Package size={12} />
+            Danh sách công đoạn ({workerLogs.filter(l => !l.isPayment && l.isReadOnly).length} mục)
+          </div>
+          <div className="max-h-[250px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+            {Object.values(
+              workerLogs
+                .filter(l => !l.isPayment && l.isReadOnly)
+                .reduce((acc, log) => {
+                  const key = `${log.productionPartId}_${log.partOrderSizeId}`;
+                  if (!acc[key]) {
+                    acc[key] = {
+                      name: log.partName,
+                      variant: log.variantName,
+                      totalQty: 0,
+                      totalAmount: 0,
+                      productionId: log.productionId
+                    };
+                  }
+                  acc[key].totalQty += log.quantity;
+                  acc[key].totalAmount += log.quantity * (log.cpu || 0);
+                  return acc;
+                }, {})
+            ).map((item, idx) => (
+              <div key={idx} className="bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between group hover:border-emerald-200 transition-colors">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-black text-slate-900 line-clamp-1">
+                    {item.name} <span className="text-slate-400 font-mono text-[9px]">#PR-{item.productionId}</span>
+                  </span>
+                  <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-tighter italic">
+                    {item.variant}
+                  </span>
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <span className="text-[10px] font-black text-slate-900">
+                    {item.totalAmount.toLocaleString("vi-VN")} <span className="text-[8px] text-slate-400 uppercase">VND</span>
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400">
+                    SL: {item.totalQty}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ConfirmModal>
 
       <SuccessModal
         isOpen={isSuccessOpen}

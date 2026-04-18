@@ -100,7 +100,7 @@ export default function WorkerErrorReport() {
     partId: normalizedAssignment?.partId ? String(normalizedAssignment.partId) : "",
     colorName: normalizedAssignment?.colorName || "",
     sizeName: normalizedAssignment?.sizeName || "",
-    orderSizeId: normalizedAssignment?.orderSizeId || "",
+    partOrderSizeId: normalizedAssignment?.orderSizeId || "",
     errorType: normalizedAssignment?.errorType !== undefined ? normalizedAssignment.errorType : 0,
     severity: 2,
     title: "",
@@ -286,8 +286,8 @@ export default function WorkerErrorReport() {
   }, [form.productionId, normalizedAssignment, isPartLocked]);
 
   useEffect(() => {
-    const partId = String(form.partId || "").trim();
-    if (!partId) {
+    const partOrderSizeId = String(form.partOrderSizeId || "").trim();
+    if (!partOrderSizeId) {
       setEmployees([]);
       return;
     }
@@ -296,7 +296,7 @@ export default function WorkerErrorReport() {
     const fetchIssueWorkers = async () => {
       try {
         setLoadingEmployees(true);
-        const res = await ProductionPartService.getIssueWorkers(partId);
+        const res = await ProductionPartService.getIssueWorkers(partOrderSizeId);
         if (!active) return;
 
         // Axios interceptor returns response.data, so res might be the payload or the array
@@ -304,7 +304,7 @@ export default function WorkerErrorReport() {
         const list = toList(payload);
 
         if (list.length === 0) {
-          console.warn("API returned empty worker list for part:", partId);
+          console.warn("API returned empty worker list for part:", partOrderSizeId);
           setEmployees([]);
           toast.info("Công đoạn này chưa có thợ được phân công.");
           return;
@@ -334,7 +334,7 @@ export default function WorkerErrorReport() {
     return () => {
       active = false;
     };
-  }, [form.partId]);
+  }, [form.partOrderSizeId]);
 
   const productionOptions = useMemo(() => {
     const map = new Map();
@@ -409,7 +409,7 @@ export default function WorkerErrorReport() {
         if (part) {
           next.colorName = part.colorName || "";
           next.sizeName = part.sizeName || "";
-          next.orderSizeId = part.partOrderSizeId || ""; // Syncing orderSizeId
+          next.partOrderSizeId = part.partOrderSizeId || ""; // Syncing partOrderSizeId
         }
       }
 
@@ -586,7 +586,7 @@ export default function WorkerErrorReport() {
       }
 
       // API hoàn toàn dựa trên partOrderSizeId nếu có (ID 58), nếu không mới dùng ProductionPartId (ID 25)
-      const finalId = form.orderSizeId || selectedPart?.partOrderSizeId || partId;
+      const finalId = form.partOrderSizeId || selectedPart?.partOrderSizeId || partId;
 
       await ProductionPartService.createIssue(Number(finalId), formData);
 
@@ -880,11 +880,11 @@ export default function WorkerErrorReport() {
               </div>
             </div>
           </div>
-      </div>
         </div>
-      </LayoutComponent>
-    );
-  }
+      </div>
+    </LayoutComponent>
+  );
+}
 
 function InfoItem({ label, value }) {
   return (

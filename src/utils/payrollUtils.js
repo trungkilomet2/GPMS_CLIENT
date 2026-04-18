@@ -2,23 +2,10 @@ import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
 import WorkerService from "@/services/WorkerService";
 
-export const MOCK_PAYROLL_LOGS = [
-  // ... existing mock data kept for safety/development fallback
-];
+export const MOCK_PAYROLL_LOGS = [];
 
-/**
- * Aggregates data from multiple APIs to build a payroll view.
- * 1. Fetch all productions
- * 2. Fetch all parts for each production
- * 3. Fetch all work logs for each part
- * 4. Filter by month/year and aggregate
- */
-const payrollCache = new Map();
 
-/**
- * Checks if a given month/year is within the start and end dates.
- * Handle open-ended ranges or nulls.
- */
+
 const isDateInMonth = (dateStr, month, year) => {
   if (!dateStr || dateStr === "-") return false;
   const d = new Date(dateStr);
@@ -27,67 +14,64 @@ const isDateInMonth = (dateStr, month, year) => {
 
 const overlapsMonth = (startStr, endStr, month, year) => {
   const targetStart = new Date(year, month - 1, 1);
-  const targetEnd = new Date(year, month, 0); // Last day of month
-
+  const targetEnd = new Date(year, month, 0);
   const start = startStr && startStr !== "-" ? new Date(startStr) : null;
   const end = endStr && endStr !== "-" ? new Date(endStr) : null;
-
-  // If no start date, we can't be sure, but let's assume it's relevant if end exists
-  if (!start && !end) return true; // Fallback to include if totally unknown
-
+  if (!start && !end) return true;
   if (start && start > targetEnd) return false;
   if (end && end < targetStart) return false;
-
   return true;
 };
 
-/**
- * Aggregates data from multiple APIs to build a payroll view.
- * 1. Fetch all productions
- * 2. Filter productions active in this month/year
- * 3. Fetch parts for active productions
- * 4. Fetch work logs for active parts
- * 5. Aggregate by worker
- */
-export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) => {
-  const cacheKey = `${month}-${year}`;
-  if (!forceRefresh && payrollCache.has(cacheKey)) {
-    return payrollCache.get(cacheKey);
-  }
-
+export const fetchAggregatedPayroll = async (month, year) => {
   try {
-    // 1. Fetch Productions and Worker Profiles (including managers)
-    const [prodRes, workerDicRes, managerDicRes] = await Promise.all([
-      ProductionService.getProductionList({ PageIndex: 0, PageSize: 100 }),
+    // 1. Fetch ALL Productions (Loop to bypass 100 limit)
+    let allProductions = [];
+    let prodIdx = 0;
+    let hasMoreProds = true;
+    while (hasMoreProds && prodIdx < 10) {
+      try {
+        const res = await ProductionService.getProductionList({ PageIndex: prodIdx, PageSize: 30 });
+        const data = res?.data?.data || res?.data || [];
+        if (Array.isArray(data) && data.length > 0) {
+          allProductions = [...allProductions, ...data];
+          hasMoreProds = data.length === 100;
+          prodIdx++;
+        } else {
+          hasMoreProds = false;
+        }
+      } catch (err) {
+        console.error("Error fetching productions:", err);
+        hasMoreProds = false;
+      }
+    }
+
+    const [workerDicRes, managerDicRes] = await Promise.all([
       WorkerService.getEmployeeDirectory({ includeHidden: true }),
       WorkerService.getManagerDirectory({ includeHidden: true }),
     ]);
-    
-    const rawProductions = prodRes?.data?.data || prodRes?.data || [];
+
     const workerDirectory = [
       ...(workerDicRes?.data || []),
       ...(managerDicRes?.data || [])
     ];
-    
+
     const workerProfileMap = new Map();
     workerDirectory.forEach(w => {
       if (!w.id) return;
       const key = String(w.id);
-      // Prefer profiles with actual full names if we have duplicates
       const existing = workerProfileMap.get(key);
       if (!existing || (w.fullName && w.fullName !== "Chưa cập nhật")) {
         workerProfileMap.set(key, w);
       }
     });
 
-    if (!Array.isArray(rawProductions)) return [];
+    if (allProductions.length === 0) return [];
 
-    // Filter relevant productions to reduce part/log requests
-    const productions = rawProductions.filter(p =>
+    const productions = allProductions.filter(p =>
       overlapsMonth(p.startDate || p.pStartDate, p.endDate || p.pEndDate, month, year)
     );
 
-    // 2. Fetch all parts for relevant productions in parallel
     const partsResults = await Promise.all(
       productions.map(p => ProductionPartService.getPartsByProduction(p.productionId || p.id, { PageSize: 100 }))
     );
@@ -98,7 +82,6 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       const prod = productions[idx];
       if (Array.isArray(parts)) {
         parts.forEach(part => {
-          // Only fetch logs if the part schedule overlaps with the month
           if (overlapsMonth(part.startDate || part.planStartDate, part.endDate || part.planEndDate, month, year)) {
             relevantParts.push({
               ...part,
@@ -111,80 +94,66 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       }
     });
 
-    // 3. Fetch all work logs for EACH VARIANT of relevant parts in parallel
-    const logPromises = [];
-    const logSourceMap = []; // To trace back which part/variant a log belongs to
+    // 3. Fetch all work logs for EACH VARIANT in parallel chunks
+    const allLogsList = [];
 
-    relevantParts.forEach(part => {
-      if (Array.isArray(part.listPartOrderSizes)) {
-        part.listPartOrderSizes.forEach(variant => {
-          logPromises.push(ProductionPartService.getWorkLogs(part.id, variant.id));
-          logSourceMap.push({ part, variant });
-        });
-      }
-    });
+    await Promise.all(relevantParts.map(async (part) => {
+      const variants = Array.isArray(part.listPartOrderSizes) ? part.listPartOrderSizes : [];
+      for (const variant of variants) {
+        let lIdx = 0;
+        let hasMoreLogs = true;
+        while (hasMoreLogs && lIdx < 10) {
+          try {
+            const res = await ProductionPartService.getWorkLogs(part.id, variant.id, { PageIndex: lIdx, PageSize: 100 });
+            const pageData = res?.data?.data || res?.data || [];
+            if (Array.isArray(pageData) && pageData.length > 0) {
+              pageData.forEach(log => {
+                const d = new Date(log.createDate || log.workDate || log.reportDate);
+                if (d.getMonth() + 1 === month && d.getFullYear() === year) {
+                  const uid = log.userId || log.uId || log.accountId;
+                  if (!uid) return;
 
-    const logsResults = await Promise.all(logPromises);
-
-    const allLogs = [];
-    logsResults.forEach((res, idx) => {
-      const { part, variant } = logSourceMap[idx];
-      const rawLogs = res?.data?.data || res?.data || [];
-      if (Array.isArray(rawLogs)) {
-        rawLogs.forEach(log => {
-          const d = new Date(log.createDate || log.workDate || log.reportDate);
-          if (d.getMonth() + 1 === month && d.getFullYear() === year) {
-            const uid = log.userId || log.uId || log.accountId;
-            if (!uid) return;
-
-            const logEntry = {
-              ...log,
-              id: log.id || log.workLogId,
-              partId: part.id, 
-              productionPartId: part.id,
-              partOrderSizeId: variant.id,
-              partName: log.partName || part.partName || part.name,
-              variantName: log.color && log.size ? `${log.color} / ${log.size}` : `${variant.color || ""} / ${variant.size || ""}`,
-              cpu: part.cpu || 0,
-              productionId: part.productionId,
-              orderName: part.orderName,
-              orderId: part.orderId,
-              workerId: uid,
-              workerName: log.workerName || log.userName || `Thợ #${uid}`,
-              quantity: log.quantity || 0,
-              reportDate: log.createDate || log.workDate || log.reportDate,
-              isPayment: log.isPayment || !!log.paidAt,
-              isReadOnly: log.isReadOnly,
-              workerFullName: null,
-              workerAvatar: null,
-            };
-
-            // Enhanced lookup: check directory first
-            const profile = workerProfileMap.get(String(uid));
-            if (profile && profile.fullName && profile.fullName !== "Chưa cập nhật") {
-              logEntry.workerFullName = profile.fullName;
-              logEntry.workerAvatar = profile.avatarUrl;
-            } else if (log.workerName || log.fullName) {
-              // Fallback to name in log if it looks better than "Thợ #id"
-              const nameInLog = log.workerName || log.fullName;
-              if (nameInLog && !nameInLog.includes("Thợ #")) {
-                logEntry.workerFullName = nameInLog;
-              }
+                  allLogsList.push({
+                    ...log,
+                    id: log.id || log.workLogId,
+                    partId: part.id,
+                    productionPartId: part.id,
+                    partOrderSizeId: variant.id,
+                    partName: log.partName || part.partName || part.name,
+                    variantName: log.color && log.size ? `${log.color} / ${log.size}` : `${variant.color || ""} / ${variant.size || ""}`,
+                    cpu: part.cpu || 0,
+                    productionId: part.productionId,
+                    orderName: part.orderName,
+                    orderId: part.orderId,
+                    workerId: uid,
+                    workerName: log.workerName || log.userName || `Thợ #${uid}`,
+                    quantity: log.quantity || 0,
+                    reportDate: log.createDate || log.workDate || log.reportDate,
+                    isPayment: log.isPayment || !!log.paidAt,
+                    isReadOnly: !!log.isReadOnly,
+                  });
+                }
+              });
+              hasMoreLogs = pageData.length === 100;
+              lIdx++;
+            } else {
+              hasMoreLogs = false;
             }
-
-            allLogs.push(logEntry);
+          } catch (e) {
+            console.error("Error fetching logs for variant in payroll:", e);
+            hasMoreLogs = false;
           }
-        });
+        }
       }
-    });
+    }));
 
     // 4. Aggregate by worker
     const workerMap = new Map();
-    allLogs.forEach(log => {
-      const key = String(log.userId || log.workerName);
+    allLogsList.forEach(log => {
+      const key = String(log.workerId || log.workerName);
       if (!workerMap.has(key)) {
         workerMap.set(key, {
-          userId: log.userId,
+          userId: log.workerId,
           workerName: log.workerName,
           totalQuantity: 0,
           totalSalary: 0,
@@ -197,26 +166,25 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
       const stats = workerMap.get(key);
       const qty = Number(log.quantity || 0);
       const cpu = Number(log.cpu || 0);
-      
-      // NEW LOGIC: Only count salary if approved (isReadOnly)
-      const isApproved = log.isReadOnly === true;
-      
+
       stats.totalQuantity += qty;
-      if (isApproved) {
+      if (log.isReadOnly) {
         stats.totalSalary += qty * cpu;
       }
       stats.logCount += 1;
       if (log.partId) stats.uniqueParts.add(log.partId);
       stats.uniquePartCount = stats.uniqueParts.size;
 
-      if (log.workerFullName && !stats.fullName) stats.fullName = log.workerFullName;
-      if (log.workerAvatar && !stats.avatarUrl) stats.avatarUrl = log.workerAvatar;
+      const profile = workerProfileMap.get(String(log.workerId));
+      if (profile) {
+        if (profile.fullName && profile.fullName !== "Chưa cập nhật") stats.fullName = profile.fullName;
+        if (profile.avatarUrl) stats.avatarUrl = profile.avatarUrl;
+      }
 
       stats.logs.push(log);
     });
 
     const result = Array.from(workerMap.values());
-    payrollCache.set(cacheKey, result);
     return result;
   } catch (err) {
     console.error("Payroll aggregation error:", err);
@@ -224,38 +192,10 @@ export const fetchAggregatedPayroll = async (month, year, forceRefresh = false) 
   }
 };
 
-export const aggregateMonthlyPayroll = (logs, month, year) => {
-  // Keeping this for backward compatibility or filtering fetched logs
-  const filtered = logs.filter((log) => {
-    const d = new Date(log.reportDate);
-    return d.getMonth() + 1 === month && d.getFullYear() === year;
-  });
-
-  const workerMap = new Map();
-  filtered.forEach((log) => {
-    const key = log.userId || log.workerName;
-    if (!workerMap.has(key)) {
-      workerMap.set(key, {
-        userId: log.userId,
-        workerName: log.workerName,
-        totalQuantity: 0,
-        totalSalary: 0,
-        logCount: 0,
-      });
-    }
-    const stats = workerMap.get(key);
-    stats.totalQuantity += log.quantity;
-    stats.totalSalary += log.quantity * log.cpu;
-    stats.logCount += 1;
-  });
-
-  return Array.from(workerMap.values());
-};
-
 export const getWorkerMonthlyDetail = (logs, userId, month, year) => {
   return logs.filter((log) => {
     const d = new Date(log.reportDate || log.workDate);
-    const keyMatch = String(log.userId || log.workerName) === String(userId) || log.workerName === userId;
+    const keyMatch = String(log.workerId || log.workerName) === String(userId);
     return keyMatch && d.getMonth() + 1 === month && d.getFullYear() === year;
   });
 };

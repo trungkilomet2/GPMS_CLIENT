@@ -141,14 +141,20 @@ export default function WorkerDailyReport() {
       normalized === "hoan thanh" ||
       normalized === "cho nghiem thu";
 
-    return !isHidden;
+    if (isHidden) return false;
+
+    // Check if totally done based on system quantity (qtyVar vs finVar)
+    const qty = Number(step.qtyVar || step.targetQuantity || step.quantity || 0);
+    const fin = Number(step.finVar || step.actualQuantity || step.finishedQuantity || 0);
+    if (qty > 0 && fin >= qty) return false;
+
+    return true;
   };
 
   const initialBase = useMemo(() => {
     if (planSteps.length > 0) {
       const results = [];
       planSteps.forEach((part, pIdx) => {
-        // Nếu part đã có thông tin biến thể cụ thể (đã được làm phẳng từ ProductionDetail)
         if (part.colorName || part.sizeName || part.variant || part.partOrderSizeId) {
           if (isStepAssignedToCurrentWorker(part, currentWorkerIdSet, currentWorkerNameSet)) {
             results.push({
@@ -167,13 +173,13 @@ export default function WorkerDailyReport() {
               statusName: part.statusName,
               statusId: part.statusId,
               isCuttingStep: part.isCuttingStep || false,
-              cumulativeToday: part.actualQuantity || 0, // Fallback for visibility
+              qtyVar: part.quantity || part.targetQuantity || 0,
+              finVar: part.actualQuantity || part.finishedQuantity || 0,
             });
           }
           return;
         }
 
-        // Trường hợp fallback: Nếu dữ liệu chưa được làm phẳng
         const variants = part.variants || part.listPartOrderSizes || [];
         variants.forEach((v, vIdx) => {
           if (isStepAssignedToCurrentWorker(v, currentWorkerIdSet, currentWorkerNameSet)) {
@@ -194,14 +200,16 @@ export default function WorkerDailyReport() {
               statusName: v.statusName || part.statusName,
               statusId: v.statusId || part.statusId,
               isCuttingStep: part.isCuttingStep || false,
+              qtyVar: v.quantity || 0,
+              finVar: v.finishedQuantity || 0,
             });
           }
         });
       });
-      return results;
+      return results.filter(isStepAvailableForReporting);
     }
 
-    if (assignment) {
+    if (assignment && isStepAvailableForReporting(assignment)) {
       if (isStepAssignedToCurrentWorker(assignment, currentWorkerIdSet, currentWorkerNameSet)) {
         return [{
           ...assignment,
@@ -233,42 +241,7 @@ export default function WorkerDailyReport() {
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [changedItems, setChangedItems] = useState([]);
-
-  const fetchNotebookLogs = async (row) => {
-    if (!row?.productionId) return;
-
-    try {
-      setIsLoadingLogs(true);
-      setActiveRowId(row.id);
-
-      const nbRes = await CuttingNotebookService.getByProduction(row.productionId);
-      const nbData = nbRes?.data?.data || nbRes?.data || nbRes;
-
-      const notebook = Array.isArray(nbData) ? nbData[0] : nbData;
-      if (!notebook || !notebook.id) {
-        toast.info("Không tìm thấy sổ cắt cho đơn sản xuất này.");
-        return;
-      }
-
-      const logsRes = await CuttingNotebookService.getListLogs(notebook.id);
-      const logs = logsRes?.data?.data || logsRes?.data || logsRes;
-
-      setCurrentNotebookLogs(Array.isArray(logs) ? logs : []);
-      setShowLogSelector(true);
-    } catch (err) {
-      console.error(err);
-      toast.error(getErrorMessage(err, "Lỗi khi tải dữ liệu sổ cắt."));
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  };
-
-  const handleSelectLog = (log) => {
-    const qty = log.productQty || log.quantity || 0;
-    handleChange(activeRowId, "quantity", qty);
-    toast.success(`Đã lấy sản lượng (${qty}) từ sổ cắt.`);
-    setShowLogSelector(false);
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalAmount = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.cpu) || 0), 0),
@@ -276,31 +249,35 @@ export default function WorkerDailyReport() {
   );
 
   const handleChange = (id, field, value) => {
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id === id) {
-          let nextValue = value;
-          if (field === "quantity") {
-            nextValue = String(value).replace(/[^0-9]/g, "");
-            const num = Number(nextValue);
-            const maxAllowed = (row.qtyVar || 0) - (row.finVar || 0);
+    if (field === "quantity") {
+      const row = rows.find(r => r.id === id);
+      if (!row) return;
 
-            if (num > maxAllowed && maxAllowed > 0) {
-              nextValue = String(maxAllowed);
-              toast.warning(`Chỉ được báo cáo tối đa ${maxAllowed} sản phẩm.`);
-            }
-          }
-          return { ...row, [field]: nextValue };
-        }
-        return row;
-      })
-    );
+      const cleanValue = String(value).replace(/[^0-9]/g, "");
+      const num = Number(cleanValue);
+      const limit = Math.max(0, (row.qtyVar || 0) - (row.finVar || 0));
+
+      let finalValue = cleanValue;
+      if (num > limit && limit >= 0) {
+        finalValue = String(limit);
+        toast.warning(`Chỉ được báo cáo tối đa ${limit} sản phẩm.`, {
+          toastId: `max-qty-${id}`
+        });
+      }
+
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, quantity: finalValue } : r))
+      );
+    } else {
+      setRows((prev) =>
+        prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      );
+    }
   };
 
   const displayedRows = rows.filter(row => {
     if (!isToday) return true;
-    // Hide if already reported today (logReadOnly is set in sync logic)
-    if (row.logReadOnly) return false;
+    // Only hide if the stage is fully completed (finVar >= qtyVar)
     return isStepAvailableForReporting(row);
   });
 
@@ -311,22 +288,10 @@ export default function WorkerDailyReport() {
       const [mm, dd, yyyy] = raw.split("/").map((v) => v.trim());
       if (yyyy && mm && dd) return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
     }
-    // Handle ISO string or date string with T
     if (raw.includes("T")) {
       return raw.split("T")[0];
     }
     return raw.substring(0, 10);
-  };
-
-  const sameDate = (value, target) => {
-    if (!value || !target) return false;
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return false;
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const normalizedTarget = normalizeDateString(target);
-    return `${yyyy}-${mm}-${dd}` === normalizedTarget;
   };
 
   const normalizeName = (value) => {
@@ -339,6 +304,7 @@ export default function WorkerDailyReport() {
       .replace(/đ/g, "d")
       .replace(/[^a-z0-9]/g, "");
   };
+
   const unwrapArrayPayload = (response) => {
     const root = response?.data ?? response;
     if (Array.isArray(root)) return root;
@@ -362,11 +328,11 @@ export default function WorkerDailyReport() {
       })));
 
       const activeRows = rows || [];
-      const productionId = plan?.production?.productionId || activeRows.find(r => r.productionId)?.productionId;
+      const prodId = plan?.production?.productionId || activeRows.find(r => r.productionId)?.productionId;
 
-      if (productionId) {
+      if (prodId) {
         try {
-          const res = await ProductionPartService.getPartsByProduction(productionId, { PageSize: 100 });
+          const res = await ProductionPartService.getPartsByProduction(prodId, { PageSize: 100 });
           const payload = res?.data?.data ?? res?.data ?? [];
           const partList = Array.isArray(payload) ? payload : [];
 
@@ -377,70 +343,72 @@ export default function WorkerDailyReport() {
             variants.forEach(v => {
               const color = normalizeName(v.colorName || v.color);
               const size = normalizeName(v.sizeName || v.size);
-
               const idKey = `${p.id || p.partId}-${v.id || v.partOrderSizeId}`;
               const nameKey = `${stageName}-${color}-${size}`;
-
               const data = {
                 total: v.quantity || 0,
-                finished: v.finishedQuantity || 0,
+                finished: v.actualQuantity || v.finishedQuantity || 0,
                 partId: p.id || p.partId,
                 partOrderSizeId: v.id || v.partOrderSizeId
               };
-
               latestDataMap.set(idKey, data);
               latestDataMap.set(nameKey, data);
             });
           });
 
-          // NEW: Fetch today's logs to block multiple reports
           const currentId = currentUser?.userId || currentUser?.id;
-          // Try to use a very simple query to avoid 400
-          const logRes = await ProductionPartService.getProductionWorkLogs(productionId, {
-            WorkerId: Number(currentId)
-          }).catch(err => {
-            console.error("Lỗi gọi work-logs:", err);
-            return { data: [] };
-          });
+          let allLogs = [];
+          let pIdx = 0;
+          let hasMore = true;
 
-          const logList = unwrapArrayPayload(logRes);
-          const targetDateStr = normalizeDateString(new Date());
+          while (hasMore && pIdx < 30) {
+            try {
+              const logRes = await ProductionPartService.getProductionWorkLogs(prodId, { PageIndex: pIdx, PageSize: 30 });
+              const pageData = unwrapArrayPayload(logRes);
+              if (pageData.length > 0) {
+                allLogs = [...allLogs, ...pageData];
+                hasMore = pageData.length === 30;
+                pIdx++;
+              } else {
+                hasMore = false;
+              }
+            } catch (err) {
+              console.error(`Lỗi gọi logs trang ${pIdx}:`, err);
+              hasMore = false;
+            }
+          }
+
+          const targetDateStr = formatDateInput(new Date());
           const reportedTodayMap = new Map();
+          const finishedTotalMap = new Map();
 
-          logList.forEach(log => {
+          allLogs.forEach(log => {
+            const sid = String(log.partOrderSizeId);
+            const qty = Number(log.quantity || 0);
+            finishedTotalMap.set(sid, (finishedTotalMap.get(sid) || 0) + qty);
+
             const logDate = normalizeDateString(log.createDate || log.workDate);
-            if (logDate === targetDateStr) {
-              // Store by ID
-              reportedTodayMap.set(String(log.partOrderSizeId), log);
+            const logWorkerId = String(log.workerId || log.userId || log.accountId || "");
+            if (logDate === targetDateStr && logWorkerId === String(currentId)) {
+              reportedTodayMap.set(sid, log);
             }
           });
 
           setRows(prev => (prev || []).map(row => {
-            const idKey = `${row.partId}-${row.partOrderSizeId}`;
-            const rowStageName = normalizeName(row.partName);
-            const rowColor = normalizeName(row.color);
-            const rowSize = normalizeName(row.size);
-            const nameKey = `${rowStageName}-${rowColor}-${rowSize}`;
+            const sid = String(row.partOrderSizeId);
+            const idKey = `${row.partId || ""}-${row.partOrderSizeId || ""}`;
+            const latest = latestDataMap.get(idKey);
+            const latestFinished = latest ? latest.finished : (finishedTotalMap.get(sid) || 0);
+            const existingLog = reportedTodayMap.get(sid);
 
-            const latest = latestDataMap.get(idKey) || latestDataMap.get(nameKey);
-
-            // Check if reported today by ID
-            const existingLog = reportedTodayMap.get(String(row.partOrderSizeId)) ||
-              reportedTodayMap.get(String(latest?.partOrderSizeId));
-
-            if (latest) {
-              return {
-                ...row,
-                partId: row.partId || latest.partId,
-                partOrderSizeId: row.partOrderSizeId || latest.partOrderSizeId,
-                qtyVar: latest.total,
-                finVar: latest.finished,
-                quantity: existingLog ? String(existingLog.quantity) : "",
-                logReadOnly: !!existingLog,
-                workLogId: existingLog?.id || null
-              };
-            }
-            return row;
+            return {
+              ...row,
+              finVar: latestFinished,
+              quantity: "", // Keep input empty for next entry
+              reportedTodayQty: existingLog ? Number(existingLog.quantity || 0) : 0,
+              logReadOnly: !!existingLog,
+              workLogId: existingLog?.id || null
+            };
           }));
         } catch (err) {
           console.error("Lỗi đồng bộ dữ liệu:", err);
@@ -448,7 +416,7 @@ export default function WorkerDailyReport() {
       }
     };
     initData();
-  }, [rows?.length]);
+  }, [plan?.production?.productionId, refreshKey]);
 
   const buildPayload = (row) => {
     const currentId = currentUser?.userId || currentUser?.id;
@@ -463,18 +431,14 @@ export default function WorkerDailyReport() {
     const currentRows = rows;
     if (!Array.isArray(currentRows) || currentRows.length === 0) return;
 
-    // Detect actual changes compared to current saved rows
     const errors = [];
     const changes = currentRows.filter((row) => {
       if (!row.partId || row.logReadOnly) return false;
       const currentQty = Number(row.quantity || 0);
       const limit = (row.qtyVar || 0) - (row.finVar || 0);
-
       if (currentQty > limit && limit > 0) {
         errors.push(`${row.partName} (${row.color}/${row.size}): Số lượng vượt quá mức cho phép.`);
       }
-
-      // If it has quantity > 0, it's a new report to save
       return currentQty > 0;
     });
 
@@ -482,12 +446,10 @@ export default function WorkerDailyReport() {
       toast.error(errors[0]);
       return;
     }
-
     if (changes.length === 0) {
       toast.info("Vui lòng nhập số lượng để lưu báo cáo.");
       return;
     }
-
     setChangedItems(changes);
     setIsConfirmOpen(true);
   };
@@ -502,10 +464,8 @@ export default function WorkerDailyReport() {
       const results = await Promise.allSettled(
         currentRows.map(async (row) => {
           if (!row?.partId || row.logReadOnly) return { row, skipped: true };
-
           const isChanged = changedItems.some(c => c.id === row.id);
           if (!isChanged) return { row, skipped: true };
-
           const payload = buildPayload(row);
           const response = await ProductionPartService.createWorkLog(row.partId, row.partOrderSizeId, payload);
           let createdId = unwrapObjectId(response);
@@ -513,37 +473,14 @@ export default function WorkerDailyReport() {
         })
       );
 
-      const failed = results
-        .map((res, idx) => ({ res, row: currentRows[idx] }))
-        .filter((item) => item.res.status === "rejected");
-
-      const failedWithReasons = failed.map((item) => ({
-        row: item.row,
-        reason: getErrorMessage(item.res.reason, "Lỗi không xác định")
-      }));
-
-      const updatedRows = currentRows.map((row, idx) => {
-        const res = results[idx];
-        if (res.status !== "fulfilled") return row;
-        const createdId = res.value?.createdId ?? row.workLogId ?? null;
-        return { ...row, workLogId: createdId };
-      });
-
-      setRows(updatedRows.map((row) => ({ ...row, quantity: "" })));
+      const failed = results.filter((res) => res.status === "rejected");
+      setRows((prev) => (prev || []).map((row) => ({ ...row, quantity: "" })));
 
       if (failed.length === 0) {
         toast.success("Đã lưu báo cáo thành công.");
+        setRefreshKey(prev => prev + 1); // Trigger server-side reload
       } else {
-        // Ghi log chi tiết lỗi vào console cho developer
-        console.error("Chi tiết lưu thất bại:", failedWithReasons);
-
-        // Thông báo cho người dùng một cách thân thiện
-        const firstFailed = failedWithReasons[0];
-        if (failed.length === 1) {
-          toast.error(`${firstFailed.row.partName}: ${firstFailed.reason}`);
-        } else {
-          toast.error(`Lỗi lưu ${failed.length} dòng. Dòng đầu tiên (${firstFailed.row.partName}): ${firstFailed.reason}`);
-        }
+        toast.error(`Có ${failed.length} dòng lưu thất bại. Vui lòng kiểm tra lại.`);
       }
     } catch (err) {
       console.error(err);
@@ -564,14 +501,12 @@ export default function WorkerDailyReport() {
                 onClick={() => {
                   const prodId = plan?.production?.productionId ?? assignment?.productionId;
                   if (prodId) {
-                    const target = `/production/${prodId}`;
-                    navigate(target);
+                    navigate(`/production/${prodId}`);
                   } else {
                     navigate(-1);
                   }
                 }}
                 className="rounded-xl border border-slate-200 p-2 text-slate-400 transition hover:bg-slate-50"
-                aria-label="Quay lại"
               >
                 <ArrowLeft size={18} />
               </button>
@@ -579,11 +514,7 @@ export default function WorkerDailyReport() {
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
                   {assignment ? "Báo cáo sản lượng công đoạn" : "Báo cáo sản lượng hằng ngày"}
                 </h1>
-                <p className="text-slate-600">
-                  {assignment
-                    ? "Nhập số lượng vừa hoàn thành cho công đoạn được chọn."
-                    : "Nhập số lượng vừa hoàn thành hằng ngày."}
-                </p>
+                <p className="text-slate-600">Điền số lượng vừa hoàn thành hằng ngày.</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -591,11 +522,8 @@ export default function WorkerDailyReport() {
                 onClick={() => {
                   const firstRow = displayedRows[0] || rows[0];
                   const prodId = plan?.production?.id || plan?.production?.productionId || assignment?.productionId || firstRow?.productionId;
-                  
                   if (prodId) {
-                    navigate(`/production-plan/${prodId}/history`, { 
-                      state: { productionId: prodId } 
-                    });
+                    navigate(`/production-plan/${prodId}/history`, { state: { productionId: prodId } });
                   } else {
                     navigate('/worker/output-history');
                   }
@@ -611,11 +539,7 @@ export default function WorkerDailyReport() {
                   disabled={isSavingAll}
                   className="h-10 px-5 rounded-xl bg-emerald-600 text-[11px] font-bold uppercase tracking-widest text-white transition-all hover:bg-emerald-700 disabled:opacity-50 shadow-lg shadow-emerald-100 flex items-center gap-2"
                 >
-                  {isSavingAll ? (
-                    <Loader2 className="animate-spin" size={16} />
-                  ) : (
-                    <ClipboardCheck size={16} />
-                  )}
+                  {isSavingAll ? <Loader2 className="animate-spin" size={16} /> : <ClipboardCheck size={16} />}
                   Lưu báo cáo
                 </button>
               )}
@@ -685,35 +609,27 @@ export default function WorkerDailyReport() {
                             <div className="flex flex-col gap-1">
                               {(() => {
                                 const mQty = (row.qtyVar || 0) - (row.finVar || 0);
-                                const hasData = row.qtyVar > 0;
-
-                                if (row.logReadOnly) {
-                                  return (
-                                    <div className="flex flex-col items-center gap-1.5 py-1">
-                                      <div className="text-sm font-black text-emerald-700 bg-emerald-50 px-4 py-1.5 rounded-lg border border-emerald-100 shadow-sm">
-                                        {row.quantity}
-                                      </div>
-                                      <span className="text-[9px] text-slate-400 font-medium italic underline decoration-slate-200 decoration-1 underline-offset-2">
-                                        Đã báo cáo. Vào Sổ ghi chép để sửa/xóa.
-                                      </span>
-                                    </div>
-                                  );
-                                }
-
                                 return (
                                   <>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      max={mQty}
-                                      value={row.quantity}
-                                      placeholder={!hasData ? "Nhập số lượng..." : mQty > 0 ? `Tối đa ${mQty}...` : "Đã hoàn thành"}
-                                      onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
-                                      className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-center text-sm font-black outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-inner"
-                                    />
-                                    {hasData && mQty > 0 && (
-                                      <div className="text-[10px] text-slate-400 text-center font-medium">
-                                        <span>Số lượng còn lại: {mQty}</span>
+                                    <div className="relative group">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={mQty}
+                                        value={row.quantity}
+                                        placeholder={"Nhập thêm..."}
+                                        onChange={(event) => handleChange(row.id, "quantity", event.target.value)}
+                                        className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-center text-sm font-black outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-inner"
+                                      />
+                                    </div>
+                                    {row.qtyVar > 0 && (
+                                      <div className="text-[10px] text-slate-400 text-center font-medium mt-1 space-y-0.5">
+                                        {mQty > 0 ? (
+                                          <div className="text-emerald-600 font-bold uppercase text-[11px]">CÒN LẠI TỐI ĐA: {mQty}</div>
+                                        ) : (
+                                          <div className="text-slate-400 font-bold uppercase text-[11px]">ĐÃ HOÀN TẤT</div>
+                                        )}
+                                        <div className="italic text-slate-500">Tiến độ: {row.finVar}/{row.qtyVar} sản phẩm</div>
                                       </div>
                                     )}
                                   </>
@@ -721,20 +637,17 @@ export default function WorkerDailyReport() {
                               })()}
                             </div>
                           ) : (
-                            <div className="text-center text-slate-900 font-black">
-                              {row.quantity === "" ? "-" : row.quantity}
-                            </div>
+                            <div className="text-center text-slate-900 font-black">{row.quantity === "" ? "-" : row.quantity}</div>
                           )}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-3 py-10 text-center">
+                      <td colSpan={7} className="px-3 py-10 text-center">
                         <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
                           <BookOpen size={48} className="text-slate-200 mb-2" />
                           <p className="font-semibold text-slate-600">Bạn chưa có công việc được giao</p>
-                          <p className="text-xs">Vui lòng liên hệ quản lý hoặc chờ kế hoạch sản xuất mới.</p>
                         </div>
                       </td>
                     </tr>
@@ -742,7 +655,7 @@ export default function WorkerDailyReport() {
                   {displayedRows.length > 0 && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={5} className="px-3 py-4 font-bold text-slate-500 text-right uppercase tracking-wider text-[10px]">TỔNG TIỀN BÁO CÁO:</td>
-                      <td className="px-2 py-4 text-center font-black text-emerald-700 text-lg whitespace-nowrap border-x border-slate-100/50 bg-emerald-50/30">
+                      <td className="px-2 py-4 text-center font-black text-emerald-700 text-lg whitespace-nowrap bg-emerald-50/30">
                         {totalAmount.toLocaleString("vi-VN")} đ
                       </td>
                       <td></td>
@@ -755,58 +668,36 @@ export default function WorkerDailyReport() {
         </div>
       </div>
 
-      {/* Save Confirmation Modal */}
       {isConfirmOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-md">
           <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-white/95 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="bg-emerald-600 px-6 py-5 text-white">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-                  <ClipboardCheck size={22} className="text-white" />
+                  <ClipboardCheck size={22} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">Xác nhận báo cáo sản lượng</h3>
-                  <p className="text-emerald-50/80 text-xs">Vui lòng kiểm tra lại các thông tin trước khi lưu</p>
+                  <p className="text-emerald-50/80 text-xs">Vui lòng kiểm tra lại thông tin trước khi lưu</p>
                 </div>
               </div>
             </div>
-
             <div className="px-6 py-5">
-              <div className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Danh sách các phần tử thay đổi</div>
               <div className="max-h-[300px] overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-white text-[10px] font-bold uppercase text-slate-400 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Công đoạn</th>
-                      <th className="px-4 py-2 text-right">Số lượng</th>
-                    </tr>
-                  </thead>
                   <tbody className="divide-y divide-slate-100/50">
                     {changedItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-emerald-50/30 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-700">{item.partName}</td>
+                      <tr key={item.id} className="hover:bg-emerald-50/30">
+                        <td className="px-4 py-3 font-medium text-slate-700">{item.partName} ({item.color}/{item.size})</td>
                         <td className="px-4 py-3 text-right font-black text-emerald-700">{item.quantity} cái</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => setIsConfirmOpen(false)}
-                    className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 hover:border-slate-300"
-                  >
-                    Hủy bỏ
-                  </button>
-                  <button
-                    onClick={executeSaveAll}
-                    className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 shadow-lg shadow-emerald-200"
-                  >
-                    Xác nhận & Lưu
-                  </button>
-                </div>
+              <div className="mt-6 flex gap-3">
+                <button onClick={() => setIsConfirmOpen(false)} className="flex-1 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-600 hover:bg-slate-50">Hủy bỏ</button>
+                <button onClick={executeSaveAll} className="flex-1 rounded-2xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200">Xác nhận & Lưu</button>
               </div>
             </div>
           </div>
@@ -815,17 +706,3 @@ export default function WorkerDailyReport() {
     </LayoutComponent>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

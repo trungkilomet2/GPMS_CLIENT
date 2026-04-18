@@ -48,7 +48,7 @@ const ProductionPartService = {
   },
   completePayment(partId, partOrderSizeId, payload) {
     return axiosClient.patch(API_ENDPOINTS.PRODUCTION_PART.COMPLETE_PAYMENT(partId), payload, {
-      params: { partOrderSizeId }
+      params: { partOrderSizeId },
     });
   },
   getProductionWorkLogs(productionId, params) {
