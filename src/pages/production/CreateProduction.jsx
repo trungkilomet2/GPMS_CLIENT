@@ -11,7 +11,7 @@ import WorkerService from "@/services/WorkerService";
 import ProductionService from "@/services/ProductionService";
 import DesignTemplatesSection from "@/components/orders/DesignTemplatesSection";
 import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import { formatOrderDate } from "@/lib/orders/formatters";
 import { normalizeOrderStatus, getOrderStatusLabel } from "@/lib/orders/status";
 import { getOrderCustomerId } from "@/lib/orders/customerInfo";
@@ -22,6 +22,7 @@ import { getProductionStatusLabel } from "@/utils/statusUtils";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
+import OrderSpecificationCard from "@/components/orders/OrderSpecificationCard";
 
 
 export default function CreateProduction() {
@@ -384,16 +385,6 @@ export default function CreateProduction() {
     };
   }, [customerId]);
 
-  const orderSummaryRows = useMemo(() => ([
-    ["Mã đơn hàng", order?.id ? `#ĐH-${order.id}` : "-"],
-    ["Tên đơn hàng", order?.orderName ?? "-"],
-    ["Loại đơn hàng", order?.type ?? "-"],
-    ["Kích thước", order?.size ?? "-"],
-    ["Màu sắc", order?.color ?? "-"],
-    ["Số lượng", order?.quantity ? `${order.quantity}` : "-"],
-    ["Ngày bắt đầu", formatOrderDate(order?.startDate)],
-    ["Ngày kết thúc", formatOrderDate(order?.endDate)],
-  ]), [order]);
 
   const normalizedStatus = normalizeOrderStatus(order?.status);
   const isAccepted = getOrderStatusLabel(normalizedStatus) === "Đã Chấp Nhận";
@@ -514,7 +505,7 @@ export default function CreateProduction() {
             </div>
           </div>
         )}
-        <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="leave-shell mx-auto flex flex-col gap-6 px-4 py-8 sm:px-6 lg:px-10">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
               <button
@@ -535,180 +526,110 @@ export default function CreateProduction() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-slate-600 mb-4">
-                  <UserCheck size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin đơn sản xuất</h2>
-                </div>
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center gap-2 text-slate-600 mb-4">
+                <UserCheck size={16} />
+                <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin đơn sản xuất</h2>
+              </div>
 
-                {!isAccepted && order?.id && (
-                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                    Chỉ được tạo đơn sản xuất cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
+              {!isAccepted && order?.id && (
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
+                  Chỉ được tạo đơn sản xuất cho đơn hàng có trạng thái <strong>Đã Chấp Nhận</strong>.
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                {!orderId && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Chọn đơn hàng</label>
+                    <select
+                      value={selectedOrderId}
+                      onChange={(e) => setSelectedOrderId(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    >
+                      <option value="">
+                        {ordersLoading ? "Đang tải đơn hàng..." : "Chọn đơn hàng"}
+                      </option>
+                      {orders
+                        .filter((o) => {
+                          const statusValue = o.statusName ?? o.status ?? o.statusText ?? o.state ?? o.statusId;
+                          const label = getOrderStatusLabel(statusValue);
+                          if (label === "Đã Chấp Nhận") return true;
+                          const statusId = Number(statusValue);
+                          return Number.isFinite(statusId) && statusId === 3;
+                        })
+                        .map((o) => (
+                          <option key={o.id ?? o.orderId} value={o.id ?? o.orderId}>
+                            #{o.id ?? o.orderId} - {o.orderName}
+                          </option>
+                        ))}
+                    </select>
+                    {ordersError && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{ordersError}</div>
+                    )}
+                    {errors.orderId && (
+                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
+                    )}
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {!orderId && (
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Chọn đơn hàng</label>
-                      <select
-                        value={selectedOrderId}
-                        onChange={(e) => setSelectedOrderId(e.target.value)}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      >
-                        <option value="">
-                          {ordersLoading ? "Đang tải đơn hàng..." : "Chọn đơn hàng"}
-                        </option>
-                        {orders
-                          .filter((o) => {
-                            const statusValue = o.statusName ?? o.status ?? o.statusText ?? o.state ?? o.statusId;
-                            const label = getOrderStatusLabel(statusValue);
-                            if (label === "Đã Chấp Nhận") return true;
-                            const statusId = Number(statusValue);
-                            return Number.isFinite(statusId) && statusId === 3;
-                          })
-                          .map((o) => (
-                            <option key={o.id ?? o.orderId} value={o.id ?? o.orderId}>
-                              #{o.id ?? o.orderId} - {o.orderName}
-                            </option>
-                          ))}
-                      </select>
-                      {ordersError && (
-                        <div className="mt-2 text-xs text-red-600 font-semibold">{ordersError}</div>
-                      )}
-                      {errors.orderId && (
-                        <div className="mt-2 text-xs text-red-600 font-semibold">{errors.orderId}</div>
-                      )}
-                    </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Người quản lý</label>
+                  <select
+                    name="pmId"
+                    value={form.pmId}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    disabled={loadingPM}
+                  >
+                    <option value="">{loadingPM ? "Đang tải danh sách người quản lý..." : "Chọn người quản lý"}</option>
+                    {pmUsers.map((pm) => (
+                      <option key={pm.id} value={pm.id}>
+                        {pm.fullName || pm.userName || `PM #${pm.id}`} ({pm.managedCount} công nhân)
+                      </option>
+                    ))}
+                    {currentUser && (hasAnyRole(roleValue, ["Owner"]) || hasAnyRole(roleValue, ["Admin"])) && (
+                      <option value={currentUser.userId ?? currentUser.id}>
+                        Giao việc cho tôi ({currentUser.fullName || currentUser.userName}) ({managerCountMap[String(currentUser.userId ?? currentUser.id)] || 0} công nhân)
+                      </option>
+                    )}
+                  </select>
+
+                  {pmError && (
+                    <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
                   )}
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2 block">Người quản lý</label>
-                    <select
-                      name="pmId"
-                      value={form.pmId}
-                      onChange={handleChange}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                      disabled={loadingPM}
-                    >
-                      <option value="">{loadingPM ? "Đang tải danh sách người quản lý..." : "Chọn người quản lý"}</option>
-                      {pmUsers.map((pm) => (
-                        <option key={pm.id} value={pm.id}>
-                          {pm.fullName || pm.userName || `PM #${pm.id}`} ({pm.managedCount} công nhân)
-                        </option>
-                      ))}
-                      {currentUser && (hasAnyRole(roleValue, ["Owner"]) || hasAnyRole(roleValue, ["Admin"])) && (
-                        <option value={currentUser.userId ?? currentUser.id}>
-                          Giao việc cho tôi ({currentUser.fullName || currentUser.userName}) ({managerCountMap[String(currentUser.userId ?? currentUser.id)] || 0} công nhân)
-                        </option>
-                      )}
-                    </select>
-
-                    {pmError && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{pmError}</div>
-                    )}
-                    {errors.pmId && (
-                      <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
-                    )}
-                  </div>
-
-                  <div className="md:col-span-2 flex flex-wrap justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate(-1)}
-                      className="rounded-xl border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                    >
-                      Hủy
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmitting || !isAccepted}
-                      className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
-                    >
-                      {isSubmitting ? "Đang tạo..." : "Tạo đơn sản xuất"}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 text-slate-600 text-xs font-bold uppercase tracking-widest">
-                  Thông tin đơn hàng
+                  {errors.pmId && (
+                    <div className="mt-2 text-xs text-red-600 font-semibold">{errors.pmId}</div>
+                  )}
                 </div>
-                <div className="p-5 grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center border-b border-slate-100">
-                  <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center shadow-sm relative group">
-                    {order?.image ? (
-                      <button
-                        type="button"
-                        className="w-full h-full cursor-zoom-in"
-                        onClick={() => {
-                          setZoomImageUrl(order.image);
-                          setIsImageModalOpen(true);
-                        }}
-                        title="Click để zoom ảnh"
-                      >
-                        <img src={order.image} alt="" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="text-[10px] text-white font-semibold">Click để zoom</span>
-                        </div>
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-slate-400">-</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-500 leading-relaxed">
-                    Thông tin tổng quan đơn hàng để đối chiếu trước khi giao cho người quản lý.
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
-                  {orderSummaryRows.map(([label, value]) => (
-                    <div key={label}>
-                      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-50 last:border-0 hover:bg-slate-50/30">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-tight">{label}</span>
-                        <span className="text-sm font-medium text-slate-700">{value}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center gap-2 text-slate-600">
-                  <Package size={16} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest">Danh sách vật liệu sản xuất</h2>
+                <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => navigate(-1)}
+                    className="rounded-xl border border-slate-200 px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !isAccepted}
+                    className="rounded-xl bg-emerald-600 px-7 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:bg-emerald-400"
+                  >
+                    {isSubmitting ? "Đang tạo..." : "Tạo đơn sản xuất"}
+                  </button>
                 </div>
-                <div className="overflow-x-auto">
-                  <MaterialsTable
-                    materials={order?.materials ?? []}
-                    variant="detail"
-                    showImage
-                    emptyText={MATERIALS_TABLE_EMPTY_TEXT.detail}
-                  />
-                </div>
-              </div>
+              </form>
             </div>
 
-            <div className="space-y-6">
-              {isOwner && (
-                <CustomerInfoCard
-                  order={order}
-                  profile={customerProfile}
-                  title="Thông tin bổ sung"
-                  nameLabel="Khách hàng"
-                  phoneLabel="SĐT"
-                  addressLabel="Địa chỉ"
-                />
-              )}
-
-              <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-5">
-                <DesignTemplatesSection
-                  templates={order?.templates ?? order?.template ?? order?.files ?? []}
-                  title="Mẫu thiết kế"
-                />
-              </div>
-            </div>
+            <OrderSpecificationCard
+              order={order}
+              onImageClick={(url) => {
+                setZoomImageUrl(url);
+                setIsImageModalOpen(true);
+              }}
+            />
           </div>
         </div>
       </div>

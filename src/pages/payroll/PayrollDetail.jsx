@@ -44,7 +44,7 @@ export default function PayrollDetail() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const aggregated = await fetchAggregatedPayroll(month, year);
+        const aggregated = await fetchAggregatedPayroll(month, year, refreshKey > 0);
         const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(workerId));
         if (active) {
           setLogs(workerData?.logs || []);
@@ -52,7 +52,6 @@ export default function PayrollDetail() {
       } catch (err) {
         if (active) {
           setError(getErrorMessage(err, "Không thể tải chi tiết lương."));
-          console.error(err);
         }
       } finally {
         if (active) setLoading(false);
@@ -80,40 +79,60 @@ export default function PayrollDetail() {
     setIsConfirmOpen(false);
     try {
       setIsPaying(true);
-      
-      // Filter ONLY unpaid logs before grouping
-      const unpaidLogs = workerLogs.filter(l => !(l.isPayment || !!l.paidAt));
+
+      const unpaidLogs = workerLogs.filter(l =>
+        !(l.isPayment || !!l.paidAt) &&
+        l.isReadOnly === true
+      );
       if (unpaidLogs.length === 0) {
         toast.info("Không có công đoạn mới nào cần thanh toán.");
         return;
       }
 
-      // Group logically by partId
+      // Group by both partId and partOrderSizeId
       const groups = unpaidLogs.reduce((acc, log) => {
-        const pId = log.partId;
+        const pId = log.productionPartId || log.partId;
+        const variantId = log.partOrderSizeId;
         if (!pId) return acc;
-        if (!acc[pId]) acc[pId] = [];
-        acc[pId].push(log.id || log.workLogId || log.wlId);
+
+        const groupKey = `${pId}_${variantId || 0}`;
+        if (!acc[groupKey]) {
+          acc[groupKey] = {
+            partId: pId,
+            variantId: variantId,
+            logIds: []
+          };
+        }
+        acc[groupKey].logIds.push(log.id || log.workLogId || log.wlId);
         return acc;
       }, {});
 
-      const promises = Object.entries(groups).map(([partId, logIds]) =>
-        ProductionPartService.completePayment(partId, { workLogIds: logIds })
+      const promises = Object.values(groups).map(group =>
+        ProductionPartService.completePayment(Number(group.partId), group.variantId, { workLogIds: group.logIds })
       );
 
       await Promise.all(promises);
       setIsSuccessOpen(true);
       setRefreshKey(prev => prev + 1);
     } catch (err) {
-      toast.error(getErrorMessage(err, "Thanh toán thất bại."));
+      console.error("Payment Error:", err.response || err);
+      const data = err.response?.data;
+      let msg = "Thanh toán thất bại: ";
+      if (data?.errors) msg += Object.values(data.errors).flat().join(", ");
+      else if (data?.message) msg += data.message;
+      else if (typeof data === "string") msg += data;
+      else msg += data?.title || "Lỗi tham số hoặc không xác định (400)";
+
+      toast.error(msg, { autoClose: 6000 });
     } finally {
       setIsPaying(false);
     }
   };
 
   const workerLogs = useMemo(() => {
-    // If we have logs from state but navigate directly, this ensures we filter correctly
-    return getWorkerMonthlyDetail(logs, workerId, month, year);
+    // Sort by reportDate descending (latest first)
+    const detailedLogs = getWorkerMonthlyDetail(logs, workerId, month, year);
+    return [...detailedLogs].sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
   }, [logs, workerId, month, year]);
 
   const filteredLogs = useMemo(() => {
@@ -127,16 +146,18 @@ export default function PayrollDetail() {
   const stats = useMemo(() => {
     const totalQty = workerLogs.reduce((sum, log) => sum + (log.quantity || 0), 0);
     const uniquePartCount = new Set(workerLogs.map(l => l.partId).filter(Boolean)).size;
-    
-    // Total Salary in Month
-    const totalSalary = workerLogs.reduce((sum, log) => sum + (log.quantity || 0) * (log.cpu || 0), 0);
-    
+
     const totalPaid = workerLogs.reduce((sum, log) => {
       const isPaid = log.isPayment || !!log.paidAt;
       return isPaid ? sum + (log.quantity || 0) * (log.cpu || 0) : sum;
     }, 0);
-    
-    const totalUnpaid = totalSalary - totalPaid;
+
+    // Total Salary should only count APPROVED logs
+    const totalSalary = workerLogs.reduce((sum, log) => {
+      return log.isReadOnly ? sum + (log.quantity || 0) * (log.cpu || 0) : sum;
+    }, 0);
+
+    const totalUnpaid = Math.max(0, totalSalary - totalPaid);
 
     const firstLog = workerLogs[0];
     const workerName = firstLog?.workerFullName || firstLog?.workerName || workerId;
@@ -154,7 +175,13 @@ export default function PayrollDetail() {
     if (!dateStr) return "-";
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("vi-VN");
+      return d.toLocaleDateString("vi-VN", {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch {
       return dateStr;
     }
@@ -294,7 +321,7 @@ export default function PayrollDetail() {
                 <Info size={16} className="text-slate-400" />
                 <h2 className="leave-table-card__title">Danh sách công đoạn đã làm trong tháng</h2>
               </div>
-              
+
               <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                 <div className="flex items-center gap-2 px-2 text-slate-400">
                   <Filter size={14} />
@@ -309,11 +336,10 @@ export default function PayrollDetail() {
                     <button
                       key={btn.id}
                       onClick={() => { setStatusFilter(btn.id); setCurrentPage(1); }}
-                      className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-lg transition-all ${
-                        statusFilter === btn.id
+                      className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-tight rounded-lg transition-all ${statusFilter === btn.id
                         ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-emerald-100'
                         : 'text-slate-500 hover:bg-white/50'
-                      }`}
+                        }`}
                     >
                       {btn.label}
                     </button>
@@ -340,10 +366,11 @@ export default function PayrollDetail() {
                     <tr className="bg-slate-50/50">
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Ngày ghi nhận</th>
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn hàng / Sản xuất</th>
-                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn</th>
+                      <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Công đoạn & Biến thể</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Đơn giá</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số lượng</th>
-                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Trạng thái</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Nghiệm thu</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thanh toán</th>
                       <th className="px-6 py-4 text-right font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thành tiền</th>
                     </tr>
                   </thead>
@@ -376,6 +403,11 @@ export default function PayrollDetail() {
                           </td>
                           <td className="px-6 py-5">
                             <div className="font-bold text-slate-700">{log.partName}</div>
+                            {log.variantName && log.variantName !== " / " && (
+                              <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
+                                {log.variantName}
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-5 text-center text-slate-600 font-black">
                             {Number(log.cpu).toLocaleString("vi-VN")}
@@ -384,6 +416,18 @@ export default function PayrollDetail() {
                             <span className="inline-flex h-9 w-12 items-center justify-center rounded-xl bg-blue-50/50 border border-blue-100 font-black text-blue-700 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-lg group-hover:shadow-blue-200 transition-all duration-300 transform group-hover:scale-110">
                               {log.quantity}
                             </span>
+                          </td>
+                          <td className="px-6 py-5 text-center whitespace-nowrap">
+                            {log.isReadOnly ? (
+                              <div className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-sky-50 text-sky-700 rounded-xl border border-sky-100 font-black text-[9px] uppercase">
+                                <CheckCircle2 size={12} />
+                                Đã nghiệm thu
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 bg-slate-50 text-slate-400 rounded-xl border border-slate-100 font-black text-[9px] uppercase italic">
+                                Chờ nghiệm thu
+                              </div>
+                            )}
                           </td>
                           <td className="px-6 py-5 text-center whitespace-nowrap">
                             {log.isPayment || log.paidAt ? (
@@ -398,21 +442,14 @@ export default function PayrollDetail() {
                               </div>
                             )}
                           </td>
-                          <td className="px-6 py-5 text-right font-black text-emerald-700 text-base">
-                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className="text-[10px] opacity-50 ml-0.5">VND</span>
+                          <td className={`px-6 py-5 text-right font-black text-base ${log.isReadOnly ? 'text-emerald-700' : 'text-slate-300'}`}>
+                            {(log.quantity * log.cpu).toLocaleString("vi-VN")} <span className={`text-[10px] uppercase ml-0.5 ${log.isReadOnly ? 'opacity-50' : 'opacity-30'}`}>VND</span>
                           </td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                  <tfoot className="bg-slate-50/80 font-black">
-                    <tr>
-                      <td colSpan={6} className="px-6 py-4 text-right text-slate-400 uppercase tracking-widest text-[10px]">Tổng cộng thu nhập (Trên kết quả lọc)</td>
-                      <td className="px-6 py-4 text-right text-emerald-800 text-lg">
-                        {filteredLogs.reduce((sum, log) => sum + (log.quantity * log.cpu), 0).toLocaleString("vi-VN")} VND
-                      </td>
-                    </tr>
-                  </tfoot>
+
                 </table>
               )}
             </div>

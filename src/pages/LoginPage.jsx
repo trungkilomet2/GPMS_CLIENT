@@ -194,6 +194,19 @@ export default function LoginPage() {
             ← Về trang chủ
           </button>
 
+          <div className="login-mobile-hero">
+            <div className="login-mobile-hero__brand">
+              <div className="brand-logo">🏭</div>
+              <div className="brand-text">
+                <h2>GPMS</h2>
+                <p>Quản lý sản xuất may mặc</p>
+              </div>
+            </div>
+            <p className="login-mobile-hero__desc">
+              Đăng nhập nhanh để tiếp tục theo dõi đơn hàng, nhân sự và tiến độ sản xuất.
+            </p>
+          </div>
+
           <h2>Đăng nhập</h2>
           <p>Chào mừng trở lại! Vui lòng đăng nhập để tiếp tục</p>
 

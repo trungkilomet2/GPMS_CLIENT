@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Pencil, ShieldCheck } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { getAdminLogs } from "@/lib/admin/adminMockStore";
 import AdminUserService, { getAdminRoleProfile, getAdminUserErrorMessage } from "@/services/AdminUserService";
+import LogService from "@/services/LogService";
 import {
   AdminBanner,
   AdminOutcomeBadge,
@@ -13,6 +13,66 @@ import {
   formatAdminDateTime,
   getAdminInitials,
 } from "@/pages/admin/adminShared";
+
+function normalizeSearchText(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+function extractPropertyValue(properties = "", key = "") {
+  if (!properties || !key) return "";
+
+  const escapedKey = String(key).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`<property key='${escapedKey}'>([\\s\\S]*?)<\\/property>`, "i");
+  const match = String(properties).match(pattern);
+  if (!match) return "";
+
+  return match[1]
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&gt;/g, ">")
+    .replace(/&lt;/g, "<")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeLogItem(item = {}) {
+  const properties = String(item.properties ?? "").trim();
+  const level = String(item.level ?? "Information").trim();
+  const hasException = Boolean(String(item.exception ?? "").trim());
+
+  return {
+    id: item.id ?? Math.random().toString(36).slice(2),
+    action:
+      extractPropertyValue(properties, "ActionName") ||
+      String(item.messageTemplate ?? item.message ?? "Hoạt động hệ thống").trim(),
+    description:
+      String(item.message ?? "").trim() ||
+      String(item.messageTemplate ?? "").trim() ||
+      "Hệ thống đã ghi nhận một thay đổi liên quan tới tài khoản này.",
+    timestamp: item.timeStemp ?? item.timeStamp ?? item.timestamp ?? item.createdAt ?? "",
+    severity: level.toLowerCase() === "warning" ? "warning" : hasException || level.toLowerCase() === "error" ? "danger" : "info",
+    outcome: hasException || level.toLowerCase() === "error" ? "failure" : level.toLowerCase() === "warning" ? "warning" : "success",
+    searchableText: normalizeSearchText(
+      [
+        item.message,
+        item.messageTemplate,
+        properties,
+        extractPropertyValue(properties, "RequestPath"),
+        extractPropertyValue(properties, "UserName"),
+        extractPropertyValue(properties, "ActionName"),
+        extractPropertyValue(properties, "TargetId"),
+      ].join(" ")
+    ),
+  };
+}
 
 export default function AdminUserDetail() {
   const { id } = useParams();
@@ -26,6 +86,7 @@ export default function AdminUserDetail() {
   const [isDisabling, setIsDisabling] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
   const [reloadSeed, setReloadSeed] = useState(0);
+  const [activityLogs, setActivityLogs] = useState([]);
   const permissionProfile = useMemo(() => (user ? getAdminRoleProfile(user.roleKey) : null), [user]);
 
   useEffect(() => {
@@ -76,12 +137,52 @@ export default function AdminUserDetail() {
     };
   }, [id, reloadSeed]);
 
-  const relatedLogs = useMemo(() => {
-    if (!user) return [];
+  useEffect(() => {
+    let mounted = true;
 
-    return getAdminLogs()
-      .filter((log) => log.actorUserId === user.id || log.targetId === user.id)
-      .slice(0, 6);
+    const fetchRelatedLogs = async () => {
+      if (!user?.id) {
+        if (mounted) setActivityLogs([]);
+        return;
+      }
+
+      try {
+        const response = await LogService.getAllPages({
+          pageSize: 100,
+          pageIndex: 0,
+          sortColumn: "Name",
+          sortOrder: "DESC",
+        });
+
+        if (!mounted) return;
+
+        const userIdText = String(user.id);
+        const userNameText = normalizeSearchText(user.userName);
+        const fullNameText = normalizeSearchText(user.fullName);
+
+        const matchedLogs = (Array.isArray(response?.data) ? response.data : [])
+          .map(normalizeLogItem)
+          .filter((log) => {
+            const haystack = log.searchableText;
+            return (
+              haystack.includes(userIdText) ||
+              (userNameText && haystack.includes(userNameText)) ||
+              (fullNameText && haystack.includes(fullNameText))
+            );
+          })
+          .slice(0, 6);
+
+        setActivityLogs(matchedLogs);
+      } catch {
+        if (mounted) setActivityLogs([]);
+      }
+    };
+
+    fetchRelatedLogs();
+
+    return () => {
+      mounted = false;
+    };
   }, [user]);
 
   const handleRetry = () => {
@@ -387,14 +488,14 @@ export default function AdminUserDetail() {
                     </Link>
                   </div>
 
-                  {relatedLogs.length === 0 ? (
+                  {activityLogs.length === 0 ? (
                     <div className="admin-note-box">
                       <strong>Chưa có log liên quan</strong>
-                      <p>Hiện chưa ghi nhận hoạt động mới cho tài khoản này hoặc nhật ký chưa khớp với mã từ hệ thống.</p>
+                      <p>Hiện chưa có nhật ký hệ thống khớp với tài khoản này hoặc dữ liệu log chưa trả đủ thông tin nhận diện.</p>
                     </div>
                   ) : (
                     <div className="admin-timeline">
-                      {relatedLogs.map((log) => (
+                      {activityLogs.map((log) => (
                         <div key={log.id} className="admin-timeline__item">
                           <div className="admin-timeline__item-top">
                             <div>

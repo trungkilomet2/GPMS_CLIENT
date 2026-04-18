@@ -7,7 +7,7 @@ import OrderService from '@/services/OrderService';
 import { getStoredUser } from '@/lib/authStorage';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
-import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
@@ -28,7 +28,6 @@ export default function EditOrder() {
         userId,
         image: '',
         orderName: '',
-        type: '',
         size: '',
         color: '',
         startDate: '',
@@ -65,6 +64,10 @@ export default function EditOrder() {
         title: '',
         desc: ''
     });
+    const [variants, setVariants] = useState([
+        { id: 1, color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+    ]);
+    const [initialVariants, setInitialVariants] = useState([]);
     const [initialState, setInitialState] = useState(null);
 
     const normalizeMaterial = (m = {}) => {
@@ -97,7 +100,6 @@ export default function EditOrder() {
         const formattedData = {
             ...data,
             orderName: data.orderName || data.OrderName || '',
-            type: data.type || data.Type || '',
             size: String(data.size || data.Size || '').trim().toUpperCase(),
             color: data.color || data.Color || '',
             note: data.note || data.Note || '',
@@ -109,6 +111,65 @@ export default function EditOrder() {
 
         setOrderData((prev) => ({ ...prev, ...formattedData }));
         setMaterials((data.materials || []).map(normalizeMaterial));
+
+        // Handle Variants / Sizes (Matrix Mapping)
+        const rawSizes = data.size || data.sizes || [];
+        const horizontalVariants = data.variants || data.orderVariants || data.orderItemVariants || [];
+        let parsedVariants = [];
+
+        if (Array.isArray(rawSizes) && rawSizes.length > 0) {
+            const grouped = {};
+            const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+            rawSizes.forEach((item, idx) => {
+                const colorLabel = item.color || item.Color || 'Mặc định';
+                if (!grouped[colorLabel]) {
+                    grouped[colorLabel] = {
+                        id: `variant-${idx}-${Date.now()}`,
+                        color: colorLabel,
+                        xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+                    };
+                }
+                const key = SIZE_ID_TO_KEY[item.sizeId];
+                if (key) {
+                    grouped[colorLabel][key] = Number(item.quantity) || 0;
+                }
+            });
+            parsedVariants = Object.values(grouped);
+        } else if (Array.isArray(horizontalVariants) && horizontalVariants.length > 0) {
+            parsedVariants = horizontalVariants.map((v, idx) => ({
+                id: v.id || idx + 1,
+                color: v.color || '',
+                xs: Number(v.xs || v.XS || 0),
+                s: Number(v.s || v.S || 0),
+                m: Number(v.m || v.M || 0),
+                l: Number(v.l || v.L || 0),
+                xl: Number(v.xl || v.XL || 0),
+                '2xl': Number(v['2xl'] || v['2XL'] || 0),
+                '3xl': Number(v['3xl'] || v['3XL'] || 0),
+            }));
+        } else if (formattedData.color || formattedData.size) {
+            // Fallback: Create one variant from legacy root fields
+            const sKey = String(formattedData.size || '').toLowerCase();
+            const record = {
+                id: 'legacy-1',
+                color: formattedData.color || 'Mặc định',
+                xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+            };
+            if (sKey && record[sKey] !== undefined) {
+                record[sKey] = Number(formattedData.quantity) || 0;
+            } else {
+                record.s = Number(formattedData.quantity) || 0;
+            }
+            parsedVariants = [record];
+        }
+
+        // If still empty, ensure at least one empty row
+        if (parsedVariants.length === 0) {
+            parsedVariants = [{ id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }];
+        }
+
+        setVariants(parsedVariants);
+        setInitialVariants(JSON.parse(JSON.stringify(parsedVariants)));
 
         const rawTemplates = data.templates ?? data.template ?? data.Templates ?? [];
         const templatesArr = Array.isArray(rawTemplates) ? rawTemplates : [];
@@ -127,13 +188,66 @@ export default function EditOrder() {
             }))
             .filter((t) => t.file);
         setTemplateItems(items);
-        
+
         // Save initial state for comparison
         setInitialState({
             orderData: { ...formattedData },
             materials: (data.materials || []).map(normalizeMaterial),
-            templateItems: [...items]
+            templateItems: [...items],
+            variants: JSON.parse(JSON.stringify(parsedVariants))
         });
+    };
+
+    useEffect(() => {
+        const total = variants.reduce((acc, v) => {
+            const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+            return acc + sum;
+        }, 0);
+        if (orderData.quantity !== total) {
+            setOrderData(prev => ({ ...prev, quantity: total }));
+        }
+    }, [variants]);
+
+    const handleAddVariant = () => {
+        setVariants(prev => [
+            ...prev,
+            { id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+        ]);
+    };
+
+    const handleRemoveVariant = (index) => {
+        if (variants.length <= 1) return;
+        setDeleteConfirm({
+            show: true,
+            type: 'variant',
+            index: index,
+            title: 'Xóa phối màu',
+            desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các kích thước của phối màu này sẽ bị mất.'
+        });
+    };
+
+    const handleVariantChange = (index, field, value) => {
+        setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+
+        if (errors.variantsGlobal) {
+            setErrors(prev => {
+                const next = { ...prev };
+                delete next.variantsGlobal;
+                return next;
+            });
+        }
+        if (errors.variants?.[index]?.[field]) {
+            setErrors(prev => {
+                const next = { ...prev };
+                const nextVariantsErrors = { ...next.variants };
+                delete nextVariantsErrors[index][field];
+                if (Object.keys(nextVariantsErrors[index]).length === 0) {
+                    delete nextVariantsErrors[index];
+                }
+                next.variants = nextVariantsErrors;
+                return next;
+            });
+        }
     };
 
     useEffect(() => {
@@ -175,21 +289,29 @@ export default function EditOrder() {
             newErrors.orderName = 'Tên đơn hàng không được vượt quá 100 ký tự';
         }
 
-        // TYPE
-        if (!orderData.type?.trim()) {
-            newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
-        } else if (orderData.type.trim().length > 50) {
-            newErrors.type = 'Loại sản phẩm không được vượt quá 50 ký tự';
+
+
+        // VARIANTS VALIDATION
+        const variantErrors = [];
+        let hasAnyQuantity = false;
+        variants.forEach((v, idx) => {
+            const vErrs = {};
+            if (!v.color?.trim()) {
+                vErrs.color = 'Vui lòng nhập tên màu';
+            }
+            const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+            if (sum > 0) hasAnyQuantity = true;
+
+            if (Object.keys(vErrs).length > 0) {
+                variantErrors[idx] = vErrs;
+            }
+        });
+
+        if (variantErrors.length > 0) {
+            newErrors.variants = variantErrors;
         }
-
-        // SIZE
-        if (!orderData.size?.trim()) newErrors.size = 'Vui lòng chọn kích thước';
-
-        // COLOR
-        if (!orderData.color?.trim()) {
-            newErrors.color = 'Màu sắc không được để trống';
-        } else if (orderData.color.trim().length > 30) {
-            newErrors.color = 'Màu sắc không được vượt quá 30 ký tự';
+        if (!hasAnyQuantity) {
+            newErrors.variantsGlobal = 'Vui lòng nhập ít nhất một kích thước có số lượng > 0';
         }
 
         // QUANTITY
@@ -262,7 +384,6 @@ export default function EditOrder() {
             const materialErrors = [];
             materials.forEach((m, idx) => {
                 const mErrs = {};
-                if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
                 if (!m.materialName?.trim()) {
                     mErrs.materialName = 'Tên vật liệu là bắt buộc';
                 } else if (m.materialName.trim().length > 150) {
@@ -440,7 +561,7 @@ export default function EditOrder() {
                 let reason = "Định dạng không hỗ trợ";
                 if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
                 else if (!isNameOk) reason = "Tên file quá 255 ký tự";
-                
+
                 invalid.push(`${file.name} (${reason})`);
             }
         });
@@ -496,25 +617,47 @@ export default function EditOrder() {
         const { type, index } = deleteConfirm;
         if (type === 'template') {
             setTemplateItems((prev) => prev.filter((_, i) => i !== index));
+            if (errors.templates) {
+                setErrors((prev) => {
+                    const newTemplates = { ...prev.templates };
+                    delete newTemplates[index];
+                    const adjusted = {};
+                    Object.keys(newTemplates).forEach((key) => {
+                        const k = parseInt(key);
+                        if (k > index) adjusted[k - 1] = newTemplates[key];
+                        else adjusted[k] = newTemplates[key];
+                    });
+                    return { ...prev, templates: adjusted };
+                });
+            }
         } else if (type === 'material') {
             setMaterials((prev) => prev.filter((_, i) => i !== index));
             if (errors.materialsList) {
                 setErrors((prev) => {
                     const newMaterialsList = { ...prev.materialsList };
                     delete newMaterialsList[index];
-                    
-                    // Shift subsequent errors back
                     const adjustedList = {};
-                    Object.keys(newMaterialsList).forEach(key => {
+                    Object.keys(newMaterialsList).forEach((key) => {
                         const k = parseInt(key);
-                        if (k > index) {
-                            adjustedList[k - 1] = newMaterialsList[key];
-                        } else {
-                            adjustedList[k] = newMaterialsList[key];
-                        }
+                        if (k > index) adjustedList[k - 1] = newMaterialsList[key];
+                        else adjustedList[k] = newMaterialsList[key];
                     });
-                    
                     return { ...prev, materialsList: adjustedList };
+                });
+            }
+        } else if (type === 'variant') {
+            setVariants((prev) => prev.filter((_, i) => i !== index));
+            if (errors.variants) {
+                setErrors((prev) => {
+                    const newVariants = { ...prev.variants };
+                    delete newVariants[index];
+                    const adjusted = {};
+                    Object.keys(newVariants).forEach((key) => {
+                        const k = parseInt(key);
+                        if (k > index) adjusted[k - 1] = newVariants[key];
+                        else adjusted[k] = newVariants[key];
+                    });
+                    return { ...prev, variants: adjusted };
                 });
             }
         }
@@ -540,7 +683,7 @@ export default function EditOrder() {
         }
 
         // Compare orderData basic fields
-        const fields = ['orderName', 'type', 'size', 'color', 'startDate', 'endDate', 'quantity', 'cpu', 'note'];
+        const fields = ['orderName', 'size', 'color', 'startDate', 'endDate', 'quantity', 'cpu', 'note'];
         const isOrderDataChanged = fields.some(f => {
             const current = orderData[f];
             const initial = initialState.orderData[f];
@@ -562,18 +705,8 @@ export default function EditOrder() {
         });
         if (areMaterialsChanged) return true;
 
-        // Compare templates
-        if (templateItems.length !== initialState.templateItems.length) return true;
-        const areTemplatesChanged = templateItems.some((t, idx) => {
-            const initT = initialState.templateItems[idx];
-            const tFields = ['templateName', 'type', 'file', 'note'];
-            return tFields.some(f => {
-                const current = t[f];
-                const initial = initT[f];
-                return String(current ?? '').trim() !== String(initial ?? '').trim();
-            });
-        });
-        if (areTemplatesChanged) return true;
+        // Compare variants
+        if (JSON.stringify(variants) !== JSON.stringify(initialState.variants)) return true;
 
         return false;
     };
@@ -649,40 +782,66 @@ export default function EditOrder() {
                 });
             }
 
+            const sizesPayload = [];
+            const SIZE_ID_MAP = {
+                'xs': 1,
+                's': 2,
+                'm': 3,
+                'l': 4,
+                'xl': 5,
+                '2xl': 6,
+                '3xl': 7
+            };
+
+            variants.forEach(v => {
+                ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(sizeKey => {
+                    const qty = Number(v[sizeKey]) || 0;
+                    if (qty > 0) {
+                        sizesPayload.push({
+                            sizeId: SIZE_ID_MAP[sizeKey],
+                            color: v.color?.trim() || '',
+                            quantity: qty
+                        });
+                    }
+                });
+            });
+
             const payload = {
-                userId: Number(orderData.userId ?? userId) || 0,
-                image: orderImageUrl || null,
-                orderName: orderData.orderName ?? '',
-                type: orderData.type ?? '',
-                size: orderData.size ?? '',
-                color: orderData.color ?? '',
-                startDate: orderData.startDate ?? '',
-                endDate: orderData.endDate ?? '',
+                orderName: orderData.orderName?.trim() || '',
+                startDate: orderData.startDate || null,
+                endDate: orderData.endDate || null,
                 quantity: Number(orderData.quantity) || 0,
                 cpu: Number(orderData.cpu) || 0,
-                note: orderData.note ?? '',
-                materials: materialsPayload,
-                templates: templatesPayload,
+                image: orderImageUrl || '',
+                note: orderData.note?.trim() || '',
+                sizes: sizesPayload,
+                templates: templatesPayload.map(t => ({
+                    templateName: t.templateName,
+                    type: "SOFT", // Mapping "SOFT" as standard technical requirement
+                    file: t.file,
+                    quantity: 1, // Defaulting to 1 as specified in dynamic structures
+                    note: t.note
+                })),
+                materials: materialsPayload.map(m => ({
+                    materialName: m.materialName,
+                    color: m.color,
+                    image: m.image || '',
+                    value: Number(m.value) || 0,
+                    note: m.note,
+                    uom: m.uom
+                }))
             };
 
             await OrderService.updateOrder(id, payload);
             setIsSuccessOpen(true);
         } catch (error) {
-            console.error('Lỗi API:', error.response?.data || error.message);
-            const data = error.response?.data;
-            let errorMsg = 'Không thể kết nối đến máy chủ';
+            console.error('--- LỖI API CHI TIẾT (EditOrder) ---');
+            console.error('Status:', error?.response?.status);
+            console.error('Data từ Backend:', error?.response?.data);
+            console.error('Message:', error?.message);
 
-            if (data) {
-                if (data.errors) {
-                    errorMsg = Object.values(data.errors)
-                        .flat()
-                        .map(translateError)
-                        .join(' - ');
-                } else {
-                    errorMsg = translateError(data.detail || data.title || error.message);
-                }
-            }
-            toast.error('Lỗi: ' + errorMsg);
+            const errMsg = getErrorMessage(error, 'Không thể cập nhật đơn hàng');
+            toast.error('Lỗi: ' + errMsg);
         } finally {
             setIsSubmitting(false);
         }
@@ -763,21 +922,17 @@ export default function EditOrder() {
                                 onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
                                 editingIndex,
                             }}
+                            variants={variants}
+                            onAddVariant={handleAddVariant}
+                            onRemoveVariant={handleRemoveVariant}
+                            onVariantChange={handleVariantChange}
                         />
                     </form>
 
-                    <OrderSuccessModal
+                    <SuccessModal
                         isOpen={isSuccessOpen}
-                        title="Cập nhật thành công!"
-                        description={`Đơn hàng #${id} đã được cập nhật thông tin.`}
-                        onClose={() => {
-                            setIsSuccessOpen(false);
-                            navigate(`/orders/detail/${id}`);
-                        }}
-                        onConfirm={() => {
-                            setIsSuccessOpen(false);
-                            navigate(`/orders/detail/${id}`);
-                        }}
+                        onClose={() => navigate(`/orders/detail/${id}`)}
+                        message="Đơn hàng đã được cập nhật thành công!"
                     />
 
                     <ConfirmModal
@@ -786,6 +941,7 @@ export default function EditOrder() {
                         description={deleteConfirm.desc}
                         onConfirm={executeDelete}
                         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+                        variant="danger"
                     />
                 </div>
             </div>

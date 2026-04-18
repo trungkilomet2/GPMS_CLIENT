@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { userService } from "@/services/userService";
+import { userService } from "@/services/UserService";
 import OrderService from "@/services/OrderService";
+import { authService } from "@/services/authService";
 import Header from "@/components/Header";
 import { clearAuthStorage, getAuthItem, getStoredUser } from "@/lib/authStorage";
 
@@ -133,10 +134,11 @@ function NavItem({ icon, label, active, onClick }) {
 }
 
 function SectionInfo({ user, onViewOrders, onCreateOrder }) {
+  const resolvedLocation = user.location || user.address || "";
   const customerProfileRows = [
-    ["👤", "Người đại diện", user.fullName || user.name],
+    ["👤", "Họ và tên", user.fullName || user.name],
     ["✉️", "Email", user.email],
-    ["📍", "Địa chỉ", user.address],
+    ["📍", "Địa chỉ", resolvedLocation],
   ];
 
   const orderSummaryRows = [
@@ -185,14 +187,46 @@ function SectionSecurity() {
   const [form,setForm] = useState({current:"",next:"",confirm:""});
   const [msg,setMsg]   = useState(null);
   const [show,setShow] = useState({current:false,next:false,confirm:false});
+  const [submitting,setSubmitting] = useState(false);
   const handle = e => setForm(p=>({...p,[e.target.name]:e.target.value}));
-  const submit = e => {
+
+  const getErrorMessage = (error) => {
+    const data = error?.response?.data;
+    if (typeof data === "string" && data.trim()) return data.trim();
+    if (typeof data?.message === "string" && data.message.trim()) return data.message.trim();
+    if (typeof data?.title === "string" && data.title.trim()) return data.title.trim();
+
+    const errors = data?.errors;
+    if (errors && typeof errors === "object") {
+      const firstEntry = Object.values(errors).find((value) => Array.isArray(value) && value.length > 0);
+      if (firstEntry) return String(firstEntry[0]);
+    }
+
+    return "Không thể đổi mật khẩu lúc này. Vui lòng thử lại.";
+  };
+
+  const submit = async (e) => {
     e.preventDefault();
+    if(!form.current.trim())     return setMsg({ok:false,text:"Vui lòng nhập mật khẩu hiện tại."});
     if(form.next!==form.confirm) return setMsg({ok:false,text:"Mật khẩu mới không khớp."});
     if(form.next.length<6)       return setMsg({ok:false,text:"Mật khẩu phải ít nhất 6 ký tự."});
-    setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
-    setForm({current:"",next:"",confirm:""});
-    setTimeout(()=>setMsg(null),3000);
+
+    try {
+      setSubmitting(true);
+      setMsg(null);
+      await authService.changePassword({
+        currentPassword: form.current,
+        newPassword: form.next,
+        confirmPassword: form.confirm,
+      });
+      setMsg({ok:true,text:"Đổi mật khẩu thành công!"});
+      setForm({current:"",next:"",confirm:""});
+      setTimeout(()=>setMsg(null),3000);
+    } catch (error) {
+      setMsg({ ok:false, text:getErrorMessage(error) });
+    } finally {
+      setSubmitting(false);
+    }
   };
   const fields = [
     {name:"current",label:"Mật khẩu hiện tại", placeholder:"Nhập mật khẩu hiện tại"},
@@ -217,11 +251,13 @@ function SectionSecurity() {
                 value={form[f.name]}
                 onChange={handle}
                 placeholder={f.placeholder}
+                disabled={submitting}
                 style={{width:"100%",padding:".65rem 2.8rem .65rem .9rem",border:`1.5px solid ${T.border}`,borderRadius:8,fontSize:".88rem",outline:"none",background:T.white}}
               />
               <button
                 type="button"
                 onClick={() => setShow((p) => ({ ...p, [f.name]: !p[f.name] }))}
+                disabled={submitting}
                 style={{
                   position:"absolute",
                   right:10,
@@ -240,7 +276,7 @@ function SectionSecurity() {
             </div>
           </div>
         ))}
-        <BtnPrimary>🔒 Cập nhật mật khẩu</BtnPrimary>
+        <BtnPrimary disabled={submitting}>{submitting ? "Đang cập nhật..." : "🔒 Cập nhật mật khẩu"}</BtnPrimary>
       </form>
     </CardSection>
   );
@@ -320,6 +356,7 @@ export default function ViewProfile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [warning, setWarning] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -333,18 +370,62 @@ export default function ViewProfile() {
 
       setLoading(true);
       setError(null);
+      setWarning(null);
       const userId = getCurrentUserId();
+      const storedUser = getStoredUser() || {};
 
-      Promise.all([
+      Promise.allSettled([
         userService.getProfile(),
-        userId ? OrderService.getOrdersByUser().catch(() => []) : Promise.resolve([]),
+        userId ? OrderService.getOrdersByUser() : Promise.resolve([]),
       ])
-        .then(([profileData, ordersResponse]) => {
+        .then(([profileResult, ordersResult]) => {
           if (!active) return;
-          const orders = ordersResponse?.data || ordersResponse || [];
+
+          const profileData =
+            profileResult?.status === "fulfilled"
+              ? profileResult.value
+              : null;
+
+          const fallbackProfile =
+            storedUser && (storedUser.fullName || storedUser.name || storedUser.email)
+              ? {
+                  fullName: storedUser.fullName || storedUser.name || "",
+                  name: storedUser.name || storedUser.fullName || "",
+                  email: storedUser.email || "",
+                  location: storedUser.location || storedUser.address || "",
+                  address: storedUser.address || storedUser.location || "",
+                  avatarUrl: storedUser.avatarUrl || "",
+                }
+              : null;
+
+          const resolvedProfile = profileData || fallbackProfile;
+
+          if (!resolvedProfile) {
+            const err = profileResult?.reason;
+            if (err?.response?.data?.status === 401 || err?.status === 401) {
+              clearAuthStorage();
+              navigate("/login");
+              return;
+            }
+            setError(err?.response?.data?.message || "Không thể tải hồ sơ.");
+            return;
+          }
+
+          const ordersSource =
+            ordersResult?.status === "fulfilled"
+              ? (ordersResult.value?.data || ordersResult.value || [])
+              : [];
+
+          if (profileResult?.status !== "fulfilled") {
+            setWarning("Không tải được hồ sơ mới nhất từ server. Đang hiển thị dữ liệu đã lưu gần nhất.");
+          } else if (ordersResult?.status !== "fulfilled") {
+            setWarning("Không tải được danh sách đơn hàng lúc này. Thông tin hồ sơ vẫn hiển thị bình thường.");
+          }
+
+          const orders = Array.isArray(ordersSource) ? ordersSource : [];
           setProfile({
-            ...profileData,
-            ...buildOrderSummary(Array.isArray(orders) ? orders : []),
+            ...resolvedProfile,
+            ...buildOrderSummary(orders),
           });
         })
         .catch(err => {
@@ -447,6 +528,21 @@ export default function ViewProfile() {
           position:"relative",zIndex:1,
         }}
       >
+        {warning ? (
+          <div style={{
+            gridColumn:"1 / -1",
+            marginBottom: "0.25rem",
+            border:`1px solid ${T.border}`,
+            background:T.light,
+            color:T.mid,
+            borderRadius:12,
+            padding:"0.85rem 1rem",
+            fontSize:".84rem",
+            fontWeight:600,
+          }}>
+            {warning}
+          </div>
+        ) : null}
         {/* Sidebar */}
         <aside style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
           {/* Nav tabs */}

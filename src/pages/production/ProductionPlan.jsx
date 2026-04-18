@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical, Save, LogOut, CheckCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Pencil, Loader2, GripVertical, Save, LogOut, CheckCircle, Info } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ProductionPartService from "@/services/ProductionPartService";
@@ -12,6 +12,8 @@ import { getProductionStatusLabel } from "@/utils/statusUtils";
 import { getErrorMessage } from "@/utils/errorUtils";
 import SuccessModal from "@/components/SuccessModal";
 import ConfirmModal from "@/components/ConfirmModal";
+import OrderSpecificationCard from "@/components/orders/OrderSpecificationCard";
+import OrderImageZoomModal from "@/pages/orders/components/OrderImageZoomModal";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
@@ -265,16 +267,33 @@ export default function ProductionPlan() {
 
   const [rows, setRows] = useState(() => {
     if (incoming && Array.isArray(incoming.steps) && incoming.steps.length > 0) {
-      const initial = incoming.steps.map((s, idx) => ({
+      const stageGroups = {};
+      incoming.steps.forEach((s) => {
+        const name = String(s.partName || "").trim();
+        const key = name.toUpperCase();
+        if (!stageGroups[key]) {
+          stageGroups[key] = {
+            ...s,
+            allIds: [s.partId || s.id].filter(Boolean)
+          };
+        } else {
+          const id = s.partId || s.id;
+          if (id && !stageGroups[key].allIds.includes(id)) {
+            stageGroups[key].allIds.push(id);
+          }
+        }
+      });
+      const uniqueSteps = Object.values(stageGroups);
+      return uniqueSteps.map((s, idx) => ({
         ppId: 2000 + idx,
         productionId: Number(initialProductionId),
         partName: s.partName,
         cpu: String(s.cpu || ""),
         startDate: s.startDate || "",
         endDate: s.endDate || "",
-        ppsId: s.partId || "",
+        ppsId: s.partId || s.id || "",
+        allIds: s.allIds || []
       }));
-      return initial;
     }
     return [];
   });
@@ -304,6 +323,8 @@ export default function ProductionPlan() {
   const [isSaveTemplateModalOpen, setIsSaveTemplateModalOpen] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState("");
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [zoomImageUrl, setZoomImageUrl] = useState("");
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState(null);
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -442,14 +463,34 @@ export default function ProductionPlan() {
             setHasExistingParts(true);
             setRows(prev => {
               if (prev.length === 0) {
-                const fetched = res.data.map((s, idx) => ({
+                const stageGroups = {};
+                res.data.forEach((s) => {
+                  const name = String(s.partName || "").trim();
+                  const key = name.toUpperCase();
+                  if (!stageGroups[key]) {
+                    stageGroups[key] = {
+                      ...s,
+                      allIds: [s.id || s.partId].filter(Boolean)
+                    };
+                  } else {
+                    const id = s.id || s.partId;
+                    if (id && !stageGroups[key].allIds.includes(id)) {
+                      stageGroups[key].allIds.push(id);
+                    }
+                  }
+                });
+
+                const uniqueParts = Object.values(stageGroups);
+
+                const fetched = uniqueParts.map((s, idx) => ({
                   ppId: 2000 + idx,
                   productionId: Number(selectedProductionId),
                   partName: s.partName,
                   cpu: String(s.cpu || ""),
                   startDate: s.startDate || "",
                   endDate: s.endDate || "",
-                  ppsId: s.id || s.partId || ""
+                  ppsId: s.id || s.partId || "",
+                  allIds: s.allIds || []
                 }));
                 setInitialRows(fetched.map(r => ({ ...r })));
                 return fetched;
@@ -490,7 +531,7 @@ export default function ProductionPlan() {
           pEndDate: payload.endDate || payload.pEndDate || order.endDate || "",
           status: getProductionStatusLabel(payload.statusName || payload.status || "Chờ Xét Duyệt"),
           pmId: payload.pm?.id ?? payload.pmId,
-          pmName: (payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "")),
+          pmName: (payload.pm?.fullName ?? payload.pm?.name ?? payload.pmName) || (payload.pmId ? `PM #${payload.pmId}` : (payload.pm?.id ? `PM #${payload.pm.id}` : "Chưa phân công")),
           product: {
             productCode: order.id ? `MSP-${order.id}` : "MÃ-SP-KXD",
             productName: order.orderName,
@@ -500,6 +541,7 @@ export default function ProductionPlan() {
             quantity: order.quantity,
             cpu: order.cpu,
             image: order.image || "",
+            originalOrder: { ...payload, ...order },
           }
         });
       } catch (err) {
@@ -789,9 +831,21 @@ export default function ProductionPlan() {
 
       // 2. Update existing parts if any
       if (existingParts.length > 0) {
-        await Promise.all(
-          existingParts.map((p) => ProductionPartService.updatePart(p.partId, p))
-        );
+        const updatePromises = [];
+        existingParts.forEach((p) => {
+          // Find the original row to get allIds
+          const row = rows.find(r => r.ppsId === String(p.partId) || Number(r.ppsId) === p.partId);
+          if (row && row.allIds && row.allIds.length > 0) {
+            // Update all siblings with the same data
+            row.allIds.forEach(id => {
+              updatePromises.push(ProductionPartService.updatePart(id, { ...p, partId: id }));
+            });
+          } else {
+            // Fallback for single ID
+            updatePromises.push(ProductionPartService.updatePart(p.partId, p));
+          }
+        });
+        await Promise.all(updatePromises);
       }
 
       setHasExistingParts(true);
@@ -1089,86 +1143,37 @@ export default function ProductionPlan() {
 
 
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setShowProductionInfo((prev) => !prev)}
-              className="w-full flex items-center justify-between mb-4 text-left"
-            >
+          {/* Standardized Order Info Section */}
+          <div className="space-y-6">
+            <div className="bg-emerald-50/80 border border-emerald-900/20 p-6 flex items-center justify-between shadow-sm">
               <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin đơn sản xuất</div>
-                <div className="text-lg font-semibold text-slate-900">
-                  {selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}
-                </div>
+                <p className="text-[10px] font-black text-emerald-800/80 uppercase tracking-widest leading-none mb-1">Mã đơn sản xuất</p>
+                <h3 className="text-xl font-black text-emerald-950 uppercase">{selectedProduction ? `#PR-${selectedProduction.productionId}` : "-"}</h3>
               </div>
-            </button>
-            {showProductionInfo && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-700">
-                <InfoItem label="Đơn hàng" value={selectedProduction ? `#ĐH-${selectedProduction.orderId}` : "-"} />
-                <InfoItem label="Tên đơn" value={selectedProduction?.orderName || "-"} />
-                <InfoItem label="PM quản lý" value={selectedProduction?.pmName || "-"} />
-                <InfoItem label="Ngày bắt đầu" value={formatDateOnly(selectedProduction?.pStartDate) || "-"} />
-                <InfoItem label="Ngày kết thúc" value={formatDateOnly(selectedProduction?.pEndDate) || "-"} />
+              <div className="text-right">
+                <p className="text-[10px] font-black text-emerald-800/80 uppercase tracking-widest leading-none mb-1">Quản lý dự án (PM)</p>
+                <p className="text-sm font-black text-emerald-700 uppercase">{selectedProduction?.pmName || "Chưa phân công"}</p>
               </div>
-            )}
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setShowProductInfo((prev) => !prev)}
-              className="w-full flex items-center justify-between mb-4 text-left"
-            >
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-400">Thông tin sản phẩm</div>
-                <div className="text-lg font-semibold text-slate-900">
-                  {selectedProduction?.product?.productName || "-"}
-                </div>
-              </div>
-              <div className="text-xs font-semibold text-slate-500 uppercase">
-                #{selectedProduction?.product?.productCode || "-"}
-              </div>
-            </button>
-            {showProductInfo && (
-              <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-4 items-center">
-                <div className="w-32 h-32 rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
-                  {selectedProduction?.product?.image ? (
-                    <img src={selectedProduction.product.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-[11px] text-slate-400">Chưa có ảnh</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
-                  <InfoItem label="Loại sản phẩm" value={selectedProduction?.product?.type || "-"} />
-                  <InfoItem label="Kích thước" value={selectedProduction?.product?.size || "-"} />
-                  <InfoItem label="Màu sắc" value={selectedProduction?.product?.color || "-"} />
-                  <InfoItem label="Số lượng" value={selectedProduction?.product?.quantity || "-"} />
-                  <InfoItem
-                    label="Giá/SP"
-                    value={`${selectedProduction?.product?.cpu?.toLocaleString("vi-VN") ?? "-"} VND`}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="overflow-hidden border border-black bg-white shadow-sm">
             <button
               type="button"
               onClick={() => setShowTemplateSection((prev) => !prev)}
-              className="w-full flex items-center justify-between text-left"
+              className="w-full flex items-center justify-between p-6 text-left border-b border-black bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors"
             >
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Template công đoạn</h2>
-                <p className="text-sm text-slate-600">Chọn nhanh theo loại sản phẩm, sau đó chỉnh sửa tùy ý.</p>
+                <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Template công đoạn</h2>
+                <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest mt-1">Chọn nhanh theo loại sản phẩm, sau đó chỉnh sửa tùy ý.</p>
               </div>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest border-b border-emerald-700">
                 {showTemplateSection ? "Thu gọn" : "Mở rộng"}
               </span>
             </button>
 
             {showTemplateSection && (
-              <>
+              <div className="p-6">
                 <div className="mt-4 flex flex-wrap gap-2">
                   {["all", "Áo", "Quần", "Giày", "Mũ", "Người dùng"].map((item) => {
                     const label = item === "all" ? "Tất cả" : item;
@@ -1304,54 +1309,48 @@ export default function ProductionPlan() {
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
 
-          <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="leave-table-card__header">
+          <div className="overflow-hidden border border-black bg-white shadow-sm">
+            <div className="px-6 py-4 border-b border-black flex items-center justify-between bg-emerald-50/20">
               <div>
-                <h2 className="leave-table-card__title">Danh sách công đoạn</h2>
-                <p className="leave-table-card__subtitle">Quản lý công đoạn theo tổ trưởng và giá/sp.</p>
+                <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Danh sách công đoạn</h2>
+                <div className="flex flex-col gap-1 mt-1">
+                  <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest">Quản lý định mức nhân công cho từng bước sản xuất.</p>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsSaveTemplateModalOpen(true)}
                   disabled={!rows.length || !isAssignedPM}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-50 px-3.5 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  className="inline-flex items-center gap-2 rounded-xl border border-black bg-emerald-50 px-3.5 py-2 text-[10px] font-black text-emerald-900 uppercase tracking-widest transition hover:bg-emerald-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
-                  Lưu mẫu công đoạn
+                  Lưu mẫu thiết kế
                 </button>
                 <button
                   onClick={openAddModal}
                   disabled={!selectedProductionId || !isAssignedPM}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 rounded-xl border border-black bg-emerald-100 px-3.5 py-2 text-[10px] font-black text-emerald-950 uppercase tracking-widest transition hover:bg-emerald-900 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   <Plus size={16} /> Thêm công đoạn
                 </button>
-                {savePartsMessage.text && (
-                  <span
-                    className={`text-xs font-semibold ${savePartsMessage.type === "error" ? "text-red-600" : "text-emerald-600"
-                      }`}
-                  >
-                    {savePartsMessage.text}
-                  </span>
-                )}
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full divide-y divide-slate-200 table-auto">
-                <thead className="leave-table-head">
-                  <tr>
-                    <th className="leave-table-th px-3 py-3 text-center">STT</th>
-                    <th className="leave-table-th px-3 py-3"></th>
-                    <th className="leave-table-th px-3 py-3 text-left">Tên công đoạn</th>
-                    <th className="leave-table-th px-3 py-3 text-center">Giá/SP</th>
-                    <th className="leave-table-th px-3 py-3 text-center">Thao tác</th>
+              <table className="w-full divide-y divide-black table-auto border-collapse">
+                <thead className="bg-slate-100/50">
+                  <tr className="divide-x divide-black border-b border-black">
+                    <th className="px-3 py-3 text-center text-[10px] font-black text-black uppercase tracking-widest w-16">STT</th>
+                    <th className="px-3 py-3 w-10"></th>
+                    <th className="px-6 py-3 text-left text-[10px] font-black text-black uppercase tracking-widest">Tên công đoạn</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-black text-black uppercase tracking-widest">Đơn giá</th>
+                    <th className="px-3 py-3 text-center text-[10px] font-black text-black uppercase tracking-widest w-32">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white text-sm">
+                <tbody className="divide-y divide-black bg-white">
                   {rows.map((row, idx) => (
                     <tr
                       key={`${row.ppId}-${idx}`}
@@ -1364,27 +1363,30 @@ export default function ProductionPlan() {
                         setDragOverIndex(null);
                       }}
                       onDrop={() => handleDrop(idx)}
-                      className={`leave-table-row group transition-all duration-300 border-x-0 border-t-0 border-b-2 border-transparent 
-                        ${selectedIndex === idx ? "bg-emerald-50/60" : "hover:bg-slate-50/60"} 
-                        ${draggedIndex === idx ? "opacity-5 cursor-grabbing bg-slate-50 scale-95" : "cursor-default"}
-                        border-t-4 transition-all duration-200 
-                        ${dragOverIndex === idx ? "border-t-emerald-600 bg-emerald-50/80 shadow-sm" : "border-t-transparent"}`}
+                      className={`group transition-all duration-200 divide-x divide-black
+                        ${selectedIndex === idx ? "bg-emerald-50/40" : "hover:bg-slate-50/60"} 
+                        ${dragOverIndex === idx ? "border-t-2 border-emerald-600 bg-emerald-50" : ""}`}
                       onClick={() => setSelectedIndex(idx)}
                     >
-                      <td className="px-3 py-2 text-center">{idx + 1}</td>
-                      <td className="px-1 py-2 border-x-0">
+                      <td className="px-3 py-4 text-center text-[11px] font-black text-slate-500">{idx + 1}</td>
+                      <td className="px-1 py-4 text-center">
                         {isAssignedPM && (
-                          <div className={`p-1 transition-all duration-200 
-                            ${draggedIndex === idx ? "text-emerald-600 scale-125 cursor-grabbing" : "text-slate-300 cursor-grab hover:text-slate-500 hover:scale-110"}`}>
+                          <div className="text-slate-300 cursor-grab hover:text-black">
                             <GripVertical size={18} />
                           </div>
                         )}
                       </td>
-                      <td className="px-3 py-2 font-medium text-slate-700 underline-offset-4">{row.partName || "-"}</td>
-                      <td className="px-3 py-2 text-center font-semibold text-slate-700">
-                        {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} VNĐ` : "-"}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-black text-black uppercase tracking-tight">{row.partName || "-"}</span>
+                        </div>
                       </td>
-                      <td className="px-2 py-2">
+                      <td className="px-3 py-4 text-center">
+                        <span className="text-[13px] font-mono font-black text-black">
+                          {row.cpu ? `${Number(row.cpu).toLocaleString("vi-VN")} đ` : "-"}
+                        </span>
+                      </td>
+                      <td className="px-2 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={(event) => {
@@ -1393,10 +1395,9 @@ export default function ProductionPlan() {
                               openEditModal(idx);
                             }}
                             disabled={!isAssignedPM}
-                            className={`text-slate-500 hover:text-slate-700 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            aria-label="Sửa công đoạn"
+                            className="p-2 rounded-lg text-slate-400 hover:bg-black hover:text-white transition-all shadow-sm disabled:opacity-30"
                           >
-                            <Pencil size={16} />
+                            <Pencil size={15} />
                           </button>
                           <button
                             onClick={(event) => {
@@ -1405,37 +1406,36 @@ export default function ProductionPlan() {
                               handleRequestDeleteStep(idx);
                             }}
                             disabled={!isAssignedPM}
-                            className={`text-rose-500 hover:text-rose-600 ${!isAssignedPM ? 'opacity-30 cursor-not-allowed' : ''}`}
-                            aria-label="Xóa công đoạn"
+                            className="p-2 rounded-lg text-rose-500 hover:bg-rose-500 hover:text-white transition-all shadow-sm disabled:opacity-30"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-50 border-t-2 border-slate-100">
-                    <td colSpan={3} className="px-3 py-3 font-semibold text-slate-700 text-right">TỔNG CỘNG</td>
-                    <td className="px-3 py-3 text-center font-bold text-emerald-600">
-                      {`${totalCpu.toLocaleString("vi-VN")} VNĐ`}
+                  <tr className="bg-emerald-800 text-white border-t border-black divide-x divide-emerald-700">
+                    <td colSpan={3} className="px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-right">Tổng định mức CPU</td>
+                    <td className="px-3 py-4 text-center text-lg font-black text-emerald-300">
+                      {totalCpu.toLocaleString("vi-VN")}
                     </td>
-                    <td></td>
+                    <td className="text-[10px] font-black uppercase text-center text-emerald-200/80 italic">vnđ / sp</td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600 shadow-sm sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start justify-between gap-4 border border-black bg-white px-8 py-6 shadow-sm sm:flex-row sm:items-center">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-1">
                 Lưu kế hoạch sản xuất
               </div>
-              <div className="mt-1 text-sm text-slate-600">
-                {savedPlanAt ? `Đã lưu: ${savedPlanAt}` : "Chưa có bản lưu kế hoạch trong phiên này."}
+              <div className="text-[11px] font-bold text-slate-400 italic">
+                {savedPlanAt ? `Bản nháp gần nhất: ${savedPlanAt}` : "Mọi thay đổi sẽ được lưu trực tiếp vào cơ sở dữ liệu."}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -1443,15 +1443,15 @@ export default function ProductionPlan() {
                   const basePath = isWorkerPath ? "/worker/production" : "/production";
                   navigate(`${basePath}/${selectedProductionId}`);
                 }}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                className="px-6 py-3 text-[10px] font-black text-black uppercase tracking-widest border border-black hover:bg-slate-50 transition-colors"
               >
-                Hủy
+                Hủy bỏ
               </button>
               <button
                 type="button"
                 onClick={saveSteps}
                 disabled={!selectedProductionId || !rows.length || !isAssignedPM}
-                className="rounded-2xl bg-emerald-600 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md disabled:bg-emerald-400 disabled:cursor-not-allowed"
+                className="px-10 py-3 text-[10px] font-black text-white uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-100 disabled:bg-slate-300 disabled:shadow-none transition-all active:scale-95"
               >
                 Lưu kế hoạch
               </button>
@@ -1459,6 +1459,15 @@ export default function ProductionPlan() {
           </div>
         </div>
       </div>
+
+      <OrderImageZoomModal
+        isOpen={isImageModalOpen}
+        imageUrl={zoomImageUrl}
+        onClose={() => {
+          setIsImageModalOpen(false);
+          setZoomImageUrl("");
+        }}
+      />
       {isModalOpen && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl border border-slate-200">
@@ -1528,6 +1537,7 @@ export default function ProductionPlan() {
         onClose={() => setIsConfirmSaveOpen(false)}
         primaryLabel="Xác nhận cập nhật"
         confirmIcon={Save}
+        variant="warning"
       />
       <ConfirmModal
         isOpen={isConfirmDeleteOpen}
@@ -1537,6 +1547,7 @@ export default function ProductionPlan() {
         onClose={() => setIsConfirmDeleteOpen(false)}
         primaryLabel="Xác nhận xóa"
         confirmIcon={Trash2}
+        variant="danger"
       />
 
       {isSaveTemplateModalOpen && (
@@ -1626,6 +1637,7 @@ export default function ProductionPlan() {
         }}
         primaryLabel="Xác nhận xóa"
         confirmIcon={Trash2}
+        variant="danger"
       />
 
       <ConfirmModal
@@ -1637,6 +1649,7 @@ export default function ProductionPlan() {
         primaryLabel="Xác nhận thoát"
         secondaryLabel="Quay lại"
         confirmIcon={LogOut}
+        variant="warning"
       />
       <ConfirmModal
         isOpen={isConfirmApplyOpen}
@@ -1649,20 +1662,8 @@ export default function ProductionPlan() {
         }}
         primaryLabel="Xác nhận áp dụng"
         confirmIcon={CheckCircle}
+        variant="warning"
       />
     </OwnerLayout>
   );
 }
-
-function InfoItem({ label, value }) {
-  return (
-    <div className="flex items-center justify-between border-b border-slate-100 py-2">
-      <span className="text-xs font-semibold text-slate-400 uppercase">{label}</span>
-      <span className="text-sm font-medium text-slate-700">{value}</span>
-    </div>
-  );
-}
-
-
-
-

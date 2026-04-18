@@ -12,9 +12,9 @@ import {
   Users,
 } from "lucide-react";
 import DashboardLayout from "@/layouts/DashboardLayout";
-import { ADMIN_STATUS_META } from "@/lib/admin/adminMockStore";
 import AdminUserService, { getAdminUserErrorMessage } from "@/services/AdminUserService";
 import {
+  ADMIN_STATUS_META,
   AdminBanner,
   AdminRoleBadge,
   AdminStatCard,

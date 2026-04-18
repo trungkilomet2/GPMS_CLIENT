@@ -1,7 +1,6 @@
 import axiosClient from "@/lib/axios";
 import { API_ENDPOINTS } from "@/lib/apiconfig";
 import { clearAuthStorage, getAuthItem, getStoredUser, setStoredUser } from "@/lib/authStorage";
-import { countGrantedPermissions, getPermissionProfiles } from "@/lib/admin/adminMockStore";
 import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 
 const ROLE_CATALOG = [
@@ -12,6 +11,7 @@ const ROLE_CATALOG = [
     shortLabel: "Toàn quyền hệ thống",
     tone: "danger",
     description: "Quản lý tài khoản, phân quyền và cấu hình hệ thống.",
+    permissionCount: 23,
   },
   {
     key: "Owner",
@@ -20,6 +20,7 @@ const ROLE_CATALOG = [
     shortLabel: "Quyền điều hành",
     tone: "warning",
     description: "Theo dõi và phê duyệt các nghiệp vụ quan trọng của xưởng.",
+    permissionCount: 16,
   },
   {
     key: "PM",
@@ -28,6 +29,7 @@ const ROLE_CATALOG = [
     shortLabel: "Điều phối vận hành",
     tone: "primary",
     description: "Quản lý sản xuất, nhân sự và tiến độ vận hành.",
+    permissionCount: 14,
   },
   {
     key: "Worker",
@@ -36,6 +38,7 @@ const ROLE_CATALOG = [
     shortLabel: "Nhân sự vận hành",
     tone: "success",
     description: "Tài khoản nhân viên sản xuất và tác nghiệp hằng ngày.",
+    permissionCount: 8,
   },
   {
     key: "Customer",
@@ -44,6 +47,7 @@ const ROLE_CATALOG = [
     shortLabel: "Khách hàng",
     tone: "info",
     description: "Tài khoản khách hàng theo dõi và tạo đơn hàng.",
+    permissionCount: 5,
   },
 ];
 
@@ -179,24 +183,13 @@ const getRoleMeta = (roleKey = "") => {
   const trimmedKey = String(roleKey ?? "").trim();
   if (!trimmedKey) return null;
 
-  const permissionProfile = getPermissionProfiles().find((profile) => profile.key === trimmedKey);
-  if (permissionProfile) {
-    return {
-      key: permissionProfile.key,
-      label: permissionProfile.label,
-      shortLabel: permissionProfile.shortLabel,
-      tone: permissionProfile.tone,
-      description: permissionProfile.description,
-      permissions: permissionProfile.permissions,
-    };
-  }
-
   return ROLE_KEY_MAP[trimmedKey] || {
     key: trimmedKey,
     label: getSystemRoleLabel(trimmedKey),
     shortLabel: getSystemRoleLabel(trimmedKey),
     tone: "info",
     description: "Vai trò này chưa có phần xem nhanh quyền trong màn quản trị.",
+    permissionCount: 0,
   };
 };
 
@@ -337,7 +330,7 @@ const normalizeAdminUser = (item = {}) => {
     roleTone: roleMeta?.tone || "info",
     roleShortLabel: roleMeta?.shortLabel || "Chưa có vai trò",
     roleDescription: roleMeta?.description || "Danh sách tài khoản hiện chưa trả đủ thông tin vai trò cho tài khoản này.",
-    grantedPermissionCount: roleMeta?.permissions ? countGrantedPermissions(roleMeta) : 0,
+    grantedPermissionCount: Number(roleMeta?.permissionCount ?? 0),
     hasKnownRole: Boolean(primaryRole),
     workerRole: workerRoleNames[0] || "",
     workerRoleLabel: workerRoleNames[0] || "",

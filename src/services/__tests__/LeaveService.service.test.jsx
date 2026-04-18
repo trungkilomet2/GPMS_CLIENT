@@ -48,4 +48,19 @@ describe("LeaveService", () => {
       "Lý do từ chối không được vượt quá 100 ký tự."
     );
   });
+
+  it("returns the backend message for 404 leave endpoints", () => {
+    const error = {
+      response: {
+        status: 404,
+        data: {
+          message: "Backend hiện tại chưa hỗ trợ xác nhận yêu cầu hủy đơn nghỉ.",
+        },
+      },
+    };
+
+    expect(getLeaveErrorMessage(error, "fallback")).toBe(
+      "Backend hiện tại chưa hỗ trợ xác nhận yêu cầu hủy đơn nghỉ."
+    );
+  });
 });

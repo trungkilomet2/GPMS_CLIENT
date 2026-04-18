@@ -209,19 +209,10 @@ export default function LeaveRequestHistoryDetail() {
                 </div>
               </div>
 
-              <div className="grid gap-5 xl:grid-cols-[1.25fr_0.88fr]">
+              <div className="grid gap-5 xl:grid-cols-[1.28fr_0.88fr]">
                 <div className="space-y-5">
                   <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 className="text-[1.1rem] font-bold text-slate-900">Thông tin đơn nghỉ</h2>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <DetailItem icon={UserRound} label="Nhân viên gửi đơn" value={leave.userFullName} />
-                      <DetailItem icon={CalendarClock} label="Ngày tạo đơn" value={formatLeaveDateTime(leave.dateCreate)} />
-                      <DetailItem icon={UserRound} label="Người phê duyệt" value={shouldShowApprover(leave) ? leave.approvedByName : ""} />
-                      <DetailItem icon={CalendarClock} label="Bắt đầu nghỉ" value={formatLeaveDateTime(leave.fromDate)} />
-                      <DetailItem icon={CalendarClock} label="Kết thúc nghỉ" value={formatLeaveDateTime(leave.toDate)} />
-                    </div>
-
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Nội dung xin nghỉ</h2>
                     <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-[13px] leading-6 text-amber-900">
                       {leave.content || "Chưa có nội dung đơn nghỉ."}
                     </div>
@@ -231,7 +222,7 @@ export default function LeaveRequestHistoryDetail() {
                     <h2 className="text-[1.1rem] font-bold text-slate-900">Phản hồi xử lý</h2>
 
                     <div className={`mt-4 rounded-xl border px-4 py-3.5 text-[13px] leading-6 ${statusConfig.panel}`}>
-                      <div className="font-semibold">Trạng thái hiện tại: {statusConfig.label}</div>
+                      <div className="font-semibold">Trạng thái xử lý: {statusConfig.label}</div>
                       <div className="mt-2">
                         {leave.status === "rejected"
                           ? leave.denyContent || "Đơn bị từ chối nhưng chưa có nội dung phản hồi chi tiết."
@@ -243,11 +234,6 @@ export default function LeaveRequestHistoryDetail() {
                             ? "Đơn nghỉ đã được chấp nhận."
                             : "Đơn nghỉ hiện đang chờ phản hồi từ người phụ trách."}
                       </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <DetailItem icon={CalendarClock} label="Ngày phản hồi" value={formatLeaveDateTime(leave.dateReply)} />
-                      <DetailItem icon={FileText} label="Mã nhân viên gửi đơn" value={leave.userId ? `NV-${leave.userId}` : ""} />
                     </div>
 
                     {leave.denyContent ? (
@@ -272,8 +258,9 @@ export default function LeaveRequestHistoryDetail() {
                   </div>
                 </div>
 
-                <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
-                  <h2 className="text-[1.1rem] font-bold text-slate-900">Timeline xử lý</h2>
+                <div className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 className="text-[1.1rem] font-bold text-slate-900">Timeline xử lý</h2>
                   <div className="mt-4 space-y-3">
                     {timelineItems.map((item, index) => (
                       <div key={item.title} className="flex gap-3">

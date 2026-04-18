@@ -135,9 +135,16 @@ export default function CustomerManagement() {
 
         if (!mounted) return;
 
-        const nextCustomers = response?.data ?? [];
+        const rawCustomers = response?.data ?? [];
+        const nextCustomers = rawCustomers.filter((customer) => {
+          const role = String(customer?.role || "").toLowerCase();
+          const userName = String(customer?.userName || "").toLowerCase();
+          return !role.includes("admin") && userName !== "admin";
+        });
+        const excludedCount = rawCustomers.length - nextCustomers.length;
+        
         setCustomers(nextCustomers);
-        setCustomerRecordCount(response?.recordCount ?? nextCustomers.length);
+        setCustomerRecordCount(Math.max(0, (response?.recordCount ?? rawCustomers.length) - excludedCount));
 
         setSelectedCustomerId((current) => {
           if (nextCustomers.length === 0) return null;
@@ -247,9 +254,6 @@ export default function CustomerManagement() {
                 <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-[2.6rem]">
                   Khách hàng và đơn hàng trong một màn hình
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-50/85 sm:text-base">
-                  Tra cứu nhanh khách hàng, xem thông tin liên hệ và theo dõi toàn bộ đơn hàng liên quan mà không phải chuyển màn liên tục.
-                </p>
               </div>
               <div className="grid gap-3 text-sm md:grid-cols-3 xl:min-w-[34rem]">
                 <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
@@ -318,7 +322,7 @@ export default function CustomerManagement() {
                   <input
                     value={customerSearchInput}
                     onChange={(event) => setCustomerSearchInput(event.target.value)}
-                    placeholder="Tìm theo tên, user, điện thoại, email..."
+                    placeholder="Tìm theo tên, số điện thoại, email..."
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                   />
                 </label>
@@ -374,7 +378,6 @@ export default function CustomerManagement() {
                                 </span>
                               ) : null}
                             </div>
-                            <div className="mt-1 truncate text-sm text-slate-500">@{customer.userName || "chua-cap-nhat"}</div>
                             <div className="mt-3 grid gap-1 text-xs text-slate-500">
                               <span>{customer.phoneNumber || "Chưa có số điện thoại"}</span>
                               <span className="truncate">{customer.email || "Chưa có email"}</span>
@@ -412,7 +415,6 @@ export default function CustomerManagement() {
                     <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>
                         <div className="font-semibold text-slate-900">{selectedCustomer.fullName}</div>
-                        <div>@{selectedCustomer.userName || "chua-cap-nhat"}</div>
                       </div>
                       <div>
                         <div>{selectedCustomer.phoneNumber || "Chưa có số điện thoại"}</div>

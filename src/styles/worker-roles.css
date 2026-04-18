@@ -437,6 +437,78 @@
 }
 
 @media (max-width: 768px) {
+  .worker-role-page {
+    background:
+      radial-gradient(circle at top right, rgba(111, 222, 160, 0.14), transparent 24%),
+      linear-gradient(180deg, #f6fbf8 0 8.5rem, #f5f3ee 8.5rem 100%);
+  }
+
+  .worker-role-hero__title {
+    font-size: 1.55rem;
+  }
+
+  .worker-role-hero__subtitle {
+    font-size: 0.9rem;
+  }
+
+  .worker-role-hero__action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .worker-role-filter-card,
+  .worker-role-table-card,
+  .worker-role-create-card,
+  .worker-role-side-card,
+  .worker-role-summary {
+    border-radius: 1.35rem;
+  }
+
+  .worker-role-filter-card,
+  .worker-role-create-card,
+  .worker-role-side-card {
+    padding: 1rem;
+  }
+
+  .worker-role-table th,
+  .worker-role-table td {
+    padding: 0.85rem 0.9rem;
+    white-space: nowrap;
+  }
+
+  .worker-role-table {
+    min-width: 820px;
+  }
+
+  .worker-role-table th:first-child,
+  .worker-role-table td:first-child {
+    min-width: 12rem;
+  }
+
+  .worker-role-table th:nth-child(3),
+  .worker-role-table td:nth-child(3) {
+    min-width: 16rem;
+  }
+
+  .worker-role-table__primary,
+  .worker-role-table__secondary {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+  }
+
+  .worker-role-table-card__header {
+    padding: 1rem;
+  }
+
+  .worker-role-table-card__title {
+    font-size: 1rem;
+  }
+
+  .worker-role-table-card__subtitle {
+    font-size: 0.82rem;
+  }
+
   .worker-role-create-actions {
     flex-direction: column-reverse;
     align-items: stretch;

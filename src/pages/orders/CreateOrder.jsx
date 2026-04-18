@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import CloudinaryService from '@/services/CloudinaryService';
 import OrderService from '@/services/OrderService';
-import { userService } from '@/services/userService';
+import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import { getErrorMessage } from '@/utils/errorUtils';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import { OrderFormSections } from '@/pages/orders/components/OrderFormSections';
-import OrderSuccessModal from '@/pages/orders/components/OrderSuccessModal';
+import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import { getPrimaryWorkspaceRole, splitRoles } from '@/lib/internalRoleFlow';
 import '@/styles/homepage.css';
@@ -23,6 +23,70 @@ export default function CreateOrder() {
 
   const userId = getUserId();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const reuse = location.state?.reuseOrder;
+    if (!reuse) return;
+
+    // 1. Basic Info
+    setOrderData(prev => ({
+      ...prev,
+      orderName: `${reuse.orderName || ''}`,
+      image: reuse.image || '',
+      note: reuse.note || '',
+      cpu: reuse.cpu || '',
+    }));
+
+    // 2. Materials
+    if (reuse.materials && Array.isArray(reuse.materials)) {
+      setMaterials(reuse.materials.map(m => ({
+        materialName: m.materialName || '',
+        color: m.color || '',
+        value: m.value || m.quantity || '',
+        uom: m.uom || '',
+        image: m.image || '',
+        imageFile: null,
+        imagePreview: m.image || '',
+        note: m.note || '',
+      })));
+    }
+
+    // 3. Size / Variants Mapping (Matrix Conversion)
+    const rawSizes = reuse.sizes || reuse.size || [];
+    if (Array.isArray(rawSizes) && rawSizes.length > 0) {
+      const grouped = {};
+      const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+      rawSizes.forEach((item, idx) => {
+        const colorLabel = item.color || 'Mặc định';
+        if (!grouped[colorLabel]) {
+          grouped[colorLabel] = {
+            id: `reuse-${idx}-${Date.now()}`,
+            color: colorLabel,
+            xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
+          };
+        }
+        const key = SIZE_ID_TO_KEY[item.sizeId];
+        if (key) grouped[colorLabel][key] = Number(item.quantity) || 0;
+      });
+      setVariants(Object.values(grouped));
+    }
+
+    // 4. Templates
+    const rawTemplates = reuse.templates || reuse.template || [];
+    if (Array.isArray(rawTemplates)) {
+      setTemplateItems(rawTemplates.map((t, idx) => ({
+        id: `reuse-tmp-${idx}-${Date.now()}`,
+        file: t.file || '',
+        fileName: t.templateName || 'Bản sao thiết kế',
+        templateName: t.templateName || 'Bản sao thiết kế',
+        type: t.type || 'FILE',
+        note: t.note || '',
+      })));
+    }
+
+    toast.info('Đã tải dữ liệu từ đơn hàng cũ.');
+  }, [location.state]);
 
   const [profileCheck, setProfileCheck] = useState({ checking: true, missing: [] });
 
@@ -71,16 +135,69 @@ export default function CreateOrder() {
     userId,
     image: '',
     orderName: '',
-    type: '',
-    size: '',
-    color: '',
     startDate: new Date().toLocaleDateString('sv-SE'),
     endDate: new Date().toLocaleDateString('sv-SE'),
-    quantity: '',
+    quantity: 0,
     cpu: '',
     note: '',
     status: 'Chờ xét duyệt',
   });
+
+  const [variants, setVariants] = useState([
+    { id: 1, color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+  ]);
+
+  useEffect(() => {
+    const total = variants.reduce((acc, v) => {
+      const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      return acc + sum;
+    }, 0);
+    setOrderData(prev => ({ ...prev, quantity: total }));
+  }, [variants]);
+
+  const handleAddVariant = () => {
+    setVariants(prev => [
+      ...prev,
+      { id: Date.now(), color: '', xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0 }
+    ]);
+  };
+
+  const handleRemoveVariant = (index) => {
+    if (variants.length <= 1) return;
+    setDeleteConfirm({
+      show: true,
+      type: 'variant',
+      index: index,
+      title: 'Xóa phối màu',
+      desc: 'Bạn có chắc chắn muốn xóa phối màu này? Dữ liệu về số lượng các kích thước của phối màu này sẽ bị mất.'
+    });
+  };
+
+  const handleVariantChange = (index, field, value) => {
+    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+
+    // Clear global variants error if any
+    if (errors.variantsGlobal) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.variantsGlobal;
+        return next;
+      });
+    }
+    // Clear specific variant error
+    if (errors.variants?.[index]?.[field]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        const nextVariantsErrors = { ...next.variants };
+        delete nextVariantsErrors[index][field];
+        if (Object.keys(nextVariantsErrors[index]).length === 0) {
+          delete nextVariantsErrors[index];
+        }
+        next.variants = nextVariantsErrors;
+        return next;
+      });
+    }
+  };
 
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -123,21 +240,29 @@ export default function CreateOrder() {
       newErrors.orderName = 'Tên đơn hàng không được vượt quá 100 ký tự';
     }
 
-    // TYPE: NOT NULL, NVARCHAR(50)
-    if (!orderData.type?.trim()) {
-      newErrors.type = 'Vui lòng nhập loại sản phẩm (vd: Sơ mi, Quần tây)';
-    } else if (orderData.type.trim().length > 50) {
-      newErrors.type = 'Loại sản phẩm không được vượt quá 50 ký tự';
+
+
+    // VARIANTS VALIDATION
+    const variantErrors = [];
+    let hasAnyQuantity = false;
+    variants.forEach((v, idx) => {
+      const vErrs = {};
+      if (!v.color?.trim()) {
+        vErrs.color = 'Vui lòng nhập tên màu';
+      }
+      const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
+      if (sum > 0) hasAnyQuantity = true;
+
+      if (Object.keys(vErrs).length > 0) {
+        variantErrors[idx] = vErrs;
+      }
+    });
+
+    if (variantErrors.length > 0) {
+      newErrors.variants = variantErrors;
     }
-
-    // SIZE: CHAR(5) — dropdown nên chỉ cần bắt buộc chọn
-    if (!orderData.size?.trim()) newErrors.size = 'Vui lòng chọn kích thước';
-
-    // COLOR: NOT NULL, NVARCHAR(30)
-    if (!orderData.color?.trim()) {
-      newErrors.color = 'Màu sắc không được để trống';
-    } else if (orderData.color.trim().length > 30) {
-      newErrors.color = 'Màu sắc không được vượt quá 30 ký tự';
+    if (!hasAnyQuantity) {
+      newErrors.variantsGlobal = 'Vui lòng nhập ít nhất một kích thước có số lượng > 0';
     }
 
     // QUANTITY: INT NOT NULL, khoảng [100, 999] theo yêu cầu nghiệp vụ
@@ -211,7 +336,6 @@ export default function CreateOrder() {
       const materialErrors = [];
       materials.forEach((m, idx) => {
         const mErrs = {};
-        if (!m.image && !m.imageFile) mErrs.image = 'Vui lòng chọn ảnh vật liệu';
         if (!m.materialName?.trim()) {
           mErrs.materialName = 'Tên vật liệu là bắt buộc';
         } else if (m.materialName.trim().length > 150) {
@@ -410,7 +534,7 @@ export default function CreateOrder() {
         let reason = "Định dạng không hỗ trợ";
         if (!isSizeOk) reason = "Dung lượng vượt quá 10MB";
         else if (!isNameOk) reason = "Tên file quá 255 ký tự";
-        
+
         invalid.push(`${file.name} (${reason})`);
       }
     });
@@ -441,7 +565,7 @@ export default function CreateOrder() {
       prev.map((item, idx) => (idx === index ? { ...item, [field]: value } : item))
     );
   };
-  
+
   const removeTemplateItem = (index) => {
     setDeleteConfirm({
       show: true,
@@ -492,6 +616,21 @@ export default function CreateOrder() {
             else adjustedList[k] = newMaterialsList[key];
           });
           return { ...prev, materialsList: adjustedList };
+        });
+      }
+    } else if (type === 'variant') {
+      setVariants((prev) => prev.filter((_, i) => i !== index));
+      if (errors.variants) {
+        setErrors((prev) => {
+          const newVariants = { ...prev.variants };
+          delete newVariants[index];
+          const adjusted = {};
+          Object.keys(newVariants).forEach((key) => {
+            const k = parseInt(key);
+            if (k > index) adjusted[k - 1] = newVariants[key];
+            else adjusted[k] = newVariants[key];
+          });
+          return { ...prev, variants: adjusted };
         });
       }
     }
@@ -569,27 +708,73 @@ export default function CreateOrder() {
         });
       }
 
-      const payload = {
-        userId: Number(orderData.userId ?? userId) || 0,
-        image: orderImageUrl || null,
-        orderName: orderData.orderName ?? '',
-        type: orderData.type ?? '',
-        size: orderData.size ?? '',
-        color: orderData.color ?? '',
-        startDate: orderData.startDate ?? '',
-        endDate: orderData.endDate ?? '',
-        quantity: Number(orderData.quantity) || 0,
-        cpu: Number(orderData.cpu) || 0,
-        note: orderData.note ?? '',
-        materials: materialsPayload,
-        templates: templatesPayload,
+      const sizesPayload = [];
+      const SIZE_ID_MAP = {
+        'xs': 1,
+        's': 2,
+        'm': 3,
+        'l': 4,
+        'xl': 5,
+        '2xl': 6,
+        '3xl': 7
       };
-      console.log('CreateOrder payload:', payload);
+
+      variants.forEach(v => {
+        ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(sizeKey => {
+          const qty = Number(v[sizeKey]) || 0;
+          if (qty > 0) {
+            sizesPayload.push({
+              sizeId: SIZE_ID_MAP[sizeKey],
+              color: v.color?.trim() || '',
+              quantity: qty
+            });
+          }
+        });
+      });
+
+      const payload = {
+        userId: Number(orderData.userId || userId) || 0,
+        image: orderImageUrl || "",
+        orderName: (orderData.orderName || "").trim(),
+        startDate: orderData.startDate || "",
+        endDate: orderData.endDate || "",
+        quantity: Math.floor(Number(orderData.quantity) || 0),
+        cpu: Number(orderData.cpu) || 0,
+        note: (orderData.note || "").trim(),
+        materials: materialsPayload.map(m => ({
+          ...m,
+          image: m.image || "",
+          note: (m.note || "").trim()
+        })),
+        o_Material: materialsPayload.map(m => ({
+          ...m,
+          image: m.image || "",
+          note: (m.note || "").trim()
+        })),
+        templates: templatesPayload.map(t => ({
+          ...t,
+          type: "SOFT", // Thống nhất với chuẩn hệ thống (Bản mềm)
+          file: t.file || "",
+          note: (t.note || "").trim()
+        })),
+        o_Template: templatesPayload.map(t => ({
+          ...t,
+          type: "SOFT",
+          file: t.file || "",
+          note: (t.note || "").trim()
+        })),
+        sizes: sizesPayload
+      };
+      console.log('CreateOrder payload (AutoMapper focus):', payload);
 
       await OrderService.createOrder(payload);
       setIsSuccessOpen(true);
     } catch (error) {
-      console.error('Lỗi API (CreateOrder):', error);
+      console.error('--- LỖI API CHI TIẾT (CreateOrder) ---');
+      console.error('Status:', error?.response?.status);
+      console.error('Data từ Backend:', error?.response?.data);
+      console.error('Message:', error?.message);
+
       const errMsg = getErrorMessage(error, 'Không thể kết nối đến máy chủ');
       toast.error('Lỗi: ' + errMsg);
     } finally {
@@ -619,8 +804,8 @@ export default function CreateOrder() {
                 <div className="flex-1">
                   <div className="mb-1 text-lg font-bold text-slate-900">Thông tin tài khoản chưa hoàn thiện</div>
                   <p className="text-slate-600 leading-relaxed mb-4">
-                    Để đảm bảo việc liên lạc và giao nhận hàng chính xác, vui lòng cập nhật đầy đủ 
-                    <span className="font-bold text-slate-900"> số điện thoại</span> và 
+                    Để đảm bảo việc liên lạc và giao nhận hàng chính xác, vui lòng cập nhật đầy đủ
+                    <span className="font-bold text-slate-900"> số điện thoại</span> và
                     <span className="font-bold text-slate-900"> địa chỉ</span> của bạn.
                   </p>
                   <button
@@ -695,21 +880,19 @@ export default function CreateOrder() {
                     onChange: (e) => setMaterialFormData((prev) => ({ ...prev, [e.target.name]: e.target.value })),
                     editingIndex,
                   }}
+                  variants={variants}
+                  onAddVariant={handleAddVariant}
+                  onRemoveVariant={handleRemoveVariant}
+                  onVariantChange={handleVariantChange}
                 />
               </form>
             </>
           )}
 
-          <OrderSuccessModal
+          <SuccessModal
             isOpen={isSuccessOpen}
-            onClose={() => {
-              setIsSuccessOpen(false);
-              navigate('/orders');
-            }}
-            onConfirm={() => {
-              setIsSuccessOpen(false);
-              navigate('/orders');
-            }}
+            onClose={() => navigate('/orders')}
+            message="Đơn hàng của bạn đã được gửi thành công!"
           />
         </div>
       </div>
@@ -720,6 +903,7 @@ export default function CreateOrder() {
         description={deleteConfirm.desc}
         onConfirm={executeDelete}
         onClose={() => setDeleteConfirm({ show: false, type: null, index: null, title: '', desc: '' })}
+        variant="danger"
       />
     </OwnerLayout>
   );

@@ -2,19 +2,28 @@
 // const BASE_URL = 'http://localhost:5229';
 
 //main URL
-//const BASE_URL = 'http://26.250.4.244:5229';
+ const BASE_URL = 'http://26.250.4.244:5229';
+
+//Deploy URL
+//const BASE_URL = 'https://gpms-api.onrender.com';
 
 // sub URL
-const BASE_URL = 'http://26.93.63.192:8000';
+// const BASE_URL = 'http://26.93.63.192:8000';
 
 // const BASE_URL = 'https://localhost:7096';
 // const BASE_URL = '';
 
 export const API_ENDPOINTS = {
+  AI: {
+    OPENROUTER_CHAT: `${BASE_URL}/ai/openrouter/chat`,
+  },
+
   ACCOUNT: {
     LOGIN: `${BASE_URL}/api/Account/login`,
     REGISTER: `${BASE_URL}/api/Account/register`,
-    FORGOT_PASSWORD: "",
+    FORGOT_PASSWORD: `${BASE_URL}/api/Account/forgot-password`,
+    RESET_PASSWORD: `${BASE_URL}/api/Account/reset-password`,
+    CHANGE_PASSWORD: `${BASE_URL}/api/Account/change-password`,
   },
 
   EMAIL: {
@@ -28,6 +37,7 @@ export const API_ENDPOINTS = {
     GET_DETAIL: (orderId) => `${BASE_URL}/api/Order/order-detail/${orderId}`,
     GET_ORDERS_BY_USER: `${BASE_URL}/api/Order/my-orders`,
     CREATE_ORDER: `${BASE_URL}/api/Order/create-order`,
+    CREATE_MANUAL: `${BASE_URL}/api/Order/create-manual-order`,
     UPDATE_ORDER: (orderId) => `${BASE_URL}/api/Order/${orderId}/update`,
     GET_UPDATE_ORDER_HISTORY: (orderId) => `${BASE_URL}/api/Order/${orderId}/history`,
     REQUEST_MODIFICATION: (orderId) => `${BASE_URL}/api/Order/request-order-modification/${orderId}`,
@@ -46,7 +56,7 @@ export const API_ENDPOINTS = {
     APPROVE: (id) => `${BASE_URL}/api/Production/production/approve/${id}`,
     REJECT: (id) => `${BASE_URL}/api/Production/production/reject/${id}`,
     REJECT_REASON: (id) => `${BASE_URL}/api/Production/production/reject-reason/detail/${id}`,
-    ISSUES: (id) => `${BASE_URL}/api/Production/production/issues/${id}`,
+    ISSUES: (id) => `${BASE_URL}/api/ProductionPart/production/issues/${id}`,
     ISSUES_SUMMARY: (id) => `${BASE_URL}/api/Production/production/issues/summary-by-type/${id}`,
     APPROVE_PLAN: (id) => `${BASE_URL}/api/Production/production/approve/production-plan/${id}`,
     NEED_UPDATE_PLAN: (id) => `${BASE_URL}/api/Production/production/need-update/production-plan/${id}`,
@@ -61,15 +71,23 @@ export const API_ENDPOINTS = {
       `${BASE_URL}/api/ProductionPart/production/create-parts/${productionId}`,
     UPDATE_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/update/${id}`,
     LIST_ASSIGN_WORKERS: `${BASE_URL}/api/ProductionPart/parts/list-assign-workers`,
-    UPDATE_ASSIGN_WORKERS: (id) =>
-      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${id}`,
-    CREATE_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}`,
-    UPDATE_WORK_LOGS: (partId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${logId}`,
-    GET_WORK_LOGS: (partId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}`,
+    UPDATE_ASSIGN_WORKERS: (partId, partOrderSizeId) =>
+      `${BASE_URL}/api/ProductionPart/parts/update-assign-workers/${partId}/${partOrderSizeId}`,
+    CREATE_WORK_LOGS: (partId, partOrderSizeId) => `${BASE_URL}/api/ProductionPart/parts/create-work-logs/${partId}/${partOrderSizeId}`,
+    UPDATE_WORK_LOGS: (partId, partOrderSizeId, logId) => `${BASE_URL}/api/ProductionPart/parts/update-work-logs/${partId}/${partOrderSizeId}/${logId}`,
+    GET_WORK_LOGS: (partId, partOrderSizeId) => `${BASE_URL}/api/ProductionPart/parts/get-work-logs/${partId}/${partOrderSizeId}`,
+    DELETE_WORK_LOGS: (logId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${logId}`,
+    APPROVE_WORK_LOG: (partId, partOrderSizeId, logId) => `${BASE_URL}/api/ProductionPart/parts/approve-work-log/${partId}/${partOrderSizeId}/${logId}`,
     CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/create/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
     COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
+    GET_PRODUCTION_WORK_LOGS: (productionId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${productionId}`,
+    RECORD_DELIVERY: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/${orderId}`,
+    GET_DELIVERY_PLANNING: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/planning/${orderId}`,
+    UPDATE_ISSUE_STATUS: (issueId) => `${BASE_URL}/api/ProductionPart/parts/issues/update-status/${issueId}`,
+    CONFIRM_UNFIXABLE: (issueId) => `${BASE_URL}/api/ProductionPart/parts/issues/confirm-unfixable/${issueId}`,
+    CONFIRM_DELIVERY: (deliveryId) => `${BASE_URL}/api/ProductionPart/delivery/confirm/${deliveryId}`,
   },
 
   CUTTING_NOTEBOOK: {
@@ -79,6 +97,8 @@ export const API_ENDPOINTS = {
     UPDATE: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/update/${notebookId}`,
     CREATE_LOG: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/create-logs/${notebookId}`,
     GET_LOGS: (notebookId) => `${BASE_URL}/api/CuttingNotebook/notebook/get-list-logs/${notebookId}`,
+    UPDATE_LOG: (logId) => `${BASE_URL}/api/CuttingNotebook/notebook/log/update/${logId}`,
+    DELETE_LOG: (logId) => `${BASE_URL}/api/CuttingNotebook/notebook/log/delete/${logId}`,
   },
 
   CLOUDINARY: {

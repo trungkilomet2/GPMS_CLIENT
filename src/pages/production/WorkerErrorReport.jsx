@@ -3,17 +3,19 @@ import { AlertTriangle, ArrowLeft, ImagePlus, Send, Wrench } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import OwnerLayout from "@/layouts/OwnerLayout";
+import WorkerLayout from "@/layouts/WorkerLayout";
 import ProductionService from "@/services/ProductionService";
 import ProductionPartService from "@/services/ProductionPartService";
 import { getAuthItem, getStoredUser } from "@/lib/authStorage";
+import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
 const SEVERITIES = [
-  { value: "low", label: "Thấp", priority: 1 },
-  { value: "medium", label: "Trung bình", priority: 2 },
-  { value: "high", label: "Cao", priority: 3 },
-  { value: "critical", label: "Nghiêm trọng", priority: 4 },
+  { value: 1, label: "Thấp" },
+  { value: 2, label: "Trung bình" },
+  { value: 3, label: "Cao" },
+  { value: 4, label: "Nghiêm trọng" },
 ];
 
 const ERROR_TYPES = [
@@ -54,8 +56,11 @@ const mapPart = (part, fallbackProductionId) => ({
     "",
   orderName: part?.orderName ?? part?.order?.orderName ?? "",
   partName: part?.partName ?? part?.name ?? part?.title ?? "",
+  colorName: part?.colorName ?? part?.color ?? part?.variant?.color ?? "",
+  sizeName: part?.sizeName ?? part?.size ?? part?.variant?.size ?? "",
   startDate: part?.startDate ?? part?.planStartDate ?? "",
   endDate: part?.endDate ?? part?.planEndDate ?? "",
+  partOrderSizeId: part?.partOrderSizeId ?? part?.orderSizeId ?? null,
 });
 
 const getPriorityBySeverity = (severity) =>
@@ -73,10 +78,13 @@ export default function WorkerErrorReport() {
   const normalizedAssignment = useMemo(() => {
     if (!assignment) return null;
     return {
-      partId: assignment?.partId ?? assignment?.id ?? "",
+      partId: assignment?.partId ?? "",
+      orderSizeId: assignment?.orderSizeId ?? assignment?.id ?? "",
       productionId: assignment?.productionId ?? "",
       orderName: assignment?.orderName ?? "",
       partName: assignment?.partName ?? "",
+      colorName: assignment?.colorName ?? assignment?.color ?? "",
+      sizeName: assignment?.sizeName ?? assignment?.size ?? "",
       startDate: assignment?.startDate ?? "",
       endDate: assignment?.endDate ?? "",
       errorType: assignment?.errorType ?? 0,
@@ -90,14 +98,17 @@ export default function WorkerErrorReport() {
       ? String(normalizedAssignment.productionId)
       : "",
     partId: normalizedAssignment?.partId ? String(normalizedAssignment.partId) : "",
+    colorName: normalizedAssignment?.colorName || "",
+    sizeName: normalizedAssignment?.sizeName || "",
+    orderSizeId: normalizedAssignment?.orderSizeId || "",
     errorType: normalizedAssignment?.errorType !== undefined ? normalizedAssignment.errorType : 0,
-    otherErrorDetail: normalizedAssignment?.otherErrorDetail || "",
-    severity: "medium",
+    severity: 2,
     title: "",
     description: "",
     quantity: "",
     happenAt: formatToDateTimeLocal(normalizedAssignment?.happenAt || new Date().toISOString()),
-    repairWorker: "",
+    repairWorker: "", // Full name for UI display if needed
+    assignedTo: "",   // The worker ID (integer)
   });
 
   const [employees, setEmployees] = useState([]);
@@ -203,6 +214,7 @@ export default function WorkerErrorReport() {
         String(normalizedAssignment.productionId) === productionId
         ? {
           id: normalizedAssignment.partId,
+          partOrderSizeId: normalizedAssignment.orderSizeId,
           productionId,
           orderName: normalizedAssignment.orderName,
           partName: normalizedAssignment.partName,
@@ -286,11 +298,11 @@ export default function WorkerErrorReport() {
         setLoadingEmployees(true);
         const res = await ProductionPartService.getIssueWorkers(partId);
         if (!active) return;
-        
+
         // Axios interceptor returns response.data, so res might be the payload or the array
-        const payload = res; 
+        const payload = res;
         const list = toList(payload);
-        
+
         if (list.length === 0) {
           console.warn("API returned empty worker list for part:", partId);
           setEmployees([]);
@@ -300,12 +312,12 @@ export default function WorkerErrorReport() {
 
         const normalized = list.map(emp => {
           const info = emp.worker || emp.workerInfo || emp.user || emp.account || emp;
-          const id = (info.id !== undefined && info.id !== null) ? String(info.id) : 
-                     (info.userId || info.workerId || info.uId || String(Math.random()));
+          const id = (info.id !== undefined && info.id !== null) ? String(info.id) :
+            (info.userId || info.workerId || info.uId || String(Math.random()));
           const name = info.fullName || info.workerName || info.userName || info.name || "N/A";
           return { id, fullName: name };
         });
-        
+
         setEmployees(normalized);
       } catch (err) {
         console.error("Lỗi tải danh sách thợ:", err);
@@ -363,6 +375,8 @@ export default function WorkerErrorReport() {
         productionId: normalizedAssignment.productionId,
         orderName: normalizedAssignment.orderName,
         partName: normalizedAssignment.partName,
+        colorName: normalizedAssignment.colorName,
+        sizeName: normalizedAssignment.sizeName,
         startDate: normalizedAssignment.startDate,
         endDate: normalizedAssignment.endDate,
       };
@@ -384,7 +398,27 @@ export default function WorkerErrorReport() {
           );
           if (matchedPart) {
             next.partId = String(matchedPart.id);
+            next.colorName = matchedPart.colorName || "";
+            next.sizeName = matchedPart.sizeName || "";
           }
+        }
+      }
+
+      if (field === "partId") {
+        const part = parts.find(p => String(p.id) === String(value));
+        if (part) {
+          next.colorName = part.colorName || "";
+          next.sizeName = part.sizeName || "";
+          next.orderSizeId = part.partOrderSizeId || ""; // Syncing orderSizeId
+        }
+      }
+
+      if (field === "assignedTo") {
+        const emp = employees.find(e => String(e.id) === String(value));
+        if (emp) {
+          next.repairWorker = emp.fullName;
+        } else {
+          next.repairWorker = "";
         }
       }
 
@@ -444,10 +478,13 @@ export default function WorkerErrorReport() {
       title: "",
       description: "",
       quantity: "",
-      happenAt: "",
+      happenAt: formatToDateTimeLocal(new Date().toISOString()),
       repairWorker: "",
       otherErrorDetail: "",
     }));
+
+    setNotice("");
+    setSubmitError("");
 
     attachments.forEach((item) => {
       if (item?.preview) URL.revokeObjectURL(item.preview);
@@ -466,7 +503,8 @@ export default function WorkerErrorReport() {
     let title = String(form.title || "").trim();
     const typeNum = Number(form.errorType);
 
-    if (typeNum !== 3) {
+    // If title is empty, generate a default one
+    if (!title) {
       const typeLabel = getErrorTypeLabel(typeNum);
       if (typeNum === 0) {
         title = `${typeLabel}: ${selectedPart?.partName || `Mã #${partId}`}`;
@@ -492,7 +530,6 @@ export default function WorkerErrorReport() {
       setSubmitError(`Vui lòng nhập ${titleLabel}.`);
       return;
     }
-
     const qtyRaw = String(form.quantity || "").trim();
     if (qtyRaw) {
       const qty = Number(qtyRaw);
@@ -501,6 +538,14 @@ export default function WorkerErrorReport() {
         return;
       }
     }
+
+    const assignedTo = Number(form.assignedTo);
+    if (!assignedTo) {
+      setSubmitError("Vui lòng chọn nhân viên liên quan.");
+      return;
+    }
+
+    const priority = Number(form.severity || 2);
 
     const storedUser = getStoredUser() || {};
     const createdBy = Number(storedUser?.userId ?? storedUser?.id ?? getAuthItem("userId"));
@@ -514,7 +559,8 @@ export default function WorkerErrorReport() {
 
       const formData = new FormData();
       formData.append("CreatedBy", String(createdBy));
-      formData.append("Priority", String(getPriorityBySeverity(form.severity)));
+      formData.append("AssignedTo", String(assignedTo));
+      formData.append("Priority", String(priority));
       formData.append("TypeIssue", String(form.errorType));
       formData.append("Title", title);
 
@@ -522,8 +568,9 @@ export default function WorkerErrorReport() {
       if (form.errorType === 3 && form.otherErrorDetail?.trim()) {
         fullDescription += `\n(Chi tiết khác: ${form.otherErrorDetail.trim()})`;
       }
-      if (form.happenAt) fullDescription += `\n(Xảy ra lúc: ${form.happenAt})`;
-      if (form.repairWorker) fullDescription += `\n(Thợ sửa: ${form.repairWorker})`;
+      if (form.colorName) fullDescription += `\n(Màu sắc: ${form.colorName})`;
+      if (form.sizeName) fullDescription += `\n(Kích cỡ: ${form.sizeName})`;
+      // No need to append time/worker to description anymore as they have fields
 
       if (fullDescription) formData.append("Description", fullDescription);
 
@@ -531,11 +578,17 @@ export default function WorkerErrorReport() {
         formData.append("Quantity", String(Number(qtyRaw)));
       }
 
+      const isoHappenAt = form.happenAt ? new Date(form.happenAt).toISOString() : new Date().toISOString();
+      formData.append("OccurredAt", isoHappenAt);
+
       if (attachments.length > 0 && attachments[0]?.file) {
         formData.append("Image", attachments[0].file);
       }
 
-      await ProductionPartService.createIssue(Number(partId), formData);
+      // API hoàn toàn dựa trên partOrderSizeId nếu có (ID 58), nếu không mới dùng ProductionPartId (ID 25)
+      const finalId = form.orderSizeId || selectedPart?.partOrderSizeId || partId;
+
+      await ProductionPartService.createIssue(Number(finalId), formData);
 
       resetFormAfterSubmit();
       toast.success("Gửi báo cáo lỗi thành công.");
@@ -558,9 +611,16 @@ export default function WorkerErrorReport() {
     }
   };
 
+  const currentUser = getStoredUser();
+  const LayoutComponent = useMemo(() => {
+    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+    if (hasAnyRole(roleValue, ["Owner", "PM"])) return OwnerLayout;
+    return WorkerLayout;
+  }, [currentUser]);
+
   return (
-    <OwnerLayout>
-      <div className="leave-page leave-list-page">
+    <LayoutComponent>
+      <div className="leave-page min-h-screen pb-20">
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
@@ -584,7 +644,7 @@ export default function WorkerErrorReport() {
               type="submit"
               form="error-report-form"
               disabled={
-                isSubmitting || 
+                isSubmitting ||
                 (form.partId && employees.length === 0 && !loadingEmployees)
               }
               className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -597,20 +657,19 @@ export default function WorkerErrorReport() {
             <form
               id="error-report-form"
               onSubmit={handleSubmit}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="rounded-xl border border-black bg-white p-5 shadow-sm"
             >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Đơn sản xuất</label>
                   <select
                     value={form.productionId}
                     onChange={(event) => handleProductionChange(event.target.value)}
                     disabled={isProductionLocked}
-                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
-                      isProductionLocked
-                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
-                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    }`}
+                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${isProductionLocked
+                      ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
+                      : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                      }`}
                   >
                     <option value="">Chọn đơn sản xuất...</option>
                     {productionOptions.map((item) => (
@@ -623,31 +682,18 @@ export default function WorkerErrorReport() {
                     <div className="mt-1 text-xs text-slate-400">Đang tải đơn sản xuất...</div>
                   )}
                 </div>
-
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Mức độ</label>
-                  <select
-                    value={form.severity}
-                    onChange={(event) => handleChange("severity", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    {SEVERITIES.map((item) => (
-                      <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase text-slate-500">Công đoạn</label>
+                  </div>
                   <select
                     value={form.partId}
                     onChange={(event) => handleChange("partId", event.target.value)}
                     disabled={!form.productionId || isPartLocked}
-                    className={`mt-1 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${
-                      isPartLocked
-                        ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed"
-                        : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                    }`}
+                    className={`mt-1.5 w-full rounded-xl border px-3 py-2 text-sm outline-none transition ${isPartLocked
+                      ? "bg-amber-50/50 border-amber-200 text-amber-900 cursor-not-allowed font-bold"
+                      : "bg-slate-50 border-slate-200 focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                      }`}
                   >
                     <option value="">Chọn công đoạn...</option>
                     {parts.map((item) => (
@@ -661,7 +707,19 @@ export default function WorkerErrorReport() {
                     <div className="mt-1 text-xs text-rose-600">{partsError}</div>
                   )}
                 </div>
+              </div>
 
+              <div className="mt-4">
+                <label className="text-xs font-semibold uppercase text-slate-500">Tiêu đề lỗi <span className="text-rose-500">*</span></label>
+                <input
+                  value={form.title}
+                  onChange={(event) => handleChange("title", event.target.value)}
+                  placeholder="Nhập tiêu đề ngắn gọn cho lỗi này..."
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
                   <input
@@ -673,12 +731,48 @@ export default function WorkerErrorReport() {
                 </div>
 
                 <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Mức độ lỗi</label>
+                  <select
+                    value={form.severity}
+                    onChange={(event) => handleChange("severity", Number(event.target.value))}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    {SEVERITIES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi<span className="text-rose-500">*</span></label>
+                  <select
+                    value={form.assignedTo}
+                    onChange={(event) => handleChange("assignedTo", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                  >
+                    <option value="">Chọn nhân viên...</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.fullName}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingEmployees && (
+                    <div className="mt-1 text-xs text-slate-400">Đang tải danh sách nhân viên...</div>
+                  )}
+                </div>
+
+                <div>
                   <label className="text-xs font-semibold uppercase text-slate-500">Thời gian phát sinh</label>
                   <input
                     type="datetime-local"
                     value={form.happenAt}
                     readOnly
-                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 outline-none cursor-not-allowed"
+                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm text-amber-900 outline-none transition cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -693,34 +787,6 @@ export default function WorkerErrorReport() {
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                 />
               </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi</label>
-                  <select
-                    value={form.repairWorker}
-                    onChange={(event) => handleChange("repairWorker", event.target.value)}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    <option value="">Chọn thợ sửa lỗi...</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id} value={emp.fullName}>
-                        {emp.fullName}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingEmployees ? (
-                    <div className="mt-1 text-xs text-slate-400">Đang tải danh sách thợ...</div>
-                  ) : (
-                    employees.length === 0 && form.partId && (
-                      <div className="mt-1 text-xs text-amber-600 font-medium italic">
-                        * Công đoạn này chưa có thợ được phân công.
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-
               <div className="mt-4">
                 <label className="text-xs font-semibold uppercase text-slate-500">Ảnh minh chứng</label>
                 <div
@@ -784,43 +850,41 @@ export default function WorkerErrorReport() {
             </form>
 
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-black bg-white p-5 shadow-sm">
                 <div className="flex items-center gap-2 text-slate-600 mb-3">
                   <Wrench size={16} />
                   <h2 className="text-xs font-bold uppercase tracking-widest">Thông tin công đoạn</h2>
                 </div>
                 {selectedPart ? (
                   <div className="space-y-2 text-sm text-slate-700">
-                    <InfoItem label="Part ID" value={selectedPart.id} />
                     <InfoItem label="Đơn sản xuất" value={`#PR-${selectedPart.productionId}`} />
                     <InfoItem label="Đơn hàng" value={selectedPart.orderName || "-"} />
                     <InfoItem label="Công đoạn" value={selectedPart.partName || "-"} />
-                    <InfoItem label="Bắt đầu" value={(selectedPart.startDate || "-").replace("T", " ").slice(0, 16)} />
-                    <InfoItem label="Kết thúc" value={(selectedPart.endDate || "-").replace("T", " ").slice(0, 16)} />
+                    <InfoItem label="Màu sắc" value={form.colorName || "-"} />
+                    <InfoItem label="Size" value={form.sizeName || "-"} />
                   </div>
                 ) : (
                   <div className="text-sm text-slate-500">Chọn đơn sản xuất và công đoạn để xem thông tin.</div>
                 )}
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="rounded-xl border border-black bg-white p-5 shadow-sm">
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-600 mb-3">
                   Mẹo báo cáo nhanh
                 </div>
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>Ghi rõ vị trí lỗi và số lượng lỗi.</li>
                   <li>Đính kèm ảnh để tổ trưởng đánh giá nhanh.</li>
-                  <li>Chọn mức độ nghiêm trọng đúng thực tế.</li>
                   <li>Thông tin thợ sửa lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
                 </ul>
               </div>
             </div>
           </div>
-        </div>
       </div>
-    </OwnerLayout>
-  );
-}
+        </div>
+      </LayoutComponent>
+    );
+  }
 
 function InfoItem({ label, value }) {
   return (

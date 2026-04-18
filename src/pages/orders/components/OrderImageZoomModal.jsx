@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function OrderImageZoomModal({ isOpen, imageUrl, onClose }) {
   const handleClose = () => {

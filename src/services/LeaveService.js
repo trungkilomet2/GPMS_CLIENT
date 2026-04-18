@@ -98,6 +98,8 @@ const normalizeLeaveQueryParams = (params) => {
   return nextParams;
 };
 
+const isNotFoundError = (error) => error?.response?.status === 404;
+
 export const getLeaveErrorMessage = (error, fallbackMessage) => {
   const status = error?.response?.status;
   const responseData = error?.response?.data;
@@ -120,6 +122,15 @@ export const getLeaveErrorMessage = (error, fallbackMessage) => {
       responseData?.message ||
       responseData?.title ||
       "Dữ liệu gửi lên chưa hợp lệ. Vui lòng kiểm tra lại nội dung và thời gian nghỉ."
+    );
+  }
+
+  if (status === 404) {
+    return translateLeaveMessage(
+      responseData?.message ||
+      responseData?.title ||
+      fallbackMessage ||
+      "API hiện tại chưa hỗ trợ thao tác này hoặc đường dẫn không tồn tại."
     );
   }
 
@@ -277,27 +288,66 @@ const LeaveService = {
   },
 
   async requestCancelLeaveRequest(id, payload) {
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REQUEST_CANCEL(id), payload);
-    const response = parseApiPayload(rawResponse);
+    try {
+      const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REQUEST_CANCEL(id), payload);
+      const response = parseApiPayload(rawResponse);
 
-    emitLeaveChange({ action: "request-cancel", id });
-    return response;
+      emitLeaveChange({ action: "request-cancel", id });
+      return response;
+    } catch (error) {
+      // Older backend builds expose only the direct cancel endpoint.
+      if (isNotFoundError(error)) {
+        return this.cancelLeaveRequest(id, payload);
+      }
+
+      throw error;
+    }
   },
 
   async confirmCancelLeaveRequest(id) {
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.CONFIRM_CANCEL(id));
-    const response = parseApiPayload(rawResponse);
+    try {
+      const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.CONFIRM_CANCEL(id));
+      const response = parseApiPayload(rawResponse);
 
-    emitLeaveChange({ action: "confirm-cancel", id });
-    return response;
+      emitLeaveChange({ action: "confirm-cancel", id });
+      return response;
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        throw {
+          response: {
+            status: 404,
+            data: {
+              message: "Backend hiện tại chưa hỗ trợ xác nhận yêu cầu hủy đơn nghỉ.",
+            },
+          },
+        };
+      }
+
+      throw error;
+    }
   },
 
   async rejectCancelLeaveRequest(id, payload) {
-    const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REJECT_CANCEL(id), payload);
-    const response = parseApiPayload(rawResponse);
+    try {
+      const rawResponse = await axiosClient.put(API_ENDPOINTS.LEAVE_REQUEST.REJECT_CANCEL(id), payload);
+      const response = parseApiPayload(rawResponse);
 
-    emitLeaveChange({ action: "reject-cancel", id });
-    return response;
+      emitLeaveChange({ action: "reject-cancel", id });
+      return response;
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        throw {
+          response: {
+            status: 404,
+            data: {
+              message: "Backend hiện tại chưa hỗ trợ từ chối yêu cầu hủy đơn nghỉ.",
+            },
+          },
+        };
+      }
+
+      throw error;
+    }
   },
 
   async createLeaveRequest(payload) {
