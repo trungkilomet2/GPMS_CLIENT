@@ -139,37 +139,35 @@ export default function ProductionDetail() {
   useEffect(() => {
     const loadWorkerMap = async () => {
       try {
+        // Sử dụng getManagerDirectory để lấy cả Admin/PM tham gia sản xuất
+        const response = await WorkerService.getManagerDirectory();
 
+        if (response?.data) {
+          const newMappings = {};
+          response.data.forEach(e => {
+            if (e.id) {
+              const sid = String(e.id);
+              newMappings[sid] = (e.fullName && e.fullName !== "Chưa cập nhật")
+                ? e.fullName
+                : (e.userName || `Thợ #${e.id}`);
+            }
+          });
 
-        const map = {};
-        const process = (p) => {
-          if (p.status === 'fulfilled' && p.value?.data) {
-            p.value.data.forEach(e => {
-              if (e.id) {
-                const sid = String(e.id);
-                // Ưu tiên fullName thực sự > userName > fallback Thợ #id
-                const realName = (e.fullName && e.fullName !== "Chưa cập nhật")
-                  ? e.fullName
-                  : (e.userName || `Thợ #${e.id}`);
-                map[sid] = realName;
-              }
-            });
-          }
-        };
-
-
-        // Bổ sung PM của chính dự án này vào map để chắc chắn hiển thị đúng tên Tùng (Manager)
-        if (production?.pmId && production?.pmName) {
-          map[String(production.pmId)] = production.pmName;
+          // Cập nhật gộp (functional update) để không ghi đè dữ liệu từ logs
+          setWorkerMap(prev => ({ ...prev, ...newMappings }));
         }
 
-        setWorkerMap(map);
+        // Đảm bảo PM của dự án luôn có tên
+        if (production?.pmId && production?.pmName) {
+          setWorkerMap(prev => ({ ...prev, [String(production.pmId)]: production.pmName }));
+        }
+
       } catch (err) {
         console.error("Worker map load error:", err);
       }
     };
     loadWorkerMap();
-  }, [isOwner, production?.pmId, production?.pmName]);
+  }, [production?.pmId, production?.pmName]);
 
   useEffect(() => {
     if (!production?.productionId) return;
