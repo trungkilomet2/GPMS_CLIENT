@@ -3,10 +3,10 @@
 
 //main URL
 
-//const BASE_URL = 'http://26.250.4.244:5229';
+const BASE_URL = 'http://26.250.4.244:5229';
 
 //Deploy URL
-const BASE_URL = 'https://gpms-api.onrender.com';
+//const BASE_URL = 'https://gpms-api.onrender.com';
 
 // sub URL
 // const BASE_URL = 'http://26.93.63.192:8000';
