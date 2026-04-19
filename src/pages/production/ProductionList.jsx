@@ -35,7 +35,7 @@ export default function ProductionList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [onlyMyOrders, setOnlyMyOrders] = useState(!isWorker); // Default false for workers so they see everything if discovery hasn't finished
+  const [onlyMyOrders, setOnlyMyOrders] = useState(isWorker || isPm); // Default true for workers/PMs to show assigned items first
   const [involvedProdIds, setInvolvedProdIds] = useState(() => {
     try {
       const saved = localStorage.getItem(`involved_prods_${currentUserId}`);
@@ -52,7 +52,7 @@ export default function ProductionList() {
   const baseProductions = useMemo(() => {
     // Owner sees all
     if (isOwner || currentUserId == null) return productions;
-    
+
     // If not PM and not Worker, we show everything (fallback)
     if (!isPm && !isWorker) return productions;
 
@@ -118,7 +118,7 @@ export default function ProductionList() {
       // 1. Collect ALL production IDs that aren't discovered yet
       const allIds = productions.map(p => p.productionId).filter(Boolean);
       const pendingIds = allIds.filter(id => partCounts[id] === undefined);
-      
+
       if (pendingIds.length === 0) return;
 
       // 2. Process in chunks of 5 to avoid overloading the server/browser
@@ -126,52 +126,47 @@ export default function ProductionList() {
       for (let i = 0; i < pendingIds.length; i += chunkSize) {
         if (!isMounted) break;
         const chunk = pendingIds.slice(i, i + chunkSize);
-        
+
         const results = await Promise.all(
           chunk.map(async (productionId) => {
             try {
               const response = await ProductionPartService.getPartsByProduction(productionId, { PageSize: 100 });
               const payload = response?.data?.data ?? response?.data ?? [];
               const list = Array.isArray(payload) ? payload : [];
-              
-              const uid = String(currentUserId);
-                const collectWorkers = (p) => {
-                  const items = [
-                    ...(Array.isArray(p.workerIds) ? p.workerIds : []),
-                    ...(Array.isArray(p.assignedWorkers) ? p.assignedWorkers : []),
-                    ...(Array.isArray(p.assignees) ? p.assignees : []),
-                    ...(Array.isArray(p.workers) ? p.workers : []),
-                    ...(Array.isArray(p.listWorker) ? p.listWorker : []),
-                    p.workerId,
-                    p.workerIdRaw,
-                    p.userId,
-                    p.worker?.id,
-                    p.worker?.userId,
-                    p.workerInfo?.id,
-                    p.workerInfo?.userId
-                  ].filter(Boolean);
-                  return items;
-                };
 
-                // Check both part level and all variants (listPartOrderSizes)
-                const isUserInvolved = list.some(part => {
-                  const partWorkers = collectWorkers(part);
-                  const isPartWorker = partWorkers.some(w => {
+              const uid = String(currentUserId);
+              const collectWorkers = (p) => {
+                const items = [
+                  ...(Array.isArray(p.assigneeIds) ? p.assigneeIds : []),
+                  // Fallbacks for compatibility
+                  ...(Array.isArray(p.workerIds) ? p.workerIds : []),
+                  ...(Array.isArray(p.assignedWorkers) ? p.assignedWorkers : []),
+                  ...(Array.isArray(p.assignees) ? p.assignees : []),
+                  p.workerId,
+                  p.userId
+                ].filter(Boolean);
+                return items;
+              };
+
+              // Check both part level and all variants (listPartOrderSizes)
+              const isUserInvolved = list.some(part => {
+                const partWorkers = collectWorkers(part);
+                const isPartWorker = partWorkers.some(w => {
+                  const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
+                  return String(wid) === uid;
+                });
+                if (isPartWorker) return true;
+
+                // Check variants
+                const variants = part.listPartOrderSizes || part.partOrderSizes || [];
+                return variants.some(v => {
+                  const variantWorkers = collectWorkers(v);
+                  return variantWorkers.some(w => {
                     const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
                     return String(wid) === uid;
                   });
-                  if (isPartWorker) return true;
-
-                  // Check variants
-                  const variants = part.listPartOrderSizes || part.partOrderSizes || [];
-                  return variants.some(v => {
-                    const variantWorkers = collectWorkers(v);
-                    return variantWorkers.some(w => {
-                      const wid = (typeof w === 'object') ? (w.id || w.workerId || w.userId || w.accountId) : w;
-                      return String(wid) === uid;
-                    });
-                  });
                 });
+              });
 
               const display = list.length > 0 ? `${list.length}` : "0";
               return { productionId, display, isUserInvolved };
@@ -322,16 +317,16 @@ export default function ProductionList() {
                   <option value="Từ Chối">Từ Chối</option>
                 </select>
               </label>
-              
-              {(isPm || isWorker) && !isOwner && (
+
+              {isPm && !isOwner && !isWorker && (
                 <div className="flex items-center gap-3 h-[45px] pb-1">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <div className="relative">
-                      <input 
-                        type="checkbox" 
-                        checked={onlyMyOrders} 
+                      <input
+                        type="checkbox"
+                        checked={onlyMyOrders}
                         onChange={(e) => setOnlyMyOrders(e.target.checked)}
-                        className="sr-only peer" 
+                        className="sr-only peer"
                       />
                       <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                     </div>

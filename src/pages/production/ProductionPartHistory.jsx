@@ -18,7 +18,6 @@ import OwnerLayout from "@/layouts/OwnerLayout";
 import ConfirmModal from "@/components/ConfirmModal";
 import ProductionPartService from "@/services/ProductionPartService";
 import ProductionService from "@/services/ProductionService";
-import OrderService from "@/services/OrderService";
 import { toast } from "react-toastify";
 import { getStoredUser } from "@/lib/authStorage";
 import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
@@ -66,36 +65,22 @@ export default function ProductionPartHistory() {
   };
 
   const getLogIdentity = (log = {}) => {
-    // WorkLogId is the ID of the record itself
     const finalLogId = toPositiveInt(log.id || log.workLogId);
-
-    // PartOrderSizeId is the variant/link ID
     const variantIdValue = log.partOrderSizeId || log.productionPartOrderSizeId || log.orderSizeId || 0;
     const finalVariantId = toPositiveInt(variantIdValue);
-
-    // PartId is the Stage/ProductionPart ID. 
-    // We try to find it in the log first, then fallback to variantLookup if not present.
     const logPartId = log.productionPartId || log.partId;
     let finalPartId = toPositiveInt(logPartId);
 
     if (finalPartId === 0 && finalVariantId !== 0) {
-      // Lookup the Stage ID from our variant map
       const foundPart = variantLookup[String(finalVariantId)];
       if (foundPart) {
         finalPartId = toPositiveInt(foundPart.id || foundPart.partId);
       }
     }
-
-    // Last resort fallback to URL param if still 0
     if (finalPartId === 0) {
       finalPartId = toPositiveInt(params.partId);
     }
-
-    return {
-      partId: finalPartId,
-      partOrderSizeId: finalVariantId,
-      workLogId: finalLogId,
-    };
+    return { partId: finalPartId, partOrderSizeId: finalVariantId, workLogId: finalLogId };
   };
 
   useEffect(() => {
@@ -116,75 +101,67 @@ export default function ProductionPartHistory() {
 
       try {
         setLoading(true);
-        // A. Fetch Production Detail
-        let prodData = {};
+        // A. Fetch Production Detail (Basic Info)
         try {
-          const prodRes = await ProductionService.getProductionDetail(activeProdId);
-          prodData = prodRes?.data?.data || prodRes?.data || {};
+          await ProductionService.getProductionDetail(activeProdId);
         } catch (e) {
           console.error("Error Production Detail API:", e);
         }
 
-        const orderId = prodData?.orderId || prodData?.order?.id || prodData?.orderID;
+        // B. Fetch Parts & Build Lookup (No Order API needed anymore)
+        const partsRes = await ProductionPartService.getPartsByProduction(activeProdId).catch(err => {
+          console.error("Error Parts API:", err);
+          return { data: [] };
+        });
 
-        // B. Fetch Order Detail
-        if (orderId && hasAnyRole(user?.role, ["Owner", "PM", "Manager", "Team Leader"])) {
-          try {
-            const orderRes = await OrderService.getOrderDetail(orderId);
-            const orderData = orderRes?.data?.data || orderRes?.data || {};
-            const orderDetails = orderData?.orderDetails || orderData?.orderItems || [];
-
-            const osLookup = {};
-            orderDetails.forEach(detail => {
-              const color = detail.colorName || detail.productColorName || detail.color || "-";
-              if (detail.orderSizes) {
-                detail.orderSizes.forEach(os => {
-                  const osId = String(os.id || os.orderSizeId || "");
-                  if (osId) {
-                    osLookup[osId] = {
-                      color,
-                      size: os.sizeName || os.size || os.productSize || "-"
-                    };
-                  }
-                });
-              }
-            });
-            setOrderSizeLookup(osLookup);
-          } catch (err) { console.error("Error Order API:", err); }
-        }
-
-        // C. Fetch Parts & Logs in parallel
-        const [partsRes, logsRes] = await Promise.allSettled([
-          ProductionPartService.getPartsByProduction(activeProdId),
-          ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: 0, PageSize: 100 })
-        ]);
-
-        if (partsRes.status === 'fulfilled') {
-          const partsList = partsRes.value?.data?.data || partsRes.value?.data || [];
+        if (partsRes) {
+          const partsList = partsRes.data?.data || partsRes.data || [];
           const pLookup = {};
           const vLookup = {};
+          const osLookup = {};
 
           partsList.forEach((p) => {
             const pid = String(p.id || p.partId || p.productionPartId || "");
-            const vlinkId = String(p.partOrderSizeId || p.orderSizeId || p.productionPartOrderSizeId || "");
-
             if (pid && pid !== "0") pLookup[pid] = p;
-            if (vlinkId && vlinkId !== "0") vLookup[vlinkId] = p;
+
+            const variants = p.listPartOrderSizes || p.variants || p.partOrderSizes || [];
+            variants.forEach(v => {
+              const vlinkId = String(v.id || v.partOrderSizeId || "");
+              if (vlinkId && vlinkId !== "0") {
+                vLookup[vlinkId] = p;
+                osLookup[vlinkId] = {
+                  color: v.color || v.colorName || "-",
+                  size: v.size || v.sizeName || "-"
+                };
+              }
+            });
           });
           setPartsLookup(pLookup);
           setVariantLookup(vLookup);
-        } else {
-          console.error("Error Parts API:", partsRes.reason);
+          setOrderSizeLookup(osLookup);
         }
 
-        if (logsRes.status === 'fulfilled') {
-          const logData = logsRes.value?.data?.data || logsRes.value?.data || [];
-          setLogs(Array.isArray(logData) ? logData : []);
-        } else {
-          console.error("Error Logs API:", logsRes.reason);
-          // Only show toast if the MAIN data fails
-          toast.error("Không thể tải danh sách bản ghi.");
+        // C. Fetch Logs (Multi-page)
+        let allLogs = [];
+        let pIdx = 0;
+        let hasMore = true;
+        while (hasMore && pIdx < 50) {
+          try {
+            const logsRes = await ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: pIdx, PageSize: 30 });
+            const logData = logsRes?.data?.data || logsRes?.data || [];
+            if (Array.isArray(logData) && logData.length > 0) {
+              allLogs = [...allLogs, ...logData];
+              hasMore = logData.length === 30;
+              pIdx++;
+            } else {
+              hasMore = false;
+            }
+          } catch (err) {
+            console.error(`Error Logs API Page ${pIdx}:`, err);
+            hasMore = false;
+          }
         }
+        setLogs(allLogs);
 
       } catch (err) {
         console.error("Critical Fetch Error:", err);
@@ -199,11 +176,7 @@ export default function ProductionPartHistory() {
   const stats = useMemo(() => {
     const totalLogs = logs.length;
     const pendingCount = logs.filter(log => !log.isReadOnly).length;
-
-    return {
-      totalLogs,
-      pendingCount
-    };
+    return { totalLogs, pendingCount };
   }, [logs]);
 
   const filteredLogs = useMemo(() => {
@@ -219,8 +192,6 @@ export default function ProductionPartHistory() {
     const start = (currentPage - 1) * pageSize;
     return filteredLogs.slice(start, start + pageSize);
   }, [filteredLogs, currentPage, pageSize]);
-
-  // --- ACTIONS ---
 
   const handleOpenApprove = (log) => {
     const fallbackQty = Number(log.quantity);
@@ -254,18 +225,7 @@ export default function ProductionPartHistory() {
       )));
       toast.success("Đã nghiệm thu sản lượng thành công.");
     } catch (err) {
-      let msg = "Lỗi nghiệm thu: ";
-      const data = err.response?.data;
-      if (data?.errors) {
-        msg += Object.values(data.errors).flat().join(", ");
-      } else if (data?.message) {
-        msg += data.message;
-      } else if (typeof data === 'string') {
-        msg += data;
-      } else {
-        msg += data?.title || "Lỗi tham số hoặc dữ liệu không hợp lệ (400)";
-      }
-      toast.error(msg, { autoClose: 6000 });
+      toast.error("Lỗi nghiệm thu sản phẩm.");
     } finally {
       setIsProcessing(false);
       setTargetLog(null);
@@ -301,23 +261,15 @@ export default function ProductionPartHistory() {
     const { type, data } = confirmConfig;
     setConfirmConfig(prev => ({ ...prev, isOpen: false }));
     setIsProcessing(true);
-
     try {
       if (type === "DELETE") {
         const { workLogId } = getLogIdentity(data);
-        if (!workLogId) {
-          throw new Error("Missing work log id");
-        }
         await ProductionPartService.deleteWorkLog(workLogId);
         setLogs((prev) => prev.filter((item) => getLogIdentity(item).workLogId !== workLogId));
         toast.success("Đã xóa bản ghi.");
       } else if (type === "EDIT") {
         const { log, newVal } = data;
         const { partId, partOrderSizeId, workLogId } = getLogIdentity(log);
-        if (!partId || !partOrderSizeId || !workLogId) {
-          throw new Error("Missing ids to update work log");
-        }
-
         await ProductionPartService.updateWorkLog(partId, partOrderSizeId, workLogId, { quantity: newVal });
         setLogs((prev) => prev.map((item) => (getLogIdentity(item).workLogId === workLogId ? { ...item, quantity: newVal } : item)));
         setEditingId(null);
@@ -333,16 +285,21 @@ export default function ProductionPartHistory() {
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("vi-VN");
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
   };
 
   return (
     <LayoutComponent>
-
       <div className="leave-page min-h-screen font-sans selection:bg-[#1e6e43]/10 selection:text-[#1e6e43] pb-20">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
 
-          {/* HEADER SECTION */}
+          {/* HEADER */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-4">
               <button
@@ -362,30 +319,17 @@ export default function ProductionPartHistory() {
             </div>
           </div>
 
-          {/* STATS SECTION */}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <StatCard
-              icon={<History size={24} />}
-              label="Số lượt báo cáo"
-              value={loading ? "..." : `${stats.totalLogs} lượt`}
-              color="emerald"
-            />
-            <StatCard
-              icon={<Zap size={24} />}
-              label="Bản ghi chờ duyệt"
-              value={loading ? "..." : `${stats.pendingCount} bản ghi`}
-              color="emerald"
-            />
+            <StatCard icon={<History size={24} />} label="Số lượt báo cáo" value={loading ? "..." : `${stats.totalLogs} lượt`} color="emerald" />
+            <StatCard icon={<Zap size={24} />} label="Bản ghi chờ duyệt" value={loading ? "..." : `${stats.pendingCount} bản ghi`} color="emerald" />
           </div>
 
-          {/* TABLE SECTION */}
           <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
             <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between bg-white">
               <div className="flex items-center gap-3">
                 <div className="w-1.5 h-6 bg-[#1e6e43] rounded-full" />
                 <h2 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-800">Bảng kê chi tiết thực hiện</h2>
               </div>
-
               <div className="flex items-center gap-2">
                 <div className="flex bg-slate-100 p-1 rounded-xl border border-black shadow-sm mr-4">
                   {[
@@ -412,131 +356,109 @@ export default function ProductionPartHistory() {
                   <tr className="bg-slate-50/50 border-b border-black">
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black w-16">STT</th>
                     <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Công đoạn</th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Biến thể</th>
-                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Thợ thực hiện</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Kích cỡ & màu sắc</th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black min-w-[160px]">Thợ thực hiện</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Số lượng</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Ngày ghi</th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600 border-r border-black">Trạng thái</th>
-                    {!isWorker && <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800">Quản lý</th>}
+                    <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-slate-800 w-[140px]">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 border-black">
                   {logs.length === 0 && !loading ? (
                     <tr>
-                      <td colSpan={8} className="py-32 text-center">
-                        <div className="flex flex-col items-center gap-4 text-slate-200">
-                          <Package size={64} />
-                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">
-                            {statusFilter !== "all" ? "Không có bản ghi nào khớp với bộ lọc" : "Không có dữ liệu bản ghi"}
-                          </p>
-                        </div>
-                      </td>
+                      <td colSpan={8} className="py-32 text-center text-slate-400 font-bold uppercase text-[10px] tracking-widest">Không có dữ liệu</td>
                     </tr>
                   ) : pageLogs.map((log, index) => {
                     const globalIndex = (currentPage - 1) * pageSize + index + 1;
                     const logPosId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
-                    const logPartId = String(log.productionPartId || log.partId || log.productPartId || log.id || "");
-
-                    // Priority: variantLookup is more specific as it links a specific assignment to a stage
-                    const part = variantLookup[logPosId] || partsLookup[logPartId];
-                    const osInfo = orderSizeLookup[log.orderSizeId || log.productionPartOrderSizeId || log.partOrderSizeId];
+                    const osInfo = orderSizeLookup[logPosId];
                     const { workLogId } = getLogIdentity(log);
                     const rowId = workLogId || `row-${index}`;
                     const isEditing = editingId === rowId;
-                    const isDone =
-                      log.status === 2 ||
-                      log.statusName === "Đã nghiệm thu" ||
-                      log.status === 4 ||
-                      log.statusName === "Đã hoàn thành";
+                    const isDone = log.status === 2 || log.statusName === "Đã nghiệm thu";
 
-                    const partName = log.productionPartName || log.partName || part?.name || part?.partName || "N/A";
-                    const color = log.colorName || log.productColorName || log.color || osInfo?.color || part?.color || part?.colorName || part?.productColor || "-";
-                    const size = log.sizeName || log.productSizeName || log.size || osInfo?.size || part?.size || part?.sizeName || part?.productSize || "-";
+                    // CHECK PERMISSIONS
+                    const isCreator = String(log.userId || log.workerId || log.accountId) === String(user?.id || user?.userId);
+                    const canApprove = !isWorker && !isDone && !log.isReadOnly;
+                    const canEditDelete = isCreator && !isDone && !log.isReadOnly;
 
                     return (
-                      <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/10" : ""}`}>
+                      <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/5" : ""}`}>
                         <td className="px-6 py-4 text-center font-bold text-slate-400 text-[11px] italic">{String(globalIndex).padStart(2, "0")}</td>
+                        <td className="px-6 py-4 font-bold text-slate-900 uppercase tracking-tight text-sm">{log.productionPartName || log.partName || "N/A"}</td>
                         <td className="px-6 py-4">
-                          <div className="font-bold text-slate-900 uppercase tracking-tight text-sm">{partName}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-1.5 focus:outline-none">
-                            {color !== "-" && <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase text-slate-700">{color}</span>}
-                            {size !== "-" && <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase text-slate-700">{size}</span>}
+                          <div className="flex gap-1.5">
+                            <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase">{log.colorName || osInfo?.color || "-"}</span>
+                            <span className="rounded-lg bg-white border border-black px-2.5 py-1 text-[10px] font-bold uppercase">{log.sizeName || osInfo?.size || "-"}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="font-bold text-slate-600 uppercase text-[10px] tracking-widest px-3 py-1 rounded-lg bg-slate-50 inline-block border border-black">
+                          <span className="inline-flex items-center justify-center whitespace-nowrap font-bold text-slate-600 uppercase text-[10px] tracking-widest px-4 py-1.5 rounded-full bg-slate-50 border border-black italic min-w-[120px]">
                             {log.userName || log.workerName || `Thợ #${log.userId}`}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center">
                           {isEditing ? (
-                            <input
-                              type="number"
-                              value={editValue}
-                              onChange={e => setEditValue(e.target.value)}
-                              className="w-20 rounded-xl border border-black bg-white px-3 py-2 text-center font-bold text-slate-900 outline-none shadow-sm focus:border-slate-400 transition-all"
-                              autoFocus
-                            />
+                            <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-16 rounded border border-black text-center font-bold outline-none" autoFocus />
                           ) : (
-                            <span className={`inline-flex h-9 w-12 items-center justify-center rounded-xl font-bold text-sm border ${isDone ? 'bg-slate-900 text-white border-black' : 'bg-white text-slate-800 border-black'}`}>
-                              {log.quantity}
-                            </span>
+                            <span className={`inline-flex h-8 w-10 items-center justify-center rounded-lg font-bold text-xs border ${isDone ? 'bg-slate-900 text-white' : 'bg-white border-black'}`}>{log.quantity}</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-600 uppercase tracking-tighter italic">{formatDate(log.createDate || log.workDate)}</td>
+                        <td className="px-6 py-4 text-center text-[10px] font-bold text-slate-600 italic">{formatDate(log.createDate || log.workDate)}</td>
                         <td className="px-6 py-4 text-center">
                           {log.isReadOnly ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-300 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-indigo-700 shadow-sm">
-                              <ClipboardCheck size={11} /> Đã nghiệm thu
-                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-300 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-indigo-700"><ClipboardCheck size={11} /> Đã nghiệm thu</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600 shadow-sm">
-                              <Zap size={11} className="animate-pulse" /> Chờ nghiệm thu
-                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400 bg-white px-3 py-0.5 text-[9px] font-bold uppercase text-amber-600"><Zap size={11} className="animate-pulse" /> Chờ nghiệm thu</span>
                           )}
                         </td>
-                        {!isWorker && (
-                          <td className="px-6 py-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
-                              {isEditing ? (
-                                <>
-                                  <button onClick={() => openEditConfirm(log)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all"><Check size={18} /></button>
-                                  <button onClick={() => setEditingId(null)} className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all"><X size={18} /></button>
-                                </>
-                              ) : (
-                                <>
-                                  {!isDone && !log.isReadOnly && (
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            {isEditing ? (
+                              <>
+                                <button onClick={() => openEditConfirm(log)} title="Lưu số lượng" className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"><Check size={18} /></button>
+                                <button onClick={() => setEditingId(null)} title="Hủy bỏ" className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all active:scale-95 shadow-sm"><X size={18} /></button>
+                              </>
+                            ) : (
+                              <>
+                                {canApprove && (
+                                  <button
+                                    onClick={() => handleOpenApprove(log)}
+                                    title="Xác nhận Nghiệm thu"
+                                    className="w-10 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-[#1e6e43] flex items-center justify-center transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95 shadow-sm"
+                                  >
+                                    <Zap size={16} />
+                                  </button>
+                                )}
+                                {canEditDelete && (
+                                  <>
                                     <button
-                                      onClick={() => handleOpenApprove(log)}
-                                      title="Xác nhận Nghiệm thu"
-                                      className="w-10 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-[#1e6e43] flex items-center justify-center transition-all hover:bg-[#1e6e43] hover:text-white hover:shadow-md active:scale-95"
+                                      onClick={() => (setEditingId(rowId), setEditValue(String(log.quantity)))}
+                                      title="Chỉnh sửa sản lượng"
+                                      className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 transition-all hover:text-slate-900 hover:border-slate-300 hover:shadow-sm active:scale-95 shadow-sm"
                                     >
-                                      <Zap size={16} />
+                                      <Pencil size={15} />
                                     </button>
-                                  )}
-                                  <button
-                                    onClick={() => !log.isReadOnly && (setEditingId(rowId), setEditValue(String(log.quantity)))}
-                                    disabled={log.isReadOnly || isDone}
-                                    className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-300' : 'text-slate-400 hover:text-slate-900 hover:border-slate-300 active:scale-95'}`}
-                                    title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Sửa"}
-                                  >
-                                    <Pencil size={15} />
-                                  </button>
-                                  <button
-                                    onClick={() => !log.isReadOnly && openDeleteConfirm(log)}
-                                    disabled={log.isReadOnly || isDone}
-                                    className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 transition-all shadow-sm ${log.isReadOnly || isDone ? 'opacity-30 cursor-not-allowed text-slate-200' : 'text-rose-300 hover:text-rose-500 hover:border-rose-200 active:scale-95'}`}
-                                    title={log.isReadOnly ? "Bản ghi đã nghiệm thu (Read Only)" : "Xóa"}
-                                  >
-                                    <Trash size={15} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                        )}
+                                    <button
+                                      onClick={() => openDeleteConfirm(log)}
+                                      title="Xóa lượt báo cáo này"
+                                      className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-rose-300 transition-all hover:text-rose-500 hover:border-rose-200 hover:shadow-sm active:scale-95 shadow-sm"
+                                    >
+                                      <Trash size={15} />
+                                    </button>
+                                  </>
+                                )}
+                                {!canApprove && !canEditDelete && (
+                                  <div className="flex items-center gap-1.5 opacity-40 px-3 py-1 bg-slate-50 rounded-lg border border-slate-200 grayscale" title="Bạn không có quyền thao tác trên bản ghi này">
+                                    <ShieldCheck size={14} className="text-slate-400" />
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Chỉ xem</span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -544,85 +466,44 @@ export default function ProductionPartHistory() {
               </table>
             </div>
 
-            {/* PAGINATION FOOTER */}
             <div className="px-8 py-5 border-t border-black bg-slate-50/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Hiển thị {Math.min(filteredLogs.length, (currentPage - 1) * pageSize + 1)}-{Math.min(filteredLogs.length, currentPage * pageSize)} trên {filteredLogs.length} bản ghi
-              </p>
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hiển thị {filteredLogs.length} bản ghi</p>
+              <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
             </div>
           </div>
         </div>
 
-        {/* MODALS */}
         {isApproveOpen && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-3xl bg-white p-8 border border-black shadow-2xl animate-in zoom-in-95 duration-200">
               <div className="text-center mb-8">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 text-black mb-4">
-                  <ShieldCheck size={32} />
-                </div>
-                <h3 className="text-xl font-black text-black uppercase tracking-tight">Nghiệm thu bản ghi</h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-2">
-                  Xác nhận sản lượng của: {targetLog?.userName || targetLog?.workerName}
-                </p>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 border border-slate-200 mb-4"><ShieldCheck size={32} /></div>
+                <h3 className="text-xl font-black uppercase tracking-tight">Nghiệm thu bản ghi</h3>
               </div>
-
               <div className="space-y-6 mb-8">
-                <div className="relative">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 block">Số lượng nghiệm thu</label>
-                  <input
-                    type="number"
-                    value={approveQty}
-                    onChange={(e) => setApproveQty(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-center text-4xl font-bold text-slate-900 outline-none focus:bg-white focus:border-slate-400 transition-all shadow-inner"
-                    autoFocus
-                  />
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-3 italic">
-                    * Thợ báo cáo: {targetLog?.quantity} cái
-                  </div>
-                </div>
+                <input type="number" value={approveQty} onChange={(e) => setApproveQty(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-center text-4xl font-bold outline-none shadow-inner" autoFocus />
+                <div className="text-[10px] font-bold text-slate-400 uppercase text-center mt-3">Thợ báo cáo: {targetLog?.quantity} cái</div>
               </div>
-
               <div className="flex gap-4">
-                <button
-                  onClick={() => setIsApproveOpen(false)}
-                  className="flex-1 rounded-xl bg-white border border-slate-200 py-4 text-xs font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  onClick={executeApprove}
-                  className="flex-[2] rounded-xl bg-[#1e6e43] py-4 text-xs font-bold text-white uppercase tracking-widest hover:bg-[#155232] shadow-lg shadow-green-100 active:scale-[0.98] transition-all"
-                >
-                  Xác nhận Nghiệm thu
-                </button>
+                <button onClick={() => setIsApproveOpen(false)} className="flex-1 rounded-xl bg-white border border-slate-200 py-4 text-xs font-bold text-slate-500 uppercase">Hủy bỏ</button>
+                <button onClick={executeApprove} className="flex-[2] rounded-xl bg-[#1e6e43] py-4 text-xs font-bold text-white uppercase shadow-lg shadow-green-100">Xác nhận Nghiệm thu</button>
               </div>
             </div>
           </div>
         )}
 
         <ConfirmModal
-          isOpen={confirmConfig.isOpen}
-          title={confirmConfig.title}
-          description={confirmConfig.description}
-          onConfirm={executeAction}
-          onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
-          primaryLabel={confirmConfig.type === "DELETE" ? "Đồng ý xóa" : "Xác nhận lưu"}
-          secondaryLabel="Quay lại"
-          confirmIcon={confirmConfig.type === "DELETE" ? <Trash size={32} /> : <Check size={32} />}
-          variant={confirmConfig.type === "DELETE" ? "danger" : "success"}
+          isOpen={confirmConfig.isOpen} title={confirmConfig.title} description={confirmConfig.description}
+          onConfirm={executeAction} onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+          primaryLabel={confirmConfig.type === "DELETE" ? "Đồng ý xóa" : "Xác nhận lưu"} secondaryLabel="Quay lại"
+          confirmIcon={confirmConfig.type === "DELETE" ? <Trash size={32} /> : <Check size={32} />} variant={confirmConfig.type === "DELETE" ? "danger" : "success"}
         />
 
         {isProcessing && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/5 backdrop-blur-[2px]">
             <div className="rounded-2xl bg-white p-6 border border-slate-200 shadow-xl flex items-center gap-4">
               <Loader2 className="animate-spin text-black" size={24} />
-              <span className="text-xs font-black text-black uppercase tracking-widest">Đang cập nhật...</span>
+              <span className="text-xs font-black uppercase tracking-widest">Đang cập nhật...</span>
             </div>
           </div>
         )}
@@ -632,11 +513,9 @@ export default function ProductionPartHistory() {
 }
 
 function StatCard({ icon, label, value, color }) {
-  const colorMap = {
-    emerald: "bg-[#f0f9f4] border-[#d4e3da] text-[#1e6e43]",
-  };
+  const colorMap = { emerald: "bg-[#f0f9f4] border-[#d4e3da] text-[#1e6e43]" };
   return (
-    <div className="flex items-center gap-6 rounded-2xl border border-black bg-white p-8 shadow-sm transition-all hover:translate-y-[-2px] hover:shadow-md">
+    <div className="flex items-center gap-6 rounded-2xl border border-black bg-white p-8 shadow-sm transition-all hover:translate-y-[-2px]">
       <div className={`flex h-16 w-16 items-center justify-center rounded-xl border shadow-sm ${colorMap[color] || colorMap.emerald}`}>{icon}</div>
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{label}</p>

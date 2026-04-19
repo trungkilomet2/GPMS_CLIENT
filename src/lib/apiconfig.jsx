@@ -2,7 +2,7 @@
 // const BASE_URL = 'http://localhost:5229';
 
 //main URL
- const BASE_URL = 'http://26.250.4.244:5229';
+const BASE_URL = 'http://26.250.4.244:5229';
 
 //Deploy URL
 //const BASE_URL = 'https://gpms-api.onrender.com';
@@ -81,7 +81,8 @@ export const API_ENDPOINTS = {
     CREATE_ISSUE: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/create/${partId}`,
     DONE_A_PART: (id) => `${BASE_URL}/api/ProductionPart/parts/done-a-part/${id}`,
     GET_ISSUE_WORKERS: (partId) => `${BASE_URL}/api/ProductionPart/parts/issues/workers/${partId}`,
-    COMPLETE_PAYMENT: (partId) => `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
+    COMPLETE_PAYMENT: (partId) =>
+      `${BASE_URL}/api/ProductionPart/parts/complete-payment/${partId}`,
     GET_PRODUCTION_WORK_LOGS: (productionId) => `${BASE_URL}/api/ProductionPart/production/work-logs/${productionId}`,
     RECORD_DELIVERY: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/${orderId}`,
     GET_DELIVERY_PLANNING: (orderId) => `${BASE_URL}/api/ProductionPart/delivery/order/planning/${orderId}`,

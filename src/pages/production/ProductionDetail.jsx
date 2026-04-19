@@ -139,18 +139,7 @@ export default function ProductionDetail() {
   useEffect(() => {
     const loadWorkerMap = async () => {
       try {
-        const calls = [];
-        // Nếu là Owner/Admin, ưu tiên lấy danh bạ toàn hệ thống và danh bạ manager
-        if (isOwner) {
-          calls.push(WorkerService.getEmployeeDirectory({ PageSize: 1000 }));
-          calls.push(WorkerService.getManagerDirectory({ PageSize: 1000 }));
-        } else {
-          // Nếu là PM/Worker, chỉ nên lấy danh bạ trong phạm vi được phép (PM Scope)
-          // để tránh lỗi 403 Forbidden khi truy cập danh bạ toàn cục.
-          calls.push(WorkerService.getEmployeeDirectoryByPmScope({ PageSize: 1000 }));
-        }
 
-        const results = await Promise.allSettled(calls);
 
         const map = {};
         const process = (p) => {
@@ -168,7 +157,6 @@ export default function ProductionDetail() {
           }
         };
 
-        results.forEach(process);
 
         // Bổ sung PM của chính dự án này vào map để chắc chắn hiển thị đúng tên Tùng (Manager)
         if (production?.pmId && production?.pmName) {
@@ -348,7 +336,7 @@ export default function ProductionDetail() {
   const handleRejectProduction = async (reason) => {
     try {
       await ProductionService.rejectProduction(production.productionId, { userId: currentUserId, reason });
-      setProduction(prev => ({ ...prev, status: "Từ Chối", reason })); 
+      setProduction(prev => ({ ...prev, status: "Từ Chối", reason }));
       setIsReasonModalOpen(false);
       toast.success("Đã từ chối đơn sản xuất.");
       setTimeout(() => window.location.reload(), 1500);
@@ -540,7 +528,7 @@ export default function ProductionDetail() {
             {production.status === "Từ Chối" && (production.reason || production.rejectReason) && (
               <div className="flex items-center gap-4 px-8 py-5 bg-rose-50 border border-rose-200 rounded-2xl animate-in zoom-in-95 duration-500 shadow-sm border-l-4 border-l-rose-500">
                 <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-sm">
-                   <AlertTriangle size={20} />
+                  <AlertTriangle size={20} />
                 </div>
                 <div className="flex-1 space-y-1">
                   <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] opacity-70">Lý do từ chối / Hủy đơn</h5>
@@ -896,7 +884,7 @@ export default function ProductionDetail() {
         isOpen={isRequestPlanUpdateConfirmOpen}
         onClose={() => setIsRequestPlanUpdateConfirmOpen(false)}
         onConfirm={(reason) => {
-           confirmRequestPlanUpdate(reason);
+          confirmRequestPlanUpdate(reason);
         }}
         title="Yêu cầu sửa kế hoạch"
         description="Gửi yêu cầu yêu cầu PM chỉnh sửa lại kế hoạch sản xuất."
@@ -923,13 +911,13 @@ export default function ProductionDetail() {
         requireReason={false}
       />
 
-      <ConfirmModal 
-        isOpen={isReasonModalOpen} 
-        onClose={() => setIsReasonModalOpen(false)} 
-        onConfirm={handleRejectProduction} 
-        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"} 
-        requireReason={true} 
-        variant="danger" 
+      <ConfirmModal
+        isOpen={isReasonModalOpen}
+        onClose={() => setIsReasonModalOpen(false)}
+        onConfirm={handleRejectProduction}
+        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"}
+        requireReason={true}
+        variant="danger"
       />
     </OwnerLayout>
   );
@@ -999,7 +987,7 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
       {/* Header */}
       <div className="grid grid-cols-12 items-center px-6 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
         <div className="col-span-4 text-xs font-black text-gray-500 uppercase tracking-widest">Công đoạn</div>
-        <div className="col-span-3 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Biến thể</div>
+        <div className="col-span-3 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Kích cỡ & màu sắc</div>
         <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Sản lượng</div>
         <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Trạng thái</div>
         <div className="col-span-1"></div>
