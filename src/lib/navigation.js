@@ -32,7 +32,7 @@ export const BREADCRUMB_CONFIG = [
   { path: "/production/:id", label: ({ id }) => `Chi tiết sản xuất #${id}`, parent: "/production" },
   { path: "/worker-roles", label: "Vai trò thợ", parent: "/home" },
   { path: "/worker-roles/create", label: "Thêm vai trò thợ", parent: "/worker-roles" },
-  { path: "/worker/assignments", label: "Công việc được giao", parent: "/home" },
+  // { path: "/worker/assignments", label: "Công việc được giao", parent: "/home" },
   { path: "/worker/output-history", label: "Sản lượng của tôi", parent: "/home" },
   {
     path: "/employees/:id/edit",
@@ -45,7 +45,7 @@ export const BREADCRUMB_CONFIG = [
     parent: "/employees",
   },
   { path: "/leave", label: "Đơn xin nghỉ", parent: "/dashboard" },
-  
+
   { path: "/leave-requests", label: "Lịch sử đơn nghỉ của tôi", parent: "/home" },
   {
     path: "/leave-requests/:id",

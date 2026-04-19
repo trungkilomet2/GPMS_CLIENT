@@ -69,7 +69,7 @@ const getPriorityBySeverity = (severity) =>
 const getErrorTypeLabel = (value) =>
   ERROR_TYPES.find((item) => item.value === Number(value))?.label ?? value;
 
-export default function WorkerErrorReport() {
+export default function ErrorReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const fileInputRef = useRef(null);

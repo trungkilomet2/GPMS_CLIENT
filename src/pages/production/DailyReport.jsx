@@ -104,7 +104,7 @@ function formatDateInput(date = new Date()) {
 
 import { getPlanStatusLabel } from "@/utils/statusUtils";
 
-export default function WorkerDailyReport() {
+export default function DailyReport() {
   const navigate = useNavigate();
   const location = useLocation();
   const assignment = location.state?.assignment || null;

@@ -125,7 +125,6 @@ export default function OrderDetail() {
         try {
             setLoading(true);
             const response = await OrderService.getOrderDetail(id);
-            console.log('Order Detail Response:', response);
             const orderData = response.data.data || response.data;
             setOrder(orderData);
 

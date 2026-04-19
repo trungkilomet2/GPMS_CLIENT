@@ -765,7 +765,6 @@ export default function CreateOrder() {
         })),
         sizes: sizesPayload
       };
-      console.log('CreateOrder payload (AutoMapper focus):', payload);
 
       await OrderService.createOrder(payload);
       setIsSuccessOpen(true);
