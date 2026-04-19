@@ -15,9 +15,9 @@ const FOOTER_SUPPORT = [
 ];
 
 const FOOTER_CONTACT = [
-  ["📍", "123 Đường ABC, Quận 1, TP.HCM"],
-  ["📞", "(+84) 123 456 789"],
-  ["✉️", "info@garmentpro.vn"],
+  ["📍", "Khu vực vận hành: Hà Nội"],
+  ["🧵", "Làm việc theo nhu cầu thực tế của đơn hàng"],
+  ["✉️", "Tiếp nhận yêu cầu tại trang Liên hệ"],
 ];
 
 const FOOTER_SOCIALS = [
@@ -75,7 +75,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom">
-          © 2024 GarmentPro – GPMS. Tất cả quyền được bảo lưu.
+          © 2026 GarmentPro – GPMS. Tất cả quyền được bảo lưu.
         </div>
       </div>
     </footer>

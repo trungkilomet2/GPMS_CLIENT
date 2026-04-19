@@ -304,17 +304,7 @@ export default function EmployeeUpdate() {
 
                 </div>
 
-                {form.role === "Worker" ? (
-                  <div className="employee-create-banner">
-                    <span>
-                      Chuyên môn của nhân viên đã được tách sang màn riêng để hỗ trợ chọn nhiều chuyên môn cùng lúc.
-                      {" "}
-                      <Link to={`/employees/${id}/skills`} className="employee-create-inline-link">
-                        Mở màn gán chuyên môn
-                      </Link>
-                    </span>
-                  </div>
-                ) : null}
+
 
                 <div className="employee-create-banner">
                   <span>{getManagerRoleHint(form.role)}</span>
