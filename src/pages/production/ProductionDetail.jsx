@@ -173,33 +173,64 @@ export default function ProductionDetail() {
 
   useEffect(() => {
     if (!production?.productionId) return;
-    ProductionPartService.getPartsByProduction(production.productionId, { PageIndex: 0, PageSize: 100, SortColumn: "id", SortOrder: "ASC" })
-      .then(res => {
-        const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
-        setRawParts(rawList);
-        setTotalParts(rawList.length);
-      });
 
-    // Fetch combined issues for reportedErrorCount
-    ProductionService.getProductionIssues(production.productionId)
-      .then(res => {
-        const issues = res?.data?.data ?? res?.data ?? [];
+    const fetchRemainingData = async () => {
+      try {
+        const prodId = production.productionId;
+
+        // 1. Fetch ALL Parts
+        let allPartsList = [];
+        let partIdx = 0;
+        let hasMoreParts = true;
+        while (hasMoreParts && partIdx < 20) { // Limit to 20 pages (2000 items) to prevent infinite loop
+          const res = await ProductionPartService.getPartsByProduction(prodId, {
+            PageIndex: partIdx,
+            PageSize: 30,
+            SortColumn: "id",
+            SortOrder: "ASC"
+          });
+          const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            allPartsList = [...allPartsList, ...rawList];
+            hasMoreParts = rawList.length === 100;
+            partIdx++;
+          } else {
+            hasMoreParts = false;
+          }
+        }
+        setRawParts(allPartsList);
+        setTotalParts(allPartsList.length);
+
+        // 2. Fetch Issues
+        const issuesRes = await ProductionService.getProductionIssues(prodId).catch(() => ({ data: [] }));
+        const issues = issuesRes?.data?.data ?? issuesRes?.data ?? [];
         setReportedErrorCount(issues.length);
-      })
-      .catch(err => console.error("Error fetching issue count:", err));
 
-    // Fetch total report logs for reportCount
-    ProductionPartService.getProductionWorkLogs(production.productionId)
-      .then(res => {
-        const data = res?.data?.data ?? res?.data ?? [];
-        const logs = Array.isArray(data) ? data : [];
-        setAllLogs(logs);
-        setReportCount(logs.length);
+        // 3. Fetch ALL Work Logs (Lịch sử báo cáo sản lượng)
+        let allReportLogs = [];
+        let logIdx = 0;
+        let hasMoreLogs = true;
+        while (hasMoreLogs && logIdx < 50) { // Limit to 50 pages (1500 items)
+          const res = await ProductionPartService.getProductionWorkLogs(prodId, {
+            PageIndex: logIdx,
+            PageSize: 30
+          });
+          const logData = res?.data?.data ?? res?.data ?? [];
+          if (Array.isArray(logData) && logData.length > 0) {
+            allReportLogs = [...allReportLogs, ...logData];
+            hasMoreLogs = logData.length === 30;
+            logIdx++;
+          } else {
+            hasMoreLogs = false;
+          }
+        }
+        setAllLogs(allReportLogs);
+        setReportCount(allReportLogs.length);
 
-        // Supplemental name resolution: Extract names from logs to bypass directory restrictions
+        // Update Worker Map from logs
         setWorkerMap(prev => {
           const newMap = { ...prev };
-          logs.forEach(log => {
+          allReportLogs.forEach(log => {
             const uid = log.userId || log.uId || log.accountId;
             const name = log.workerName || log.fullName;
             if (uid && name && !newMap[String(uid)]) {
@@ -208,8 +239,13 @@ export default function ProductionDetail() {
           });
           return newMap;
         });
-      })
-      .catch(err => console.error("Error fetching logs count:", err));
+
+      } catch (err) {
+        console.error("Error fetching production sub-data:", err);
+      }
+    };
+
+    fetchRemainingData();
   }, [production?.productionId]);
 
   // Flatten rawParts + workerMap → steps, tự re-compute khi worker map load xong
