@@ -507,7 +507,7 @@ export default function RegisterPage() {
         </form>
       </div>
 
-      <div className="footer-text">© 2024 GarmentPro. Bảo lưu mọi quyền.</div>
+      <div className="footer-text">© 2026 GarmentPro. Bảo lưu mọi quyền.</div>
     </div>
   );
 }

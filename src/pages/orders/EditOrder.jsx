@@ -332,8 +332,8 @@ export default function EditOrder() {
             newErrors.cpu = 'Giá / sản phẩm không được để trống';
         } else if (cpu < 0) {
             newErrors.cpu = 'Giá / sản phẩm không được âm';
-        } else if (cpu < 1000 || cpu > 1000000000) {
-            newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 1.000.000.000 VND';
+        } else if (cpu < 1000 || cpu > 10000000) {
+            newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 10.000.000 VND';
         }
 
         // NOTE
@@ -891,16 +891,17 @@ export default function EditOrder() {
                                 setIsModalOpen(true);
                             }}
                             onEditMaterial={(i) => {
+                                const m = materials[i];
                                 setEditingIndex(i);
                                 setMaterialFormData({
-                                    materialName: materials[i].materialName ?? materials[i].name ?? '',
-                                    color: materials[i].color ?? '',
-                                    value: materials[i].value ?? materials[i].quantity ?? '',
-                                    uom: materials[i].uom ?? '',
-                                    image: materials[i].image ?? '',
+                                    materialName: m.materialName ?? m.name ?? '',
+                                    color: m.color ?? '',
+                                    value: m.value ?? m.quantity ?? '',
+                                    uom: m.uom ?? '',
+                                    image: m.image ?? '',
                                     imageFile: null,
-                                    imagePreview: materials[i].imagePreview ?? materials[i].image ?? '',
-                                    note: materials[i].note ?? '',
+                                    imagePreview: m.imagePreview || m.image || '',
+                                    note: m.note ?? '',
                                 });
                                 setIsModalOpen(true);
                             }}

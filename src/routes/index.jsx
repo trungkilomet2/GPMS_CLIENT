@@ -33,12 +33,11 @@ const ProductionPlan = lazy(() => import("@/pages/production/ProductionPlan"));
 const ProductionPlanDetail = lazy(() => import("@/pages/production/ProductionDetail"));
 const ProductionErrorSummary = lazy(() => import("@/pages/production/ProductionErrorSummary"));
 const ProductionAssignment = lazy(() => import("@/pages/production/ProductionAssignment"));
-const WorkerDailyReport = lazy(() => import("@/pages/production/WorkerDailyReport"));
-const WorkerDailyReportEdit = lazy(() => import("@/pages/production/WorkerDailyReportEdit"));
-const WorkerErrorReport = lazy(() => import("@/pages/production/WorkerErrorReport"));
-const WorkerCuttingBook = lazy(() => import("@/pages/production/WorkerCuttingBook"));
-const WorkerCuttingBookDetail = lazy(() => import("@/pages/production/WorkerCuttingBookDetail"));
-const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
+const ErrorReport = lazy(() => import("@/pages/production/ErrorReport"));
+const CuttingBook = lazy(() => import("@/pages/production/CuttingBook"));
+const CuttingBookDetail = lazy(() => import("@/pages/production/CuttingBookDetail"));
+// const WorkerAssignment = lazy(() => import("@/pages/production/WorkerAssignment"));
+const DailyReport = lazy(() => import("@/pages/production/DailyReport"));
 const OutputHistory = lazy(() => import("@/pages/production/OutputHistory"));
 const ProductionPartHistory = lazy(() => import("@/pages/production/ProductionPartHistory"));
 const LeaveRequests = lazy(() => import("@/pages/owner/LeaveRequests"));
@@ -114,17 +113,13 @@ export const routes = [
 
   { path: "/production-plan/assign", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
   { path: "/production-plan/assign/:id", element: guardByRoles(["Team Leader", "Owner", "PM"], <ProductionAssignment />) },
-  { path: "/worker/daily-report", element: guardByRoles(["Owner", "PM", "Worker", "KCS"], <WorkerDailyReport />) },
-  { path: "/worker/daily-report/edit", element: guardByRoles(["Worker", "KCS"], <WorkerDailyReportEdit />) },
-  { path: "/worker/error-report", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader", "Worker", "KCS"], <WorkerErrorReport />) },
-  { path: "/worker/cutting-book", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBook />) },
-  { path: "/worker/cutting-book/detail/:id", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <WorkerCuttingBookDetail />) },
-  { path: "/worker/assignments", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <WorkerAssignment />) },
-  { path: "/worker/production-plan", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <ProductionList />) },
+  { path: "/worker/error-report", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader", "Worker", "KCS"], <ErrorReport />) },
+  { path: "/worker/cutting-book", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <CuttingBook />) },
+  { path: "/worker/cutting-book/detail/:id", element: guardByRoles(["owner", "pm", "team leader", "worker", "kcs"], <CuttingBookDetail />) },
+  // { path: "/worker/assignments", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <WorkerAssignment />) },
 
   { path: "/worker/output-history", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS", "Team Leader"], <OutputHistory />) },
-  { path: "/worker/leave-requests", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequests />) },
-  { path: "/worker/leave-requests/:id", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <LeaveRequestDetail />) },
+  { path: "/worker/daily-report", element: guardByRoles(["Owner", "PM", "Manager", "Worker", "KCS"], <DailyReport />) },
   { path: "/production/part/:partId/:variantId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader"], <ProductionPartHistory />) },
   { path: "/production-plan/:productionId/history", element: guardByRoles(["Owner", "PM", "Manager", "Team Leader", "Worker"], <ProductionPartHistory />) },
   { path: "/leave-requests", element: guardByRoles(["PM", "Team Leader"], <LeaveRequests />) },

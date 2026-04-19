@@ -153,7 +153,7 @@ export default function LeaveRequestDetail() {
             ? leave?.denyContent || "Đơn nghỉ đã bị từ chối."
             : isCancelled
               ? leave?.cancelContent || "Đơn nghỉ đã được hủy."
-            : "Chưa có phản hồi cuối cùng.",
+              : "Chưa có phản hồi cuối cùng.",
         tone: isApproved || isCancelled ? "done" : isRejected ? "rejected" : "upcoming",
       },
     ];
@@ -289,9 +289,9 @@ export default function LeaveRequestDetail() {
                           ? leave.cancelContent || "Bạn đã gửi yêu cầu hủy và đang chờ phản hồi."
                           : leave.status === "cancelled"
                             ? leave.cancelContent || "Đơn nghỉ của bạn đã được hủy."
-                        : leave.status === "approved"
-                          ? "Đơn nghỉ của bạn đã được phê duyệt."
-                          : "Đơn nghỉ đang chờ người có thẩm quyền xem xét."}
+                            : leave.status === "approved"
+                              ? "Đơn nghỉ của bạn đã được phê duyệt."
+                              : "Đơn nghỉ đang chờ người có thẩm quyền xem xét."}
                     </div>
 
                     {(canCancelPending || canRequestCancel) ? (
@@ -363,15 +363,14 @@ export default function LeaveRequestDetail() {
                         <div key={item.title} className="flex gap-3">
                           <div className="flex flex-col items-center">
                             <div
-                              className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                                item.tone === "done"
+                              className={`mt-1 h-2.5 w-2.5 rounded-full ${item.tone === "done"
                                   ? "bg-emerald-500"
                                   : item.tone === "current"
                                     ? "bg-amber-500"
                                     : item.tone === "rejected"
                                       ? "bg-rose-500"
                                       : "bg-slate-300"
-                              }`}
+                                }`}
                             />
                             {index < timelineItems.length - 1 && (
                               <div className="mt-2 h-full w-px bg-slate-200" />

@@ -139,18 +139,7 @@ export default function ProductionDetail() {
   useEffect(() => {
     const loadWorkerMap = async () => {
       try {
-        const calls = [];
-        // Nếu là Owner/Admin, ưu tiên lấy danh bạ toàn hệ thống và danh bạ manager
-        if (isOwner) {
-          calls.push(WorkerService.getEmployeeDirectory({ PageSize: 1000 }));
-          calls.push(WorkerService.getManagerDirectory({ PageSize: 1000 }));
-        } else {
-          // Nếu là PM/Worker, chỉ nên lấy danh bạ trong phạm vi được phép (PM Scope)
-          // để tránh lỗi 403 Forbidden khi truy cập danh bạ toàn cục.
-          calls.push(WorkerService.getEmployeeDirectoryByPmScope({ PageSize: 1000 }));
-        }
 
-        const results = await Promise.allSettled(calls);
 
         const map = {};
         const process = (p) => {
@@ -168,7 +157,6 @@ export default function ProductionDetail() {
           }
         };
 
-        results.forEach(process);
 
         // Bổ sung PM của chính dự án này vào map để chắc chắn hiển thị đúng tên Tùng (Manager)
         if (production?.pmId && production?.pmName) {
@@ -185,33 +173,64 @@ export default function ProductionDetail() {
 
   useEffect(() => {
     if (!production?.productionId) return;
-    ProductionPartService.getPartsByProduction(production.productionId, { PageIndex: 0, PageSize: 100, SortColumn: "id", SortOrder: "ASC" })
-      .then(res => {
-        const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
-        setRawParts(rawList);
-        setTotalParts(rawList.length);
-      });
 
-    // Fetch combined issues for reportedErrorCount
-    ProductionService.getProductionIssues(production.productionId)
-      .then(res => {
-        const issues = res?.data?.data ?? res?.data ?? [];
+    const fetchRemainingData = async () => {
+      try {
+        const prodId = production.productionId;
+
+        // 1. Fetch ALL Parts
+        let allPartsList = [];
+        let partIdx = 0;
+        let hasMoreParts = true;
+        while (hasMoreParts && partIdx < 20) { // Limit to 20 pages (2000 items) to prevent infinite loop
+          const res = await ProductionPartService.getPartsByProduction(prodId, {
+            PageIndex: partIdx,
+            PageSize: 30,
+            SortColumn: "id",
+            SortOrder: "ASC"
+          });
+          const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+          if (Array.isArray(rawList) && rawList.length > 0) {
+            allPartsList = [...allPartsList, ...rawList];
+            hasMoreParts = rawList.length === 100;
+            partIdx++;
+          } else {
+            hasMoreParts = false;
+          }
+        }
+        setRawParts(allPartsList);
+        setTotalParts(allPartsList.length);
+
+        // 2. Fetch Issues
+        const issuesRes = await ProductionService.getProductionIssues(prodId).catch(() => ({ data: [] }));
+        const issues = issuesRes?.data?.data ?? issuesRes?.data ?? [];
         setReportedErrorCount(issues.length);
-      })
-      .catch(err => console.error("Error fetching issue count:", err));
 
-    // Fetch total report logs for reportCount
-    ProductionPartService.getProductionWorkLogs(production.productionId)
-      .then(res => {
-        const data = res?.data?.data ?? res?.data ?? [];
-        const logs = Array.isArray(data) ? data : [];
-        setAllLogs(logs);
-        setReportCount(logs.length);
+        // 3. Fetch ALL Work Logs (Lịch sử báo cáo sản lượng)
+        let allReportLogs = [];
+        let logIdx = 0;
+        let hasMoreLogs = true;
+        while (hasMoreLogs && logIdx < 50) { // Limit to 50 pages (1500 items)
+          const res = await ProductionPartService.getProductionWorkLogs(prodId, {
+            PageIndex: logIdx,
+            PageSize: 30
+          });
+          const logData = res?.data?.data ?? res?.data ?? [];
+          if (Array.isArray(logData) && logData.length > 0) {
+            allReportLogs = [...allReportLogs, ...logData];
+            hasMoreLogs = logData.length === 30;
+            logIdx++;
+          } else {
+            hasMoreLogs = false;
+          }
+        }
+        setAllLogs(allReportLogs);
+        setReportCount(allReportLogs.length);
 
-        // Supplemental name resolution: Extract names from logs to bypass directory restrictions
+        // Update Worker Map from logs
         setWorkerMap(prev => {
           const newMap = { ...prev };
-          logs.forEach(log => {
+          allReportLogs.forEach(log => {
             const uid = log.userId || log.uId || log.accountId;
             const name = log.workerName || log.fullName;
             if (uid && name && !newMap[String(uid)]) {
@@ -220,8 +239,13 @@ export default function ProductionDetail() {
           });
           return newMap;
         });
-      })
-      .catch(err => console.error("Error fetching logs count:", err));
+
+      } catch (err) {
+        console.error("Error fetching production sub-data:", err);
+      }
+    };
+
+    fetchRemainingData();
   }, [production?.productionId]);
 
   // Flatten rawParts + workerMap → steps, tự re-compute khi worker map load xong
@@ -348,7 +372,7 @@ export default function ProductionDetail() {
   const handleRejectProduction = async (reason) => {
     try {
       await ProductionService.rejectProduction(production.productionId, { userId: currentUserId, reason });
-      setProduction(prev => ({ ...prev, status: "Từ Chối", reason })); 
+      setProduction(prev => ({ ...prev, status: "Từ Chối", reason }));
       setIsReasonModalOpen(false);
       toast.success("Đã từ chối đơn sản xuất.");
       setTimeout(() => window.location.reload(), 1500);
@@ -540,7 +564,7 @@ export default function ProductionDetail() {
             {production.status === "Từ Chối" && (production.reason || production.rejectReason) && (
               <div className="flex items-center gap-4 px-8 py-5 bg-rose-50 border border-rose-200 rounded-2xl animate-in zoom-in-95 duration-500 shadow-sm border-l-4 border-l-rose-500">
                 <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-sm">
-                   <AlertTriangle size={20} />
+                  <AlertTriangle size={20} />
                 </div>
                 <div className="flex-1 space-y-1">
                   <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] opacity-70">Lý do từ chối / Hủy đơn</h5>
@@ -896,7 +920,7 @@ export default function ProductionDetail() {
         isOpen={isRequestPlanUpdateConfirmOpen}
         onClose={() => setIsRequestPlanUpdateConfirmOpen(false)}
         onConfirm={(reason) => {
-           confirmRequestPlanUpdate(reason);
+          confirmRequestPlanUpdate(reason);
         }}
         title="Yêu cầu sửa kế hoạch"
         description="Gửi yêu cầu yêu cầu PM chỉnh sửa lại kế hoạch sản xuất."
@@ -923,13 +947,13 @@ export default function ProductionDetail() {
         requireReason={false}
       />
 
-      <ConfirmModal 
-        isOpen={isReasonModalOpen} 
-        onClose={() => setIsReasonModalOpen(false)} 
-        onConfirm={handleRejectProduction} 
-        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"} 
-        requireReason={true} 
-        variant="danger" 
+      <ConfirmModal
+        isOpen={isReasonModalOpen}
+        onClose={() => setIsReasonModalOpen(false)}
+        onConfirm={handleRejectProduction}
+        title={isOwner ? "Hủy giao việc" : "Từ chối đơn sản xuất"}
+        requireReason={true}
+        variant="danger"
       />
     </OwnerLayout>
   );
@@ -999,7 +1023,7 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
       {/* Header */}
       <div className="grid grid-cols-12 items-center px-6 py-3 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
         <div className="col-span-4 text-xs font-black text-gray-500 uppercase tracking-widest">Công đoạn</div>
-        <div className="col-span-3 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Biến thể</div>
+        <div className="col-span-3 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Kích cỡ & màu sắc</div>
         <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Sản lượng</div>
         <div className="col-span-2 text-xs font-black text-gray-500 uppercase tracking-widest text-center">Trạng thái</div>
         <div className="col-span-1"></div>

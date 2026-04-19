@@ -122,7 +122,7 @@ export default function Orders({
         while (true) {
           const params = {
             PageIndex: pageIndex,
-            PageSize: 100,
+            PageSize: 30,
             SortColumn: sortBy.key === 'orderName' ? 'Name' : sortBy.key,
             SortOrder: sortBy.dir.toUpperCase(),
           };

@@ -10,16 +10,10 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
 
   useEffect(() => {
     setErrors({});
-    if (formData.imagePreview) {
-      setPreview(formData.imagePreview);
-      return;
+    if (isOpen) {
+      setPreview(null);
     }
-    if (formData.image) {
-      setPreview(formData.image);
-      return;
-    }
-    setPreview(null);
-  }, [isOpen, editingIndex, formData.image, formData.imagePreview]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -36,6 +30,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
         return;
       }
 
+      setErrors((prev) => ({ ...prev, image: null }));
       const previewUrl = URL.createObjectURL(file);
       setPreview(previewUrl);
       onChange({ target: { name: 'imageFile', value: file } });
@@ -81,6 +76,11 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
       newErrors.uom = 'Vui lòng chọn đơn vị tính';
     }
 
+    // Require material image
+    if (!formData.image && !formData.imageFile && !formData.imagePreview) {
+      newErrors.image = 'Vui lòng chọn ảnh cho vật liệu';
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -108,11 +108,11 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
 
         <div className="flex-1 overflow-y-auto p-6 pt-5 space-y-5 custom-scrollbar">
           <div>
-            <label className="mb-2 block text-sm font-bold text-slate-700">Ảnh vật liệu</label>
+            <label className="mb-2 block text-sm font-bold text-slate-700">Ảnh vật liệu <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-4">
               <div className="h-24 w-24 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                {preview ? (
-                  <img src={preview} alt="Preview" className="h-full w-full object-cover" />
+                {(preview || formData.imagePreview || formData.image) ? (
+                  <img src={preview || formData.imagePreview || formData.image} alt="Preview" className="h-full w-full object-contain" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-slate-300">
                     <ImagePlus size={20} />

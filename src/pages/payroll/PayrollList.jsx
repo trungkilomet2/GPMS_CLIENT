@@ -29,7 +29,7 @@ export default function PayrollList() {
     try {
       setLoading(true);
       setError(null);
-      const data = await fetchAggregatedPayroll(selectedMonth, selectedYear, isRefresh);
+      const data = await fetchAggregatedPayroll(selectedMonth, selectedYear);
       setWorkerSummary(data || []);
     } catch (err) {
       setError(getErrorMessage(err, "Không thể tải dữ liệu bảng lương. Vui lòng thử lại sau."));
@@ -149,7 +149,7 @@ export default function PayrollList() {
                       ))}
                     </select>
                     <button
-                      onClick={() => loadData(true)}
+                      onClick={() => loadData()}
                       disabled={loading}
                       className="ml-2 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-emerald-600 shadow-sm disabled:opacity-50"
                       title="Cập nhật dữ liệu mới nhất"

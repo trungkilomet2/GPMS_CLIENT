@@ -80,21 +80,20 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
       try {
         // Register handlers BEFORE starting
         connection.on("CommentCreated", (msg) => {
-          console.log('SignalR Message: CommentCreated Received', msg);
           if (!msg) return;
-          
+
           const list = Array.isArray(msg) ? msg : [msg];
           list.forEach((m) => {
             const msgOrderId = m.toOrderId ?? m.ToOrderId ?? m.orderId ?? m.OrderId;
-            
+
             if (msgOrderId && String(msgOrderId) !== String(orderId)) {
-                return;
+              return;
             }
 
             setComments((prev) => {
               // Check duplicate by ID or Content+User+Time
-              const exists = prev.some((c) => 
-                (c.id && m.Id && String(c.id) === String(m.Id)) || 
+              const exists = prev.some((c) =>
+                (c.id && m.Id && String(c.id) === String(m.Id)) ||
                 (c.id && m.id && String(c.id) === String(m.id)) ||
                 (c.content === m.Content && String(m.FromUserId) === String(c.fromUserId))
               );
@@ -117,11 +116,9 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         });
 
         await connection.start();
-        console.log('SignalR Connected to Hub.');
-        
+
         // Call the correct method from your CommentHub.cs
         await connection.invoke("JoinOrderCommentGroup", Number(orderId));
-        console.log(`Joined group for order: ${orderId}`);
 
       } catch (err) {
         console.error('SignalR Connection Error: ', err);
@@ -133,7 +130,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
     return () => {
       if (connection) {
         // Cleanup: Leave group
-        connection.invoke("LeaveOrderCommentGroup", Number(orderId)).catch(() => {});
+        connection.invoke("LeaveOrderCommentGroup", Number(orderId)).catch(() => { });
         connection.stop();
         connectionRef.current = null;
       }
@@ -243,11 +240,10 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
                     )}
 
                     <div
-                      className={`rounded-2xl px-4 py-2.5 text-left text-sm leading-relaxed shadow-sm ${
-                        isMine
+                      className={`rounded-2xl px-4 py-2.5 text-left text-sm leading-relaxed shadow-sm ${isMine
                           ? 'rounded-tr-none bg-emerald-600 text-white'
                           : 'rounded-tl-none border border-gray-100 bg-white text-gray-800'
-                      }`}
+                        }`}
                     >
                       {comment.content}
                     </div>

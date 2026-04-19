@@ -292,6 +292,7 @@ export default function ProductionPlan() {
         startDate: s.startDate || "",
         endDate: s.endDate || "",
         ppsId: s.partId || s.id || "",
+        statusId: s.statusId || s.status || 1,
         allIds: s.allIds || []
       }));
     }
@@ -305,7 +306,6 @@ export default function ProductionPlan() {
   }, [rows, initialRows.length]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [showProductionInfo, setShowProductionInfo] = useState(true);
   const [showProductInfo, setShowProductInfo] = useState(true);
@@ -470,6 +470,7 @@ export default function ProductionPlan() {
                   if (!stageGroups[key]) {
                     stageGroups[key] = {
                       ...s,
+                      statusId: s.statusId || s.status || 1,
                       allIds: [s.id || s.partId].filter(Boolean)
                     };
                   } else {
@@ -490,6 +491,7 @@ export default function ProductionPlan() {
                   startDate: s.startDate || "",
                   endDate: s.endDate || "",
                   ppsId: s.id || s.partId || "",
+                  statusId: s.statusId || s.status || 1,
                   allIds: s.allIds || []
                 }));
                 setInitialRows(fetched.map(r => ({ ...r })));
@@ -818,36 +820,13 @@ export default function ProductionPlan() {
         startDate: row?.startDate ? new Date(row.startDate).toISOString() : new Date().toISOString(),
         endDate: row?.endDate ? new Date(row.endDate).toISOString() : new Date().toISOString(),
         cpu: Number(row?.cpu || 0),
+        statusId: Number(row?.statusId || 1),
       }));
-
-      // Split into new and existing parts
-      const newParts = payload.filter((p) => p.partId === 0);
-      const existingParts = payload.filter((p) => p.partId > 0);
-
-      // 1. Create new parts if any
-      if (newParts.length > 0) {
-        await ProductionPartService.createParts(productionId, { parts: newParts });
+      console.log("payload: ", payload)
+      // Replace all parts in bulk as create-parts handles deletion of old ones
+      if (payload.length > 0) {
+        await ProductionPartService.createParts(productionId, { parts: payload });
       }
-
-      // 2. Update existing parts if any
-      if (existingParts.length > 0) {
-        const updatePromises = [];
-        existingParts.forEach((p) => {
-          // Find the original row to get allIds
-          const row = rows.find(r => r.ppsId === String(p.partId) || Number(r.ppsId) === p.partId);
-          if (row && row.allIds && row.allIds.length > 0) {
-            // Update all siblings with the same data
-            row.allIds.forEach(id => {
-              updatePromises.push(ProductionPartService.updatePart(id, { ...p, partId: id }));
-            });
-          } else {
-            // Fallback for single ID
-            updatePromises.push(ProductionPartService.updatePart(p.partId, p));
-          }
-        });
-        await Promise.all(updatePromises);
-      }
-
       setHasExistingParts(true);
 
       let finalMsg = hasExistingParts ? "Đã cập nhật kế hoạch sản xuất thành công!" : "Đã lưu kế hoạch sản xuất thành công!";
@@ -859,7 +838,7 @@ export default function ProductionPlan() {
           if (currentStatus !== "Đang Sản Xuất") {
             // Directly approve for Owners (skipping submit)
             await ProductionService.approveProductionPlan(productionId);
-            finalMsg = "Đã lưu và phê duyệt kế hoạch tự động!";
+            finalMsg = "Lưu kế hoạch thành công.";
             setSelectedProduction(prev => prev ? { ...prev, status: "Đang Sản Xuất" } : prev);
           }
         } catch (autoErr) {
@@ -868,8 +847,11 @@ export default function ProductionPlan() {
       }
 
       toast.success(finalMsg);
-      setIsSuccessModalOpen(true);
       savePlan();
+      // Redirect to production detail
+      const isWorkerPath = location.pathname.startsWith("/worker/");
+      const basePath = isWorkerPath ? "/worker/production" : "/production";
+      navigate(`${basePath}/${selectedProductionId}`);
     } catch (error) {
       console.error("Save Error:", error);
       const errMsg = getErrorMessage(error, "Lưu công đoạn thất bại.");
@@ -988,6 +970,7 @@ export default function ProductionPlan() {
             startDate: defaultStart,
             endDate: defaultEnd,
             ppsId: "",
+            statusId: 1,
           },
         ];
         setSelectedIndex(next.length - 1);
@@ -1059,6 +1042,7 @@ export default function ProductionPlan() {
         startDate: baseStart,
         endDate: baseEnd,
         ppsId: "",
+        statusId: 1,
       }));
       setRows(next);
     } else if (type === "design") {
@@ -1087,6 +1071,7 @@ export default function ProductionPlan() {
         startDate: baseStart,
         endDate: baseEnd,
         ppsId: "",
+        statusId: 1,
       }));
       setRows(next);
       setSelectedIndex(0);
@@ -1164,7 +1149,7 @@ export default function ProductionPlan() {
               className="w-full flex items-center justify-between p-6 text-left border-b border-black bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors"
             >
               <div>
-                <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Template công đoạn</h2>
+                <h2 className="text-base font-black text-emerald-950 uppercase tracking-tight">Mẫu kế hoạch sản xuất</h2>
                 <p className="text-[10px] font-bold text-emerald-800/80 uppercase tracking-widest mt-1">Chọn nhanh theo loại sản phẩm, sau đó chỉnh sửa tùy ý.</p>
               </div>
               <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest border-b border-emerald-700">
@@ -1521,14 +1506,6 @@ export default function ProductionPlan() {
           </div>
         </div>
       )}
-      <SuccessModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        onPrimary={() => navigate("/production")}
-        title={hasExistingParts ? "Cập nhật thành công" : "Lưu thành công"}
-        description={hasExistingParts ? "Kế hoạch sản xuất đã được cập nhật bản ghi mới." : "Kế hoạch sản xuất đã được lưu vào hệ thống."}
-        primaryLabel="OK"
-      />
       <ConfirmModal
         isOpen={isConfirmSaveOpen}
         title="Xác nhận cập nhật kế hoạch"
