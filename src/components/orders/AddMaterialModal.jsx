@@ -10,6 +10,9 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
 
   useEffect(() => {
     setErrors({});
+    if (isOpen) {
+      setPreview(null);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -109,7 +112,7 @@ export default function AddMaterialModal({ isOpen, onClose, onSave, formData, on
             <div className="flex items-center gap-4">
               <div className="h-24 w-24 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                 {(preview || formData.imagePreview || formData.image) ? (
-                  <img src={preview || formData.imagePreview || formData.image} alt="Preview" className="h-full w-full object-cover" />
+                  <img src={preview || formData.imagePreview || formData.image} alt="Preview" className="h-full w-full object-contain" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-slate-300">
                     <ImagePlus size={20} />

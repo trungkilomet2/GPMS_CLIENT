@@ -283,8 +283,8 @@ export default function CreateOrder() {
       newErrors.cpu = 'Giá / sản phẩm không được để trống';
     } else if (cpu < 0) {
       newErrors.cpu = 'Giá / sản phẩm không được âm';
-    } else if (cpu < 1000 || cpu > 1000000000) {
-      newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 1.000.000.000 VND';
+    } else if (cpu < 1000 || cpu > 10000000) {
+      newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 10.000.000 VND';
     }
 
     // NOTE: NVARCHAR(255) — nullable, chỉ check độ dài

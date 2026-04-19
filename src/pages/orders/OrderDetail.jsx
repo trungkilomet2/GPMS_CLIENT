@@ -88,6 +88,38 @@ export default function OrderDetail() {
     const isCustomer = hasAnyRole(roles, ['customer']);
     const canModerate = isOwner || isAdmin;
 
+    // --- DERIVED CONSTANTS ---
+    const orderStatusValue = order?.statusName ?? order?.status;
+    const currentUserId = user?.userId ?? user?.id ?? null;
+    const normalizedStatus = normalizeOrderStatus(orderStatusValue);
+    const isRejected = normalizedStatus === 'Đã từ chối';
+    const isAccepted = normalizedStatus === 'Đã chấp nhận';
+    const isCanceled = normalizedStatus === 'Đã hủy';
+    const isProcessing = normalizedStatus === 'Đang sản xuất';
+    const isCompleted = normalizedStatus === 'Đã hoàn thành';
+
+    const orderOwnerId = getOrderCustomerId(order);
+    const currentUserPhone = user?.phone ?? user?.phoneNumber ?? user?.userPhone ?? "";
+    const orderPhone = order?.userPhone ?? "";
+
+    // Robust ownership check: compare IDs OR compare phones as fallback
+    const isOrderOwner = (currentUserId && orderOwnerId && String(currentUserId) === String(orderOwnerId)) ||
+        (currentUserPhone && orderPhone && String(currentUserPhone).replace(/\D/g, '') === String(orderPhone).replace(/\D/g, ''));
+
+    // Safety fallback: if user is customer and order was likely their but ID check is tricky
+    const isLikelyOwner = isCustomer && isOrderOwner;
+
+    // Permission rules: ONLY the order owner (customer) can edit when requested
+    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
+    const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
+    const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
+    const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;
+
+    const workshopErrorQuantity = criticalIssues.reduce((sum, issue) => sum + (issue.confirmedQuantity || issue.quantity || 0), 0);
+    const finalQuantity = Math.max(0, (order?.quantity || 0) - workshopErrorQuantity);
+    const templates = order?.templates ?? order?.template ?? order?.files ?? [];
+    const processedVariants = processOrderVariants(order);
+
     // --- EFFECTS ---
     const fetchOrderDetail = async () => {
         try {
@@ -132,7 +164,8 @@ export default function OrderDetail() {
         const loadRejectReason = async () => {
             const orderId = order?.id ?? id;
             const normalized = normalizeOrderStatus(order?.statusName ?? order?.status);
-            if (!orderId || normalized !== 'Đã từ chối') {
+            // Tải lý do cho cả trạng thái Từ chối và Hủy
+            if (!orderId || (normalized !== 'Đã từ chối' && normalized !== 'Đã hủy')) {
                 if (isMounted) {
                     setRejectReason('');
                     setRejectReasonError(null);
@@ -155,7 +188,7 @@ export default function OrderDetail() {
         };
         loadRejectReason();
         return () => { isMounted = false; };
-    }, [order?.id, order?.status, id]);
+    }, [order?.id, orderStatusValue, id]);
 
     useEffect(() => {
         let isMounted = true;
@@ -208,38 +241,7 @@ export default function OrderDetail() {
         fetchIssues();
     }, [linkedProductionId]);
 
-    // --- DERIVED CONSTANTS ---
-    const workshopErrorQuantity = criticalIssues.reduce((sum, issue) => sum + (issue.confirmedQuantity || issue.quantity || 0), 0);
-    const finalQuantity = Math.max(0, (order?.quantity || 0) - workshopErrorQuantity);
 
-    const templates = order?.templates ?? order?.template ?? order?.files ?? [];
-    const orderStatusValue = order?.statusName ?? order?.status;
-    const orderOwnerId = getOrderCustomerId(order);
-    const currentUserId = user?.userId ?? user?.id ?? null;
-    const currentUserPhone = user?.phone ?? user?.phoneNumber ?? user?.userPhone ?? "";
-    const orderPhone = order?.userPhone ?? "";
-
-    // Robust ownership check: compare IDs OR compare phones as fallback
-    const isOrderOwner = (currentUserId && orderOwnerId && String(currentUserId) === String(orderOwnerId)) ||
-        (currentUserPhone && orderPhone && String(currentUserPhone).replace(/\D/g, '') === String(orderPhone).replace(/\D/g, ''));
-
-    // Safety fallback: if user is customer and order was likely their but ID check is tricky
-    const isLikelyOwner = isCustomer && isOrderOwner;
-
-    const normalizedStatus = normalizeOrderStatus(orderStatusValue);
-    const isRejected = normalizedStatus === 'Đã từ chối';
-    const isAccepted = normalizedStatus === 'Đã chấp nhận';
-    const isCanceled = normalizedStatus === 'Đã hủy';
-    const isProcessing = normalizedStatus === 'Đang sản xuất';
-    const isCompleted = normalizedStatus === 'Đã hoàn thành';
-
-    // Permission rules: ONLY the order owner (customer) can edit when requested
-    const canEdit = isCustomer && isOrderOwner && normalizedStatus === 'Yêu cầu chỉnh sửa';
-    const canAccept = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
-    const canRequestModification = (isOwner || isAdmin) && normalizedStatus === 'Chờ xét duyệt';
-    const canCustomerDeny = isCustomer && isOrderOwner && !isAccepted && !isRejected && !isCanceled && !isProcessing && !isCompleted;
-
-    const processedVariants = processOrderVariants(order);
 
     // --- HANDLERS ---
     const handleApproveOrder = async () => {
@@ -328,30 +330,14 @@ export default function OrderDetail() {
                                     <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-none uppercase">
                                         Đơn hàng #{order.id}
                                     </h1>
-                                    <div className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest border ${orderStatusValue === 'Chờ xét duyệt' || orderStatusValue === 'Chờ Xét Duyệt' || orderStatusValue === 'Pending'
-                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
-                                        : 'bg-[#f0f9f4] text-[#1e6e43] border-[#d4e3da]'
-                                        }`}>
+                                    <div className={`rounded-lg px-3 py-1 text-[10px] font-black uppercase tracking-widest border ${getOrderStatusStyle(orderStatusValue)}`}>
                                         {order.statusName || order.status}
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Order Rejection Reason Display */}
-                        {(normalizedStatus === 'Từ chối' || normalizedStatus === 'Rejected' || normalizedStatus === 'Cancelled' || normalizedStatus === 'Hủy đơn') && (order.statusReason || order.rejectReason || order.note) && (
-                            <div className="flex items-center gap-4 px-8 py-5 bg-rose-50 border border-rose-200 rounded-2xl animate-in zoom-in-95 duration-500 shadow-sm border-l-4 border-l-rose-500">
-                                <div className="p-2.5 bg-rose-500 text-white rounded-xl shadow-sm">
-                                    <AlertCircle size={20} />
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                    <h5 className="text-[10px] font-black text-rose-600 uppercase tracking-[0.2em] opacity-70">Lý do từ chối / Hủy đơn</h5>
-                                    <p className="text-sm font-bold text-rose-900 leading-snug italic font-serif">
-                                        "{order.statusReason || order.rejectReason || order.note}"
-                                    </p>
-                                </div>
-                            </div>
-                        )}
+
 
                         <div className="flex flex-col items-end gap-3 flex-1">
                             {/* Actions and Tabs unified box */}
@@ -506,6 +492,23 @@ export default function OrderDetail() {
 
                         <div className="space-y-8">
                             <div className="rounded-xl border border-black bg-white shadow-sm p-8 space-y-8 sticky top-8">
+                                {/* Order Rejection Reason Display - Moved to Sidebar */}
+                                {(isRejected || isCanceled) && (rejectReason || order.statusReason || order.rejectReason || order.note) && (
+                                    <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl animate-in fade-in slide-in-from-top-2 duration-500 shadow-sm border-l-4 border-l-rose-500">
+                                        <div className="shrink-0 p-1.5 bg-rose-500 text-white rounded-lg shadow-sm">
+                                            <AlertCircle size={14} />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <h5 className="text-[9px] font-black text-rose-600 uppercase tracking-widest opacity-80">
+                                                {isRejected ? 'Lý do từ chối' : 'Lý do hủy đơn'}
+                                            </h5>
+                                            <p className="text-xs font-bold text-rose-900 leading-relaxed italic">
+                                                "{rejectReason || order.statusReason || order.rejectReason || order.note}"
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {canModerate && (order?.userFullName || order?.userPhone || order?.userLocation) && (
                                     <div className="pb-8 border-b border-black">
                                         <CustomerInfoCard
@@ -615,12 +618,24 @@ export default function OrderDetail() {
                     } else if (pendingStatus === 'Từ chối') {
                         try {
                             setIsUpdatingStatus(true);
-                            await OrderService.rejectOrder({ orderId: order.id, reason, userId: user?.userId });
+                            // Safety: Re-check if status is still pending before allowing rejection
+                            if (normalizedStatus !== 'Chờ xét duyệt') {
+                                toast.warning("Đơn hàng đã được xử lý hoặc thay đổi trạng thái.");
+                                setIsReasonModalOpen(false);
+                                return;
+                            }
+                            await OrderService.rejectOrder({
+                                orderId: order.id,
+                                reason,
+                                note: reason,
+                                userId: currentUserId,
+                                statusName: 'Từ chối'
+                            });
                             toast.success("Đã từ chối đơn hàng.");
                             setIsReasonModalOpen(false);
                             await fetchOrderDetail();
                         } catch (err) {
-                            toast.error("Từ chối thất bại.");
+                            toast.error(getErrorMessage(err, "Từ chối thất bại."));
                         } finally {
                             setIsUpdatingStatus(false);
                         }

@@ -98,11 +98,11 @@ export default function MaterialsTable({
                                                 className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded cursor-zoom-in"
                                                 title="Bấm để phóng to"
                                             >
-                                                <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
+                                                <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-contain" />
                                             </button>
                                         ) : (
                                             <div className="w-12 h-12 border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center mx-auto rounded">
-                                                <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-cover" />
+                                                <img src={m.imagePreview || m.image} alt="" className="w-full h-full object-contain" />
                                             </div>
                                         )
                                     ) : (

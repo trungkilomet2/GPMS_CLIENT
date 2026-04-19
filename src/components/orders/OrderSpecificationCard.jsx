@@ -26,7 +26,7 @@ export default function OrderSpecificationCard({ order, onImageClick }) {
                     <div className="space-y-4">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ảnh đơn hàng</p>
                         <div className="flex flex-col md:flex-row gap-8 items-center">
-                            <div className="w-[160px] h-[160px] shrink-0 rounded-2xl border border-black bg-white p-2 shadow-sm">
+                            <div className="w-[160px] h-[160px] shrink-0 rounded-2xl border border-black bg-white p-2 shadow-sm overflow-hidden">
                                 {order.image ? (
                                     <img
                                         src={order.image}

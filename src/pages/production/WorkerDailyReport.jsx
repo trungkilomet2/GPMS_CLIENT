@@ -433,7 +433,7 @@ export default function WorkerDailyReport() {
 
     const errors = [];
     const changes = currentRows.filter((row) => {
-      if (!row.partId || row.logReadOnly) return false;
+      if (!row.partId) return false;
       const currentQty = Number(row.quantity || 0);
       const limit = (row.qtyVar || 0) - (row.finVar || 0);
       if (currentQty > limit && limit > 0) {
@@ -463,7 +463,7 @@ export default function WorkerDailyReport() {
     try {
       const results = await Promise.allSettled(
         currentRows.map(async (row) => {
-          if (!row?.partId || row.logReadOnly) return { row, skipped: true };
+          if (!row?.partId) return { row, skipped: true };
           const isChanged = changedItems.some(c => c.id === row.id);
           if (!isChanged) return { row, skipped: true };
           const payload = buildPayload(row);
