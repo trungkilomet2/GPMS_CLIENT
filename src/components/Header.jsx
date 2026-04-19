@@ -106,24 +106,7 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Contact — chỉ hiện khi chưa login */}
-          {!user && (
-            <div className="header-contact-area">
-              {PUBLIC_SITE_CONTENT.guestHeaderActions.map((action) => (
-                <button
-                  key={action.label}
-                  className="header-contact-btn"
-                  onClick={() => navigate(action.path)}
-                >
-                <div className="header-contact-icon">{action.icon}</div>
-                <div>
-                  <div className="header-contact-label">{action.label}</div>
-                  <div className="header-contact-value">{action.value}</div>
-                </div>
-              </button>
-              ))}
-            </div>
-          )}
+
 
           {/* Auth area */}
           <div className="header-auth-area">
@@ -146,7 +129,7 @@ export default function Header() {
                     <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", lineHeight: 1.15 }}>
                         <span style={{ fontSize: ".68rem", color: C.textMid, fontWeight: 500 }}>
-                          Xin chào,
+                          {user?.role?.toLowerCase().includes("customer") ? "Khách hàng:" : "Xin chào,"}
                         </span>
                         <span style={{ fontSize: ".82rem", color: C.green, fontWeight: 700, maxWidth: 140, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {displayName}
