@@ -17,14 +17,8 @@ export function getPostLoginPath(roleValue) {
       return "/dashboard";
     case "pm":
       return "/production";
-    case "teamLeader":
-      return "/production-plan";
-    case "manager":
-      return "/worker/assignments";
-    case "kcs":
-      return "/worker/daily-report";
     case "worker":
-      return "/worker/production-plan";
+      return "/production";
     case "customer":
       return "/orders";
     default:

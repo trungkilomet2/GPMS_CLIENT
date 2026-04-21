@@ -743,7 +743,6 @@ export default function CreateManualOrder() {
         }
       };
 
-      console.log('Final Manual Order Payload:', JSON.stringify(payload, null, 2));
 
       const response = await OrderService.createManualOrder(payload);
 

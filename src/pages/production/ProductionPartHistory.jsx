@@ -131,7 +131,8 @@ export default function ProductionPartHistory() {
                 vLookup[vlinkId] = p;
                 osLookup[vlinkId] = {
                   color: v.color || v.colorName || "-",
-                  size: v.size || v.sizeName || "-"
+                  size: v.size || v.sizeName || "-",
+                  targetQuantity: v.quantity || v.targetQuantity || 0
                 };
               }
             });
@@ -208,6 +209,12 @@ export default function ProductionPartHistory() {
       return;
     }
     const approvedQuantity = Math.floor(qty);
+    const logPosId = String(targetLog.productionPartOrderSizeId || targetLog.partOrderSizeId || targetLog.orderSizeId || "");
+    const osInfo = orderSizeLookup[logPosId];
+    if (osInfo && approvedQuantity > osInfo.targetQuantity) {
+      toast.warn(`Số lượng nghiệm thu không được vượt quá số lượng của biến thể (${osInfo.targetQuantity}).`);
+      return;
+    }
     const { partId, partOrderSizeId, workLogId } = getLogIdentity(targetLog);
     if (!partId || !partOrderSizeId || !workLogId) {
       toast.error("Không đủ thông tin để nghiệm thu bản ghi này.");
@@ -225,7 +232,8 @@ export default function ProductionPartHistory() {
       )));
       toast.success("Đã nghiệm thu sản lượng thành công.");
     } catch (err) {
-      toast.error("Lỗi nghiệm thu sản phẩm.");
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.response?.data?.error || "Lỗi nghiệm thu sản phẩm.";
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
       setTargetLog(null);
@@ -248,6 +256,14 @@ export default function ProductionPartHistory() {
       toast.warn("Số lượng không hợp lệ.");
       return;
     }
+
+    const logPosId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+    const osInfo = orderSizeLookup[logPosId];
+    if (osInfo && val > osInfo.targetQuantity) {
+      toast.warn(`Số lượng không được vượt quá số lượng của biến thể (${osInfo.targetQuantity}).`);
+      return;
+    }
+
     setConfirmConfig({
       isOpen: true,
       type: "EDIT",
@@ -276,7 +292,8 @@ export default function ProductionPartHistory() {
         toast.success("Đã cập nhật số lượng.");
       }
     } catch (err) {
-      toast.error("Thao tác thất bại.");
+      const msg = err.response?.data?.detail || err.response?.data?.message || err.response?.data?.error || "Thao tác thất bại.";
+      toast.error(msg);
     } finally {
       setIsProcessing(false);
     }
@@ -400,7 +417,24 @@ export default function ProductionPartHistory() {
                         </td>
                         <td className="px-6 py-4 text-center">
                           {isEditing ? (
-                            <input type="number" value={editValue} onChange={e => setEditValue(e.target.value)} className="w-16 rounded border border-black text-center font-bold outline-none" autoFocus />
+                            (() => {
+                              const posId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+                              const limit = orderSizeLookup[posId]?.targetQuantity || 0;
+                              const isOver = Number(editValue) > limit;
+                              return (
+                                <div className="flex flex-col items-center gap-1">
+                                  <input
+                                    type="number"
+                                    value={editValue}
+                                    max={limit}
+                                    onChange={e => setEditValue(e.target.value)}
+                                    className={`w-16 rounded border ${isOver ? 'border-rose-500 bg-rose-50 text-rose-600' : 'border-black'} text-center font-bold outline-none transition-all`}
+                                    autoFocus
+                                  />
+                                  {isOver && <span className="text-[8px] font-black text-rose-500 uppercase leading-none">Tối đa: {limit}</span>}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <span className={`inline-flex h-8 w-10 items-center justify-center rounded-lg font-bold text-xs border ${isDone ? 'bg-slate-900 text-white' : 'bg-white border-black'}`}>{log.quantity}</span>
                           )}
@@ -416,10 +450,24 @@ export default function ProductionPartHistory() {
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             {isEditing ? (
-                              <>
-                                <button onClick={() => openEditConfirm(log)} title="Lưu số lượng" className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-emerald-500 text-emerald-600 hover:bg-emerald-50 transition-all active:scale-95 shadow-sm"><Check size={18} /></button>
-                                <button onClick={() => setEditingId(null)} title="Hủy bỏ" className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all active:scale-95 shadow-sm"><X size={18} /></button>
-                              </>
+                              (() => {
+                                const posId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+                                const limit = orderSizeLookup[posId]?.targetQuantity || 0;
+                                const isOver = Number(editValue) > limit;
+                                return (
+                                  <>
+                                    <button
+                                      onClick={() => !isOver && openEditConfirm(log)}
+                                      disabled={isOver}
+                                      title={isOver ? "Vượt quá giới hạn" : "Lưu số lượng"}
+                                      className={`h-9 w-9 flex items-center justify-center rounded-xl bg-white border ${isOver ? 'border-slate-200 text-slate-300' : 'border-emerald-500 text-emerald-600 hover:bg-emerald-50'} transition-all active:scale-95 shadow-sm`}
+                                    >
+                                      <Check size={18} />
+                                    </button>
+                                    <button onClick={() => setEditingId(null)} title="Hủy bỏ" className="h-9 w-9 flex items-center justify-center rounded-xl bg-white border border-rose-500 text-rose-600 hover:bg-rose-50 transition-all active:scale-95 shadow-sm"><X size={18} /></button>
+                                  </>
+                                );
+                              })()
                             ) : (
                               <>
                                 {canApprove && (
@@ -481,12 +529,41 @@ export default function ProductionPartHistory() {
                 <h3 className="text-xl font-black uppercase tracking-tight">Nghiệm thu bản ghi</h3>
               </div>
               <div className="space-y-6 mb-8">
-                <input type="number" value={approveQty} onChange={(e) => setApproveQty(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-center text-4xl font-bold outline-none shadow-inner" autoFocus />
-                <div className="text-[10px] font-bold text-slate-400 uppercase text-center mt-3">Thợ báo cáo: {targetLog?.quantity} cái</div>
-              </div>
-              <div className="flex gap-4">
-                <button onClick={() => setIsApproveOpen(false)} className="flex-1 rounded-xl bg-white border border-slate-200 py-4 text-xs font-bold text-slate-500 uppercase">Hủy bỏ</button>
-                <button onClick={executeApprove} className="flex-[2] rounded-xl bg-[#1e6e43] py-4 text-xs font-bold text-white uppercase shadow-lg shadow-green-100">Xác nhận Nghiệm thu</button>
+                {(() => {
+                  const logPosId = String(targetLog?.productionPartOrderSizeId || targetLog?.partOrderSizeId || targetLog?.orderSizeId || "");
+                  const limit = orderSizeLookup[logPosId]?.targetQuantity || 0;
+                  const isOver = Number(approveQty) > limit;
+                  return (
+                    <>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          value={approveQty}
+                          max={limit}
+                          onChange={(e) => setApproveQty(e.target.value)}
+                          className={`w-full rounded-2xl border ${isOver ? 'border-rose-500 bg-rose-50 text-rose-600 shadow-rose-100' : 'border-slate-200 bg-slate-50 text-slate-900'} px-6 py-5 text-center text-4xl font-bold outline-none transition-all shadow-inner`}
+                          autoFocus
+                        />
+                        {isOver && (
+                          <div className="absolute -bottom-4 left-0 right-0 text-center">
+                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest bg-white px-2">Số lượng tối đa: {limit}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase text-center mt-3">Thợ báo cáo: {targetLog?.quantity} cái</div>
+                      <div className="flex gap-4">
+                        <button onClick={() => setIsApproveOpen(false)} className="flex-1 rounded-xl bg-white border border-slate-200 py-4 text-xs font-bold text-slate-500 uppercase">Hủy bỏ</button>
+                        <button
+                          onClick={() => !isOver && executeApprove()}
+                          disabled={isOver}
+                          className={`flex-[2] rounded-xl py-4 text-xs font-bold text-white uppercase shadow-lg transition-all ${isOver ? 'bg-slate-300 shadow-none cursor-not-allowed' : 'bg-[#1e6e43] shadow-green-100 active:scale-[0.98]'}`}
+                        >
+                          Xác nhận Nghiệm thu
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>

@@ -16,7 +16,7 @@ import {
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 
-export default function WorkerCuttingBook() {
+export default function CuttingBook() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getStoredUser();

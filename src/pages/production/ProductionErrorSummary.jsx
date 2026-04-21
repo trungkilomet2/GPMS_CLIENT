@@ -357,7 +357,6 @@ export default function ProductionErrorSummary() {
 
     return Array.from(map.values());
   }, [errors]);
-  console.log(errors);
   const totalPages = Math.max(1, Math.ceil(errors.length / pageSize));
 
   const pagedErrors = useMemo(() => {

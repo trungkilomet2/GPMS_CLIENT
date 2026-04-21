@@ -57,15 +57,16 @@ export default function RecordDeliveryModal({
                 .filter(d => {
                     const dId = String(d.orderSizeId || d.orderSizeID || d.order_size_id);
                     const statusId = Number(d.deliverStatusId);
-                    const dateStr = d.deliveredAt || d.receivedDate || d.date;
-                    const isConfirmed = statusId === 3 || isAutoConfirmed(dateStr);
-                    return dId === osId && isConfirmed;
+                    // Trừ đi tất cả các đợt giao trừ khi đợt đó bị "Từ chối/Chưa nhận được" (Status 2)
+                    const isRejected = statusId === 2;
+                    return dId === osId && !isRejected;
                 })
                 .reduce((sum, d) => sum + (Number(d.deliverQuantity || d.quantity || 0)), 0);
 
             const totalOrdered = item.totalOrderedQuantity || 0;
             const remaining = Math.max(0, totalOrdered - confirmedQuantity);
-            const finished = item.completedQuantity || 0;
+            const totalFinished = item.completedQuantity || 0;
+            const availableFinished = Math.max(0, totalFinished - confirmedQuantity);
 
             return {
                 id: osId,
@@ -74,8 +75,8 @@ export default function RecordDeliveryModal({
                 totalOrdered,
                 alreadyDelivered: confirmedQuantity,
                 remaining,
-                finishedQty: finished,
-                maxDeliverable: Math.min(remaining, finished),
+                finishedQty: availableFinished,
+                maxDeliverable: Math.min(remaining, availableFinished),
                 quantity: items.find(i => i.id === osId)?.quantity || 0
             };
         });
@@ -153,20 +154,6 @@ export default function RecordDeliveryModal({
                 </div>
 
                 <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
-                    {/* Date Picker */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Calendar size={12} className="text-[#1e6e43]" /> Ngày giao
-                            </label>
-                            <input
-                                type="date"
-                                value={deliveryDate}
-                                onChange={(e) => setDeliveryDate(e.target.value)}
-                                className="w-full h-12 px-6 rounded-xl bg-slate-50 border border-slate-100 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1e6e43]/20 focus:border-[#1e6e43] transition-all"
-                            />
-                        </div>
-                    </div>
 
                     {/* Table */}
                     <div className="space-y-4">
