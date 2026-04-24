@@ -339,9 +339,9 @@ export default function InternalDashboard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* CARD: TOTAL CUSTOMERS */}
-              <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform">
                     <ContactRound size={28} />
                   </div>
                   <div>
@@ -362,9 +362,9 @@ export default function InternalDashboard() {
               </div>
 
               {/* CARD: TOTAL ORDERS */}
-              <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform">
                     <ShoppingBag size={28} />
                   </div>
                   <div>
@@ -385,9 +385,9 @@ export default function InternalDashboard() {
               </div>
 
               {/* CARD: TOTAL REVENUE */}
-              <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform">
                     <DollarSign size={28} />
                   </div>
                   <div>
@@ -410,9 +410,9 @@ export default function InternalDashboard() {
               </div>
 
               {/* CARD: TOTAL PAYROLL */}
-              <div className="group relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
+              <div className="group relative overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white p-6 transition-all hover:shadow-xl hover:shadow-slate-100 hover:-translate-y-1">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 group-hover:scale-110 transition-transform">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-rose-50 text-rose-600 group-hover:scale-110 transition-transform">
                     <Users size={28} />
                   </div>
                   <div>
@@ -439,13 +439,13 @@ export default function InternalDashboard() {
             {/* CHARTS GRID - Enhanced 2-Chart Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* CHART 1: FINANCIAL TRENDS */}
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-100 flex flex-col">
+              <div className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-100 flex flex-col">
                 <div className="mb-8 flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Hiệu quả tài chính</h3>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">So sánh Doanh thu và Chi phí nhân công</p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-inner">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-inner">
                     <DollarSign size={24} />
                   </div>
                 </div>
@@ -514,13 +514,13 @@ export default function InternalDashboard() {
               </div>
 
               {/* CHART 2: ORDER INTENSITY */}
-              <div className="group relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-100 flex flex-col">
+              <div className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white p-8 shadow-sm transition-all hover:shadow-xl hover:shadow-slate-100 flex flex-col">
                 <div className="mb-8 flex items-center justify-between">
                   <div>
                     <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Tần suất đơn hàng</h3>
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Số lượng đơn hàng được tiếp nhận</p>
                   </div>
-                  <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+                  <div className="h-12 w-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
                     <ShoppingBag size={24} />
                   </div>
                 </div>
@@ -557,7 +557,7 @@ export default function InternalDashboard() {
                           cursor={{ fill: '#f8fafc', radius: 10 }}
                           formatter={(value) => [new Intl.NumberFormat('vi-VN').format(value), "Đơn hàng"]}
                           contentStyle={{ 
-                            borderRadius: '20px', 
+                            borderRadius: '12px', 
                             border: '1px solid #f1f5f9', 
                             boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', 
                             padding: '12px 16px',

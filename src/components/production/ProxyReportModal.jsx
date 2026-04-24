@@ -321,13 +321,13 @@ export default function ProxyReportModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-md transition-all duration-300">
-      <div className="w-full max-w-3xl overflow-hidden rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] border border-white/20">
+      <div className="w-full max-w-3xl overflow-hidden rounded-[1.25rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] border border-white/20">
 
         {/* Header with Gradient */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-6 text-white flex justify-between items-center shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
           <div className="flex items-center gap-4 relative z-10">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md shadow-inner border border-white/30">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md shadow-inner border border-white/30">
               <Users size={24} className="text-white" />
             </div>
             <div>
@@ -335,7 +335,7 @@ export default function ProxyReportModal({
               <p className="text-emerald-50/80 text-[10px] font-bold uppercase tracking-widest mt-0.5">Chọn nhân sự & nhập sản lượng hoàn thành</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2.5 hover:bg-white/20 rounded-2xl transition-all active:scale-90 group relative z-10">
+          <button onClick={onClose} className="p-2.5 hover:bg-white/20 rounded-xl transition-all active:scale-90 group relative z-10">
             <X size={20} className="group-hover:rotate-90 transition-transform duration-300" />
           </button>
         </div>
@@ -355,7 +355,7 @@ export default function ProxyReportModal({
                   setProxyWorker(worker || null);
                 }}
                 disabled={isLoadingWorkers}
-                className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-6 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all appearance-none cursor-pointer disabled:opacity-50"
+                className="w-full h-14 rounded-xl border-2 border-slate-100 bg-slate-50/50 px-6 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all appearance-none cursor-pointer disabled:opacity-50"
                 style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.5rem center', backgroundSize: '1.2rem' }}
               >
                 <option value="">{isLoadingWorkers ? "Đang tải danh sách..." : "-- Danh sách nhân sự khả dụng --"}</option>
@@ -384,7 +384,7 @@ export default function ProxyReportModal({
               </div>
 
               {proxyRows.length > 0 ? (
-                <div className="rounded-[2rem] border border-slate-100 overflow-hidden bg-white shadow-sm ring-1 ring-slate-100">
+                <div className="rounded-xl border border-slate-100 overflow-hidden bg-white shadow-sm ring-1 ring-slate-100">
                   <table className="w-full text-sm">
                     <thead className="bg-slate-50/80 border-b border-slate-100 backdrop-blur-sm">
                       <tr>
@@ -424,7 +424,7 @@ export default function ProxyReportModal({
                                     placeholder="Nhập..."
                                     value={row.quantity}
                                     onChange={(e) => handleQtyChange(row.id, e.target.value)}
-                                    className="w-full h-11 rounded-2xl border-2 border-slate-100 text-center font-black text-slate-700 focus:border-emerald-500 focus:ring-8 focus:ring-emerald-500/5 outline-none transition-all placeholder:text-slate-300 text-base"
+                                    className="w-full h-11 rounded-xl border-2 border-slate-100 text-center font-black text-slate-700 focus:border-emerald-500 focus:ring-8 focus:ring-emerald-500/5 outline-none transition-all placeholder:text-slate-300 text-base"
                                   />
                                 </div>
                                 <div className="flex flex-col items-center gap-1">
@@ -443,8 +443,8 @@ export default function ProxyReportModal({
                   </table>
                 </div>
               ) : !isLoading && (
-                <div className="py-16 text-center border-4 border-dashed border-slate-50 rounded-[2.5rem] bg-slate-50/20">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 text-slate-300 mb-4">
+                <div className="py-16 text-center border-4 border-dashed border-slate-50 rounded-[1.25rem] bg-slate-50/20">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-300 mb-4">
                     <Users size={32} />
                   </div>
                   <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Thợ này không có công việc khả dụng</p>
@@ -459,14 +459,14 @@ export default function ProxyReportModal({
         <div className="p-8 border-t border-slate-100 bg-slate-50/80 backdrop-blur-md flex gap-4">
           <button
             onClick={onClose}
-            className="flex-1 h-14 rounded-2xl border-2 border-slate-200 bg-white font-black text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 text-xs uppercase tracking-widest"
+            className="flex-1 h-14 rounded-xl border-2 border-slate-200 bg-white font-black text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 text-xs uppercase tracking-widest"
           >
             Hủy bỏ
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving || !proxyWorker || proxyRows.length === 0}
-            className="flex-[1.5] h-14 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 font-black text-white hover:from-emerald-700 hover:to-teal-700 disabled:opacity-30 shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3 text-xs uppercase tracking-[0.15em] border-t border-white/20"
+            className="flex-[1.5] h-14 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 font-black text-white hover:from-emerald-700 hover:to-teal-700 disabled:opacity-30 shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3 text-xs uppercase tracking-[0.15em] border-t border-white/20"
           >
             {isSaving ? (
               <Loader2 className="animate-spin" size={20} />
