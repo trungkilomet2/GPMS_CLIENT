@@ -138,11 +138,11 @@ export default function ProductionDetail() {
     ProductionService.getProductionRejectReason(production.productionId).then(res => setRejectReason(res?.data)).catch(() => setRejectReason(null));
   }, [production?.productionId, production?.status]);
 
-  // Load worker directory để resolve assigneeIds → tên thật (role-aware, không crash 403)
+  // Load worker directory to resolve assigneeIds -> names & for proxy reporting
   useEffect(() => {
-    const loadWorkerMap = async () => {
+    const fetchWorkerData = async () => {
       try {
-        // Sử dụng getManagerDirectory để lấy cả Admin/PM tham gia sản xuất
+        // Only fetch if has permission or for mapping
         const response = await WorkerService.getManagerDirectory();
 
         if (response?.data) {
@@ -156,32 +156,27 @@ export default function ProductionDetail() {
             }
           });
 
-          // Cập nhật gộp (functional update) để không ghi đè dữ liệu từ logs
+          // Update map for name resolution
           setWorkerMap(prev => ({ ...prev, ...newMappings }));
+
+          // Update workers list for ProxyReportModal
+          if (isOwner || isPM) {
+            setWorkers(response.data);
+          }
         }
 
-        // Đảm bảo PM của dự án luôn có tên
+        // Ensure current PM is in the map
         if (production?.pmId && production?.pmName) {
           setWorkerMap(prev => ({ ...prev, [String(production.pmId)]: production.pmName }));
         }
 
       } catch (err) {
-        console.error("Worker map load error:", err);
+        console.error("Worker directory load error:", err);
       }
     };
-    loadWorkerMap();
 
-    // Fetch workers for proxy reporting
-    const fetchWorkers = async () => {
-      try {
-        const res = await WorkerService.getManagerDirectory();
-        setWorkers(res?.data || []);
-      } catch (err) {
-        console.error("Error fetching workers for proxy reporting:", err);
-      }
-    };
-    fetchWorkers();
-  }, [production?.pmId, production?.pmName]);
+    fetchWorkerData();
+  }, [production?.pmId, production?.pmName, isOwner, isPM]);
 
   useEffect(() => {
     if (!production?.productionId) return;
