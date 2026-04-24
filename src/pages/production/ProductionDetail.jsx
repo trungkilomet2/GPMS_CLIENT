@@ -71,7 +71,6 @@ export default function ProductionDetail() {
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null);
   const [isProxyModalOpen, setIsProxyModalOpen] = useState(false);
-  const [workers, setWorkers] = useState([]);
 
   // --- DATA STATES ---
   const [production, setProduction] = useState(null);
@@ -158,11 +157,6 @@ export default function ProductionDetail() {
 
           // Update map for name resolution
           setWorkerMap(prev => ({ ...prev, ...newMappings }));
-
-          // Update workers list for ProxyReportModal
-          if (isOwner || isPM) {
-            setWorkers(response.data);
-          }
         }
 
         // Ensure current PM is in the map
@@ -970,7 +964,6 @@ export default function ProductionDetail() {
         <ProxyReportModal
           isOpen={isProxyModalOpen}
           onClose={() => setIsProxyModalOpen(false)}
-          workers={workers}
           currentUser={currentUser}
           plan={production}
           steps={steps}

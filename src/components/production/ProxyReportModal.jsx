@@ -3,20 +3,22 @@ import { Users, X, Loader2, ClipboardCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import ProductionPartService from "@/services/ProductionPartService";
 
-export default function ProxyReportModal({ 
-  isOpen, 
-  onClose, 
-  workers, 
-  currentUser, 
-  plan, 
+export default function ProxyReportModal({
+  isOpen,
+  onClose,
+  workers,
+  currentUser,
+  plan,
   steps,
   allLogs,
-  onSuccess 
+  onSuccess
 }) {
   const [proxyWorker, setProxyWorker] = useState(null);
   const [proxyRows, setProxyRows] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [availableWorkers, setAvailableWorkers] = useState([]);
+  const [isLoadingWorkers, setIsLoadingWorkers] = useState(false);
 
   const normalizeDateString = (target) => {
     if (!target) return "";
@@ -103,10 +105,10 @@ export default function ProxyReportModal({
 
   const getTasksForWorker = (worker) => {
     if (!worker || !steps) return [];
-    
+
     const workerId = worker?.userId ?? worker?.id ?? worker?.accountId;
     const wIdSet = new Set(workerId ? [String(workerId).trim()] : []);
-    
+
     const names = [worker?.fullName, worker?.name, worker?.userName, worker?.username]
       .map((value) => normalizeWorkerValue(value))
       .filter(Boolean);
@@ -140,6 +142,68 @@ export default function ProxyReportModal({
     return results;
   };
 
+  // Fetch available workers for assignment
+  useEffect(() => {
+    if (isOpen) {
+      const fetchAvailableWorkers = async () => {
+        setIsLoadingWorkers(true);
+        try {
+          let allWorkers = [];
+          let pageIndex = 0;
+          let hasMore = true;
+
+          while (hasMore && pageIndex < 50) { // Safety limit of 50 pages
+            const res = await ProductionPartService.getAssignWorkers({
+              PageIndex: pageIndex,
+              PageSize: 30,
+              SortColumn: "Name",
+              SortOrder: "ASC",
+              // Include production context if available (may be required by backend)
+              ...(plan?.pmId ? { PMId: plan.pmId } : {}),
+              ...(plan?.pStartDate || plan?.startDate ? { fromDate: plan.pStartDate || plan.startDate } : {}),
+              ...(plan?.pEndDate || plan?.endDate ? { toDate: plan.pEndDate || plan.endDate } : {}),
+            });
+
+            const rawData = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+
+            if (rawData.length > 0) {
+              allWorkers = [...allWorkers, ...rawData];
+              if (rawData.length < 30) {
+                hasMore = false;
+              } else {
+                pageIndex++;
+              }
+            } else {
+              hasMore = false;
+            }
+          }
+
+          // Map to handle potential nesting in API response (workerInfo)
+          const mapped = allWorkers.map(item => ({
+            id: String(item.workerInfo?.workerId || item.workerId || item.userId || ""),
+            fullName: item.workerInfo?.workerName || item.workerName || item.fullName || item.userName || "—",
+            roleName: item.workerSkillInfo?.[0]?.skillName || item.roleName || ""
+          })).filter(w => w.id);
+
+          // Filter out current user if necessary
+          const currentUid = String(currentUser?.userId || currentUser?.id || "");
+          const filtered = mapped.filter(w => String(w.id) !== currentUid);
+
+          setAvailableWorkers(filtered);
+        } catch (err) {
+          console.error("Error fetching workers for proxy report:", err);
+          toast.error("Không thể tải danh sách thợ.");
+        } finally {
+          setIsLoadingWorkers(false);
+        }
+      };
+      fetchAvailableWorkers();
+    } else {
+      setProxyWorker(null);
+      setAvailableWorkers([]);
+    }
+  }, [isOpen, currentUser, plan]);
+
   useEffect(() => {
     if (proxyWorker) {
       setIsLoading(true);
@@ -147,7 +211,7 @@ export default function ProxyReportModal({
         const tasks = getTasksForWorker(proxyWorker);
         const targetId = proxyWorker?.userId ?? proxyWorker?.id ?? proxyWorker?.accountId;
         const todayStr = new Date().toISOString().split("T")[0];
-        
+
         // Map to store TOTAL finished for each variant (from all workers)
         const totalFinishedMap = new Map();
         // Map to store TODAY'S finished for the SELECTED worker
@@ -157,7 +221,7 @@ export default function ProxyReportModal({
           allLogs.forEach(log => {
             const sid = String(log.partOrderSizeId || log.productionPartOrderSizeId || "");
             const qty = Number(log.quantity || 0);
-            
+
             // 1. Accumulate total finished for this variant
             totalFinishedMap.set(sid, (totalFinishedMap.get(sid) || 0) + qty);
 
@@ -175,7 +239,7 @@ export default function ProxyReportModal({
           // Prefer log sum for accuracy, fallback to server field
           const realFinished = totalFinishedMap.has(sid) ? totalFinishedMap.get(sid) : t.finVar;
           const todayQty = reportedTodayMap.get(sid) || 0;
-          
+
           return {
             ...t,
             quantity: "",
@@ -230,16 +294,16 @@ export default function ProxyReportModal({
         // Double check IDs are numbers
         const pId = Number(row.partId);
         const psId = Number(row.partOrderSizeId);
-        
+
         const payload = {
           userId: Number(targetId),
           quantity: Number(row.quantity)
         };
-        
+
         if (isNaN(pId) || isNaN(psId)) {
           throw new Error("Thông tin công đoạn không hợp lệ (ID missing).");
         }
-        
+
         return ProductionPartService.createWorkLog(pId, psId, payload);
       }));
       toast.success("Đã lưu báo cáo hộ thành công.");
@@ -258,7 +322,7 @@ export default function ProxyReportModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-md transition-all duration-300">
       <div className="w-full max-w-3xl overflow-hidden rounded-[2.5rem] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] animate-in zoom-in-95 fade-in duration-300 flex flex-col max-h-[90vh] border border-white/20">
-        
+
         {/* Header with Gradient */}
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-6 text-white flex justify-between items-center shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
@@ -283,20 +347,30 @@ export default function ProxyReportModal({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Chọn nhân sự được báo cáo hộ</label>
             </div>
-            <select
-              value={proxyWorker?.id || ""}
-              onChange={(e) => {
-                const worker = workers.find(w => String(w.id) === e.target.value);
-                setProxyWorker(worker || null);
-              }}
-              className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-6 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all appearance-none cursor-pointer"
-              style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.5rem center', backgroundSize: '1.2rem' }}
-            >
-              <option value="">-- Danh sách nhân sự khả dụng --</option>
-              {workers.filter(w => String(w.id) !== String(currentUser?.userId || currentUser?.id)).map(w => (
-                <option key={w.id} value={w.id}>{w.fullName || w.name} ({w.primaryRoleLabel || "Thợ"})</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={proxyWorker?.id || ""}
+                onChange={(e) => {
+                  const worker = availableWorkers.find(w => String(w.id) === e.target.value);
+                  setProxyWorker(worker || null);
+                }}
+                disabled={isLoadingWorkers}
+                className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50/50 px-6 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white focus:ring-8 focus:ring-emerald-500/5 transition-all appearance-none cursor-pointer disabled:opacity-50"
+                style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%2364748b\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1.5rem center', backgroundSize: '1.2rem' }}
+              >
+                <option value="">{isLoadingWorkers ? "Đang tải danh sách..." : "-- Danh sách nhân sự khả dụng --"}</option>
+                {availableWorkers.map(w => (
+                  <option key={w.id} value={w.id}>
+                    {w.fullName || w.name || w.userName}
+                  </option>
+                ))}
+              </select>
+              {isLoadingWorkers && (
+                <div className="absolute right-12 top-1/2 -translate-y-1/2">
+                  <Loader2 className="animate-spin text-emerald-500" size={18} />
+                </div>
+              )}
+            </div>
           </div>
 
           {proxyWorker && (
@@ -383,8 +457,8 @@ export default function ProxyReportModal({
 
         {/* Footer with Blur Effect */}
         <div className="p-8 border-t border-slate-100 bg-slate-50/80 backdrop-blur-md flex gap-4">
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="flex-1 h-14 rounded-2xl border-2 border-slate-200 bg-white font-black text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all active:scale-95 text-xs uppercase tracking-widest"
           >
             Hủy bỏ

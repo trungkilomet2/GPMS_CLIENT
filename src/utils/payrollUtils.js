@@ -35,7 +35,7 @@ export const fetchAggregatedPayroll = async (month, year) => {
         const data = res?.data?.data || res?.data || [];
         if (Array.isArray(data) && data.length > 0) {
           allProductions = [...allProductions, ...data];
-          hasMoreProds = data.length === 100;
+          hasMoreProds = data.length === 30;
           prodIdx++;
         } else {
           hasMoreProds = false;

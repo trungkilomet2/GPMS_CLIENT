@@ -528,7 +528,7 @@ export default function PayrollDetail() {
       <SuccessModal
         isOpen={isSuccessOpen}
         title="Thanh toán thành công"
-        description={`Đã xác nhận thanh toán cho toàn bộ công đoạn trong tháng của ${stats.workerName}.`}
+        description={`Đã thanh toán thành công.`}
         primaryLabel="Đóng"
         onPrimary={() => setIsSuccessOpen(false)}
         onClose={() => setIsSuccessOpen(false)}

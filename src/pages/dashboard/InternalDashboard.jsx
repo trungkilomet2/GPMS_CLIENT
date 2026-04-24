@@ -37,6 +37,8 @@ import { getPrimaryWorkspaceRole, splitRoles } from "@/lib/internalRoleFlow";
 import { getSystemRoleLabel } from "@/lib/orgHierarchy";
 import OrderService from "@/services/OrderService";
 import CustomerService from "@/services/CustomerService";
+import ProductionService from "@/services/ProductionService";
+import ProductionPartService from "@/services/ProductionPartService";
 import { fetchAggregatedPayroll } from "@/utils/payrollUtils";
 import { toast } from "react-toastify";
 import "@/styles/internal-dashboard.css";
@@ -93,119 +95,120 @@ export default function InternalDashboard() {
     end: new Date().toISOString().split('T')[0]
   });
 
-  const [stats, setStats] = useState({
-    totalCustomers: 0,
-    totalOrders: 0,
-    totalRevenue: 0,
-    totalPayroll: 0,
+  const [dashboardData, setDashboardData] = useState({
+    stats: { totalCustomers: 0, totalOrders: 0, totalRevenue: 0, totalPayroll: 0 },
+    chartData: []
   });
-  const [chartData, setChartData] = useState([]);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   const fetchStats = async () => {
+    if (isLoadingStats && dashboardData.chartData.length > 0) return;
     setIsLoadingStats(true);
     try {
-      // 1. Fetch Customers - Reduced PageSize to 100 to avoid 400 errors
       const custRes = await CustomerService.getAllCustomers({ PageSize: 100 });
       const customers = custRes?.data || [];
-      
-      // 2. Fetch Orders - Reduced PageSize to 100
       const orderRes = await OrderService.getAllOrders({ PageSize: 100 });
       const allOrders = orderRes?.data?.data || orderRes?.data || [];
 
-      // Filter orders by date
       const filteredOrders = allOrders.filter(order => {
         const d = new Date(order.startDate || order.createDate || order.orderDate);
-        if (filterType === "month") {
-          return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-        }
+        if (filterType === "month") return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
         if (filterType === "quarter") {
           const q = Math.floor(d.getMonth() / 3) + 1;
           const targetQ = Math.floor((selectedMonth - 1) / 3) + 1;
           return q === targetQ && d.getFullYear() === selectedYear;
         }
-        if (filterType === "year") {
-          return d.getFullYear() === selectedYear;
-        }
-        if (filterType === "custom") {
-          const start = new Date(customRange.start);
-          const end = new Date(customRange.end);
-          end.setHours(23, 59, 59);
-          return d >= start && d <= end;
-        }
+        if (filterType === "year") return d.getFullYear() === selectedYear;
         return true;
       });
 
       const revenue = filteredOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0);
 
-      // 3. Fetch Payroll
       let payrollTotal = 0;
-      if (filterType === "month") {
-        const payroll = await fetchAggregatedPayroll(selectedMonth, selectedYear);
-        payrollTotal = payroll.reduce((sum, w) => sum + (w.totalSalary || 0), 0);
-      } else if (filterType === "quarter") {
-        const targetQ = Math.floor((selectedMonth - 1) / 3) + 1;
-        const months = targetQ === 1 ? [1,2,3] : targetQ === 2 ? [4,5,6] : targetQ === 3 ? [7,8,9] : [10,11,12];
-        const results = await Promise.all(months.map(m => fetchAggregatedPayroll(m, selectedYear)));
-        payrollTotal = results.flat().reduce((sum, w) => sum + (w.totalSalary || 0), 0);
-      } else if (filterType === "year") {
-        const results = await Promise.all(Array.from({length: 12}, (_, i) => fetchAggregatedPayroll(i+1, selectedYear)));
-        payrollTotal = results.flat().reduce((sum, w) => sum + (w.totalSalary || 0), 0);
-      }
+      try {
+        let allProds = [];
+        let pIdx = 0;
+        let hasMoreProds = true;
+        while (hasMoreProds && pIdx < 20) {
+          const prodRes = await ProductionService.getProductionList({ PageIndex: pIdx, PageSize: 30 });
+          const pageData = prodRes?.data?.data || prodRes?.data?.items || (Array.isArray(prodRes?.data) ? prodRes.data : []);
+          if (Array.isArray(pageData) && pageData.length > 0) {
+            allProds = [...allProds, ...pageData];
+            hasMoreProds = pageData.length === 30;
+            pIdx++;
+          } else hasMoreProds = false;
+        }
+        
+        const relevantProds = allProds.filter(p => {
+          const sStr = p.startDate || p.pStartDate || p.createDate;
+          const eStr = p.endDate || p.pEndDate;
+          if (!sStr) return false;
+          const start = new Date(sStr);
+          const end = eStr ? new Date(eStr) : start;
+          if (isNaN(start.getTime())) return false;
+          const sM = start.getMonth() + 1;
+          const sY = start.getFullYear();
+          const eM = end.getMonth() + 1;
+          const eY = end.getFullYear();
+          if (filterType === "month") return (sM === selectedMonth && sY === selectedYear) || (eM === selectedMonth && eY === selectedYear);
+          if (filterType === "quarter") {
+            const cQ = Math.floor((selectedMonth - 1) / 3) + 1;
+            return (Math.floor((sM - 1) / 3) + 1 === cQ && sY === selectedYear) || (Math.floor((eM - 1) / 3) + 1 === cQ && eY === selectedYear);
+          }
+          if (filterType === "year") return sY === selectedYear || eY === selectedYear;
+          return true;
+        });
 
-      setStats({
-        totalCustomers: customers.length,
-        totalOrders: filteredOrders.length,
-        totalRevenue: revenue,
-        totalPayroll: payrollTotal,
-      });
-
-      // 4. Generate Chart Data
-      let trend = [];
-      if (filterType === "month") {
-        const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
-        for (let i = 1; i <= daysInMonth; i++) {
-          const dOrders = filteredOrders.filter(o => new Date(o.startDate || o.createDate || o.orderDate).getDate() === i);
-          const dCusts = customers.filter(c => {
-            const cd = new Date(c.createDate || c.joinDate);
-            return cd.getDate() === i && cd.getMonth() + 1 === selectedMonth && cd.getFullYear() === selectedYear;
-          });
-          trend.push({ 
-            name: `${i}`, 
-            revenue: dOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0), 
-            payroll: payrollTotal / daysInMonth,
-            orderCount: dOrders.length,
+        if (relevantProds.length > 0) {
+          const partsResponses = await Promise.all(relevantProds.map(p => ProductionPartService.getPartsByProduction(p.productionId || p.id, { PageSize: 100 })));
+          partsResponses.forEach(res => {
+            const parts = res?.data?.data || res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
+            if (Array.isArray(parts)) parts.forEach(part => {
+              payrollTotal += (Number(part.totalQuantity || part.quantity || 0) * Number(part.unitPrice || part.cpu || 0));
+            });
           });
         }
+      } catch (e) { console.error(e); }
+
+      let trend = [];
+      if (filterType === "month") {
+        for (let i = 0; i < 4; i++) {
+          const startDay = i * 7 + 1;
+          const endDay = i === 3 ? 31 : (i + 1) * 7;
+          const wOrders = filteredOrders.filter(o => {
+            const d = new Date(o.startDate || o.createDate || o.orderDate).getDate();
+            return d >= startDay && d <= endDay;
+          });
+          trend.push({ name: `Tuần ${i + 1}`, revenue: wOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0), orderCount: wOrders.length });
+        }
+      } else if (filterType === "quarter") {
+        const currentQ = Math.floor((selectedMonth - 1) / 3) + 1;
+        [0, 1, 2].forEach(offset => {
+          const m = (currentQ - 1) * 3 + 1 + offset;
+          const mOrders = allOrders.filter(o => {
+            const d = new Date(o.startDate || o.createDate || o.orderDate);
+            return d.getMonth() + 1 === m && d.getFullYear() === selectedYear;
+          });
+          trend.push({ name: `Tháng ${m}`, revenue: mOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0), orderCount: mOrders.length });
+        });
       } else if (filterType === "year") {
         for (let i = 1; i <= 12; i++) {
           const mOrders = allOrders.filter(o => {
             const d = new Date(o.startDate || o.createDate || o.orderDate);
             return d.getMonth() + 1 === i && d.getFullYear() === selectedYear;
           });
-          const mCusts = customers.filter(c => {
-            const cd = new Date(c.createDate || c.joinDate);
-            return cd.getMonth() + 1 === i && cd.getFullYear() === selectedYear;
-          });
-          trend.push({ 
-            name: `T${i}`, 
-            revenue: mOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0), 
-            payroll: payrollTotal / 12,
-            orderCount: mOrders.length,
-          });
+          trend.push({ name: `Tháng ${i}`, revenue: mOrders.reduce((sum, o) => sum + (Number(o.quantity || 0) * Number(o.cpu || 0)), 0), orderCount: mOrders.length });
         }
       } else {
-        // Default split
-        for (let i = 0; i < 7; i++) {
-          trend.push({ name: `GĐ ${i+1}`, revenue: revenue/7, payroll: payrollTotal/7, orderCount: filteredOrders.length/7 });
-        }
+        for (let i = 0; i < 4; i++) trend.push({ name: `Tuần ${i+1}`, revenue: 0, orderCount: 0 });
       }
-      setChartData(trend);
-    } catch (err) {
-      console.error("Dashboard error:", err);
-    } finally {
-      setIsLoadingStats(false);
-    }
+
+      setDashboardData({
+        stats: { totalCustomers: customers.length, totalOrders: filteredOrders.length, totalRevenue: revenue, totalPayroll: payrollTotal },
+        chartData: trend
+      });
+    } catch (err) { console.error(err); }
+    finally { setIsLoadingStats(false); }
   };
 
   useEffect(() => {
@@ -348,7 +351,7 @@ export default function InternalDashboard() {
                         <div className="h-8 w-16 bg-slate-100 animate-pulse rounded" />
                       ) : (
                         <>
-                          <span className="text-3xl font-black text-slate-900">{stats.totalCustomers}</span>
+                          <span className="text-3xl font-black text-slate-900">{dashboardData.stats.totalCustomers}</span>
                           <span className="text-[10px] font-bold text-blue-500">Khách</span>
                         </>
                       )}
@@ -371,7 +374,7 @@ export default function InternalDashboard() {
                         <div className="h-8 w-16 bg-slate-100 animate-pulse rounded" />
                       ) : (
                         <>
-                          <span className="text-3xl font-black text-slate-900">{stats.totalOrders}</span>
+                          <span className="text-3xl font-black text-slate-900">{dashboardData.stats.totalOrders}</span>
                           <span className="text-[10px] font-bold text-amber-500">Đơn</span>
                         </>
                       )}
@@ -395,7 +398,7 @@ export default function InternalDashboard() {
                       ) : (
                         <>
                           <span className="text-xl font-black text-slate-900 leading-none">
-                            {stats.totalRevenue.toLocaleString("vi-VN")}
+                            {dashboardData.stats.totalRevenue.toLocaleString("vi-VN")}
                           </span>
                           <span className="text-[10px] font-bold text-emerald-500 uppercase">VND</span>
                         </>
@@ -420,7 +423,7 @@ export default function InternalDashboard() {
                       ) : (
                         <>
                           <span className="text-xl font-black text-slate-900 leading-none">
-                            {stats.totalPayroll.toLocaleString("vi-VN")}
+                            {dashboardData.stats.totalPayroll.toLocaleString("vi-VN")}
                           </span>
                           <span className="text-[10px] font-bold text-rose-500 uppercase">VND</span>
                         </>
@@ -453,16 +456,12 @@ export default function InternalDashboard() {
                       <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <AreaChart data={dashboardData.chartData}>
                         <defs>
                           <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
                             <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="colorPay" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -502,16 +501,6 @@ export default function InternalDashboard() {
                           name="Doanh thu" 
                           activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981' }}
                         />
-                        <Area 
-                          type="monotone" 
-                          dataKey="payroll" 
-                          stroke="#f43f5e" 
-                          strokeWidth={3} 
-                          strokeDasharray="5 5"
-                          fillOpacity={1} 
-                          fill="url(#colorPay)" 
-                          name="Tiền thợ" 
-                        />
                         <Legend 
                           verticalAlign="top" 
                           align="right"
@@ -542,8 +531,8 @@ export default function InternalDashboard() {
                       <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
                     </div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData}>
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart data={dashboardData.chartData}>
                         <defs>
                           <linearGradient id="colorOrder" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
