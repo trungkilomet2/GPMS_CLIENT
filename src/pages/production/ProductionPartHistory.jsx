@@ -396,9 +396,11 @@ export default function ProductionPartHistory() {
                     const isDone = log.status === 2 || log.statusName === "Đã nghiệm thu";
 
                     // CHECK PERMISSIONS
+                    const isOwnerOrPM = primaryRole === "owner" || primaryRole === "pm";
                     const isCreator = String(log.userId || log.workerId || log.accountId) === String(user?.id || user?.userId);
-                    const canApprove = !isWorker && !isDone && !log.isReadOnly;
-                    const canEditDelete = isCreator && !isDone && !log.isReadOnly;
+                    
+                    const canApprove = isOwnerOrPM && !isDone && !log.isReadOnly;
+                    const canEditDelete = (isOwnerOrPM || isCreator) && !isDone && !log.isReadOnly;
 
                     return (
                       <tr key={rowId} className={`hover:bg-slate-50/50 transition-all divide-x divide-black border-b border-black last:border-b-0 ${isDone ? "bg-emerald-50/5" : ""}`}>

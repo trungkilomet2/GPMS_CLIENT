@@ -35,6 +35,7 @@ import { hasAnyRole } from "@/lib/roleAccess";
 import DesignTemplatesSection from '@/components/orders/DesignTemplatesSection';
 import '@/styles/homepage.css';
 import { processOrderVariants } from '@/lib/orders/variants';
+import ProxyReportModal from "@/components/production/ProxyReportModal";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -69,6 +70,8 @@ export default function ProductionDetail() {
   const [isDonePartModalOpen, setIsDonePartModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null);
+  const [isProxyModalOpen, setIsProxyModalOpen] = useState(false);
+  const [workers, setWorkers] = useState([]);
 
   // --- DATA STATES ---
   const [production, setProduction] = useState(null);
@@ -167,6 +170,17 @@ export default function ProductionDetail() {
       }
     };
     loadWorkerMap();
+
+    // Fetch workers for proxy reporting
+    const fetchWorkers = async () => {
+      try {
+        const res = await WorkerService.getManagerDirectory();
+        setWorkers(res?.data || []);
+      } catch (err) {
+        console.error("Error fetching workers for proxy reporting:", err);
+      }
+    };
+    fetchWorkers();
   }, [production?.pmId, production?.pmName]);
 
   useEffect(() => {
@@ -587,14 +601,22 @@ export default function ProductionDetail() {
                       </div>
                       <div className="flex gap-2">
                         {isAssignedPM && (isAccepted || isNeedUpdatePlan) && (
-                          <Link to="/production-plan/create" state={{ productionId: production.productionId, steps }} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-[#1e6e43] rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
-                            <Plus size={14} /> Thiết kế công đoạn
+                          <Link to="/production-plan/create" state={{ productionId: production.productionId, steps }} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#1e6e43] rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
+                            <Plus size={12} /> Thiết kế công đoạn
                           </Link>
                         )}
                         {(isPM || isOwner) && isInProduction && (
-                          <Link to={`/production-plan/assign/${production.productionId}`} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-[#1e6e43] rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
-                            <Users size={14} /> Phân công thợ
-                          </Link>
+                          <div className="flex gap-1.5">
+                            <Link to={`/production-plan/assign/${production.productionId}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#1e6e43] rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
+                              <Users size={12} /> Phân công thợ
+                            </Link>
+                            <button
+                              onClick={() => setIsProxyModalOpen(true)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-emerald-50 hover:border-emerald-300 shadow-sm"
+                            >
+                              <UserCheck size={12} /> Báo cáo hộ
+                            </button>
+                          </div>
                         )}
                         {isInProduction && isAssignedWorker && (
                           <Link
@@ -728,10 +750,6 @@ export default function ProductionDetail() {
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="space-y-6 pt-10 border-t border-gray-100 italic font-medium text-slate-400 text-[10px] uppercase text-right">
-                      * Lưu ý: Tiến độ hoàn thành được tính dựa trên số lượng đã nghiệm thu của công đoạn cuối cùng.
                     </div>
 
                     <div className="space-y-6 pt-4">
@@ -953,6 +971,21 @@ export default function ProductionDetail() {
         requireReason={true}
         variant="danger"
       />
+      {isProxyModalOpen && (
+        <ProxyReportModal
+          isOpen={isProxyModalOpen}
+          onClose={() => setIsProxyModalOpen(false)}
+          workers={workers}
+          currentUser={currentUser}
+          plan={production}
+          steps={steps}
+          allLogs={allLogs}
+          onSuccess={() => {
+            setIsProxyModalOpen(false);
+            window.location.reload();
+          }}
+        />
+      )}
     </OwnerLayout>
   );
 }
