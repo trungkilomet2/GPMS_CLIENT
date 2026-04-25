@@ -126,49 +126,11 @@ export default function InternalDashboard() {
 
       let payrollTotal = 0;
       try {
-        let allProds = [];
-        let pIdx = 0;
-        let hasMoreProds = true;
-        while (hasMoreProds && pIdx < 20) {
-          const prodRes = await ProductionService.getProductionList({ PageIndex: pIdx, PageSize: 30 });
-          const pageData = prodRes?.data?.data || prodRes?.data?.items || (Array.isArray(prodRes?.data) ? prodRes.data : []);
-          if (Array.isArray(pageData) && pageData.length > 0) {
-            allProds = [...allProds, ...pageData];
-            hasMoreProds = pageData.length === 30;
-            pIdx++;
-          } else hasMoreProds = false;
-        }
-        
-        const relevantProds = allProds.filter(p => {
-          const sStr = p.startDate || p.pStartDate || p.createDate;
-          const eStr = p.endDate || p.pEndDate;
-          if (!sStr) return false;
-          const start = new Date(sStr);
-          const end = eStr ? new Date(eStr) : start;
-          if (isNaN(start.getTime())) return false;
-          const sM = start.getMonth() + 1;
-          const sY = start.getFullYear();
-          const eM = end.getMonth() + 1;
-          const eY = end.getFullYear();
-          if (filterType === "month") return (sM === selectedMonth && sY === selectedYear) || (eM === selectedMonth && eY === selectedYear);
-          if (filterType === "quarter") {
-            const cQ = Math.floor((selectedMonth - 1) / 3) + 1;
-            return (Math.floor((sM - 1) / 3) + 1 === cQ && sY === selectedYear) || (Math.floor((eM - 1) / 3) + 1 === cQ && eY === selectedYear);
-          }
-          if (filterType === "year") return sY === selectedYear || eY === selectedYear;
-          return true;
-        });
-
-        if (relevantProds.length > 0) {
-          const partsResponses = await Promise.all(relevantProds.map(p => ProductionPartService.getPartsByProduction(p.productionId || p.id, { PageSize: 100 })));
-          partsResponses.forEach(res => {
-            const parts = res?.data?.data || res?.data?.items || (Array.isArray(res?.data) ? res.data : []);
-            if (Array.isArray(parts)) parts.forEach(part => {
-              payrollTotal += (Number(part.totalQuantity || part.quantity || 0) * Number(part.unitPrice || part.cpu || 0));
-            });
-          });
-        }
-      } catch (e) { console.error(e); }
+        const payrollData = await fetchAggregatedPayroll(selectedMonth, selectedYear);
+        payrollTotal = payrollData.reduce((sum, w) => sum + (w.totalSalary || 0), 0);
+      } catch (e) { 
+        console.error("Dashboard payroll fetch error:", e); 
+      }
 
       let trend = [];
       if (filterType === "month") {
