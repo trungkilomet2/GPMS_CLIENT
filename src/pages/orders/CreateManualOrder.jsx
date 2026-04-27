@@ -967,7 +967,16 @@ export default function CreateManualOrder() {
                   label="Địa chỉ chi tiết (Số nhà, tên đường...)"
                   name="detail"
                   value={customerData.detail}
-                  onChange={handleCustomerChange}
+                  onChange={(e) => {
+                    handleCustomerChange(e);
+                    if (errors.customerAddress) {
+                      setErrors(prev => {
+                        const next = { ...prev };
+                        delete next.customerAddress;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="Số nhà, tên đường, tòa nhà..."
                   maxLength={150}
                   showCounter
