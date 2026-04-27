@@ -249,8 +249,8 @@ export default function CreateOrder() {
       const vErrs = {};
       if (!v.color?.trim()) {
         vErrs.color = 'Vui lòng nhập tên màu';
-      } else if (v.color.trim().length > 50) {
-        vErrs.color = 'Tên màu tối đa 50 ký tự';
+      } else if (v.color.trim().length > 30) {
+        vErrs.color = 'Tên màu tối đa 30 ký tự';
       }
 
       ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(size => {

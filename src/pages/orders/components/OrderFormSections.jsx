@@ -158,7 +158,7 @@ export function OrderFormSections({
                                   <input
                                     type="text"
                                     value={v.color || ''}
-                                    maxLength={50}
+                                    maxLength={30}
                                     onChange={(e) => onVariantChange(idx, 'color', e.target.value)}
                                     placeholder="Màu..."
                                     className={`w-full bg-transparent border-b-2 px-1 py-1 text-sm font-bold outline-none transition focus:border-emerald-500 focus:text-slate-900
@@ -171,7 +171,7 @@ export function OrderFormSections({
                                       )}
                                     </div>
                                     <span className="text-[8px] font-bold text-slate-500 uppercase tabular-nums">
-                                      {(v.color?.length || 0)}/50
+                                      {(v.color?.length || 0)}/30
                                     </span>
                                   </div>
                                 </div>
