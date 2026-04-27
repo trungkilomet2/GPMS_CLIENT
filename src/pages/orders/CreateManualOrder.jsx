@@ -321,6 +321,13 @@ export default function CreateManualOrder() {
       newErrors.customerPhone = 'Số điện thoại tối đa 20 ký tự';
     }
 
+    if (!customerData.province) {
+      newErrors.province = 'Vui lòng chọn Tỉnh/Thành phố';
+    }
+    if (!customerData.ward) {
+      newErrors.ward = 'Vui lòng chọn Phường/Xã';
+    }
+
     if (!customerData.customerAddress?.trim()) {
       newErrors.customerAddress = 'Vui lòng nhập địa chỉ';
     } else if (customerData.customerAddress.trim().length > 255) {
