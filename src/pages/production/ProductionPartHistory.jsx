@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,7 +12,12 @@ import {
   CheckCircle2,
   ShieldCheck,
   Zap,
-  History
+  History,
+  Search,
+  Users,
+  Calendar,
+  RefreshCw,
+  Filter
 } from "lucide-react";
 import OwnerLayout from "@/layouts/OwnerLayout";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -45,6 +50,14 @@ export default function ProductionPartHistory() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState("all"); // "all", "pending", "accepted"
+  const [allDates, setAllDates] = useState(true);
+  const [workerFilter, setWorkerFilter] = useState("all");
+  const [partFilter, setPartFilter] = useState("all");
+  const [advFilters, setAdvFilters] = useState({
+    color: "all",
+    size: "all",
+    date: new Date().toISOString().split("T")[0]
+  });
 
   // Management State
   const [editingId, setEditingId] = useState(null);
@@ -83,96 +96,97 @@ export default function ProductionPartHistory() {
     return { partId: finalPartId, partOrderSizeId: finalVariantId, workLogId: finalLogId };
   };
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      let activeProdId = productionId;
-      if (!activeProdId && params.partId) {
-        try {
-          const partRes = await ProductionPartService.getPartDetail(params.partId);
-          activeProdId = partRes?.data?.data?.productionId || partRes?.data?.productionId;
-          if (activeProdId) setProductionId(String(activeProdId));
-        } catch (err) { console.error(err); }
-      }
-      if (!activeProdId && location.state?.productionId) {
-        activeProdId = location.state.productionId;
-        setProductionId(String(activeProdId));
-      }
-      if (!activeProdId) { setLoading(false); return; }
-
+  const fetchAllData = useCallback(async () => {
+    let activeProdId = productionId;
+    if (!activeProdId && params.partId) {
       try {
-        setLoading(true);
-        // A. Fetch Production Detail (Basic Info)
-        try {
-          await ProductionService.getProductionDetail(activeProdId);
-        } catch (e) {
-          console.error("Error Production Detail API:", e);
-        }
+        const partRes = await ProductionPartService.getPartDetail(params.partId);
+        activeProdId = partRes?.data?.data?.productionId || partRes?.data?.productionId;
+        if (activeProdId) setProductionId(String(activeProdId));
+      } catch (err) { console.error(err); }
+    }
+    if (!activeProdId && location.state?.productionId) {
+      activeProdId = location.state.productionId;
+      setProductionId(String(activeProdId));
+    }
+    if (!activeProdId) { setLoading(false); return; }
 
-        // B. Fetch Parts & Build Lookup (No Order API needed anymore)
-        const partsRes = await ProductionPartService.getPartsByProduction(activeProdId).catch(err => {
-          console.error("Error Parts API:", err);
-          return { data: [] };
-        });
+    try {
+      setLoading(true);
+      // A. Fetch Production Detail (Basic Info)
+      try {
+        await ProductionService.getProductionDetail(activeProdId);
+      } catch (e) {
+        console.error("Error Production Detail API:", e);
+      }
 
-        if (partsRes) {
-          const partsList = partsRes.data?.data || partsRes.data || [];
-          const pLookup = {};
-          const vLookup = {};
-          const osLookup = {};
+      // B. Fetch Parts & Build Lookup
+      const partsRes = await ProductionPartService.getPartsByProduction(activeProdId).catch(err => {
+        console.error("Error Parts API:", err);
+        return { data: [] };
+      });
 
-          partsList.forEach((p) => {
-            const pid = String(p.id || p.partId || p.productionPartId || "");
-            if (pid && pid !== "0") pLookup[pid] = p;
+      if (partsRes) {
+        const partsList = partsRes.data?.data || partsRes.data || [];
+        const pLookup = {};
+        const vLookup = {};
+        const osLookup = {};
 
-            const variants = p.listPartOrderSizes || p.variants || p.partOrderSizes || [];
-            variants.forEach(v => {
-              const vlinkId = String(v.id || v.partOrderSizeId || "");
-              if (vlinkId && vlinkId !== "0") {
-                vLookup[vlinkId] = p;
-                osLookup[vlinkId] = {
-                  color: v.color || v.colorName || "-",
-                  size: v.size || v.sizeName || "-",
-                  targetQuantity: v.quantity || v.targetQuantity || 0
-                };
-              }
-            });
-          });
-          setPartsLookup(pLookup);
-          setVariantLookup(vLookup);
-          setOrderSizeLookup(osLookup);
-        }
+        partsList.forEach((p) => {
+          const pid = String(p.id || p.partId || p.productionPartId || "");
+          if (pid && pid !== "0") pLookup[pid] = p;
 
-        // C. Fetch Logs (Multi-page)
-        let allLogs = [];
-        let pIdx = 0;
-        let hasMore = true;
-        while (hasMore && pIdx < 50) {
-          try {
-            const logsRes = await ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: pIdx, PageSize: 30 });
-            const logData = logsRes?.data?.data || logsRes?.data || [];
-            if (Array.isArray(logData) && logData.length > 0) {
-              allLogs = [...allLogs, ...logData];
-              hasMore = logData.length === 30;
-              pIdx++;
-            } else {
-              hasMore = false;
+          const variants = p.listPartOrderSizes || p.variants || p.partOrderSizes || [];
+          variants.forEach(v => {
+            const vlinkId = String(v.id || v.partOrderSizeId || "");
+            if (vlinkId && vlinkId !== "0") {
+              vLookup[vlinkId] = p;
+              osLookup[vlinkId] = {
+                color: v.color || v.colorName || "-",
+                size: v.size || v.sizeName || "-",
+                targetQuantity: v.quantity || v.targetQuantity || 0
+              };
             }
-          } catch (err) {
-            console.error(`Error Logs API Page ${pIdx}:`, err);
+          });
+        });
+        setPartsLookup(pLookup);
+        setVariantLookup(vLookup);
+        setOrderSizeLookup(osLookup);
+      }
+
+      // C. Fetch Logs (Multi-page)
+      let allLogs = [];
+      let pIdx = 0;
+      let hasMore = true;
+      while (hasMore && pIdx < 50) {
+        try {
+          const logsRes = await ProductionPartService.getProductionWorkLogs(activeProdId, { PageIndex: pIdx, PageSize: 30 });
+          const logData = logsRes?.data?.data || logsRes?.data || [];
+          if (Array.isArray(logData) && logData.length > 0) {
+            allLogs = [...allLogs, ...logData];
+            hasMore = logData.length === 30;
+            pIdx++;
+          } else {
             hasMore = false;
           }
+        } catch (err) {
+          console.error(`Error Logs API Page ${pIdx}:`, err);
+          hasMore = false;
         }
-        setLogs(allLogs);
-
-      } catch (err) {
-        console.error("Critical Fetch Error:", err);
-        toast.error("Lỗi dữ liệu hệ thống.");
-      } finally {
-        setLoading(false);
       }
-    };
+      setLogs(allLogs);
+
+    } catch (err) {
+      console.error("Critical Fetch Error:", err);
+      toast.error("Lỗi dữ liệu hệ thống.");
+    } finally {
+      setLoading(false);
+    }
+  }, [productionId, params.partId, location.state]);
+
+  useEffect(() => {
     fetchAllData();
-  }, [productionId, params.partId]);
+  }, [fetchAllData]);
 
   const stats = useMemo(() => {
     const totalLogs = logs.length;
@@ -180,12 +194,74 @@ export default function ProductionPartHistory() {
     return { totalLogs, pendingCount };
   }, [logs]);
 
+  const uniqueWorkers = useMemo(() => {
+    const workers = new Set();
+    logs.forEach(log => {
+      const w = log.userName || log.workerName;
+      if (w) workers.add(w);
+    });
+    return Array.from(workers).sort();
+  }, [logs]);
+
+  const uniqueParts = useMemo(() => {
+    const parts = new Set();
+    logs.forEach(log => {
+      const p = log.productionPartName || log.partName;
+      if (p) parts.add(p);
+    });
+    return Array.from(parts).sort();
+  }, [logs]);
+
+  const uniqueColors = useMemo(() => {
+    const colors = new Set();
+    logs.forEach(log => {
+      const posId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+      const osInfo = orderSizeLookup[posId];
+      const c = log.colorName || osInfo?.color;
+      if (c && c !== "-") colors.add(c);
+    });
+    return Array.from(colors).sort();
+  }, [logs, orderSizeLookup]);
+
+  const uniqueSizes = useMemo(() => {
+    const sizes = new Set();
+    logs.forEach(log => {
+      const posId = String(log.productionPartOrderSizeId || log.partOrderSizeId || log.orderSizeId || "");
+      const osInfo = orderSizeLookup[posId];
+      const s = log.sizeName || osInfo?.size;
+      if (s && s !== "-") sizes.add(s);
+    });
+    return Array.from(sizes).sort();
+  }, [logs, orderSizeLookup]);
+
   const filteredLogs = useMemo(() => {
-    if (statusFilter === "all") return logs;
-    if (statusFilter === "pending") return logs.filter(log => !log.isReadOnly);
-    if (statusFilter === "accepted") return logs.filter(log => log.isReadOnly);
-    return logs;
-  }, [logs, statusFilter]);
+    let result = logs;
+
+    // 1. Status Filter
+    if (statusFilter === "pending") result = result.filter(log => !log.isReadOnly);
+    else if (statusFilter === "accepted") result = result.filter(log => log.isReadOnly);
+
+    // 2. Advanced Filters
+    result = result.filter(item => {
+      const matchWorker = workerFilter === "all" || (item.userName || item.workerName) === workerFilter;
+      const matchPart = partFilter === "all" || (item.productionPartName || item.partName) === partFilter;
+
+      const logPosId = String(item.productionPartOrderSizeId || item.partOrderSizeId || item.orderSizeId || "");
+      const osInfo = orderSizeLookup[logPosId];
+      const itemColor = item.colorName || osInfo?.color || "";
+      const itemSize = item.sizeName || osInfo?.size || "";
+
+      const matchColor = advFilters.color === "all" || itemColor === advFilters.color;
+      const matchSize = advFilters.size === "all" || itemSize === advFilters.size;
+
+      const itemDate = (item.createDate || item.workDate || "").split("T")[0];
+      const matchDate = allDates || !advFilters.date || itemDate === advFilters.date;
+
+      return matchWorker && matchPart && matchColor && matchSize && matchDate;
+    });
+
+    return result;
+  }, [logs, statusFilter, workerFilter, partFilter, advFilters, allDates, orderSizeLookup]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
 
@@ -337,8 +413,102 @@ export default function ProductionPartHistory() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <StatCard icon={<History size={24} />} label="Số lượt báo cáo" value={loading ? "..." : `${stats.totalLogs} lượt`} color="emerald" />
-            <StatCard icon={<Zap size={24} />} label="Bản ghi chờ duyệt" value={loading ? "..." : `${stats.pendingCount} bản ghi`} color="emerald" />
+            <StatCard icon={<History size={24} />} label="Số lượt báo cáo" value={loading ? "..." : `${filteredLogs.length} lượt`} color="emerald" />
+            <StatCard icon={<Zap size={24} />} label="Bản ghi khớp" value={loading ? "..." : `${filteredLogs.length} bản ghi`} color="emerald" />
+          </div>
+
+          {/* COMPACT FILTER SECTION */}
+          <div className="bg-white rounded-xl border border-black p-4 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <Filter size={14} className="text-emerald-700" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Bộ lọc</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setAdvFilters({ color: "all", size: "all", date: new Date().toISOString().split("T")[0] });
+                  setWorkerFilter("all");
+                  setPartFilter("all");
+                  setAllDates(true);
+                  setStatusFilter("all");
+                }}
+                className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors"
+              >
+                <RefreshCw size={10} /> Đặt lại bộ lọc
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Thợ</label>
+                <select
+                  value={workerFilter}
+                  onChange={(e) => setWorkerFilter(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-[#1e6e43] transition-all appearance-none cursor-pointer"
+                >
+                  <option value="all">Tất cả thợ</option>
+                  {uniqueWorkers.map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Công đoạn</label>
+                <select
+                  value={partFilter}
+                  onChange={(e) => setPartFilter(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-[#1e6e43] transition-all appearance-none cursor-pointer"
+                >
+                  <option value="all">Tất cả công đoạn</option>
+                  {uniqueParts.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Màu sắc</label>
+                <select
+                  value={advFilters.color}
+                  onChange={(e) => setAdvFilters({ ...advFilters, color: e.target.value })}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-black transition-all appearance-none"
+                >
+                  <option value="all">Tất cả màu</option>
+                  {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest ml-1">Size</label>
+                <select
+                  value={advFilters.size}
+                  onChange={(e) => setAdvFilters({ ...advFilters, size: e.target.value })}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-black transition-all appearance-none"
+                >
+                  <option value="all">Tất cả size</option>
+                  {uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between ml-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Ngày</label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={allDates}
+                      onChange={(e) => setAllDates(e.target.checked)}
+                      className="h-3 w-3 rounded border-slate-300 text-black focus:ring-black"
+                    />
+                    <span className="text-[8px] font-bold uppercase text-slate-400">Tất cả</span>
+                  </label>
+                </div>
+                <input
+                  type="date"
+                  value={advFilters.date}
+                  onChange={(e) => setAdvFilters({ ...advFilters, date: e.target.value })}
+                  disabled={allDates}
+                  className="w-full h-9 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[11px] font-bold text-slate-700 outline-none focus:border-black disabled:opacity-30 transition-all"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="bg-white rounded-xl border border-black shadow-sm overflow-hidden">
@@ -398,7 +568,7 @@ export default function ProductionPartHistory() {
                     // CHECK PERMISSIONS
                     const isOwnerOrPM = primaryRole === "owner" || primaryRole === "pm";
                     const isCreator = String(log.userId || log.workerId || log.accountId) === String(user?.id || user?.userId);
-                    
+
                     const canApprove = isOwnerOrPM && !isDone && !log.isReadOnly;
                     const canEditDelete = (isOwnerOrPM || isCreator) && !isDone && !log.isReadOnly;
 

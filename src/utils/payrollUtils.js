@@ -19,8 +19,8 @@ const overlapsMonth = (startStr, endStr, month, year) => {
   const targetEnd = new Date(year, month, 0, 23, 59, 59);
   const start = parseSafeDate(startStr);
   const end = parseSafeDate(endStr);
-  
-  if (!start) return true; 
+
+  if (!start) return true;
   if (start > targetEnd) return false;
   if (end && end < targetStart) return false;
   return true;
@@ -37,7 +37,7 @@ export const fetchAggregatedPayroll = async (month, year) => {
     let allProductions = [];
     let prodIdx = 0;
     let hasMoreProds = true;
-    
+
     while (hasMoreProds && prodIdx < 15) {
       const res = await ProductionService.getProductionList({ PageIndex: prodIdx, PageSize: 30 });
       const data = res?.data?.data || res?.data || [];
@@ -179,7 +179,7 @@ export const fetchWorkerPayroll = async (workerId, month, year) => {
     const response = await ProductionService.getWorkerOutputHistory(workerId);
     let logs = response?.data?.data || response?.data || [];
     if (!Array.isArray(logs)) {
-       return { userId: workerId, workerName: `Thợ #${workerId}`, totalQuantity: 0, totalSalary: 0, logs: [] };
+      return { userId: workerId, workerName: `Thợ #${workerId}`, totalQuantity: 0, totalSalary: 0, logs: [] };
     }
 
     logs = logs.filter(log => {
@@ -188,11 +188,11 @@ export const fetchWorkerPayroll = async (workerId, month, year) => {
     });
 
     if (logs.length === 0) {
-       // FALLBACK: If specialized fetch yields nothing, use the aggregated logic (same as the list view)
-       const allData = await fetchAggregatedPayroll(targetMonth, targetYear);
-       const found = allData.find(w => String(w.userId) === String(workerId));
-       if (found) return found;
-       return { userId: workerId, workerName: `Thợ #${workerId}`, totalQuantity: 0, totalSalary: 0, logs: [] };
+      // FALLBACK: If specialized fetch yields nothing, use the aggregated logic (same as the list view)
+      const allData = await fetchAggregatedPayroll(targetMonth, targetYear);
+      const found = allData.find(w => String(w.userId) === String(workerId));
+      if (found) return found;
+      return { userId: workerId, workerName: `Thợ #${workerId}`, totalQuantity: 0, totalSalary: 0, logs: [] };
     }
 
     const listRes = await ProductionService.getProductionList({ PageSize: 100 });
@@ -202,7 +202,7 @@ export const fetchWorkerPayroll = async (workerId, month, year) => {
 
     const uniqueProdIds = Array.from(new Set(logs.map(l => String(l.productionId || l.prodId)).filter(Boolean)));
     const productionsRes = await Promise.allSettled(uniqueProdIds.map(id => ProductionService.getProductionDetail(id)));
-    
+
     const prodNameMap = new Map();
     productionsRes.forEach((res, idx) => {
       const pid = uniqueProdIds[idx];
