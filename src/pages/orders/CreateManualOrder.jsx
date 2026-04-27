@@ -927,6 +927,14 @@ export default function CreateManualOrder() {
                     onChange={(e) => {
                       const p = provinces.find(x => String(x.code) === String(e.target.value));
                       setCustomerData(prev => ({ ...prev, province: p, ward: null }));
+                      if (errors.province || errors.customerAddress) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.province;
+                          delete next.customerAddress;
+                          return next;
+                        });
+                      }
                     }}
                     placeholder="Chọn Tỉnh/Thành"
                     error={errors.province}
@@ -939,6 +947,14 @@ export default function CreateManualOrder() {
                     onChange={(e) => {
                       const w = wards.find(x => String(x.code) === String(e.target.value));
                       setCustomerData(prev => ({ ...prev, ward: w }));
+                      if (errors.ward || errors.customerAddress) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.ward;
+                          delete next.customerAddress;
+                          return next;
+                        });
+                      }
                     }}
                     placeholder="Chọn Phường/Xã"
                     error={errors.ward}
