@@ -343,30 +343,67 @@ const WorkerService = {
   },
 
   async getEmployeeDirectory(options = {}) {
-    const employees = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, options);
+    const currentUser = getStoredUser();
+    const primaryRole = pickPrimarySystemRole(currentUser?.role ?? currentUser?.roles ?? "");
 
-    return {
-      data: employees,
-      pageIndex: 0,
-      pageSize: employees.length,
-      recordCount: employees.length,
-    };
+    try {
+      let employees;
+      if (primaryRole === "PM") {
+        employees = await fetchEmployeesByPmPages(options);
+      } else {
+        employees = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, options);
+      }
+
+      return {
+        data: employees,
+        pageIndex: 0,
+        pageSize: employees.length,
+        recordCount: employees.length,
+      };
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        return { data: [], pageIndex: 0, pageSize: 0, recordCount: 0 };
+      }
+      throw error;
+    }
   },
 
   async getManagerDirectory(options = {}) {
-    const users = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, {
-      ...options,
-      includeHidden: true,
-    });
-    const currentOwner = buildCurrentOwnerManager();
-    const managers = currentOwner ? dedupeEmployees([currentOwner, ...users]) : users;
+    const currentUser = getStoredUser();
+    const primaryRole = pickPrimarySystemRole(currentUser?.role ?? currentUser?.roles ?? "");
 
-    return {
-      data: managers,
-      pageIndex: 0,
-      pageSize: managers.length,
-      recordCount: managers.length,
-    };
+    try {
+      let users;
+      if (primaryRole === "PM") {
+        users = await fetchEmployeesByPmPages({ ...options, includeHidden: true });
+      } else {
+        users = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, {
+          ...options,
+          includeHidden: true,
+        });
+      }
+
+      const currentOwner = buildCurrentOwnerManager();
+      const managers = currentOwner ? dedupeEmployees([currentOwner, ...users]) : users;
+
+      return {
+        data: managers,
+        pageIndex: 0,
+        pageSize: managers.length,
+        recordCount: managers.length,
+      };
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        const currentOwner = buildCurrentOwnerManager();
+        return {
+          data: currentOwner ? [currentOwner] : [],
+          pageIndex: 0,
+          pageSize: currentOwner ? 1 : 0,
+          recordCount: currentOwner ? 1 : 0,
+        };
+      }
+      throw error;
+    }
   },
 
   async getEmployeesByPmId(params, options = {}) {

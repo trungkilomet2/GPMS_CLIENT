@@ -35,6 +35,7 @@ import { hasAnyRole } from "@/lib/roleAccess";
 import DesignTemplatesSection from '@/components/orders/DesignTemplatesSection';
 import '@/styles/homepage.css';
 import { processOrderVariants } from '@/lib/orders/variants';
+import ProxyReportModal from "@/components/production/ProxyReportModal";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -69,6 +70,7 @@ export default function ProductionDetail() {
   const [isDonePartModalOpen, setIsDonePartModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedPartId, setSelectedPartId] = useState(null);
+  const [isProxyModalOpen, setIsProxyModalOpen] = useState(false);
 
   // --- DATA STATES ---
   const [production, setProduction] = useState(null);
@@ -135,11 +137,11 @@ export default function ProductionDetail() {
     ProductionService.getProductionRejectReason(production.productionId).then(res => setRejectReason(res?.data)).catch(() => setRejectReason(null));
   }, [production?.productionId, production?.status]);
 
-  // Load worker directory để resolve assigneeIds → tên thật (role-aware, không crash 403)
+  // Load worker directory to resolve assigneeIds -> names & for proxy reporting
   useEffect(() => {
-    const loadWorkerMap = async () => {
+    const fetchWorkerData = async () => {
       try {
-        // Sử dụng getManagerDirectory để lấy cả Admin/PM tham gia sản xuất
+        // Only fetch if has permission or for mapping
         const response = await WorkerService.getManagerDirectory();
 
         if (response?.data) {
@@ -153,21 +155,22 @@ export default function ProductionDetail() {
             }
           });
 
-          // Cập nhật gộp (functional update) để không ghi đè dữ liệu từ logs
+          // Update map for name resolution
           setWorkerMap(prev => ({ ...prev, ...newMappings }));
         }
 
-        // Đảm bảo PM của dự án luôn có tên
+        // Ensure current PM is in the map
         if (production?.pmId && production?.pmName) {
           setWorkerMap(prev => ({ ...prev, [String(production.pmId)]: production.pmName }));
         }
 
       } catch (err) {
-        console.error("Worker map load error:", err);
+        console.error("Worker directory load error:", err);
       }
     };
-    loadWorkerMap();
-  }, [production?.pmId, production?.pmName]);
+
+    fetchWorkerData();
+  }, [production?.pmId, production?.pmName, isOwner, isPM]);
 
   useEffect(() => {
     if (!production?.productionId) return;
@@ -431,6 +434,7 @@ export default function ProductionDetail() {
           endDate: row.endDate,
           errorType: 0,
           happenAt: new Date().toISOString(),
+          maxQuantity: row.quantity,
         }
       }
     });
@@ -587,14 +591,22 @@ export default function ProductionDetail() {
                       </div>
                       <div className="flex gap-2">
                         {isAssignedPM && (isAccepted || isNeedUpdatePlan) && (
-                          <Link to="/production-plan/create" state={{ productionId: production.productionId, steps }} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-[#1e6e43] rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
-                            <Plus size={14} /> Thiết kế công đoạn
+                          <Link to="/production-plan/create" state={{ productionId: production.productionId, steps }} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#1e6e43] rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
+                            <Plus size={12} /> Thiết kế công đoạn
                           </Link>
                         )}
                         {(isPM || isOwner) && isInProduction && (
-                          <Link to={`/production-plan/assign/${production.productionId}`} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-[#1e6e43] rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
-                            <Users size={14} /> Phân công thợ
-                          </Link>
+                          <div className="flex gap-1.5">
+                            <Link to={`/production-plan/assign/${production.productionId}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#1e6e43] rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
+                              <Users size={12} /> Phân công thợ
+                            </Link>
+                            <button
+                              onClick={() => setIsProxyModalOpen(true)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-emerald-50 hover:border-emerald-300 shadow-sm"
+                            >
+                              <UserCheck size={12} /> Báo cáo hộ
+                            </button>
+                          </div>
                         )}
                         {isInProduction && isAssignedWorker && (
                           <Link
@@ -625,7 +637,7 @@ export default function ProductionDetail() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className={`grid grid-cols-1 ${(isOwner || isPM) ? "md:grid-cols-2" : ""} gap-8`}>
                     <div
                       onClick={() => navigate(`/production-plan/${production.productionId}/history`)}
                       className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-emerald-50/30 hover:border-[#1e6e43] cursor-pointer"
@@ -640,21 +652,23 @@ export default function ProductionDetail() {
                       <h5 className="text-4xl font-bold tracking-tighter text-gray-900">{reportCount} <span className="text-sm text-gray-400 ml-1">LƯỢT BÁO CÁO</span></h5>
                     </div>
 
-                    <div
-                      onClick={() => navigate(`/production/${production.productionId}/errors`)}
-                      className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-rose-50/30 hover:border-rose-300 cursor-pointer text-center md:text-left"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-rose-50 rounded-2xl text-rose-500 group-hover:bg-rose-100 transition-colors">
-                          <AlertTriangle size={24} />
+                    {(isOwner || isPM) && (
+                      <div
+                        onClick={() => navigate(`/production/${production.productionId}/errors`)}
+                        className="p-8 rounded-xl bg-white border border-black shadow-sm space-y-4 group transition-all hover:bg-rose-50/30 hover:border-rose-300 cursor-pointer text-center md:text-left"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 bg-rose-50 rounded-2xl text-rose-500 group-hover:bg-rose-100 transition-colors">
+                            <AlertTriangle size={24} />
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500 bg-rose-50 px-3 py-1 rounded-full">KCS / Kiểm soát</span>
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-rose-500 bg-rose-50 px-3 py-1 rounded-full">KCS / Kiểm soát</span>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng số lỗi ghi nhận</p>
+                        <h5 className="text-4xl font-bold tracking-tighter text-gray-900">
+                          {reportedErrorCount} <span className="text-sm text-gray-400 ml-1">LỖI SP</span>
+                        </h5>
                       </div>
-                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tổng số lỗi ghi nhận</p>
-                      <h5 className="text-4xl font-bold tracking-tighter text-gray-900">
-                        {reportedErrorCount} <span className="text-sm text-gray-400 ml-1">LỖI SP</span>
-                      </h5>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -728,10 +742,6 @@ export default function ProductionDetail() {
                           </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="space-y-6 pt-10 border-t border-gray-100 italic font-medium text-slate-400 text-[10px] uppercase text-right">
-                      * Lưu ý: Tiến độ hoàn thành được tính dựa trên số lượng đã nghiệm thu của công đoạn cuối cùng.
                     </div>
 
                     <div className="space-y-6 pt-4">
@@ -953,6 +963,20 @@ export default function ProductionDetail() {
         requireReason={true}
         variant="danger"
       />
+      {isProxyModalOpen && (
+        <ProxyReportModal
+          isOpen={isProxyModalOpen}
+          onClose={() => setIsProxyModalOpen(false)}
+          currentUser={currentUser}
+          plan={production}
+          steps={steps}
+          allLogs={allLogs}
+          onSuccess={() => {
+            setIsProxyModalOpen(false);
+            window.location.reload();
+          }}
+        />
+      )}
     </OwnerLayout>
   );
 }
@@ -1132,11 +1156,13 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
                 {/* Sub-header */}
                 <div className="grid grid-cols-12 items-center px-6 py-2 border-b border-gray-200 bg-gray-100/50">
                   <div className="col-span-1" />
-                  <div className="col-span-3 text-[10px] font-black text-gray-500 uppercase tracking-widest">Màu / Size</div>
+                  <div className={`text-[10px] font-black text-gray-500 uppercase tracking-widest ${(isOwner || isPM) ? "col-span-3" : "col-span-4"}`}>Màu / Size</div>
                   <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Sản lượng</div>
                   <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Nhân sự</div>
-                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-center">Trạng thái</div>
-                  <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Thao tác</div>
+                  <div className={`text-[10px] font-black text-gray-500 uppercase tracking-widest text-center ${(isOwner || isPM) ? "col-span-2" : "col-span-3"}`}>Trạng thái</div>
+                  {(isOwner || isPM) && (
+                    <div className="col-span-2 text-[10px] font-black text-gray-500 uppercase tracking-widest text-right">Thao tác</div>
+                  )}
                 </div>
                 {group.variants.map((row, vi) => {
                   const partStatus = getVariantStatusLabel
@@ -1153,7 +1179,7 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
                         <div className="w-3 h-3 rounded-full border-2 border-white shadow" style={{ backgroundColor: row.colorCode || row.variant?.colorCode || '#e2e8f0' }} />
                       </div>
                       {/* Color / Size */}
-                      <div className="col-span-3 flex items-center gap-2">
+                      <div className={`flex items-center gap-2 ${(isOwner || isPM) ? "col-span-3" : "col-span-4"}`}>
                         <span className="text-sm font-bold text-gray-800 uppercase">{row.colorName || row.color || '-'}</span>
                         <span className="text-gray-300">/</span>
                         <span className="px-2 py-0.5 rounded bg-white border border-gray-200 text-xs font-black text-gray-700 uppercase shadow-sm">{row.sizeName || row.size || '-'}</span>
@@ -1197,18 +1223,20 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
                         )}
                       </div>
                       {/* Status */}
-                      <div className="col-span-2 flex justify-center">
+                      <div className={`flex justify-center ${(isOwner || isPM) ? "col-span-2" : "col-span-3"}`}>
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${vcfg.color} ${vcfg.bg}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${vcfg.dot}`} />
                           {vcfg.label}
                         </span>
                       </div>
                       {/* Actions */}
-                      <div className="col-span-2 flex items-center justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-all">
-                        <button onClick={() => handleBaoLoi(row)} title="Báo lỗi" className="p-2.5 rounded-xl hover:bg-rose-50 text-rose-500 hover:text-rose-600 transition-all border border-transparent hover:border-rose-200 shadow-sm active:scale-90">
-                          <AlertTriangle size={22} />
-                        </button>
-                      </div>
+                      {(isOwner || isPM) && (
+                        <div className="col-span-2 flex items-center justify-end gap-2 opacity-0 group-hover/row:opacity-100 transition-all">
+                          <button onClick={() => handleBaoLoi(row)} title="Báo lỗi" className="p-2.5 rounded-xl hover:bg-rose-50 text-rose-500 hover:text-rose-600 transition-all border border-transparent hover:border-rose-200 shadow-sm active:scale-90">
+                            <AlertTriangle size={22} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

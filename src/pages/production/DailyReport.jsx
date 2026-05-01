@@ -7,9 +7,11 @@ import { toast } from "react-toastify";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
 import ProductionPartService from "@/services/ProductionPartService";
+import WorkerService from "@/services/WorkerService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getErrorMessage } from "@/utils/errorUtils";
 import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
+import { User, Users } from "lucide-react";
 
 
 function toArray(value) {
@@ -116,17 +118,40 @@ export default function DailyReport() {
   const currentUser = getStoredUser() || {};
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
   const primaryRole = getPrimaryWorkspaceRole(roleValue);
+  const isManager = ["owner", "admin", "pm", "manager"].includes(primaryRole);
   const LayoutComponent = ["worker", "kcs"].includes(primaryRole) ? WorkerLayout : OwnerLayout;
-  const currentWorkerIdSet = new Set(
-    [currentUser?.id, currentUser?.userId, currentUser?.accountId]
-      .filter((value) => value != null && String(value).trim() !== "")
-      .map((value) => String(value).trim())
-  );
-  const currentWorkerNameSet = new Set(
-    [currentUser?.fullName, currentUser?.name, currentUser?.userName, currentUser?.username]
+
+  const [selectedWorker, setSelectedWorker] = useState(currentUser);
+  const [workers, setWorkers] = useState([]);
+
+
+  const targetWorkerIdSet = useMemo(() => {
+    const id = selectedWorker?.userId ?? selectedWorker?.id ?? selectedWorker?.accountId;
+    return new Set(id ? [String(id).trim()] : []);
+  }, [selectedWorker]);
+
+  const targetWorkerNameSet = useMemo(() => {
+    const names = [selectedWorker?.fullName, selectedWorker?.name, selectedWorker?.userName, selectedWorker?.username]
       .map((value) => normalizeWorkerValue(value))
-      .filter(Boolean)
-  );
+      .filter(Boolean);
+    return new Set(names);
+  }, [selectedWorker]);
+
+  useEffect(() => {
+    if (isManager) {
+      const fetchWorkers = async () => {
+        try {
+          const res = primaryRole === "pm"
+            ? await WorkerService.getEmployeeDirectoryByPmScope()
+            : await WorkerService.getManagerDirectory();
+          setWorkers(res?.data || []);
+        } catch (err) {
+          console.error("Error fetching workers:", err);
+        }
+      };
+      fetchWorkers();
+    }
+  }, [isManager, primaryRole]);
 
   const isStepAvailableForReporting = (step) => {
     if (!step) return false;
@@ -151,12 +176,22 @@ export default function DailyReport() {
     return true;
   };
 
-  const initialBase = useMemo(() => {
+  const getTasksForWorker = (worker) => {
+    if (!worker) return [];
+    
+    const workerId = worker?.userId ?? worker?.id ?? worker?.accountId;
+    const wIdSet = new Set(workerId ? [String(workerId).trim()] : []);
+    
+    const names = [worker?.fullName, worker?.name, worker?.userName, worker?.username]
+      .map((value) => normalizeWorkerValue(value))
+      .filter(Boolean);
+    const wNameSet = new Set(names);
+
     if (planSteps.length > 0) {
       const results = [];
       planSteps.forEach((part, pIdx) => {
         if (part.colorName || part.sizeName || part.variant || part.partOrderSizeId) {
-          if (isStepAssignedToCurrentWorker(part, currentWorkerIdSet, currentWorkerNameSet)) {
+          if (isStepAssignedToCurrentWorker(part, wIdSet, wNameSet)) {
             results.push({
               id: `f-${part.id || pIdx}`,
               partId: part.partId || part.id,
@@ -182,7 +217,7 @@ export default function DailyReport() {
 
         const variants = part.variants || part.listPartOrderSizes || [];
         variants.forEach((v, vIdx) => {
-          if (isStepAssignedToCurrentWorker(v, currentWorkerIdSet, currentWorkerNameSet)) {
+          if (isStepAssignedToCurrentWorker(v, wIdSet, wNameSet)) {
             const uniqueId = `row-${pIdx}-${vIdx}-${v.id || v.partOrderSizeId || '0'}`;
             results.push({
               id: uniqueId,
@@ -210,7 +245,7 @@ export default function DailyReport() {
     }
 
     if (assignment && isStepAvailableForReporting(assignment)) {
-      if (isStepAssignedToCurrentWorker(assignment, currentWorkerIdSet, currentWorkerNameSet)) {
+      if (isStepAssignedToCurrentWorker(assignment, wIdSet, wNameSet)) {
         return [{
           ...assignment,
           id: assignment.id || "assignment-0",
@@ -227,7 +262,9 @@ export default function DailyReport() {
     }
 
     return [];
-  }, [planSteps, assignment, currentWorkerIdSet, currentWorkerNameSet]);
+  };
+
+  const initialBase = useMemo(() => getTasksForWorker(selectedWorker), [selectedWorker, planSteps, assignment]);
 
   const today = useMemo(() => formatDateInput(), []);
   const [reportDate, setReportDate] = useState(today);
@@ -237,16 +274,41 @@ export default function DailyReport() {
     initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" }))
   );
 
+  useEffect(() => {
+    setRows(initialBase.map((task) => ({ ...task, quantity: task?.quantity ?? "" })));
+  }, [initialBase]);
+
   const isToday = reportDate === today;
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [changedItems, setChangedItems] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedWorker, reportDate]);
+
+  const displayedRows = useMemo(() => {
+    return rows.filter(row => {
+      if (!isToday) return true;
+      return isStepAvailableForReporting(row);
+    });
+  }, [rows, isToday]);
+
+  const totalPages = Math.ceil(displayedRows.length / ITEMS_PER_PAGE);
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return displayedRows.slice(start, start + ITEMS_PER_PAGE);
+  }, [displayedRows, currentPage]);
+
   const totalAmount = useMemo(
     () => rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.cpu) || 0), 0),
     [rows]
   );
+
 
   const handleChange = (id, field, value) => {
     if (field === "quantity") {
@@ -275,11 +337,7 @@ export default function DailyReport() {
     }
   };
 
-  const displayedRows = rows.filter(row => {
-    if (!isToday) return true;
-    // Only hide if the stage is fully completed (finVar >= qtyVar)
-    return isStepAvailableForReporting(row);
-  });
+
 
   const normalizeDateString = (target) => {
     if (!target) return "";
@@ -353,14 +411,14 @@ export default function DailyReport() {
               };
               latestDataMap.set(idKey, data);
               latestDataMap.set(nameKey, data);
-            });
           });
-
-          const currentId = currentUser?.userId || currentUser?.id;
+          });
+ 
+          const targetId = selectedWorker?.userId ?? selectedWorker?.id ?? selectedWorker?.accountId;
           let allLogs = [];
           let pIdx = 0;
           let hasMore = true;
-
+ 
           while (hasMore && pIdx < 30) {
             try {
               const logRes = await ProductionPartService.getProductionWorkLogs(prodId, { PageIndex: pIdx, PageSize: 30 });
@@ -377,30 +435,30 @@ export default function DailyReport() {
               hasMore = false;
             }
           }
-
+ 
           const targetDateStr = formatDateInput(new Date());
           const reportedTodayMap = new Map();
           const finishedTotalMap = new Map();
-
+ 
           allLogs.forEach(log => {
             const sid = String(log.partOrderSizeId);
             const qty = Number(log.quantity || 0);
             finishedTotalMap.set(sid, (finishedTotalMap.get(sid) || 0) + qty);
-
+ 
             const logDate = normalizeDateString(log.createDate || log.workDate);
             const logWorkerId = String(log.workerId || log.userId || log.accountId || "");
-            if (logDate === targetDateStr && logWorkerId === String(currentId)) {
+            if (logDate === targetDateStr && logWorkerId === String(targetId)) {
               reportedTodayMap.set(sid, log);
             }
           });
-
+ 
           setRows(prev => (prev || []).map(row => {
             const sid = String(row.partOrderSizeId);
             const idKey = `${row.partId || ""}-${row.partOrderSizeId || ""}`;
             const latest = latestDataMap.get(idKey);
             const latestFinished = latest ? latest.finished : (finishedTotalMap.get(sid) || 0);
             const existingLog = reportedTodayMap.get(sid);
-
+ 
             return {
               ...row,
               finVar: latestFinished,
@@ -416,15 +474,16 @@ export default function DailyReport() {
       }
     };
     initData();
-  }, [plan?.production?.productionId, refreshKey]);
+  }, [plan?.production?.productionId, refreshKey, selectedWorker]);
 
-  const buildPayload = (row) => {
-    const currentId = currentUser?.userId || currentUser?.id;
+  const buildPayload = (row, worker = selectedWorker) => {
+    const targetId = worker?.userId ?? worker?.id ?? worker?.accountId;
     return {
-      userId: Number(currentId) || 1,
+      userId: Number(targetId) || 1,
       quantity: Number(row?.quantity || 0),
     };
   };
+
 
   const handlePreSaveCheck = () => {
     if (!isToday || isSavingAll) return;
@@ -533,6 +592,8 @@ export default function DailyReport() {
                 <BookOpen size={16} className="text-emerald-600" /> Sổ ghi chép
               </button>
 
+
+
               {isToday && rows.length > 0 && (
                 <button
                   onClick={handlePreSaveCheck}
@@ -546,23 +607,32 @@ export default function DailyReport() {
             </div>
           </div>
 
+
+
+
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 items-center">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ngày báo cáo</div>
-              <div className="flex items-center gap-3">
-                <CalendarDays size={18} className="text-slate-400" />
-                <input
-                  type="date"
-                  value={reportDate}
-                  onChange={(event) => setReportDate(event.target.value)}
-                  className="w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                />
-                <span className="text-xs text-slate-500">
-                  {isToday ? "Chỉ cho phép nhập sản lượng trong ngày." : "Chỉ được chỉnh sửa trong ngày hiện tại."}
-                </span>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-center gap-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">Ngày báo cáo</div>
+                <div className="flex items-center gap-3">
+                  <CalendarDays size={18} className="text-slate-400" />
+                  <input
+                    type="date"
+                    value={reportDate}
+                    onChange={(event) => setReportDate(event.target.value)}
+                    className="w-48 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                  />
+                  <span className="text-xs text-slate-500">
+                    {isToday ? "Chỉ cho phép nhập sản lượng trong ngày." : "Chỉ được chỉnh sửa trong ngày hiện tại."}
+                  </span>
+                </div>
               </div>
+
+              {/* Removed Proxy Report Button */}
             </div>
           </div>
+
+
 
           <div className="leave-table-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="leave-table-card__header">
@@ -585,10 +655,10 @@ export default function DailyReport() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {displayedRows.length > 0 ? (
-                    displayedRows.map((row, index) => (
+                  {paginatedRows.length > 0 ? (
+                    paginatedRows.map((row, index) => (
                       <tr key={`wr-${row.id}-${index}`} className="leave-table-row hover:bg-slate-50/80">
-                        <td className="px-2 py-2 text-center text-xs text-slate-500">{index + 1}</td>
+                        <td className="px-2 py-2 text-center text-xs text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
                         <td className="px-2 py-2 text-xs font-semibold text-slate-700">#PR-{row.productionId}</td>
                         <td className="px-3 py-2 font-bold text-slate-800">{row.partName}</td>
                         <td className="px-2 py-2 text-center">
@@ -652,7 +722,8 @@ export default function DailyReport() {
                       </td>
                     </tr>
                   )}
-                  {displayedRows.length > 0 && (
+
+                  {paginatedRows.length > 0 && (
                     <tr className="bg-slate-50/50">
                       <td colSpan={5} className="px-3 py-4 font-bold text-slate-500 text-right uppercase tracking-wider text-[10px]">TỔNG TIỀN BÁO CÁO:</td>
                       <td className="px-2 py-4 text-center font-black text-emerald-700 text-lg whitespace-nowrap bg-emerald-50/30">
@@ -664,7 +735,45 @@ export default function DailyReport() {
                 </tbody>
               </table>
             </div>
+
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+                <div className="text-xs text-slate-500 font-medium">
+                  Hiển thị <span className="font-bold text-slate-700">{Math.min(displayedRows.length, (currentPage - 1) * ITEMS_PER_PAGE + 1)}-{Math.min(displayedRows.length, currentPage * ITEMS_PER_PAGE)}</span> trong tổng số <span className="font-bold text-slate-700">{displayedRows.length}</span> công đoạn
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    <ChevronRight size={16} className="rotate-180" />
+                  </button>
+                  {[...Array(totalPages)].map((_, i) => (
+                    <button
+                      key={i + 1}
+                      onClick={() => setCurrentPage(i + 1)}
+                      className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition-all ${
+                        currentPage === i + 1
+                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-100"
+                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
       </div>
 
@@ -706,3 +815,4 @@ export default function DailyReport() {
     </LayoutComponent>
   );
 }
+

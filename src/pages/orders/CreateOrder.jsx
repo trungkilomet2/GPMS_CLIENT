@@ -249,7 +249,17 @@ export default function CreateOrder() {
       const vErrs = {};
       if (!v.color?.trim()) {
         vErrs.color = 'Vui lòng nhập tên màu';
+      } else if (v.color.trim().length > 30) {
+        vErrs.color = 'Tên màu tối đa 30 ký tự';
       }
+
+      ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(size => {
+        const val = Number(v[size]) || 0;
+        if (val > 9999) {
+          vErrs[size] = 'Tối đa 9999';
+        }
+      });
+
       const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
       if (sum > 0) hasAnyQuantity = true;
 
@@ -384,6 +394,8 @@ export default function CreateOrder() {
     let { name, value } = e.target;
     if (name === 'quantity' || name === 'cpu') {
       value = value.replace(/[^0-9]/g, '');
+      if (name === 'cpu' && value.length > 8) value = value.slice(0, 8);
+      if (name === 'quantity' && value.length > 4) value = value.slice(0, 4);
     }
     const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
       ? (value === '' ? '' : Number(value))
