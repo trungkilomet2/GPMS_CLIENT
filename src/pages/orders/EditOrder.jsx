@@ -253,7 +253,37 @@ export default function EditOrder() {
     };
 
     const handleVariantChange = (index, field, value) => {
-        setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+        const nextVariants = variants.map((v, i) => i === index ? { ...v, [field]: value } : v);
+        setVariants(nextVariants);
+
+        // Live validation for colors
+        if (field === 'color' || field === undefined) {
+            const colorCounts = {};
+            nextVariants.forEach(v => {
+                const c = v.color?.trim().toLowerCase();
+                if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+            });
+
+            setErrors(prev => {
+                const nextErrs = { ...prev };
+                const nextVariantErrors = { ...nextErrs.variants };
+
+                nextVariants.forEach((v, idx) => {
+                    const c = v.color?.trim().toLowerCase();
+                    if (c && colorCounts[c] > 1) {
+                        nextVariantErrors[idx] = { ...nextVariantErrors[idx], color: 'Tên màu này đã được nhập' };
+                    } else if (nextVariantErrors[idx]?.color === 'Tên màu này đã được nhập') {
+                        const updated = { ...nextVariantErrors[idx] };
+                        delete updated.color;
+                        if (Object.keys(updated).length === 0) delete nextVariantErrors[idx];
+                        else nextVariantErrors[idx] = updated;
+                    }
+                });
+
+                nextErrs.variants = nextVariantErrors;
+                return nextErrs;
+            });
+        }
 
         if (errors.variantsGlobal) {
             setErrors(prev => {
@@ -262,7 +292,7 @@ export default function EditOrder() {
                 return next;
             });
         }
-        if (errors.variants?.[index]?.[field]) {
+        if (field !== 'color' && errors.variants?.[index]?.[field]) {
             setErrors(prev => {
                 const next = { ...prev };
                 const nextVariantsErrors = { ...next.variants };
@@ -355,11 +385,23 @@ export default function EditOrder() {
         // VARIANTS VALIDATION
         const variantErrors = [];
         let hasAnyQuantity = false;
+
+        const colorCounts = {};
+        variants.forEach(v => {
+            const c = v.color?.trim().toLowerCase();
+            if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+        });
+
         variants.forEach((v, idx) => {
             const vErrs = {};
+            const c = v.color?.trim().toLowerCase();
+
             if (!v.color?.trim()) {
                 vErrs.color = 'Vui lòng nhập tên màu';
+            } else if (c && colorCounts[c] > 1) {
+                vErrs.color = 'Tên màu này đã được nhập';
             }
+
             const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
             if (sum > 0) hasAnyQuantity = true;
 
