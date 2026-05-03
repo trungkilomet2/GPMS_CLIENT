@@ -17,14 +17,14 @@ export const getEmployeeModuleErrorMessage = getErrorMessage;
 const parseApiPayload = (rawResponse) =>
   typeof rawResponse === "string"
     ? (() => {
-        // Some endpoints return `text/plain` even on success.
-        // Don't throw on JSON parse failures; treat the string as a successful payload.
-        try {
-          return JSON.parse(rawResponse);
-        } catch {
-          return { data: rawResponse };
-        }
-      })()
+      // Some endpoints return `text/plain` even on success.
+      // Don't throw on JSON parse failures; treat the string as a successful payload.
+      try {
+        return JSON.parse(rawResponse);
+      } catch {
+        return { data: rawResponse };
+      }
+    })()
     : rawResponse ?? {};
 
 const normalizeEmployeeStatus = (value, statusId) => {
@@ -92,10 +92,10 @@ const normalizeEmployee = (item = {}) => {
   const parsedManagerId = Number(managerIdRaw);
   const managerId =
     managerIdRaw === null ||
-    managerIdRaw === undefined ||
-    managerIdRaw === "" ||
-    !Number.isFinite(parsedManagerId) ||
-    parsedManagerId <= 0
+      managerIdRaw === undefined ||
+      managerIdRaw === "" ||
+      !Number.isFinite(parsedManagerId) ||
+      parsedManagerId <= 0
       ? null
       : parsedManagerId;
   const managerName = String(
@@ -170,9 +170,9 @@ const normalizeEmployeeResponse = (response = {}) => {
 const getCollectionMeta = (response = {}) => {
   const recordCount = Number(
     response?.recordCount ??
-      response?.totalCount ??
-      response?.totalRecords ??
-      response?.count
+    response?.totalCount ??
+    response?.totalRecords ??
+    response?.count
   );
 
   return {
@@ -453,12 +453,12 @@ const WorkerService = {
       const rawPayload = await response.text().catch(() => "");
       const parsedPayload = rawPayload
         ? (() => {
-            try {
-              return JSON.parse(rawPayload);
-            } catch {
-              return rawPayload;
-            }
-          })()
+          try {
+            return JSON.parse(rawPayload);
+          } catch {
+            return rawPayload;
+          }
+        })()
         : {};
 
       if (!response.ok) {

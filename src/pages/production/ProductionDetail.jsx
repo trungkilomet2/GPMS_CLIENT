@@ -85,6 +85,7 @@ export default function ProductionDetail() {
   const [allLogs, setAllLogs] = useState([]);
   const [reportedErrorCount, setReportedErrorCount] = useState(0);
   const [workerMap, setWorkerMap] = useState({}); // id -> fullName
+  const [subDataLoading, setSubDataLoading] = useState(true);
 
   const currentUser = getStoredUser();
   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
@@ -97,9 +98,10 @@ export default function ProductionDetail() {
   useEffect(() => {
     let active = true;
     const fetchProduction = async () => {
+      let response = null;
       try {
         setLoading(true);
-        const response = await ProductionService.getProductionDetail(id);
+        response = await ProductionService.getProductionDetail(id);
         if (!active) return;
         const payload = response?.data?.data ?? response?.data ?? null;
         if (payload) {
@@ -121,10 +123,18 @@ export default function ProductionDetail() {
             }
           });
         }
-      } catch (_err) {
-        if (active) setError("Không thể tải chi tiết đơn sản xuất.");
+      } catch (err) {
+        if (active) {
+          console.error("Lỗi khi tải chi tiết đơn sản xuất:", err);
+          const serverMsg = err.response?.data?.message || err.response?.data?.detail || "Không thể tải chi tiết đơn sản xuất.";
+          setError(serverMsg);
+        }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          // If production failed to load, stop sub-loading too
+          if (!response?.data) setSubDataLoading(false);
+        }
       }
     };
     if (id) fetchProduction();
@@ -140,22 +150,50 @@ export default function ProductionDetail() {
   // Load worker directory to resolve assigneeIds -> names & for proxy reporting
   useEffect(() => {
     const fetchWorkerData = async () => {
-      try {
-        // Only fetch if has permission or for mapping
-        const response = await WorkerService.getManagerDirectory();
+      if (!production?.productionId) return;
 
-        if (response?.data) {
+      try {
+        let workerList = [];
+        const pmId = production.pmId;
+
+        // 1. Try specialized assignment API (scoped to PM and timeframe)
+        if (pmId) {
+          try {
+            const res = await ProductionPartService.getAssignWorkers({
+              PMId: pmId,
+              fromDate: production.pStartDate,
+              toDate: production.pEndDate
+            });
+            const raw = res?.data?.data || res?.data || [];
+            workerList = raw.map(w => ({
+              id: w.workerInfo?.workerId || w.workerId,
+              fullName: w.workerInfo?.workerName || w.workerName
+            }));
+          } catch (err) {
+            // Silently fallback
+          }
+        }
+
+        // 2. Fallback to general directory if needed
+        if (workerList.length === 0) {
+          try {
+            const res = await WorkerService.getManagerDirectory();
+            workerList = res?.data || res?.data?.data || [];
+          } catch (err) {
+            console.error("Worker directory fallback failed:", err);
+          }
+        }
+
+        if (workerList.length > 0) {
           const newMappings = {};
-          response.data.forEach(e => {
+          workerList.forEach(e => {
             if (e.id) {
               const sid = String(e.id);
               newMappings[sid] = (e.fullName && e.fullName !== "Chưa cập nhật")
                 ? e.fullName
-                : (e.userName || `Thợ #${e.id}`);
+                : (e.userName || `Nhân viên`);
             }
           });
-
-          // Update map for name resolution
           setWorkerMap(prev => ({ ...prev, ...newMappings }));
         }
 
@@ -164,19 +202,27 @@ export default function ProductionDetail() {
           setWorkerMap(prev => ({ ...prev, [String(production.pmId)]: production.pmName }));
         }
 
+        // Add current logged-in user to map
+        if (currentUser?.id || currentUser?.userId) {
+          const myId = String(currentUser.id || currentUser.userId);
+          const myName = currentUser.fullName || currentUser.userFullName || currentUser.userName || "";
+          if (myName) setWorkerMap(prev => ({ ...prev, [myId]: myName }));
+        }
+
       } catch (err) {
-        console.error("Worker directory load error:", err);
+        // Silently handle
       }
     };
 
     fetchWorkerData();
-  }, [production?.pmId, production?.pmName, isOwner, isPM]);
+  }, [production?.pmId, production?.pmName, production?.pStartDate, production?.pEndDate, isOwner, isPM]);
 
   useEffect(() => {
     if (!production?.productionId) return;
 
     const fetchRemainingData = async () => {
       try {
+        setSubDataLoading(true);
         const prodId = production.productionId;
 
         // 1. Fetch ALL Parts
@@ -193,7 +239,7 @@ export default function ProductionDetail() {
           const rawList = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
           if (Array.isArray(rawList) && rawList.length > 0) {
             allPartsList = [...allPartsList, ...rawList];
-            hasMoreParts = rawList.length === 100;
+            hasMoreParts = rawList.length === 30;
             partIdx++;
           } else {
             hasMoreParts = false;
@@ -243,11 +289,69 @@ export default function ProductionDetail() {
 
       } catch (err) {
         console.error("Error fetching production sub-data:", err);
+      } finally {
+        setSubDataLoading(false);
       }
     };
 
     fetchRemainingData();
   }, [production?.productionId]);
+
+  // Access Control Enforcement
+  useEffect(() => {
+    // Wait for both main production and sub-data (parts) to load
+    if (loading || subDataLoading || !production || isOwner) return;
+
+    const uid = String(currentUserId);
+    const pmId = String(production.pmId || "");
+
+    // 1. If Main PM, allow
+    if (isPM && pmId === uid) return;
+
+    // 2. If we have parts, check involvement (as worker or assigned PM)
+    if (rawParts.length > 0) {
+      const collectWorkerId = (w) => {
+        if (!w) return null;
+        if (typeof w === 'object') return String(w.id || w.userId || w.accountId || w.workerId || "");
+        return String(w);
+      };
+
+      const isUserInvolved = rawParts.some(part => {
+        const partWorkers = [
+          ...(Array.isArray(part.assigneeIds) ? part.assigneeIds : []),
+          ...(Array.isArray(part.assignees) ? part.assignees : []),
+          ...(Array.isArray(part.assignedWorkerIds) ? part.assignedWorkerIds : []),
+          ...(Array.isArray(part.workerIds) ? part.workerIds : []),
+          ...(Array.isArray(part.workers) ? part.workers : []),
+          part.workerId, part.userId, part.pmId
+        ].filter(Boolean);
+
+        if (partWorkers.some(w => collectWorkerId(w) === uid)) return true;
+
+        const variants = part.listPartOrderSizes || part.partOrderSizes || [];
+        return variants.some(v => {
+          const variantWorkers = [
+            ...(Array.isArray(v.assigneeIds) ? v.assigneeIds : []),
+            ...(Array.isArray(v.assignees) ? v.assignees : []),
+            ...(Array.isArray(v.assignedWorkerIds) ? v.assignedWorkerIds : []),
+            ...(Array.isArray(v.workerIds) ? v.workerIds : []),
+            ...(Array.isArray(v.workers) ? v.workers : []),
+            v.workerId, v.userId
+          ].filter(Boolean);
+          return variantWorkers.some(w => collectWorkerId(w) === uid);
+        });
+      });
+
+      if (!isUserInvolved) {
+        setError("Bạn không có quyền truy cập đơn sản xuất này.");
+        setProduction(null);
+      }
+    } else if (totalParts === 0 && !loading && !subDataLoading) {
+      // If truly no parts (empty plan) and not Main PM, block
+      setError("Bạn không có quyền truy cập đơn sản xuất này.");
+      setProduction(null);
+    }
+  }, [production, rawParts, loading, subDataLoading, totalParts, isOwner, isPM, currentUserId]);
 
   // Flatten rawParts + workerMap → steps, tự re-compute khi worker map load xong
   useEffect(() => {
@@ -272,8 +376,9 @@ export default function ProductionDetail() {
             assignees: (variant.assigneeIds || variant.assignees || variant.workers || []).map(a => {
               if (typeof a === 'object') return a;
               const sid = String(a);
-              return { id: sid, fullName: workerMap[sid] || `Thợ #${sid}`, name: workerMap[sid] || `Thợ #${sid}` };
-            }),
+              const displayName = workerMap[sid] || "";
+              return { id: sid, fullName: displayName, name: displayName };
+            }).filter(a => a.name),
           });
         });
       } else {
@@ -595,7 +700,7 @@ export default function ProductionDetail() {
                             <Plus size={12} /> Thiết kế công đoạn
                           </Link>
                         )}
-                        {(isPM || isOwner) && isInProduction && (
+                        {isAssignedPM && isInProduction && (
                           <div className="flex gap-1.5">
                             <Link to={`/production-plan/assign/${production.productionId}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 text-[#1e6e43] rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all hover:bg-[#f0f9f4] hover:border-[#1e6e43] shadow-sm">
                               <Users size={12} /> Phân công thợ
@@ -1059,14 +1164,33 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
 
         // Calculate dynamic actual quantity from allLogs
         const actualQty = group.variants.reduce((sum, v) => {
-          const variantLogs = allLogs.filter(log =>
-            String(log.productionPartId || log.partId) === String(v.partId) &&
-            String(log.partOrderSizeId || log.orderSizeId) === String(v.id)
-          );
+          const variantLogs = allLogs.filter(log => {
+            const logPartId = String(log.productionPartId || log.partId || "");
+            const logVariantId = String(log.partOrderSizeId || log.orderSizeId || log.productionPartOrderSizeId || "");
+            const targetPartId = String(v.partId || "");
+            const targetVariantId = String(v.id || "");
+
+            if (logVariantId && targetVariantId) {
+              if (logPartId && targetPartId) {
+                return logPartId === targetPartId && logVariantId === targetVariantId;
+              }
+              return logVariantId === targetVariantId;
+            }
+            return false;
+          });
+
           const logTotal = variantLogs
-            .filter(log => log.isReadOnly === true || log.isReadOnly === 1)
-            .reduce((acc, log) => acc + (log.quantity || 0), 0);
-          return sum + (logTotal || 0);
+            .filter(log =>
+              log.isReadOnly === true ||
+              log.isReadOnly === 1 ||
+              log.isApproved === true ||
+              log.isApproved === 1 ||
+              log.status === 1
+            )
+            .reduce((acc, log) => acc + (Number(log.quantity) || 0), 0);
+
+          // Use the higher value between summed logs and the cached actualQuantity
+          return sum + Math.max(logTotal, Number(v.actualQuantity) || 0);
         }, 0);
 
         const pct = totalQty > 0 ? Math.min(100, Math.round((actualQty / totalQty) * 100)) : 0;
@@ -1187,14 +1311,32 @@ function StageMatrix({ steps, allLogs = [], isInProduction, isOwner, isPM, navig
                       {/* Quantity */}
                       <div className="col-span-2 flex flex-col items-center gap-1">
                         {(() => {
-                          const variantLogs = allLogs.filter(log =>
-                            String(log.productionPartId || log.partId) === String(row.partId) &&
-                            String(log.partOrderSizeId || log.orderSizeId) === String(row.id)
-                          );
+                          const variantLogs = allLogs.filter(log => {
+                            const logPartId = String(log.productionPartId || log.partId || "");
+                            const logVariantId = String(log.partOrderSizeId || log.orderSizeId || log.productionPartOrderSizeId || "");
+                            const targetPartId = String(row.partId || "");
+                            const targetVariantId = String(row.id || "");
+
+                            if (logVariantId && targetVariantId) {
+                              if (logPartId && targetPartId) {
+                                return logPartId === targetPartId && logVariantId === targetVariantId;
+                              }
+                              return logVariantId === targetVariantId;
+                            }
+                            return false;
+                          });
+
                           const logTotal = variantLogs
-                            .filter(log => log.isReadOnly === true || log.isReadOnly === 1)
-                            .reduce((acc, log) => acc + (log.quantity || 0), 0);
-                          const liveActual = logTotal || 0;
+                            .filter(log =>
+                              log.isReadOnly === true ||
+                              log.isReadOnly === 1 ||
+                              log.isApproved === true ||
+                              log.isApproved === 1 ||
+                              log.status === 1
+                            )
+                            .reduce((acc, log) => acc + (Number(log.quantity) || 0), 0);
+
+                          const liveActual = Math.max(logTotal, Number(row.actualQuantity) || 0);
                           const rowPct = (row.quantity > 0) ? Math.min(100, Math.round((liveActual / row.quantity) * 100)) : 0;
 
                           return (

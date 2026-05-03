@@ -103,19 +103,7 @@ export default function DeliveryProgressSection({
         return DELIVERY_STATUS_LABELS[Number(sId)] || "Giao thành công";
     };
 
-    // Helper to check 3 days logic for auto-confirmation
-    const isAutoConfirmed = (dateStr) => {
-        if (!dateStr) return false;
-        try {
-            const deliveryDate = new Date(dateStr);
-            if (isNaN(deliveryDate.getTime())) return false;
-            const now = new Date();
-            const diffDays = Math.floor((now - deliveryDate) / (1000 * 60 * 60 * 24));
-            return diffDays >= 3;
-        } catch (e) {
-            return false;
-        }
-    };
+
 
     // Calculate totals
     const totalOrdered = variants.reduce((sum, v) => {
@@ -123,7 +111,7 @@ export default function DeliveryProgressSection({
     }, 0);
 
     const totalDelivered = deliveries.reduce((sum, d) => {
-        const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
+        const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED;
         return sum + (isActuallyReceived ? Number(d.deliverQuantity || d.quantity || 0) : 0);
     }, 0);
     const totalRemaining = Math.max(0, totalOrdered - totalDelivered);
@@ -220,11 +208,11 @@ export default function DeliveryProgressSection({
                             if (rowOrdered === 0) return null;
 
                             // Calculate row delivery
-                            const rowDelivered = deliveries
-                                .filter(d => {
-                                    const dOsId = String(d.orderSizeId || d.orderSizeID || d.order_size_id || "");
-                                    const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
-                                    if (!isActuallyReceived) return false;
+                                    const rowDelivered = deliveries
+                                        .filter(d => {
+                                            const dOsId = String(d.orderSizeId || d.orderSizeID || d.order_size_id || "");
+                                            const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED;
+                                            if (!isActuallyReceived) return false;
 
                                     if (v.idMap && dOsId) {
                                         return Object.values(v.idMap).some(id => String(id) === dOsId);
@@ -249,7 +237,7 @@ export default function DeliveryProgressSection({
                                         const delivered = deliveries
                                             .filter(d => {
                                                 const dOsId = d.orderSizeId || d.orderSizeID || d.order_size_id;
-                                                const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED || isAutoConfirmed(d.deliveredAt || d.receivedDate || d.date);
+                                                const isActuallyReceived = Number(d.deliverStatusId) === DELIVERY_STATUS.RECEIVED;
                                                 if (!isActuallyReceived) return false;
 
                                                 if (osId && dOsId) {
@@ -347,9 +335,8 @@ export default function DeliveryProgressSection({
                                     .map((d, i) => {
                                     const { color, size } = getDetailedInfo(d);
                                     const dateStr = d.deliveredAt || d.receivedDate || d.date || "";
-                                    const autoConfirmed = isAutoConfirmed(dateStr);
                                     const statusId = Number(d.deliverStatusId);
-                                    const confirmed = statusId === DELIVERY_STATUS.RECEIVED || autoConfirmed;
+                                    const confirmed = statusId === DELIVERY_STATUS.RECEIVED;
 
                                     const qtyDisp = d.deliverQuantity || d.quantity || 0;
                                     const statusLabel = getStatusLabel(statusId);
@@ -378,9 +365,9 @@ export default function DeliveryProgressSection({
                                                     </div>
                                                     <div className="flex flex-col items-end gap-2">
                                                         {confirmed ? (
-                                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border ${autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]'}`}>
+                                                            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border bg-[#e7f5ed] text-[#1e6e43] border-[#d4e3da]">
                                                                 <CheckCircle size={12} />
-                                                                {autoConfirmed && statusId !== DELIVERY_STATUS.RECEIVED ? 'Đã nhận (Tự động)' : 'Đã nhận hàng'}
+                                                                Đã nhận hàng
                                                             </div>
                                                         ) : (
                                                             isCustomer && statusId !== DELIVERY_STATUS.NOT_RECEIVED && (

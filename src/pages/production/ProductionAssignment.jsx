@@ -34,28 +34,46 @@ export default function ProductionAssignment() {
    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
    const [expandedStages, setExpandedStages] = useState({});
 
+   const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+   const isOwner = roleValue.toLowerCase().includes("owner") || roleValue.toLowerCase().includes("admin");
+   const isPM = roleValue.toLowerCase().includes("pm") || roleValue.toLowerCase().includes("manager");
+   const currentUserId = currentUser?.id ?? currentUser?.userId ?? currentUser?.accountId;
+
    useEffect(() => {
       if (selectedProductionId) {
          ProductionService.getProductionDetail(selectedProductionId).then((res) => {
             const p = res?.data?.data || res?.data;
-            if (p) setFetchedProduction({
-               productionId: p.productionId ?? p.id,
-               orderName: p.order?.orderName || p.orderName || "Kế hoạch sản xuất",
-               product: p.order || {},
-               pmId: p.pm?.id ?? p.pmId,
-               startDate: p.startDate || p.order?.startDate,
-               endDate: p.endDate || p.order?.endDate,
-            });
+            if (p) {
+               const pmId = p.pm?.id ?? p.pmId;
+               
+               // Authorization Guard
+               if (!isOwner && String(currentUserId) !== String(pmId)) {
+                  toast.error("Bạn không có quyền quản lý phân công cho đơn sản xuất này.");
+                  navigate(`/production/${selectedProductionId}`);
+                  return;
+               }
+
+               setFetchedProduction({
+                  productionId: p.productionId ?? p.id,
+                  orderName: p.order?.orderName || p.orderName || "Kế hoạch sản xuất",
+                  product: p.order || {},
+                  pmId: pmId,
+                  startDate: p.startDate || p.order?.startDate,
+                  endDate: p.endDate || p.order?.endDate,
+               });
+            }
          }).catch(() => { });
          ProductionPartService.getPartsByProduction(selectedProductionId, { PageSize: 100 })
             .then(res => setBackendParts(res?.data?.data ?? res?.data ?? []))
             .catch(() => { });
       }
-   }, [selectedProductionId]);
+   }, [selectedProductionId, isOwner, currentUserId, navigate]);
 
    useEffect(() => {
       const loadWorkers = async () => {
-         if (!fetchedProduction?.pmId) return;
+         // If we don't have production info yet, we wait.
+         if (!fetchedProduction) return;
+
          try {
             setWorkers([]);
             setWorkerGroups([]);
@@ -66,15 +84,50 @@ export default function ProductionAssignment() {
                toDate: fetchedProduction.endDate,
             };
 
-            const res = await ProductionPartService.getAssignWorkers(params);
-            const rawData = res?.data?.data || res?.data || [];
+            let rawData = [];
+            let fetchSuccess = false;
+
+            // 1. Try specialized assignment API (scoped to PM and availability)
+            if (params.PMId) {
+               try {
+                  const res = await ProductionPartService.getAssignWorkers(params);
+                  rawData = res?.data?.data || res?.data || [];
+                  fetchSuccess = true;
+               } catch (apiErr) {
+                  console.warn("Specialized worker fetch failed, will try fallback.", apiErr);
+               }
+            }
+
+            // 2. Fallback for Owner or if specialized API fails/PMId missing
+            if (!fetchSuccess) {
+               try {
+                  const res = await WorkerService.getEmployeeDirectory();
+                  const allEmployees = res?.data || res?.data?.data || [];
+                  // Map WorkerService format to the format expected by the UI mapping logic below
+                  rawData = allEmployees.map(emp => ({
+                     workerInfo: { 
+                        workerId: emp.id, 
+                        workerName: emp.fullName || emp.userFullName 
+                     },
+                     workerSkillInfo: (emp.workerSkillNames || []).map(s => ({ skillName: s })),
+                     managerName: emp.managerName || "Khác"
+                  }));
+                  fetchSuccess = true;
+               } catch (fallbackErr) {
+                  console.error("Fallback worker fetch also failed:", fallbackErr);
+               }
+            }
+
+            if (!fetchSuccess) {
+               throw new Error("Could not load workers from any source.");
+            }
 
             const mapped = rawData.map(item => ({
                id: String(item.workerInfo?.workerId || item.workerId),
                fullName: item.workerInfo?.workerName || item.workerName || "—",
                skills: item.workerSkillInfo?.map(s => s.skillName) || [],
                role: item.workerSkillInfo?.[0]?.skillName || "Thợ",
-               managerName: "Nhóm sản xuất",
+               managerName: item.managerName || "Nhóm sản xuất",
             }));
 
             const ownerId = currentUser?.id || currentUser?.userId;
@@ -107,7 +160,7 @@ export default function ProductionAssignment() {
          }
       };
       loadWorkers();
-   }, [currentUser, fetchedProduction?.pmId, fetchedProduction?.startDate, fetchedProduction?.endDate]);
+   }, [currentUser, fetchedProduction?.pmId, fetchedProduction?.startDate, fetchedProduction?.endDate, fetchedProduction]);
 
    const rows = useMemo(() => {
       if (!backendParts || !backendParts.length) return [];

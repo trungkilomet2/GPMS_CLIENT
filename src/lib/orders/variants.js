@@ -42,31 +42,52 @@ export const processOrderVariants = (order) => {
             }));
         }
 
-        // Xử lý cấu trúc dọc (Group by Color)
-        rawList.forEach(item => {
+        // Xử lý cấu trúc dọc (Group by Color + Smart Occupancy)
+        const colorGroupsMap = {};
+
+        rawList.forEach((item, idx) => {
             const color = item.colorName || item.color || item.colorCode || 'Chưa xác định';
-            if (!grouped[color]) {
-                grouped[color] = { 
+            const sizeKeyFound = (item.sizeName || item.sizeValue || item.size || '').toLowerCase() || SIZE_ID_TO_KEY[item.sizeId];
+            const sizeKey = sizeKeyFound || 's';
+            
+            const variantId = item.orderDetailId || item.orderDetailID || item.order_detail_id || item.variantId || item.orderVariantId || '';
+
+            if (!colorGroupsMap[color]) {
+                colorGroupsMap[color] = [];
+            }
+
+            // Tìm một nhóm cho màu này mà:
+            // 1. Khớp với variantId (nếu có)
+            // 2. HOẶC chưa có size này (nếu không có variantId, dùng logic kiểm tra ô trống)
+            let targetGroup = colorGroupsMap[color].find(g => {
+                if (variantId && g.variantId === variantId) return true;
+                if (!variantId && !g.variantId && (g[sizeKey] === 0)) return true;
+                return false;
+            });
+
+            if (!targetGroup) {
+                targetGroup = { 
+                    id: variantId || `v-${idx}-${Date.now()}`,
+                    variantId: variantId,
                     color, 
                     colorCode: item.colorCode, 
                     xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0,
                     idMap: {} 
                 };
+                colorGroupsMap[color].push(targetGroup);
             }
-            // Hỗ trợ cả sizeKey trực tiếp, sizeName hoặc sizeId
-            const sizeKeyFound = (item.sizeName || item.sizeValue || item.size || '').toLowerCase() || SIZE_ID_TO_KEY[item.sizeId];
-            const sizeKey = sizeKeyFound || 's'; // Default to 's' if not found
-            
-            if (grouped[color][sizeKey] !== undefined) {
-                grouped[color][sizeKey] += (Number(item.quantity) || 0);
-                // Store the ID of this specific variant
+
+            if (targetGroup[sizeKey] !== undefined) {
+                targetGroup[sizeKey] += (Number(item.quantity) || 0);
+                // Lưu ID của bản ghi size cụ thể này
                 const osId = item.id || item.orderSizeId || item.orderSizeID || item.order_size_id;
                 if (osId) {
-                    grouped[color].idMap[sizeKey] = osId;
+                    targetGroup.idMap[sizeKey] = osId;
                 }
             }
         });
-        return Object.values(grouped);
+        
+        return Object.values(colorGroupsMap).flat();
     }
 
     // 2. Fallback: single color/size (Dành cho đơn hàng đơn giản)

@@ -11,12 +11,10 @@ import OrderHistoryUpdateModal from '@/components/orders/OrderHistoryUpdateModal
 import MaterialsTable from '@/components/orders/MaterialsTable';
 import CustomerInfoCard from '@/components/orders/CustomerInfoCard';
 import { MATERIALS_TABLE_EMPTY_TEXT } from '@/lib/orders/materials';
-import { formatOrderDate } from '@/lib/orders/formatters';
 import { getOrderCustomerId, getOrderCustomerInfo } from '@/lib/orders/customerInfo';
 import { getOrderStatusStyle, normalizeOrderStatus } from '@/lib/orders/status';
 import OrderService from '@/services/OrderService';
 import ProductionPartService from '@/services/ProductionPartService';
-import { userService } from '@/services/UserService';
 import { getStoredUser } from '@/lib/authStorage';
 import DeliveryProgressSection from '@/components/orders/DeliveryProgressSection';
 import { hasAnyRole, splitRoles } from '@/lib/authRouting';
@@ -227,12 +225,11 @@ export default function OrderDetail() {
             try {
                 const response = await ProductionService.getProductionIssues(linkedProductionId);
                 const allIssues = response?.data?.data ?? response?.data ?? [];
-                // Filter issues with Status 4 (Irreparable/Unfixable)
-                const unfixable = allIssues.filter(issue =>
-                    String(issue.statusId) === "4" &&
+                // Lấy toàn bộ danh sách báo lỗi có số lượng > 0
+                const issues = allIssues.filter(issue =>
                     (issue.confirmedQuantity > 0 || issue.quantity > 0)
                 );
-                setCriticalIssues(unfixable);
+                setCriticalIssues(issues);
             } catch (err) {
                 console.error('Error fetching production issues:', err);
             }
@@ -521,38 +518,30 @@ export default function OrderDetail() {
                                 </div>
 
                                 {/* Workshop Quality Summary in Sidebar - ONLY for Owner */}
-                                {hasProduction && isOwner && (
+                                {hasProduction && isOwner && criticalIssues.length > 0 && (
                                     <div className="pt-8 border-t border-gray-100 space-y-6">
                                         <div className="flex items-center gap-3">
                                             <div className="w-1.5 h-4 bg-[#1e6e43] rounded-full" />
                                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Kiểm soát chất lượng</h3>
                                         </div>
 
-                                        <div className="space-y-4 px-1">
-                                            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
-                                                <div className="space-y-0.5">
-                                                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Thống kê lỗi hỏng</h4>
-                                                    <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest">(Khấu trừ không thể sửa)</p>
+                                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                            {criticalIssues.map((issue, idx) => (
+                                                <div key={idx} className="flex flex-col gap-1 py-3 border-b border-dashed border-rose-100 last:border-0">
+                                                    <div className="flex items-center justify-between text-[11px] font-black text-rose-700">
+                                                        <span className="truncate uppercase">{issue.title || 'Lỗi sản xuất'}</span>
+                                                        <span>-{issue.confirmedQuantity || issue.quantity} SP</span>
+                                                    </div>
+                                                    {issue.description && (
+                                                        <p className="text-[10px] font-bold text-rose-500/80 leading-relaxed">
+                                                            {issue.description}
+                                                        </p>
+                                                    )}
                                                 </div>
-                                                <div className="text-right">
-                                                    <span className="text-2xl font-black text-rose-600">-{workshopErrorQuantity.toLocaleString()} <small className="text-[10px] opacity-40 font-bold ml-1">SP</small></span>
-                                                </div>
-                                            </div>
-
-                                            {criticalIssues.length > 0 && (
-                                                <div className="space-y-2">
-                                                    {criticalIssues.map((issue, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-[11px] font-bold text-gray-500 py-1 border-b border-dashed border-gray-100 last:border-0">
-                                                            <span className="truncate max-w-[180px]">{issue.title || issue.description || 'Lỗi không tên'}</span>
-                                                            <span className="text-rose-500">-{issue.confirmedQuantity || issue.quantity}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                            ))}
                                         </div>
                                     </div>
                                 )}
-
                                 <div className="flex flex-col gap-3 pt-6 border-t border-gray-100">
                                     <button onClick={() => setIsCommentModalOpen(true)} className="h-12 flex items-center justify-center gap-3 rounded-xl bg-white border border-black text-gray-700 hover:bg-gray-50 transition-all active:scale-95 shadow-sm">
                                         <MessageSquare size={18} className="text-[#1e6e43]" />
@@ -655,6 +644,7 @@ export default function OrderDetail() {
                 isOpen={isRecordDeliveryModalOpen}
                 onClose={() => setIsRecordDeliveryModalOpen(false)}
                 orderId={order.id}
+                isManualOrder={isOwner && isOrderOwner} // Truyền cờ xác định đơn thủ công
                 variants={
                     order.orderSizes ||
                     order.orderSize ||

@@ -152,7 +152,9 @@ export default function InternalDashboard() {
       ...w,
       logs: getFilteredData(w.logs || [], filter)
     }));
-    const activeLogs = filteredPayroll.flatMap(w => w.logs || []);
+    const allLogs = filteredPayroll.flatMap(w => w.logs || []);
+    // Lọc trùng bản ghi dựa trên ID để tránh hiện tượng lặp 3 lần
+    const activeLogs = Array.from(new Map(allLogs.map(log => [log.id || log.workLogId, log])).values());
 
     // Revenue: Include orders that were completed/delivered in the selected period
     // Or at least show total revenue from all orders that match the status "Đã hoàn thành"
@@ -162,14 +164,7 @@ export default function InternalDashboard() {
       const status = normalizeOrderStatus(o.statusName || o.status);
 
       const isCompleted = status === "Đã hoàn thành" ||
-        status === "Đã chấp nhận" ||
-        rawStatus.includes("hoàn thành") ||
-        rawStatus.includes("chấp nhận") ||
-        rawStatus.includes("completed") ||
-        rawStatus.includes("approved") ||
-        rawStatus.includes("accepted") ||
-        rawStatus.includes("đã giao") ||
-        rawStatus === "delivered";
+        rawStatus.includes("hoàn thành");
 
       // FOR TESTING: If total filtered revenue is 0, we might be seeing a date mismatch
       // Let's check the date but be very lenient
@@ -186,7 +181,7 @@ export default function InternalDashboard() {
       // If matchesPeriod is false, we'll still count it for now to see if data is being fetched at all
       // (The user can tell us if the 140M was for ALL time or this month)
       // IF YOU WANT TO RESTRICT TO PERIOD, UNCOMMENT THE NEXT LINE:
-      // if (!matchesPeriod) return sum;
+      //if (!matchesPeriod) return sum;
 
       const total = Number(o.totalAmount || o.totalPrice || o.amount || o.total || o.total_amount || o.total_price || o.totalPrice || 0);
       if (total > 0) return sum + total;
@@ -195,7 +190,6 @@ export default function InternalDashboard() {
       const cpu = Number(o.cpu || o.unitPrice || o.price || o.unit_price || 0);
       return sum + (qty * cpu);
     }, 0);
-
     const totalPayroll = activeLogs.reduce((sum, l) => sum + (Number(l.quantity || 0) * Number(l.cpu || 0)), 0);
     const totalOutput = activeLogs.reduce((sum, l) => sum + Number(l.quantity || 0), 0);
     const workerCount = data.totalEmployees;
@@ -251,7 +245,7 @@ export default function InternalDashboard() {
 
     return {
       kpis: [
-        { label: "Doanh thu dự kiến", val: revenue.toLocaleString(), unit: "đ", icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-50", theme: "emerald" },
+        { label: "Tổng thu đơn hoàn thành", val: revenue.toLocaleString(), unit: "đ", icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-50", theme: "emerald" },
         { label: "Tiền lương", val: totalPayroll.toLocaleString(), unit: "đ", icon: Users, color: "text-rose-600", bg: "bg-rose-50", theme: "rose" },
         { label: "Sản lượng", val: totalOutput.toLocaleString(), unit: "cái", icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50", theme: "blue" },
         { label: "Thợ xưởng", val: workerCount.toLocaleString(), unit: "người", icon: Activity, color: "text-amber-600", bg: "bg-amber-50", theme: "amber" },
@@ -404,6 +398,12 @@ export default function InternalDashboard() {
                 <div>
                   <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Thống kê vận hành</h2>
                 </div>
+                {data.updating && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full animate-pulse">
+                    <Loader2 size={14} className="animate-spin" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Đang cập nhật...</span>
+                  </div>
+                )}
               </div>
             </div>
 

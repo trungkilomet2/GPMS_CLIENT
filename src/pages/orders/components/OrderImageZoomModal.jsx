@@ -21,13 +21,34 @@ export default function OrderImageZoomModal({ isOpen, imageUrl, onClose }) {
     setImageNaturalSize({ w: 0, h: 0 });
   }, [isOpen, imageUrl]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const container = imageContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e) => {
+      // Prevent browser zoom and page scroll
+      if (e.ctrlKey || Math.abs(e.deltaY) >= 1) {
+        e.preventDefault();
+      }
+      
+      setImageZoom((z) => {
+        const next = Math.min(3, Math.max(1, Number((z + (e.deltaY > 0 ? -0.1 : 0.1)).toFixed(2))));
+        if (next === 1) setImagePan({ x: 0, y: 0 });
+        return next;
+      });
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [isOpen]);
+
   if (!isOpen || !imageUrl) return null;
 
   return (
     <div
       className="fixed inset-0 z-9999 bg-black/70 flex items-center justify-center p-4 overscroll-none touch-none"
       onClick={handleClose}
-      onWheelCapture={(e) => e.preventDefault()}
     >
       <div className="relative w-full max-w-4xl h-[80vh]" onClick={(e) => e.stopPropagation()}>
         <button
@@ -90,15 +111,6 @@ export default function OrderImageZoomModal({ isOpen, imageUrl, onClose }) {
           <div
             ref={imageContainerRef}
             className="flex-1 bg-black/5 flex items-center justify-center p-2 overflow-hidden"
-            onWheel={(e) => {
-              if (!e.ctrlKey && Math.abs(e.deltaY) < 1) return;
-              e.preventDefault();
-              setImageZoom((z) => {
-                const next = Math.min(3, Math.max(1, Number((z + (e.deltaY > 0 ? -0.1 : 0.1)).toFixed(2))));
-                if (next === 1) setImagePan({ x: 0, y: 0 });
-                return next;
-              });
-            }}
             onPointerDown={(e) => {
               if (imageZoom <= 1) return;
               setIsDragging(true);

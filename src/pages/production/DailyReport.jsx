@@ -11,7 +11,7 @@ import WorkerService from "@/services/WorkerService";
 import { getStoredUser } from "@/lib/authStorage";
 import { getErrorMessage } from "@/utils/errorUtils";
 import { getPrimaryWorkspaceRole, hasAnyRole } from "@/lib/internalRoleFlow";
-import { User, Users } from "lucide-react";
+import { getPlanStatusLabel } from "@/utils/statusUtils";
 
 
 function toArray(value) {
@@ -86,15 +86,6 @@ function isStepAssignedToCurrentWorker(step, currentWorkerIdSet, currentWorkerNa
   ];
   if (idCandidates.some((id) => currentWorkerIdSet.has(id))) return true;
 
-  const nameCandidates = [
-    ...extractWorkerNames(step?.assignedWorkers),
-    ...extractWorkerNames(step?.workerNames),
-    ...extractWorkerNames(step?.workers),
-    ...extractWorkerNames(step?.workerList),
-    ...extractWorkerNames(step?.assignees),
-    ...extractWorkerNames(step?.workerName),
-  ];
-  return nameCandidates.some((name) => currentWorkerNameSet.has(name));
 }
 
 function formatDateInput(date = new Date()) {
@@ -103,8 +94,6 @@ function formatDateInput(date = new Date()) {
   const dd = String(date.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
-
-import { getPlanStatusLabel } from "@/utils/statusUtils";
 
 export default function DailyReport() {
   const navigate = useNavigate();
@@ -178,10 +167,10 @@ export default function DailyReport() {
 
   const getTasksForWorker = (worker) => {
     if (!worker) return [];
-    
+
     const workerId = worker?.userId ?? worker?.id ?? worker?.accountId;
     const wIdSet = new Set(workerId ? [String(workerId).trim()] : []);
-    
+
     const names = [worker?.fullName, worker?.name, worker?.userName, worker?.username]
       .map((value) => normalizeWorkerValue(value))
       .filter(Boolean);
@@ -411,14 +400,14 @@ export default function DailyReport() {
               };
               latestDataMap.set(idKey, data);
               latestDataMap.set(nameKey, data);
+            });
           });
-          });
- 
+
           const targetId = selectedWorker?.userId ?? selectedWorker?.id ?? selectedWorker?.accountId;
           let allLogs = [];
           let pIdx = 0;
           let hasMore = true;
- 
+
           while (hasMore && pIdx < 30) {
             try {
               const logRes = await ProductionPartService.getProductionWorkLogs(prodId, { PageIndex: pIdx, PageSize: 30 });
@@ -435,30 +424,30 @@ export default function DailyReport() {
               hasMore = false;
             }
           }
- 
+
           const targetDateStr = formatDateInput(new Date());
           const reportedTodayMap = new Map();
           const finishedTotalMap = new Map();
- 
+
           allLogs.forEach(log => {
             const sid = String(log.partOrderSizeId);
             const qty = Number(log.quantity || 0);
             finishedTotalMap.set(sid, (finishedTotalMap.get(sid) || 0) + qty);
- 
+
             const logDate = normalizeDateString(log.createDate || log.workDate);
             const logWorkerId = String(log.workerId || log.userId || log.accountId || "");
             if (logDate === targetDateStr && logWorkerId === String(targetId)) {
               reportedTodayMap.set(sid, log);
             }
           });
- 
+
           setRows(prev => (prev || []).map(row => {
             const sid = String(row.partOrderSizeId);
             const idKey = `${row.partId || ""}-${row.partOrderSizeId || ""}`;
             const latest = latestDataMap.get(idKey);
             const latestFinished = latest ? latest.finished : (finishedTotalMap.get(sid) || 0);
             const existingLog = reportedTodayMap.get(sid);
- 
+
             return {
               ...row,
               finVar: latestFinished,
@@ -753,11 +742,10 @@ export default function DailyReport() {
                     <button
                       key={i + 1}
                       onClick={() => setCurrentPage(i + 1)}
-                      className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition-all ${
-                        currentPage === i + 1
-                          ? "bg-emerald-600 text-white shadow-md shadow-emerald-100"
-                          : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                      className={`min-w-[32px] h-8 rounded-lg text-xs font-bold transition-all ${currentPage === i + 1
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-100"
+                        : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
                     >
                       {i + 1}
                     </button>

@@ -388,7 +388,7 @@ export default function ErrorReport() {
         if (!val) return { ...prev, [field]: "" };
         const num = Number(val);
         const maxQty = selectedPart?.maxQuantity ?? normalizedAssignment?.maxQuantity;
-        
+
         // If there's a max limit, clamp the value
         if (maxQty !== null && num > maxQty) {
           toast.warn(`Số lượng tối đa cho phép là ${maxQty}`, { toastId: "max-qty-warn" });
@@ -793,7 +793,7 @@ export default function ErrorReport() {
 
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi<span className="text-rose-500">*</span></label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ làm lỗi<span className="text-rose-500">*</span></label>
                   <select
                     value={form.assignedTo}
                     onChange={(event) => handleChange("assignedTo", event.target.value)}
@@ -914,7 +914,7 @@ export default function ErrorReport() {
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>Ghi rõ vị trí lỗi và số lượng lỗi.</li>
                   <li>Đính kèm ảnh để tổ trưởng đánh giá nhanh.</li>
-                  <li>Thông tin thợ sửa lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
+                  <li>Thông tin thợ làm lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
                 </ul>
               </div>
             </div>

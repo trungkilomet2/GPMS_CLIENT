@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Users, X, Loader2, ClipboardCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import ProductionPartService from "@/services/ProductionPartService";
+import WorkerService from "@/services/WorkerService";
 
 export default function ProxyReportModal({
   isOpen,
@@ -149,33 +150,53 @@ export default function ProxyReportModal({
         setIsLoadingWorkers(true);
         try {
           let allWorkers = [];
-          let pageIndex = 0;
-          let hasMore = true;
+          let fetchSuccess = false;
 
-          while (hasMore && pageIndex < 50) { // Safety limit of 50 pages
-            const res = await ProductionPartService.getAssignWorkers({
-              PageIndex: pageIndex,
-              PageSize: 30,
-              SortColumn: "Name",
-              SortOrder: "ASC",
-              // Include production context if available (may be required by backend)
-              ...(plan?.pmId ? { PMId: plan.pmId } : {}),
-              ...(plan?.pStartDate || plan?.startDate ? { fromDate: plan.pStartDate || plan.startDate } : {}),
-              ...(plan?.pEndDate || plan?.endDate ? { toDate: plan.pEndDate || plan.endDate } : {}),
-            });
+          const params = {
+             PageIndex: 0,
+             PageSize: 100,
+             SortColumn: "Name",
+             SortOrder: "ASC",
+             ...(plan?.pmId ? { PMId: plan.pmId } : {}),
+             ...(plan?.pStartDate || plan?.startDate ? { fromDate: plan.pStartDate || plan.startDate } : {}),
+             ...(plan?.pEndDate || plan?.endDate ? { toDate: plan.pEndDate || plan.endDate } : {}),
+          };
 
-            const rawData = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+          // 1. Try specialized assignment API
+          if (params.PMId) {
+             try {
+                const res = await ProductionPartService.getAssignWorkers(params);
+                const rawData = res?.data?.data ?? res?.data?.items ?? (Array.isArray(res?.data) ? res.data : []);
+                if (rawData.length > 0) {
+                   allWorkers = rawData;
+                   fetchSuccess = true;
+                }
+             } catch (apiErr) {
+                console.warn("Specialized worker fetch failed for proxy report, trying fallback.", apiErr);
+             }
+          }
 
-            if (rawData.length > 0) {
-              allWorkers = [...allWorkers, ...rawData];
-              if (rawData.length < 30) {
-                hasMore = false;
-              } else {
-                pageIndex++;
-              }
-            } else {
-              hasMore = false;
-            }
+          // 2. Fallback to role-aware employee directory
+          if (!fetchSuccess) {
+             try {
+                const res = await WorkerService.getEmployeeDirectory();
+                const rawData = res?.data || res?.data?.data || [];
+                if (Array.isArray(rawData)) {
+                   // Map general employee format to the one expected below
+                   allWorkers = rawData.map(emp => ({
+                      workerId: emp.id,
+                      workerName: emp.fullName || emp.userFullName || emp.userName,
+                      workerSkillInfo: (emp.workerSkillNames || []).map(s => ({ skillName: s }))
+                   }));
+                   fetchSuccess = true;
+                }
+             } catch (fallbackErr) {
+                console.error("Fallback worker fetch failed for proxy report:", fallbackErr);
+             }
+          }
+
+          if (!fetchSuccess) {
+             throw new Error("Could not load workers from any source.");
           }
 
           // Map to handle potential nesting in API response (workerInfo)
