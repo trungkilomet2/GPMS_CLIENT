@@ -159,32 +159,25 @@ export default function LeaveRequestDetail() {
     ];
   }, [leave]);
 
-  const canCancelPending = leave?.status === "pending";
-  const canRequestCancel = leave?.status === "approved";
+  const canRequestCancel = leave?.status === "pending" || leave?.status === "approved";
 
   const handleCancelAction = async () => {
-    if (!(canCancelPending || canRequestCancel) || !cancelReason.trim()) return;
+    if (!canRequestCancel || !cancelReason.trim()) return;
 
     try {
       setSubmitting(true);
 
-      if (canCancelPending) {
-        await LeaveService.cancelLeaveRequest(id, {
-          cancelContent: cancelReason.trim(),
-        });
-      } else {
-        await LeaveService.requestCancelLeaveRequest(id, {
-          cancelContent: cancelReason.trim(),
-        });
-      }
+      await LeaveService.requestCancelLeaveRequest(id, {
+        cancelContent: cancelReason.trim(),
+      });
 
       const refreshed = await LeaveService.getMyLeaveRequestById(id);
       setLeave(
         refreshed ?? {
           ...leave,
-          status: canCancelPending ? "cancelled" : "cancel_requested",
+          status: "cancel_requested",
           cancelContent: cancelReason.trim(),
-          dateReply: canCancelPending ? new Date().toISOString() : leave?.dateReply,
+          dateReply: leave?.dateReply,
         }
       );
       setCancelOpen(false);
@@ -194,9 +187,7 @@ export default function LeaveRequestDetail() {
       setError(
         getLeaveErrorMessage(
           err,
-          canCancelPending
-            ? "Không thể hủy đơn nghỉ. Vui lòng thử lại."
-            : "Không thể gửi yêu cầu hủy đơn nghỉ. Vui lòng thử lại."
+          "Không thể gửi yêu cầu hủy đơn nghỉ. Vui lòng thử lại."
         )
       );
     } finally {
@@ -294,7 +285,7 @@ export default function LeaveRequestDetail() {
                               : "Đơn nghỉ đang chờ người có thẩm quyền xem xét."}
                     </div>
 
-                    {(canCancelPending || canRequestCancel) ? (
+                    {canRequestCancel ? (
                       <div className="mt-4">
                         <div className="flex flex-wrap gap-3">
                           <button
@@ -304,24 +295,20 @@ export default function LeaveRequestDetail() {
                             className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                           >
                             <XCircle size={16} />
-                            {canCancelPending ? "Hủy đơn nghỉ" : "Gửi yêu cầu hủy"}
+                            Gửi yêu cầu hủy
                           </button>
                         </div>
 
                         {cancelOpen ? (
                           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <label className="mb-2 block text-sm font-semibold text-slate-700">
-                              {canCancelPending ? "Lý do hủy đơn" : "Lý do yêu cầu hủy"}
+                              Lý do yêu cầu hủy
                             </label>
                             <textarea
                               rows={4}
                               value={cancelReason}
                               onChange={(event) => setCancelReason(event.target.value)}
-                              placeholder={
-                                canCancelPending
-                                  ? "Nhập lý do hủy đơn nghỉ (bắt buộc)"
-                                  : "Nhập lý do yêu cầu hủy đơn nghỉ (bắt buộc)"
-                              }
+                              placeholder="Nhập lý do yêu cầu hủy đơn nghỉ (bắt buộc)"
                               className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                             />
                             <div className="mt-3 flex justify-end">
@@ -333,9 +320,7 @@ export default function LeaveRequestDetail() {
                               >
                                 {submitting
                                   ? "Đang xử lý..."
-                                  : canCancelPending
-                                    ? "Xác nhận hủy đơn"
-                                    : "Xác nhận gửi yêu cầu hủy"}
+                                  : "Xác nhận gửi yêu cầu hủy"}
                               </button>
                             </div>
                           </div>
