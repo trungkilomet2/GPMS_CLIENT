@@ -143,10 +143,40 @@ export default function CreateManualOrder() {
   };
 
   const handleVariantChange = (index, field, value) => {
-    setVariants(prev => prev.map((v, i) => i === index ? { ...v, [field]: value } : v));
+    const nextVariants = variants.map((v, i) => i === index ? { ...v, [field]: value } : v);
+    setVariants(nextVariants);
 
-    // Clear specific errors if they exist
-    if (errors.variants?.[index]?.[field]) {
+    // Live validation for colors
+    if (field === 'color' || field === undefined) {
+      const colorCounts = {};
+      nextVariants.forEach(v => {
+        const c = v.color?.trim().toLowerCase();
+        if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+      });
+
+      setErrors(prev => {
+        const nextErrs = { ...prev };
+        const nextVariantErrors = { ...nextErrs.variants };
+
+        nextVariants.forEach((v, idx) => {
+          const c = v.color?.trim().toLowerCase();
+          if (c && colorCounts[c] > 1) {
+            nextVariantErrors[idx] = { ...nextVariantErrors[idx], color: 'Tên màu này đã được nhập' };
+          } else if (nextVariantErrors[idx]?.color === 'Tên màu này đã được nhập') {
+            const updated = { ...nextVariantErrors[idx] };
+            delete updated.color;
+            if (Object.keys(updated).length === 0) delete nextVariantErrors[idx];
+            else nextVariantErrors[idx] = updated;
+          }
+        });
+
+        nextErrs.variants = nextVariantErrors;
+        return nextErrs;
+      });
+    }
+
+    // Clear specific errors if they exist (other fields)
+    if (field !== 'color' && errors.variants?.[index]?.[field]) {
       setErrors(prev => {
         const next = { ...prev };
         const nextVariantsErrors = { ...next.variants };
@@ -366,12 +396,24 @@ export default function CreateManualOrder() {
     // VARIANTS
     const variantErrors = [];
     let hasAnyQuantity = false;
+    
+    // Check for duplicate colors
+    const colorCounts = {};
+    variants.forEach(v => {
+      const c = v.color?.trim().toLowerCase();
+      if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+    });
+
     variants.forEach((v, idx) => {
       const vErrs = {};
+      const c = v.color?.trim().toLowerCase();
+      
       if (!v.color?.trim()) {
         vErrs.color = 'Vui lòng nhập tên màu';
       } else if (v.color.trim().length > 30) {
         vErrs.color = 'Tên màu tối đa 30 ký tự';
+      } else if (c && colorCounts[c] > 1) {
+        vErrs.color = 'Tên màu này đã được nhập';
       }
 
       ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(size => {

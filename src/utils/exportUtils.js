@@ -1,15 +1,13 @@
-import * as XLSX from "xlsx";
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
-
 /**
  * Xuất dữ liệu bảng lương ra file Excel (.xlsx)
  * @param {Array} data Danh sách thợ và các chỉ số (workerSummary)
  * @param {number} month Tháng báo cáo
  * @param {number} year Năm báo cáo
  */
-export const exportPayrollToExcel = (data, month, year) => {
+export const exportPayrollToExcel = async (data, month, year) => {
   if (!data || data.length === 0) return;
+
+  const XLSX = await import("xlsx");
 
   // Chuẩn bị dữ liệu cho Excel (Phẳng hóa dữ liệu)
   const excelData = data.map((w, idx) => ({
@@ -45,8 +43,11 @@ export const exportPayrollToExcel = (data, month, year) => {
  * Lưu ý: jspdf mặc định không hỗ trợ tiếng Việt nếu không có font.
  * Ở đây chúng ta sẽ tạo bảng cơ bản, nếu lỗi font sẽ khuyên dùng Excel.
  */
-export const exportPayrollToPDF = (data, month, year) => {
+export const exportPayrollToPDF = async (data, month, year) => {
   if (!data || data.length === 0) return;
+
+  const { jsPDF } = await import("jspdf");
+  await import("jspdf-autotable");
 
   const doc = new jsPDF();
 
@@ -79,8 +80,10 @@ export const exportPayrollToPDF = (data, month, year) => {
 /**
  * Xuất chi tiết lương của một thợ ra Excel
  */
-export const exportDetailToExcel = (logs, workerName, month, year) => {
+export const exportDetailToExcel = async (logs, workerName, month, year) => {
   if (!logs || logs.length === 0) return;
+
+  const XLSX = await import("xlsx");
 
   const excelData = logs.map((log, idx) => ({
     "STT": idx + 1,
