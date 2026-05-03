@@ -71,7 +71,7 @@ export default function OrderCommentModal({ isOpen, onClose, orderId }) {
         transport: HttpTransportType.WebSockets
       })
       .withAutomaticReconnect()
-      .configureLogging(LogLevel.Information)
+      .configureLogging(LogLevel.Warning)
       .build();
 
     connectionRef.current = connection;

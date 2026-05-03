@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, Users, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -177,9 +177,12 @@ export default function CreateManualOrder() {
     setOrderData(prev => ({ ...prev, quantity: total }));
   }, [variants]);
 
+  const reuseRef = useRef(false);
+
   useEffect(() => {
     const reuse = location.state?.reuseOrder;
-    if (!reuse) return;
+    if (!reuse || reuseRef.current) return;
+    reuseRef.current = true;
 
     // 1. Basic Order Info
     setOrderData(prev => ({
@@ -222,21 +225,38 @@ export default function CreateManualOrder() {
     // 3. Size / Variants Mapping (Matrix Conversion)
     const rawSizes = reuse.sizes || reuse.size || [];
     if (Array.isArray(rawSizes) && rawSizes.length > 0) {
-      const grouped = {};
+      const colorGroups = {};
       const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
       rawSizes.forEach((item, idx) => {
-        const colorLabel = item.color || 'Mặc định';
-        if (!grouped[colorLabel]) {
-          grouped[colorLabel] = {
-            id: `reuse-${idx}-${Date.now()}`,
+        const colorLabel = item.color || item.Color || 'Mặc định';
+        const sizeKey = SIZE_ID_TO_KEY[item.sizeId];
+        if (!sizeKey) return;
+
+        const variantId = item.orderDetailId || item.orderDetailID || item.order_detail_id || item.variantId || item.orderVariantId || '';
+        
+        if (!colorGroups[colorLabel]) {
+          colorGroups[colorLabel] = [];
+        }
+
+        let targetGroup = colorGroups[colorLabel].find(g => {
+          if (variantId && g.variantId === variantId) return true;
+          if (!variantId && !g.variantId && g[sizeKey] === 0) return true;
+          return false;
+        });
+
+        if (!targetGroup) {
+          targetGroup = {
+            id: variantId || `reuse-${idx}-${Date.now()}`,
+            variantId: variantId,
             color: colorLabel,
             xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
           };
+          colorGroups[colorLabel].push(targetGroup);
         }
-        const key = SIZE_ID_TO_KEY[item.sizeId];
-        if (key) grouped[colorLabel][key] = Number(item.quantity) || 0;
+
+        targetGroup[sizeKey] += (Number(item.quantity) || 0);
       });
-      setVariants(Object.values(grouped));
+      setVariants(Object.values(colorGroups).flat());
     }
 
     // 4. Templates
@@ -309,14 +329,38 @@ export default function CreateManualOrder() {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!customerData.customerName?.trim()) newErrors.customerName = 'Vui lòng nhập tên khách hàng';
-    if (!customerData.customerPhone?.trim()) newErrors.customerPhone = 'Vui lòng nhập số điện thoại';
-    if (!customerData.customerAddress?.trim()) newErrors.customerAddress = 'Vui lòng nhập địa chỉ';
+    if (!customerData.customerName?.trim()) {
+      newErrors.customerName = 'Vui lòng nhập tên khách hàng';
+    } else if (customerData.customerName.trim().length > 100) {
+      newErrors.customerName = 'Tên khách hàng tối đa 100 ký tự';
+    }
+
+    if (!customerData.customerPhone?.trim()) {
+      newErrors.customerPhone = 'Vui lòng nhập số điện thoại';
+    } else if (customerData.customerPhone.trim().length > 20) {
+      newErrors.customerPhone = 'Số điện thoại tối đa 20 ký tự';
+    }
+
+    if (!customerData.province) {
+      newErrors.province = 'Vui lòng chọn Tỉnh/Thành phố';
+    }
+    if (!customerData.ward) {
+      newErrors.ward = 'Vui lòng chọn Phường/Xã';
+    }
+
+    if (!customerData.customerAddress?.trim()) {
+      newErrors.customerAddress = 'Vui lòng nhập địa chỉ';
+    } else if (customerData.customerAddress.trim().length > 255) {
+      newErrors.customerAddress = 'Tổng địa chỉ không được vượt quá 255 ký tự';
+    }
 
     if (!orderImageFile && !orderData.image) newErrors.image = 'Vui lòng chọn ảnh đơn hàng';
-    if (!orderData.orderName?.trim()) newErrors.orderName = 'Tên đơn hàng không được để trống';
-    else if (orderData.orderName.trim().length < 3 || orderData.orderName.trim().length > 50) {
-      newErrors.orderName = 'Tên đơn hàng phải từ 3 đến 50 ký tự';
+    if (!orderData.orderName?.trim()) {
+      newErrors.orderName = 'Tên đơn hàng không được để trống';
+    } else if (orderData.orderName.trim().length < 3) {
+      newErrors.orderName = 'Tên đơn hàng phải có ít nhất 3 ký tự';
+    } else if (orderData.orderName.trim().length > 100) {
+      newErrors.orderName = 'Tên đơn hàng không được vượt quá 100 ký tự';
     }
 
     // VARIANTS
@@ -324,7 +368,19 @@ export default function CreateManualOrder() {
     let hasAnyQuantity = false;
     variants.forEach((v, idx) => {
       const vErrs = {};
-      if (!v.color?.trim()) vErrs.color = 'Vui lòng nhập tên màu';
+      if (!v.color?.trim()) {
+        vErrs.color = 'Vui lòng nhập tên màu';
+      } else if (v.color.trim().length > 30) {
+        vErrs.color = 'Tên màu tối đa 30 ký tự';
+      }
+
+      ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(size => {
+        const val = Number(v[size]) || 0;
+        if (val > 9999) {
+          vErrs[size] = 'Tối đa 9999';
+        }
+      });
+
       const sumSize = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
       if (sumSize > 0) hasAnyQuantity = true;
       if (Object.keys(vErrs).length > 0) variantErrors[idx] = vErrs;
@@ -332,10 +388,26 @@ export default function CreateManualOrder() {
 
     if (variantErrors.length > 0) newErrors.variants = variantErrors;
     if (!hasAnyQuantity) newErrors.variantsGlobal = 'Vui lòng nhập ít nhất một kích thước có số lượng > 0';
-    if (orderData.quantity <= 0) newErrors.quantity = 'Số lượng sản xuất phải lớn hơn 0';
-    if (orderData.cpu < 0) newErrors.cpu = 'Chi phí đơn vị không được âm';
-    if (orderData.cpu !== '' && Number(orderData.cpu) < 10) {
-      newErrors.cpu = 'Giá / sản phẩm phải từ 10 trở lên';
+    if (orderData.quantity === '' || isNaN(orderData.quantity)) {
+      newErrors.quantity = 'Số lượng sản xuất không được để trống';
+    } else {
+      const qty = Number(orderData.quantity);
+      if (!Number.isInteger(qty)) {
+        newErrors.quantity = 'Số lượng phải là số nguyên';
+      } else if (qty < 10) {
+        newErrors.quantity = 'Số lượng sản xuất tối thiểu là 10 sản phẩm';
+      } else if (qty > 9999) {
+        newErrors.quantity = 'Số lượng sản xuất tối đa là 9999 sản phẩm';
+      }
+    }
+
+    if (orderData.cpu === '' || isNaN(orderData.cpu)) {
+      newErrors.cpu = 'Giá / sản phẩm không được để trống';
+    } else {
+      const cpu = Number(orderData.cpu);
+      if (cpu < 1000 || cpu > 10000000) {
+        newErrors.cpu = 'Giá / sản phẩm phải từ 1.000 VND đến 10.000.000 VND';
+      }
     }
 
     if (!orderData.startDate) {
@@ -352,6 +424,26 @@ export default function CreateManualOrder() {
       newErrors.endDate = 'Ngày kết thúc không được trước ngày bắt đầu';
     }
 
+    // TEMPLATES VALIDATION
+    if (templateItems.length > 0) {
+      const templateErrors = [];
+      templateItems.forEach((t, idx) => {
+        const tErrs = {};
+        if (t.templateName && t.templateName.length > 100) {
+          tErrs.templateName = 'Tên mẫu tối đa 100 ký tự';
+        }
+        if (t.note && t.note.length > 100) {
+          tErrs.note = 'Ghi chú tối đa 100 ký tự';
+        }
+        if (Object.keys(tErrs).length > 0) {
+          templateErrors[idx] = tErrs;
+        }
+      });
+      if (templateErrors.length > 0) {
+        newErrors.templates = templateErrors;
+      }
+    }
+
     // MATERIALS VALIDATION
     if (materials.length > 0) {
       const materialErrors = [];
@@ -359,13 +451,26 @@ export default function CreateManualOrder() {
         const mErrs = {};
         if (!m.materialName?.trim()) {
           mErrs.materialName = 'Tên vật liệu là bắt buộc';
+        } else if (m.materialName.trim().length > 150) {
+          mErrs.materialName = 'Tên vật liệu tối đa 150 ký tự';
         }
+
+        if (m.color && m.color.length > 30) {
+          mErrs.color = 'Màu sắc tối đa 30 ký tự';
+        }
+
         if (!m.value || isNaN(m.value) || Number(m.value) <= 0) {
           mErrs.value = 'Số lượng phải lớn hơn 0';
+        } else if (Number(m.value) > 99999) {
+          mErrs.value = 'Số lượng tối đa 99.999';
         }
+
         if (!m.uom?.trim()) {
           mErrs.uom = 'Đơn vị tính là bắt buộc';
+        } else if (m.uom.trim().length > 50) {
+          mErrs.uom = 'Đơn vị tính tối đa 50 ký tự';
         }
+
         if (Object.keys(mErrs).length > 0) {
           materialErrors[idx] = mErrs;
         }
@@ -398,6 +503,8 @@ export default function CreateManualOrder() {
     let { name, value } = e.target;
     if (name === 'quantity' || name === 'cpu') {
       value = value.replace(/[^0-9]/g, '');
+      if (name === 'cpu' && value.length > 8) value = value.slice(0, 8);
+      if (name === 'quantity' && value.length > 4) value = value.slice(0, 4);
     }
     const finalValue = (name === 'quantity' || name === 'cpu')
       ? (value === '' ? '' : Number(value))
@@ -810,6 +917,8 @@ export default function CreateManualOrder() {
                   error={errors.customerName}
                   placeholder="Ví dụ: Nguyễn Văn A"
                   required
+                  maxLength={100}
+                  showCounter
                 />
                 <OrderInput
                   label="Số điện thoại"
@@ -819,6 +928,8 @@ export default function CreateManualOrder() {
                   error={errors.customerPhone}
                   placeholder="Ví dụ: 0901 234 567"
                   required
+                  maxLength={20}
+                  showCounter
                 />
               </div>
 
@@ -836,6 +947,14 @@ export default function CreateManualOrder() {
                     onChange={(e) => {
                       const p = provinces.find(x => String(x.code) === String(e.target.value));
                       setCustomerData(prev => ({ ...prev, province: p, ward: null }));
+                      if (errors.province || errors.customerAddress) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.province;
+                          delete next.customerAddress;
+                          return next;
+                        });
+                      }
                     }}
                     placeholder="Chọn Tỉnh/Thành"
                     error={errors.province}
@@ -848,6 +967,14 @@ export default function CreateManualOrder() {
                     onChange={(e) => {
                       const w = wards.find(x => String(x.code) === String(e.target.value));
                       setCustomerData(prev => ({ ...prev, ward: w }));
+                      if (errors.ward || errors.customerAddress) {
+                        setErrors(prev => {
+                          const next = { ...prev };
+                          delete next.ward;
+                          delete next.customerAddress;
+                          return next;
+                        });
+                      }
                     }}
                     placeholder="Chọn Phường/Xã"
                     error={errors.ward}
@@ -857,16 +984,35 @@ export default function CreateManualOrder() {
                 </div>
 
                 <OrderInput
-                  label="Địa chỉ chi tiết"
+                  label="Địa chỉ chi tiết (Số nhà, tên đường...)"
                   name="detail"
                   value={customerData.detail}
-                  onChange={(e) => setCustomerData(p => ({ ...p, detail: e.target.value }))}
+                  onChange={(e) => {
+                    handleCustomerChange(e);
+                    if (errors.customerAddress) {
+                      setErrors(prev => {
+                        const next = { ...prev };
+                        delete next.customerAddress;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="Số nhà, tên đường, tòa nhà..."
+                  maxLength={150}
+                  showCounter
                 />
 
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 italic">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Xem trước địa chỉ hợp nhất (2025):</p>
-                  <p className="text-xs font-bold text-slate-600">{customerData.customerAddress || "—"}</p>
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Xem trước địa chỉ hợp nhất (2025):</p>
+                    <span className={`text-[10px] font-bold ${customerData.customerAddress?.length > 255 ? 'text-red-500' : 'text-slate-500'}`}>
+                      {customerData.customerAddress?.length || 0}/255
+                    </span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-600 break-words">{customerData.customerAddress || "—"}</p>
+                  {customerData.customerAddress?.length > 255 && (
+                    <p className="text-[9px] text-red-500 font-bold mt-1 uppercase tracking-tighter">Địa chỉ quá dài, vui lòng rút ngắn phần địa chỉ chi tiết</p>
+                  )}
                 </div>
               </div>
             </div>

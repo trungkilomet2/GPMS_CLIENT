@@ -35,7 +35,7 @@ export default function ProductionList() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [onlyMyOrders, setOnlyMyOrders] = useState(isWorker || isPm); // Default true for workers/PMs to show assigned items first
+
   const [involvedProdIds, setInvolvedProdIds] = useState(() => {
     try {
       const saved = localStorage.getItem(`involved_prods_${currentUserId}`);
@@ -56,20 +56,14 @@ export default function ProductionList() {
     // If not PM and not Worker, we show everything (fallback)
     if (!isPm && !isWorker) return productions;
 
-    // Toggle off: see everything
-    if (!onlyMyOrders) return productions;
-
-    // Toggle on: see only main PM orders or those where you are involved
+    // For PM and Worker, only show main PM orders or those where you are involved
     const uid = String(currentUserId);
     return productions.filter((item) => {
-      // If "My Orders" is off, show everything
-      if (!onlyMyOrders) return true;
-
       const isMainPm = String(getPmId(item)) === uid;
       const isPartAssignee = involvedProdIds.has(item.productionId);
       return isMainPm || isPartAssignee;
     });
-  }, [productions, isOwner, isPm, currentUserId, involvedProdIds, onlyMyOrders]);
+  }, [productions, isOwner, isPm, isWorker, currentUserId, involvedProdIds]);
 
 
 
@@ -318,22 +312,7 @@ export default function ProductionList() {
                 </select>
               </label>
 
-              {isPm && !isOwner && !isWorker && (
-                <div className="flex items-center gap-3 h-[45px] pb-1">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={onlyMyOrders}
-                        onChange={(e) => setOnlyMyOrders(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-10 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                    </div>
-                    <span className="text-sm font-medium text-slate-600">Chỉ đơn của tôi</span>
-                  </label>
-                </div>
-              )}
+
 
               <div className="flex items-center justify-end gap-3 h-[45px] pb-1">
                 {(search || statusFilter !== "all") && (

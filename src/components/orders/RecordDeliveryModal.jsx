@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Edit3, Truck, CheckCircle, Loader2, Info } from 'lucide-react';
 import ProductionPartService from '@/services/ProductionPartService';
+import ProductionService from '@/services/ProductionService'; // Import để gọi confirmDelivery
 import { toast } from 'react-toastify';
 
 export default function RecordDeliveryModal({
@@ -8,9 +9,9 @@ export default function RecordDeliveryModal({
     onClose,
     orderId,
     productionId,
-    variants = [],
     deliveries = [],
-    onRefresh
+    onRefresh,
+    isManualOrder = false // Thêm prop để nhận biết đơn thủ công
 }) {
     const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
     const [planningData, setPlanningData] = useState([]);
@@ -40,16 +41,7 @@ export default function RecordDeliveryModal({
     useEffect(() => {
         if (!planningData.length) return;
 
-        const isAutoConfirmed = (dateStr) => {
-            if (!dateStr) return false;
-            try {
-                const dDate = new Date(dateStr);
-                if (isNaN(dDate.getTime())) return false;
-                const now = new Date();
-                const diffDays = Math.floor((now - dDate) / (1000 * 60 * 60 * 24));
-                return diffDays >= 3;
-            } catch (e) { return false; }
-        };
+
 
         const mapped = planningData.map(item => {
             const osId = String(item.orderSizeId);
@@ -108,7 +100,7 @@ export default function RecordDeliveryModal({
             .map(item => ({
                 orderSizeId: item.id,
                 deliverQuantity: item.quantity,
-                deliverStatusId: 1 // Default status for new delivery
+                deliverStatusId: isManualOrder ? 3 : 1 // Nếu là đơn thủ công thì xong luôn (Status 3)
             }));
 
         if (deliveryDetails.length === 0) {
@@ -122,7 +114,29 @@ export default function RecordDeliveryModal({
 
         try {
             setIsSubmitting(true);
-            await ProductionPartService.recordDelivery(orderId, payload);
+            const res = await ProductionPartService.recordDelivery(orderId, payload);
+            
+            // XỬ LÝ RIÊNG CHO ĐƠN THỦ CÔNG: Tự động xác nhận luôn
+            if (isManualOrder) {
+                try {
+                    // Lấy lịch sử để có ID của các đợt giao vừa tạo
+                    const historyRes = await ProductionPartService.getDeliveryHistory(orderId);
+                    const history = historyRes?.data?.data || historyRes?.data || [];
+                    
+                    // Tìm các đợt giao đang chờ xác nhận (Status 1)
+                    const pendingDeliveries = history.filter(d => Number(d.deliverStatusId) === 1);
+                    
+                    // Xác nhận "Yes" cho từng cái
+                    if (pendingDeliveries.length > 0) {
+                        await Promise.all(pendingDeliveries.map(d => 
+                            ProductionService.confirmDelivery(d.id || d.deliverId, "Yes")
+                        ));
+                    }
+                } catch (confirmErr) {
+                    console.error("Lỗi tự động xác nhận đơn thủ công:", confirmErr);
+                }
+            }
+
             toast.success('Đã ghi nhận đợt giao hàng thành công!');
             if (onRefresh) onRefresh();
             onClose();

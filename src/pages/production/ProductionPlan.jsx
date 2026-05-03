@@ -822,8 +822,6 @@ export default function ProductionPlan() {
         cpu: Number(row?.cpu || 0),
         statusId: Number(row?.statusId || 1),
       }));
-      console.log("payload: ", payload)
-      // Replace all parts in bulk as create-parts handles deletion of old ones
       if (payload.length > 0) {
         await ProductionPartService.createParts(productionId, { parts: payload });
       }

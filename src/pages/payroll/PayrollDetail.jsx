@@ -2,7 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { ArrowLeft, Package, Calendar, TrendingUp, Info, Loader2, CreditCard, Filter, CheckCircle2, AlertCircle } from "lucide-react";
 import PmOwnerLayout from "@/layouts/PmOwnerLayout";
-import { fetchAggregatedPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
+import { fetchAggregatedPayroll, fetchWorkerPayroll, getWorkerMonthlyDetail } from "@/utils/payrollUtils";
 import { getErrorMessage } from "@/utils/errorUtils";
 import ProductionPartService from "@/services/ProductionPartService";
 import Pagination from "@/components/Pagination";
@@ -26,6 +26,7 @@ export default function PayrollDetail() {
   const [month] = useState(initialMonth);
   const [year] = useState(initialYear);
   const [logs, setLogs] = useState(location.state?.logs || []);
+  const [workerName, setWorkerName] = useState(location.state?.workerName || "");
   const [loading, setLoading] = useState(!location.state?.logs);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -44,10 +45,10 @@ export default function PayrollDetail() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const aggregated = await fetchAggregatedPayroll(month, year);
-        const workerData = aggregated.find(w => String(w.userId || w.workerName) === String(workerId));
+        const workerData = await fetchWorkerPayroll(workerId, Number(month), Number(year));
         if (active) {
           setLogs(workerData?.logs || []);
+          if (workerData?.workerName) setWorkerName(workerData.workerName);
         }
       } catch (err) {
         if (active) {
@@ -131,9 +132,9 @@ export default function PayrollDetail() {
 
   const workerLogs = useMemo(() => {
     // Sort by reportDate descending (latest first)
-    const detailedLogs = getWorkerMonthlyDetail(logs, workerId, month, year);
-    return [...detailedLogs].sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
-  }, [logs, workerId, month, year]);
+    if (!Array.isArray(logs)) return [];
+    return [...logs].sort((a, b) => new Date(b.reportDate) - new Date(a.reportDate));
+  }, [logs]);
 
   const filteredLogs = useMemo(() => {
     if (statusFilter === "all") return workerLogs;
@@ -160,9 +161,9 @@ export default function PayrollDetail() {
     const totalUnpaid = Math.max(0, totalSalary - totalPaid);
 
     const firstLog = workerLogs[0];
-    const workerName = firstLog?.workerFullName || firstLog?.workerName || workerId;
+    const displayName = workerName || firstLog?.workerFullName || firstLog?.workerName || `Thợ #${workerId}`;
     const workerAvatar = firstLog?.workerAvatar || null;
-    return { totalQty, uniquePartCount, totalSalary, totalPaid, totalUnpaid, workerName, workerAvatar };
+    return { totalQty, uniquePartCount, totalSalary, totalPaid, totalUnpaid, workerName: displayName, workerAvatar };
   }, [workerLogs, workerId]);
 
   const totalPages = Math.ceil(filteredLogs.length / pageSize);
@@ -391,7 +392,7 @@ export default function PayrollDetail() {
                             </div>
                           </td>
                           <td className="px-6 py-5">
-                            <div className="font-extrabold text-slate-900 line-clamp-1 italic text-sm">{log.orderName}</div>
+                            <div className="font-extrabold text-slate-900 line-clamp-1 italic text-sm cursor-help" title={log.orderName}>{log.orderName}</div>
                             <Link
                               to={`/production/${log.productionId}`}
                               state={{ from: location.pathname }}
@@ -402,7 +403,7 @@ export default function PayrollDetail() {
                             </Link>
                           </td>
                           <td className="px-6 py-5">
-                            <div className="font-bold text-slate-700">{log.partName}</div>
+                            <div className="font-bold text-slate-700 cursor-help" title={log.partName}>{log.partName}</div>
                             {log.variantName && log.variantName !== " / " && (
                               <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">
                                 {log.variantName}
@@ -528,7 +529,7 @@ export default function PayrollDetail() {
       <SuccessModal
         isOpen={isSuccessOpen}
         title="Thanh toán thành công"
-        description={`Đã xác nhận thanh toán cho toàn bộ công đoạn trong tháng của ${stats.workerName}.`}
+        description={`Đã thanh toán thành công.`}
         primaryLabel="Đóng"
         onPrimary={() => setIsSuccessOpen(false)}
         onClose={() => setIsSuccessOpen(false)}

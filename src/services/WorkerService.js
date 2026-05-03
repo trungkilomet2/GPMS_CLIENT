@@ -17,14 +17,14 @@ export const getEmployeeModuleErrorMessage = getErrorMessage;
 const parseApiPayload = (rawResponse) =>
   typeof rawResponse === "string"
     ? (() => {
-        // Some endpoints return `text/plain` even on success.
-        // Don't throw on JSON parse failures; treat the string as a successful payload.
-        try {
-          return JSON.parse(rawResponse);
-        } catch {
-          return { data: rawResponse };
-        }
-      })()
+      // Some endpoints return `text/plain` even on success.
+      // Don't throw on JSON parse failures; treat the string as a successful payload.
+      try {
+        return JSON.parse(rawResponse);
+      } catch {
+        return { data: rawResponse };
+      }
+    })()
     : rawResponse ?? {};
 
 const normalizeEmployeeStatus = (value, statusId) => {
@@ -92,10 +92,10 @@ const normalizeEmployee = (item = {}) => {
   const parsedManagerId = Number(managerIdRaw);
   const managerId =
     managerIdRaw === null ||
-    managerIdRaw === undefined ||
-    managerIdRaw === "" ||
-    !Number.isFinite(parsedManagerId) ||
-    parsedManagerId <= 0
+      managerIdRaw === undefined ||
+      managerIdRaw === "" ||
+      !Number.isFinite(parsedManagerId) ||
+      parsedManagerId <= 0
       ? null
       : parsedManagerId;
   const managerName = String(
@@ -170,9 +170,9 @@ const normalizeEmployeeResponse = (response = {}) => {
 const getCollectionMeta = (response = {}) => {
   const recordCount = Number(
     response?.recordCount ??
-      response?.totalCount ??
-      response?.totalRecords ??
-      response?.count
+    response?.totalCount ??
+    response?.totalRecords ??
+    response?.count
   );
 
   return {
@@ -343,30 +343,67 @@ const WorkerService = {
   },
 
   async getEmployeeDirectory(options = {}) {
-    const employees = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, options);
+    const currentUser = getStoredUser();
+    const primaryRole = pickPrimarySystemRole(currentUser?.role ?? currentUser?.roles ?? "");
 
-    return {
-      data: employees,
-      pageIndex: 0,
-      pageSize: employees.length,
-      recordCount: employees.length,
-    };
+    try {
+      let employees;
+      if (primaryRole === "PM") {
+        employees = await fetchEmployeesByPmPages(options);
+      } else {
+        employees = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, options);
+      }
+
+      return {
+        data: employees,
+        pageIndex: 0,
+        pageSize: employees.length,
+        recordCount: employees.length,
+      };
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        return { data: [], pageIndex: 0, pageSize: 0, recordCount: 0 };
+      }
+      throw error;
+    }
   },
 
   async getManagerDirectory(options = {}) {
-    const users = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, {
-      ...options,
-      includeHidden: true,
-    });
-    const currentOwner = buildCurrentOwnerManager();
-    const managers = currentOwner ? dedupeEmployees([currentOwner, ...users]) : users;
+    const currentUser = getStoredUser();
+    const primaryRole = pickPrimarySystemRole(currentUser?.role ?? currentUser?.roles ?? "");
 
-    return {
-      data: managers,
-      pageIndex: 0,
-      pageSize: managers.length,
-      recordCount: managers.length,
-    };
+    try {
+      let users;
+      if (primaryRole === "PM") {
+        users = await fetchEmployeesByPmPages({ ...options, includeHidden: true });
+      } else {
+        users = await fetchEmployeePages(API_ENDPOINTS.WORKER.GET_ALL_EMPLOYEES, {
+          ...options,
+          includeHidden: true,
+        });
+      }
+
+      const currentOwner = buildCurrentOwnerManager();
+      const managers = currentOwner ? dedupeEmployees([currentOwner, ...users]) : users;
+
+      return {
+        data: managers,
+        pageIndex: 0,
+        pageSize: managers.length,
+        recordCount: managers.length,
+      };
+    } catch (error) {
+      if (error?.response?.status === 403) {
+        const currentOwner = buildCurrentOwnerManager();
+        return {
+          data: currentOwner ? [currentOwner] : [],
+          pageIndex: 0,
+          pageSize: currentOwner ? 1 : 0,
+          recordCount: currentOwner ? 1 : 0,
+        };
+      }
+      throw error;
+    }
   },
 
   async getEmployeesByPmId(params, options = {}) {
@@ -416,12 +453,12 @@ const WorkerService = {
       const rawPayload = await response.text().catch(() => "");
       const parsedPayload = rawPayload
         ? (() => {
-            try {
-              return JSON.parse(rawPayload);
-            } catch {
-              return rawPayload;
-            }
-          })()
+          try {
+            return JSON.parse(rawPayload);
+          } catch {
+            return rawPayload;
+          }
+        })()
         : {};
 
       if (!response.ok) {

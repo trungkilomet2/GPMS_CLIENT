@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle, Save } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -11,6 +11,8 @@ import SuccessModal from '@/components/SuccessModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import '@/styles/homepage.css';
 import '@/styles/leave.css';
+import { normalizeOrderStatus } from '@/lib/orders/status';
+import { getOrderCustomerId } from '@/lib/orders/customerInfo';
 
 export default function EditOrder() {
     const getUserId = () => {
@@ -120,21 +122,45 @@ export default function EditOrder() {
         if (Array.isArray(rawSizes) && rawSizes.length > 0) {
             const grouped = {};
             const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
+            
+            // Map of color -> array of group objects (to handle multiple rows per color)
+            const colorGroups = {};
+
             rawSizes.forEach((item, idx) => {
                 const colorLabel = item.color || item.Color || 'Mặc định';
-                if (!grouped[colorLabel]) {
-                    grouped[colorLabel] = {
-                        id: `variant-${idx}-${Date.now()}`,
+                const sizeKey = SIZE_ID_TO_KEY[item.sizeId];
+                if (!sizeKey) return;
+
+                const variantId = item.orderDetailId || item.orderDetailID || item.order_detail_id || item.variantId || item.orderVariantId || '';
+                
+                if (!colorGroups[colorLabel]) {
+                    colorGroups[colorLabel] = [];
+                }
+
+                // Find a group for this color that:
+                // 1. Matches the variantId (if provided)
+                // 2. OR doesn't have this size yet (if no variantId, we use smart occupancy check)
+                let targetGroup = colorGroups[colorLabel].find(g => {
+                    if (variantId && g.variantId === variantId) return true;
+                    if (!variantId && !g.variantId && g[sizeKey] === 0) return true;
+                    return false;
+                });
+
+                if (!targetGroup) {
+                    targetGroup = {
+                        id: variantId || `variant-${idx}-${Date.now()}`,
+                        variantId: variantId,
                         color: colorLabel,
                         xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
                     };
+                    colorGroups[colorLabel].push(targetGroup);
                 }
-                const key = SIZE_ID_TO_KEY[item.sizeId];
-                if (key) {
-                    grouped[colorLabel][key] = Number(item.quantity) || 0;
-                }
+
+                targetGroup[sizeKey] += (Number(item.quantity) || 0);
             });
-            parsedVariants = Object.values(grouped);
+
+            // Flatten the map of arrays into a single list of variants
+            parsedVariants = Object.values(colorGroups).flat();
         } else if (Array.isArray(horizontalVariants) && horizontalVariants.length > 0) {
             parsedVariants = horizontalVariants.map((v, idx) => ({
                 id: v.id || idx + 1,
@@ -250,9 +276,20 @@ export default function EditOrder() {
         }
     };
 
+    const hasToastedRef = useRef(false);
+
     useEffect(() => {
         const prefill = location?.state?.order;
         if (prefill) {
+            const status = normalizeOrderStatus(prefill.statusName || prefill.status);
+            if (status !== 'Yêu cầu chỉnh sửa') {
+                if (!hasToastedRef.current) {
+                    toast.error('Chỉ có thể chỉnh sửa đơn hàng ở trạng thái Yêu cầu chỉnh sửa.');
+                    hasToastedRef.current = true;
+                }
+                navigate('/orders');
+                return;
+            }
             applyOrderData(prefill);
             setIsFetching(false);
         } else {
@@ -261,10 +298,34 @@ export default function EditOrder() {
                     setIsFetching(true);
                     const response = await OrderService.getOrderDetail(id);
                     const data = response?.data?.data || response?.data || {};
+                    
+                    const status = normalizeOrderStatus(data.statusName || data.status);
+                    if (status !== 'Yêu cầu chỉnh sửa') {
+                        if (!hasToastedRef.current) {
+                            toast.error('Chỉ có thể chỉnh sửa đơn hàng ở trạng thái Yêu cầu chỉnh sửa.');
+                            hasToastedRef.current = true;
+                        }
+                        navigate('/orders');
+                        return;
+                    }
+
+                    const ownerId = getOrderCustomerId(data);
+                    if (userId && ownerId && String(userId) !== String(ownerId)) {
+                        if (!hasToastedRef.current) {
+                            toast.error('Bạn không có quyền chỉnh sửa đơn hàng này.');
+                            hasToastedRef.current = true;
+                        }
+                        navigate('/orders');
+                        return;
+                    }
+
                     applyOrderData(data);
                 } catch (error) {
                     console.error('Lỗi khi tải chi tiết đơn hàng:', error);
-                    toast.error('Không thể tải thông tin đơn hàng.');
+                    if (!hasToastedRef.current) {
+                        toast.error('Không thể tải thông tin đơn hàng.');
+                        hasToastedRef.current = true;
+                    }
                     navigate('/orders');
                 } finally {
                     setIsFetching(false);

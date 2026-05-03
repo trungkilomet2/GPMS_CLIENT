@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -24,10 +24,12 @@ export default function CreateOrder() {
   const userId = getUserId();
   const navigate = useNavigate();
   const location = useLocation();
+  const reuseRef = useRef(false);
 
   useEffect(() => {
     const reuse = location.state?.reuseOrder;
-    if (!reuse) return;
+    if (!reuse || reuseRef.current) return;
+    reuseRef.current = true;
 
     // 1. Basic Info
     setOrderData(prev => ({
@@ -55,21 +57,38 @@ export default function CreateOrder() {
     // 3. Size / Variants Mapping (Matrix Conversion)
     const rawSizes = reuse.sizes || reuse.size || [];
     if (Array.isArray(rawSizes) && rawSizes.length > 0) {
-      const grouped = {};
+      const colorGroups = {};
       const SIZE_ID_TO_KEY = { 1: 'xs', 2: 's', 3: 'm', 4: 'l', 5: 'xl', 6: '2xl', 7: '3xl' };
       rawSizes.forEach((item, idx) => {
-        const colorLabel = item.color || 'Mặc định';
-        if (!grouped[colorLabel]) {
-          grouped[colorLabel] = {
-            id: `reuse-${idx}-${Date.now()}`,
+        const colorLabel = item.color || item.Color || 'Mặc định';
+        const sizeKey = SIZE_ID_TO_KEY[item.sizeId];
+        if (!sizeKey) return;
+
+        const variantId = item.orderDetailId || item.orderDetailID || item.order_detail_id || item.variantId || item.orderVariantId || '';
+        
+        if (!colorGroups[colorLabel]) {
+          colorGroups[colorLabel] = [];
+        }
+
+        let targetGroup = colorGroups[colorLabel].find(g => {
+          if (variantId && g.variantId === variantId) return true;
+          if (!variantId && !g.variantId && g[sizeKey] === 0) return true;
+          return false;
+        });
+
+        if (!targetGroup) {
+          targetGroup = {
+            id: variantId || `reuse-${idx}-${Date.now()}`,
+            variantId: variantId,
             color: colorLabel,
             xs: 0, s: 0, m: 0, l: 0, xl: 0, '2xl': 0, '3xl': 0
           };
+          colorGroups[colorLabel].push(targetGroup);
         }
-        const key = SIZE_ID_TO_KEY[item.sizeId];
-        if (key) grouped[colorLabel][key] = Number(item.quantity) || 0;
+
+        targetGroup[sizeKey] += (Number(item.quantity) || 0);
       });
-      setVariants(Object.values(grouped));
+      setVariants(Object.values(colorGroups).flat());
     }
 
     // 4. Templates
@@ -249,7 +268,17 @@ export default function CreateOrder() {
       const vErrs = {};
       if (!v.color?.trim()) {
         vErrs.color = 'Vui lòng nhập tên màu';
+      } else if (v.color.trim().length > 30) {
+        vErrs.color = 'Tên màu tối đa 30 ký tự';
       }
+
+      ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].forEach(size => {
+        const val = Number(v[size]) || 0;
+        if (val > 9999) {
+          vErrs[size] = 'Tối đa 9999';
+        }
+      });
+
       const sum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, size) => s + (Number(v[size]) || 0), 0);
       if (sum > 0) hasAnyQuantity = true;
 
@@ -384,6 +413,8 @@ export default function CreateOrder() {
     let { name, value } = e.target;
     if (name === 'quantity' || name === 'cpu') {
       value = value.replace(/[^0-9]/g, '');
+      if (name === 'cpu' && value.length > 8) value = value.slice(0, 8);
+      if (name === 'quantity' && value.length > 4) value = value.slice(0, 4);
     }
     const finalValue = (name === 'quantity' || name === 'cpu' || name === 'userId')
       ? (value === '' ? '' : Number(value))

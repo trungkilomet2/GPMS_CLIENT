@@ -10,13 +10,7 @@ import { getAuthItem, getStoredUser } from "@/lib/authStorage";
 import { hasAnyRole } from "@/lib/internalRoleFlow";
 import "@/styles/homepage.css";
 import "@/styles/leave.css";
-
-const SEVERITIES = [
-  { value: 1, label: "Thấp" },
-  { value: 2, label: "Trung bình" },
-  { value: 3, label: "Cao" },
-  { value: 4, label: "Nghiêm trọng" },
-];
+import ConfirmModal from "@/components/ConfirmModal";
 
 const ERROR_TYPES = [
   { value: 0, label: "Lỗi công đoạn" },
@@ -63,8 +57,7 @@ const mapPart = (part, fallbackProductionId) => ({
   partOrderSizeId: part?.partOrderSizeId ?? part?.orderSizeId ?? null,
 });
 
-const getPriorityBySeverity = (severity) =>
-  SEVERITIES.find((item) => item.value === severity)?.priority ?? 2;
+const getPriorityBySeverity = (severity) => 2;
 
 const getErrorTypeLabel = (value) =>
   ERROR_TYPES.find((item) => item.value === Number(value))?.label ?? value;
@@ -90,6 +83,7 @@ export default function ErrorReport() {
       errorType: assignment?.errorType ?? 0,
       otherErrorDetail: assignment?.otherErrorDetail ?? "",
       happenAt: assignment?.happenAt ?? "",
+      maxQuantity: assignment?.maxQuantity ?? null,
     };
   }, [assignment]);
 
@@ -115,7 +109,6 @@ export default function ErrorReport() {
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
   const [notice, setNotice] = useState("");
-  const [submitError, setSubmitError] = useState("");
   const [attachments, setAttachments] = useState([]);
 
   const [productions, setProductions] = useState([]);
@@ -124,6 +117,7 @@ export default function ErrorReport() {
   const [loadingParts, setLoadingParts] = useState(false);
   const [partsError, setPartsError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const isProductionLocked = Boolean(normalizedAssignment?.productionId);
   const isPartLocked = Boolean(normalizedAssignment?.partId);
@@ -336,6 +330,7 @@ export default function ErrorReport() {
     };
   }, [form.partOrderSizeId]);
 
+
   const productionOptions = useMemo(() => {
     const map = new Map();
 
@@ -379,6 +374,7 @@ export default function ErrorReport() {
         sizeName: normalizedAssignment.sizeName,
         startDate: normalizedAssignment.startDate,
         endDate: normalizedAssignment.endDate,
+        maxQuantity: normalizedAssignment.maxQuantity,
       };
     }
 
@@ -387,6 +383,20 @@ export default function ErrorReport() {
 
   const handleChange = (field, value) => {
     setForm((prev) => {
+      if (field === "quantity") {
+        const val = value.replace(/\D/g, ""); // Only allow digits
+        if (!val) return { ...prev, [field]: "" };
+        const num = Number(val);
+        const maxQty = selectedPart?.maxQuantity ?? normalizedAssignment?.maxQuantity;
+
+        // If there's a max limit, clamp the value
+        if (maxQty !== null && num > maxQty) {
+          toast.warn(`Số lượng tối đa cho phép là ${maxQty}`, { toastId: "max-qty-warn" });
+          return { ...prev, [field]: String(maxQty) };
+        }
+        return { ...prev, [field]: val };
+      }
+
       const next = { ...prev, [field]: value };
 
       if (field === "errorType") {
@@ -484,7 +494,7 @@ export default function ErrorReport() {
     }));
 
     setNotice("");
-    setSubmitError("");
+    setNotice("");
 
     attachments.forEach((item) => {
       if (item?.preview) URL.revokeObjectURL(item.preview);
@@ -495,7 +505,6 @@ export default function ErrorReport() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setNotice("");
-    setSubmitError("");
 
     const productionId = String(form.productionId || "").trim();
     const partId = String(form.partId || "").trim();
@@ -514,43 +523,70 @@ export default function ErrorReport() {
     }
 
     if (!productionId) {
-      setSubmitError("Vui lòng chọn đơn sản xuất.");
+      toast.error("Vui lòng chọn đơn sản xuất.");
       return;
     }
     if (!partId) {
-      setSubmitError("Vui lòng chọn công đoạn tương ứng với loại lỗi.");
+      toast.error("Vui lòng chọn công đoạn tương ứng với loại lỗi.");
       return;
     }
     if (employees.length === 0 && !loadingEmployees) {
-      setSubmitError("Công đoạn này chưa được phân công thợ, không thể báo cáo lỗi.");
+      toast.error("Công đoạn này chưa được phân công thợ, không thể báo cáo lỗi.");
       return;
     }
     if (!title) {
       const titleLabel = typeNum === 3 ? "mô tả chi tiết lỗi" : "tiêu đề lỗi";
-      setSubmitError(`Vui lòng nhập ${titleLabel}.`);
+      toast.error(`Vui lòng nhập ${titleLabel}.`);
       return;
     }
     const qtyRaw = String(form.quantity || "").trim();
     if (qtyRaw) {
       const qty = Number(qtyRaw);
       if (!Number.isFinite(qty) || qty < 0) {
-        setSubmitError("Số lượng lỗi không hợp lệ.");
+        toast.error("Số lượng lỗi không hợp lệ.");
         return;
       }
+      // Validate quantity against maxQuantity
+      const maxQty = selectedPart?.maxQuantity ?? normalizedAssignment?.maxQuantity;
+      if (maxQty !== null && qty > maxQty) {
+        toast.error(`Số lượng lỗi (${qty}) không được vượt quá số lượng được giao (${maxQty}).`);
+        return;
+      }
+    } else {
+      setSubmitError("Vui lòng nhập số lượng lỗi.");
+      return;
     }
 
     const assignedTo = Number(form.assignedTo);
     if (!assignedTo) {
-      setSubmitError("Vui lòng chọn nhân viên liên quan.");
+      toast.error("Vui lòng chọn nhân viên liên quan.");
       return;
     }
 
-    const priority = Number(form.severity || 2);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    if (isSubmitting) return;
+    setIsConfirmModalOpen(false);
+    const productionId = String(form.productionId || "").trim();
+    const partId = String(form.partId || "").trim();
+    const qtyRaw = String(form.quantity || "").trim();
+    const assignedTo = Number(form.assignedTo);
+    const typeNum = Number(form.errorType);
+
+    let title = String(form.title || "").trim();
+    if (!title) {
+      const typeLabel = getErrorTypeLabel(typeNum);
+      title = typeNum === 0 ? `${typeLabel}: ${selectedPart?.partName || `Mã #${partId}`}` : typeLabel;
+    }
+
+    const priority = 2; // Default priority
 
     const storedUser = getStoredUser() || {};
     const createdBy = Number(storedUser?.userId ?? storedUser?.id ?? getAuthItem("userId"));
     if (!Number.isFinite(createdBy) || createdBy <= 0) {
-      setSubmitError("Không xác định được người tạo báo lỗi. Vui lòng đăng nhập lại.");
+      toast.error("Không xác định được người tạo báo lỗi. Vui lòng đăng nhập lại.");
       return;
     }
 
@@ -605,18 +641,33 @@ export default function ErrorReport() {
       } else if (data?.message) {
         message = data.message;
       }
-      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const currentUser = getStoredUser();
+  const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
+  const canReport = hasAnyRole(roleValue, ["Owner", "PM"]);
+
   const LayoutComponent = useMemo(() => {
-    const roleValue = currentUser?.role ?? currentUser?.roles ?? currentUser?.roleName ?? "";
     if (hasAnyRole(roleValue, ["Owner", "PM"])) return OwnerLayout;
     return WorkerLayout;
-  }, [currentUser]);
+  }, [roleValue]);
+
+  if (!canReport) {
+    return (
+      <LayoutComponent>
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500">
+          <AlertTriangle className="text-rose-500 mb-6 animate-bounce" size={64} />
+          <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">Truy cập bị giới hạn</h2>
+          <p className="mt-2 text-sm font-medium max-w-md text-center">Chỉ có <strong>Chủ xưởng</strong> hoặc <strong>Quản lý (PM)</strong> mới có quyền báo cáo lỗi hỏng không thể sửa.</p>
+          <button onClick={() => navigate(-1)} className="mt-8 h-12 px-8 rounded-xl bg-slate-900 text-white font-bold uppercase text-[10px] tracking-widest hover:bg-black transition-all active:scale-95 shadow-lg">Quay lại</button>
+        </div>
+      </LayoutComponent>
+    );
+  }
 
   return (
     <LayoutComponent>
@@ -636,8 +687,8 @@ export default function ErrorReport() {
                 <AlertTriangle size={22} />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Báo cáo lỗi công đoạn</h1>
-                <p className="text-slate-600">Gửi sự cố trong quá trình sản xuất để tổ trưởng xử lý.</p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Báo cáo lỗi (Không thể sửa)</h1>
+                <p className="text-slate-600">Gửi báo cáo lỗi cho các sản phẩm hỏng không thể khắc phục.</p>
               </div>
             </div>
             <button
@@ -719,36 +770,30 @@ export default function ErrorReport() {
                 />
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-1">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi</label>
-                  <input
-                    value={form.quantity}
-                    onChange={(event) => handleChange("quantity", event.target.value)}
-                    placeholder="Ví dụ: 12"
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Mức độ lỗi</label>
-                  <select
-                    value={form.severity}
-                    onChange={(event) => handleChange("severity", Number(event.target.value))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
-                  >
-                    {SEVERITIES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Số lượng lỗi <span className="text-rose-500">*</span></label>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={form.quantity}
+                      onChange={(event) => handleChange("quantity", event.target.value)}
+                      placeholder="Nhập số lượng lỗi..."
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
+                    />
+                    {(selectedPart?.maxQuantity ?? normalizedAssignment?.maxQuantity) !== null && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                        Tối đa: {selectedPart?.maxQuantity ?? normalizedAssignment?.maxQuantity}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ sửa lỗi<span className="text-rose-500">*</span></label>
+                  <label className="text-xs font-semibold uppercase text-slate-500">Thợ làm lỗi<span className="text-rose-500">*</span></label>
                   <select
                     value={form.assignedTo}
                     onChange={(event) => handleChange("assignedTo", event.target.value)}
@@ -771,8 +816,8 @@ export default function ErrorReport() {
                   <input
                     type="datetime-local"
                     value={form.happenAt}
-                    readOnly
-                    className="mt-1 w-full rounded-xl border border-amber-200 bg-amber-50/50 px-3 py-2 text-sm text-amber-900 outline-none transition cursor-not-allowed"
+                    onChange={(event) => handleChange("happenAt", event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none transition focus:border-rose-500 focus:bg-white focus:ring-4 focus:ring-rose-500/10"
                   />
                 </div>
               </div>
@@ -836,12 +881,6 @@ export default function ErrorReport() {
                 )}
               </div>
 
-              {submitError && (
-                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {submitError}
-                </div>
-              )}
-
               {notice && (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                   {notice}
@@ -875,13 +914,23 @@ export default function ErrorReport() {
                 <ul className="space-y-2 text-sm text-slate-600">
                   <li>Ghi rõ vị trí lỗi và số lượng lỗi.</li>
                   <li>Đính kèm ảnh để tổ trưởng đánh giá nhanh.</li>
-                  <li>Thông tin thợ sửa lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
+                  <li>Thông tin thợ làm lỗi sẽ giúp tổ trưởng theo dõi tốt hơn.</li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleConfirmSubmit}
+        title="Xác nhận báo cáo lỗi"
+        description={`Vui lòng kiểm tra lại thông tin: Đơn #${form.productionId}, Công đoạn: ${selectedPart?.partName}, Số lượng: ${form.quantity}, Nhân viên: ${form.repairWorker}.`}
+        primaryLabel="Xác nhận gửi"
+        variant="danger"
+      />
     </LayoutComponent>
   );
 }

@@ -149,7 +149,7 @@ export default function PayrollList() {
                       ))}
                     </select>
                     <button
-                      onClick={() => loadData()}
+                      onClick={() => loadData(true)}
                       disabled={loading}
                       className="ml-2 flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-emerald-600 shadow-sm disabled:opacity-50"
                       title="Cập nhật dữ liệu mới nhất"
@@ -190,7 +190,7 @@ export default function PayrollList() {
                   <thead className="bg-slate-50/50">
                     <tr>
                       <th className="px-6 py-4 text-left font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thợ</th>
-                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số công đoạn</th>
+                      <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số đơn đã làm</th>
                       <th className="px-6 py-4 text-center font-bold uppercase tracking-wider text-slate-500 text-[10px]">Số báo cáo</th>
                       <th className="px-6 py-4 text-right font-bold uppercase tracking-wider text-slate-500 text-[10px]">Thu nhập</th>
                       <th className="px-6 py-4"></th>
@@ -220,7 +220,7 @@ export default function PayrollList() {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <span className="inline-flex items-center rounded-xl bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 border border-emerald-100">
-                              {worker.uniquePartCount || 0} công đoạn
+                              {worker.productionCount || 0} đơn
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center text-slate-500 font-medium">

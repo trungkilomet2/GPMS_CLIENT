@@ -84,6 +84,8 @@ export function OrderFormSections({
                     error={errors.orderName}
                     placeholder="Ví dụ: Áo thun Polo Nam V2"
                     required
+                    maxLength={100}
+                    showCounter
                   />
 
                   <div className="flex items-center gap-2 pt-2">
@@ -152,18 +154,28 @@ export function OrderFormSections({
                           <tr key={v.id || idx} className="hover:bg-slate-50/80 transition-colors">
                             <td className="py-4 px-5">
                               <div className="flex items-center gap-2">
-                                <input
-                                  type="text"
-                                  value={v.color || ''}
-                                  onChange={(e) => onVariantChange(idx, 'color', e.target.value)}
-                                  placeholder="Màu..."
-                                  className={`w-full bg-transparent border-b-2 px-1 py-1 text-sm font-bold outline-none transition focus:border-emerald-500 focus:text-slate-900
-                                    ${errors.variants?.[idx]?.color ? 'border-red-300 text-red-600' : 'border-slate-200 text-slate-700'}`}
-                                />
+                                <div className="flex flex-col w-full">
+                                  <input
+                                    type="text"
+                                    value={v.color || ''}
+                                    maxLength={30}
+                                    onChange={(e) => onVariantChange(idx, 'color', e.target.value)}
+                                    placeholder="Màu..."
+                                    className={`w-full bg-transparent border-b-2 px-1 py-1 text-sm font-bold outline-none transition focus:border-emerald-500 focus:text-slate-900
+                                      ${errors.variants?.[idx]?.color ? 'border-red-300 text-red-600' : 'border-slate-200 text-slate-700'}`}
+                                  />
+                                  <div className="flex justify-between items-center mt-1">
+                                    <div className="min-h-[12px]">
+                                      {errors.variants?.[idx]?.color && (
+                                        <p className="text-[9px] text-red-500 font-bold">{errors.variants[idx].color}</p>
+                                      )}
+                                    </div>
+                                    <span className="text-[8px] font-bold text-slate-500 uppercase tabular-nums">
+                                      {(v.color?.length || 0)}/30
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              {errors.variants?.[idx]?.color && (
-                                <p className="text-[9px] text-red-500 font-bold mt-1 pl-6">{errors.variants[idx].color}</p>
-                              )}
                             </td>
                             {SIZE_COLUMNS.map(size => (
                               <td key={size} className="py-4 px-2">
@@ -172,8 +184,24 @@ export function OrderFormSections({
                                     type="text"
                                     value={v[size.toLowerCase()] || ''}
                                     onChange={(e) => {
-                                      const val = e.target.value.replace(/[^0-9]/g, '');
-                                      onVariantChange(idx, size.toLowerCase(), val === '' ? '' : Number(val));
+                                      const inputVal = e.target.value.replace(/[^0-9]/g, '');
+                                      if (inputVal === '') {
+                                        onVariantChange(idx, size.toLowerCase(), '');
+                                        return;
+                                      }
+                                      
+                                      const newVal = Number(inputVal);
+                                      const currentTotal = variants.reduce((acc, varItem) => {
+                                        const varSum = ['xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].reduce((s, sKey) => s + (Number(varItem[sKey]) || 0), 0);
+                                        return acc + varSum;
+                                      }, 0);
+                                      
+                                      const currentFieldVal = Number(v[size.toLowerCase()]) || 0;
+                                      const totalWithoutCurrent = currentTotal - currentFieldVal;
+                                      const remaining = 9999 - totalWithoutCurrent;
+                                      
+                                      const finalVal = Math.min(newVal, Math.max(0, remaining));
+                                      onVariantChange(idx, size.toLowerCase(), finalVal);
                                     }}
                                     className={`w-14 h-10 rounded-xl border-2 text-center text-sm font-black transition-all outline-none
                                       ${v[size.toLowerCase()] > 0
@@ -235,6 +263,8 @@ export function OrderFormSections({
                 placeholder="0"
                 suffix="VND"
                 required
+                maxLength={8}
+                showCounter
               />
 
               <div className="flex flex-col gap-1.5">
@@ -299,10 +329,14 @@ export function OrderFormSections({
                         {/* CONTENT AREA */}
                         <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Tên mẫu thiết kế</label>
+                            <div className="flex justify-between items-center ml-1">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Tên mẫu thiết kế</label>
+                              <span className="text-[8px] font-bold text-slate-500 tabular-nums">{(item.templateName?.length || 0)}/100</span>
+                            </div>
                             <input
                               type="text"
                               value={item.templateName ?? ''}
+                              maxLength={100}
                               onChange={(e) => onTemplateMetaChange(idx, 'templateName', e.target.value)}
                               placeholder="Ví dụ: Rập thân trước..."
                               className={`w-full border rounded-xl px-3 py-2 text-xs font-bold outline-none transition
@@ -310,10 +344,14 @@ export function OrderFormSections({
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-1">Ghi chú kỹ thuật</label>
+                            <div className="flex justify-between items-center ml-1">
+                              <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ghi chú kỹ thuật</label>
+                              <span className="text-[8px] font-bold text-slate-500 tabular-nums">{(item.note?.length || 0)}/100</span>
+                            </div>
                             <input
                               type="text"
                               value={item.note ?? ''}
+                              maxLength={100}
                               onChange={(e) => onTemplateMetaChange(idx, 'note', e.target.value)}
                               placeholder="Khổ A4, in 2 mặt..."
                               className="w-full border border-slate-100 bg-slate-50/30 rounded-xl px-3 py-2 text-xs font-medium outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-500/5"
@@ -432,12 +470,21 @@ export function OrderInput({
   suffix,
   readOnly = false,
   required,
+  maxLength,
+  showCounter
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block ml-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      <div className="flex justify-between items-end ml-1">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {showCounter && maxLength && (
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tight tabular-nums">
+            {(value?.length || 0)}/{maxLength}
+          </span>
+        )}
+      </div>
       <div className="relative">
         <input
           type={type}
@@ -446,6 +493,7 @@ export function OrderInput({
           onChange={onChange}
           placeholder={placeholder}
           readOnly={readOnly}
+          maxLength={maxLength}
           className={`block w-full border rounded-xl px-4 py-3 text-sm font-semibold transition-all outline-none
             ${readOnly
               ? 'bg-slate-50 text-slate-500 border-slate-100'
