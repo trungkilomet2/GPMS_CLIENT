@@ -4,7 +4,6 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import logoMGC from "@/assets/logo_brand.png";
 import {
   BriefcaseBusiness,
-  CalendarDays,
   ChartPie,
   ClipboardCheck,
   ClipboardList,
@@ -36,7 +35,6 @@ const OPERATION_NAV_ITEMS = [
   { to: "/employees", label: "Danh sách nhân viên", icon: Users, disabled: false, compactLabel: true, allowedRoles: ["Owner", "PM"] },
   { to: "/customers", label: "Khách hàng", icon: ContactRound, disabled: false, allowedRoles: ["Owner"] },
   { to: "/payroll", label: "Bảng lương thợ", icon: Wallet, disabled: false, allowedRoles: ["Owner"] },
-  { to: "/leave-requests", label: "Đơn nghỉ của tôi", icon: CalendarDays, disabled: false, allowedRoles: ["PM"] },
   { to: "/leave", label: "Quản lý nghỉ phép", icon: ClipboardList, disabled: false, allowedRoles: ["Owner", "PM"] },
 ];
 

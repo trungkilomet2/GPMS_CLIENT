@@ -132,6 +132,7 @@ export default function LeaveRequests() {
   const [refreshKey, setRefreshKey] = useState(0);
   const isWorkerRoute = location.pathname.startsWith("/worker/leave-requests");
   const primaryRole = getPrimaryWorkspaceRole(user?.role);
+  const canCreateLeaveRequest = primaryRole !== "pm";
   const detailBasePath = isWorkerRoute ? "/worker/leave-requests" : "/leave-requests";
   const LayoutComponent = primaryRole === "worker" || primaryRole === "kcs" ? WorkerLayout : PmOwnerLayout;
 
@@ -204,6 +205,11 @@ export default function LeaveRequests() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!canCreateLeaveRequest) {
+      setError("PM không được phép tạo đơn nghỉ. Bạn chỉ có thể xem lịch sử đơn.");
+      return;
+    }
+
     const normalizedContent = content.trim();
 
     if (!normalizedContent) {
@@ -256,7 +262,11 @@ export default function LeaveRequests() {
         <div className="leave-shell mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-slate-900">Đơn xin nghỉ phép</h1>
-            <p className="text-sm text-slate-500">Tạo đơn mới và theo dõi lịch sử xử lý các đơn nghỉ của chính bạn.</p>
+            <p className="text-sm text-slate-500">
+              {canCreateLeaveRequest
+                ? "Tạo đơn mới và theo dõi lịch sử xử lý các đơn nghỉ của chính bạn."
+                : "Bạn chỉ có thể theo dõi lịch sử đơn nghỉ, không có quyền tạo đơn mới."}
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -266,8 +276,9 @@ export default function LeaveRequests() {
             <SummaryCard label="Từ chối" value={stats.rejected} icon={XCircle} borderTone="border-rose-200" />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[0.95fr_1.35fr]">
-            <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className={`grid gap-6 ${canCreateLeaveRequest ? "xl:grid-cols-[0.95fr_1.35fr]" : "xl:grid-cols-1"}`}>
+            {canCreateLeaveRequest ? (
+              <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Tạo đơn nghỉ mới</h2>
@@ -333,7 +344,8 @@ export default function LeaveRequests() {
                   {submitting ? "Đang gửi..." : "Gửi đơn nghỉ"}
                 </button>
               </div>
-            </form>
+              </form>
+            ) : null}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid items-end gap-3 lg:grid-cols-[1.2fr_180px_170px_170px]">
